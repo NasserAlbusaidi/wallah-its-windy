@@ -410,6 +410,9 @@ monthSelect.addEventListener('change', () => {
 // --- The loop ---------------------------------------------------------------
 let lastMs = performance.now();
 let prevFrameStorm: StormState | null = null;
+let dbgFrames = 0;
+let dbgTicks = 0;
+let dbgLastDt = 0;
 // Public-contract field the render facade ignores (it owns its own textures);
 // still built every frame so FrameState conforms to types.ts.
 const envTextures: EnvTextures = new Map();
@@ -475,6 +478,8 @@ function render(alpha: number, nowMs: number): void {
 function frame(nowMs: number): void {
   const dtRealMs = Math.min(nowMs - lastMs, MAX_FRAME_MS);
   lastMs = nowMs;
+  dbgFrames++;
+  dbgLastDt = dtRealMs;
 
   if (!paused) {
     const live = engine ? engine.getState() : null;
@@ -487,6 +492,7 @@ function frame(nowMs: number): void {
       accumulatorMin -= SIM_DT_MIN;
       ticks++;
     }
+    dbgTicks += ticks;
     if (ticks >= MAX_TICKS_PER_FRAME) accumulatorMin = 0; // shed backlog, stay real-time
   }
 
@@ -553,5 +559,23 @@ function acquireRender(glCtx: WebGL2RenderingContext): { layers: RenderLayer[]; 
 }
 
 // --- Go ---------------------------------------------------------------------
+// Read-only live-state probe for the browser console (tuning/diagnosis aid).
+// Note: in a hidden/background tab Chrome suspends rAF entirely, so the sim
+// clock freezes and __cyc reads a static state — that is expected, not a hang;
+// the MAX_FRAME_MS clamp resumes cleanly on re-focus.
+Object.defineProperty(window, '__cyc', {
+  get: () => ({
+    paused,
+    accumulatorMin,
+    lastMs,
+    dbgFrames,
+    dbgTicks,
+    dbgLastDt,
+    hasEngine: engine !== null,
+    layerCount: layers.length,
+    hoursPerSec: ui.timescaleHoursPerSec(engine ? engine.getState() : null),
+    storm: engine ? engine.getState() : null,
+  }),
+});
 requestAnimationFrame(frame);
 void loadAll();

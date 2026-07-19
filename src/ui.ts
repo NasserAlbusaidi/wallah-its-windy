@@ -28,6 +28,25 @@ import type {
 import { DeathReason, AFTERMATH_FADE_MS } from './types';
 import { randomSeed, type HashState } from './rng';
 import { latLonToCell, latLonToClip } from './grid';
+import { TOKENS } from './tokens';
+
+// Overlay colours are DERIVED from the one token source (design task T5) — never
+// hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
+const GENESIS_RGB = channels(TOKENS.genesis.rgba01);
+const GENESIS_ALPHA = TOKENS.genesis.rgba01[3];
+const TRACK_RGB = channels(TOKENS.track.rgba01);
+
+function channels(rgba01: Float32Array): string {
+  return `${Math.round(rgba01[0] * 255)},${Math.round(rgba01[1] * 255)},${Math.round(rgba01[2] * 255)}`;
+}
+/** `rgba(...)` from the genesis token's channels at alpha `a`. */
+function genesisRgba(a: number): string {
+  return `rgba(${GENESIS_RGB},${a})`;
+}
+/** `rgba(...)` from the track token's channels at alpha `a`. */
+function trackRgba(a: number): string {
+  return `rgba(${TRACK_RGB},${a})`;
+}
 
 // ---------------------------------------------------------------------------
 // Tunables (by eye; the design doc owns the intent, these are the knobs)
@@ -94,6 +113,8 @@ export class UiController {
   /** Historic genesis points (IBTrACS); drawn as a faint glow on the overlay. */
   private genesis: LatLon[] = [];
   private ackTimer: number | null = null;
+  /** A baked file failed to parse (stale/corrupt): pin an error caption over hints. */
+  private dataError = false;
 
   constructor(host: UiHost) {
     this.host = host;
@@ -108,6 +129,17 @@ export class UiController {
     const clamped = Math.max(0, Math.min(1, frac));
     this.host.progressEl.style.setProperty('--progress', String(clamped));
     if (this.state.kind === 'loading') this.state = { kind: 'loading', progress: clamped };
+  }
+
+  /**
+   * A baked .bin downloaded but failed to parse (a stale cached file after a
+   * format change — loader.ts throws a version/magic error rather than render
+   * garbage, decision D4). Surface ONE clear caption instead of only a console
+   * warning, and pin it so the loading hints don't paper over it.
+   */
+  notifyDataError(): void {
+    this.dataError = true;
+    this.setCaption('map data is stale — hard-refresh to re-download.', false);
   }
 
   /**
@@ -130,13 +162,13 @@ export class UiController {
       };
       this.lastSpawn = params;
       this.state = { kind: 'user-storm' };
-      this.setCaption(SHARED_HINT, true);
+      if (!this.dataError) this.setCaption(SHARED_HINT, true);
       return params;
     }
     const params = this.demoSpawnParams();
     this.lastSpawn = params;
     this.state = { kind: 'idle-demo' };
-    this.setCaption(FIRST_HINT, true);
+    if (!this.dataError) this.setCaption(FIRST_HINT, true);
     return params;
   }
 
@@ -158,6 +190,15 @@ export class UiController {
    * as an acknowledgement instead of silently doing nothing.
    */
   handlePointer(lat: number, lon: number, hasEngine: boolean, nowMs: number): SpawnParams | null {
+    // Still loading: the analytic fallback env + coarse SEA_RING mask are live and
+    // will be replaced by the real baked data any moment. A spawn now would (a)
+    // run physics no shared URL can reproduce and (b) publish a share hash that
+    // loadAll reads straight back and force-restarts as a "shared" storm from age
+    // 0 — the storm visibly resets. Acknowledge with a ripple, spawn nothing.
+    if (this.state.kind === 'loading') {
+      this.addRipple(lat, lon, nowMs);
+      return null;
+    }
     if (this.isLand(lat, lon)) {
       this.addRipple(lat, lon, nowMs);
       this.transientCaption(LAND_ACK);
@@ -285,8 +326,8 @@ export class UiController {
         const px = this.pxX(g.lon, w);
         const py = this.pxY(g.lat, h);
         const grad = ctx.createRadialGradient(px, py, 0, px, py, glowR);
-        grad.addColorStop(0, 'rgba(255,190,80,0.12)');
-        grad.addColorStop(1, 'rgba(255,190,80,0)');
+        grad.addColorStop(0, genesisRgba(GENESIS_ALPHA));
+        grad.addColorStop(1, genesisRgba(0));
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(px, py, glowR, 0, Math.PI * 2);
@@ -306,7 +347,7 @@ export class UiController {
       const alpha = (1 - t) * 0.5;
       ctx.beginPath();
       ctx.arc(px, py, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(120,220,255,${alpha.toFixed(3)})`;
+      ctx.strokeStyle = trackRgba(Number(alpha.toFixed(3)));
       ctx.lineWidth = Math.max(1, w * 0.0015);
       ctx.stroke();
     }

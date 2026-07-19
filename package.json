@@ -1,0 +1,20 @@
+{
+  "name": "cyclone-sim",
+  "version": "0.1.0",
+  "description": "Wallah It's Windy — Arabian Sea cyclone sandbox. Spawn a storm, let it take course.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}

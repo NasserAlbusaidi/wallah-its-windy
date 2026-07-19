@@ -1,0 +1,162 @@
+/*
+ * style.css — the instrument chrome.
+ *
+ * Colours come from CSS custom properties injected at boot by tokens.ts
+ * (injectCssVars) — the single palette source. A couple of critical
+ * properties carry a literal fallback so the first paint is never white
+ * before the JS runs; everything else waits for the vars. Tune colours in
+ * tokens.ts, spacing via --space (8px) and radius via --radius (4px).
+ */
+
+/* Fonts are in src/fonts so Vite fingerprints them and the relative url()
+   survives the './' base on a GitHub Pages subpath. */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ocean-deep, #050a12);
+  color: var(--text, #7fd4e8);
+  font-family: var(--mono);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+/* The two stacked canvases fill the viewport. WebGL2 draws the map; the 2D
+   overlay draws crisp vector chrome (track dots, halos) above it. */
+#gl-canvas,
+#overlay-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+#overlay-canvas {
+  pointer-events: none; /* clicks fall through to the app for spawning */
+}
+
+/* Thin cyan progress line at the very top during loading. Width driven by
+   --progress (0..1) set from JS; hidden once loading completes. */
+#progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: calc(var(--progress, 0) * 100%);
+  background: var(--wadi-flood, #4dd8ff);
+  box-shadow: 0 0 6px var(--wadi-flood, #4dd8ff);
+  transition: width 120ms linear, opacity 400ms ease;
+  pointer-events: none;
+  z-index: 10;
+}
+#progress[data-done='true'] {
+  opacity: 0;
+}
+
+/* All chrome is type — no icons (design doc). */
+.chrome {
+  position: absolute;
+  z-index: 5;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  user-select: none;
+}
+
+#title {
+  top: var(--space, 8px);
+  left: calc(var(--space, 8px) * 2);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text, #7fd4e8);
+}
+#title .accent {
+  color: var(--accent, #ffb74d);
+}
+
+#month-picker {
+  top: var(--space, 8px);
+  right: calc(var(--space, 8px) * 2);
+  text-align: right;
+}
+#month-picker label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: calc(var(--space, 8px) / 2);
+}
+#month {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text, #7fd4e8);
+  background: var(--ocean-shallow, #0a1522);
+  border: 1px solid var(--ridge-hi, #2c343c);
+  border-radius: var(--radius, 4px);
+  padding: calc(var(--space, 8px) / 2) var(--space, 8px);
+  cursor: pointer;
+  appearance: none;
+  min-width: 8ch;
+}
+#month:focus-visible {
+  outline: 1px solid var(--accent, #ffb74d);
+  outline-offset: 2px;
+}
+
+/* Caption / epitaph slot, bottom-left. Reserves height so the epitaph does not
+   shift the layout when it appears. */
+#caption {
+  left: calc(var(--space, 8px) * 2);
+  bottom: calc(var(--space, 8px) * 2);
+  max-width: min(60ch, 70vw);
+  min-height: 3em;
+  color: var(--text, #7fd4e8);
+  opacity: 0.92;
+  transition: opacity 400ms ease;
+}
+#caption.hint {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #progress {
+    transition: none;
+  }
+  #caption {
+    transition: none;
+  }
+}

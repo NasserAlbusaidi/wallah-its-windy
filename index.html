@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta
+      name="description"
+      content="Wallah It's Windy — spawn a tropical cyclone in the Arabian Sea and let the environment decide its fate."
+    />
+    <meta name="color-scheme" content="dark" />
+    <title>WALLAH IT'S WINDY</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- WebGL2 map (terrain, env glow, particles, rain) -->
+      <canvas id="gl-canvas"></canvas>
+      <!-- 2D vector overlay (track dots, halos, debug) above the map -->
+      <canvas id="overlay-canvas"></canvas>
+
+      <!-- thin cyan loading line -->
+      <div id="progress"></div>
+
+      <!-- chrome: all type, no icons -->
+      <h1 id="title" class="chrome">Wallah It's <span class="accent">Windy</span></h1>
+
+      <div id="month-picker" class="chrome">
+        <label for="month">Month</label>
+        <select id="month" aria-label="Spawn month">
+          <option value="0">January</option>
+          <option value="1">February</option>
+          <option value="2">March</option>
+          <option value="3">April</option>
+          <option value="4">May</option>
+          <option value="5" selected>June</option>
+          <option value="6">July</option>
+          <option value="7">August</option>
+          <option value="8">September</option>
+          <option value="9">October</option>
+          <option value="10">November</option>
+          <option value="11">December</option>
+        </select>
+      </div>
+
+      <!-- caption / epitaph slot -->
+      <p id="caption" class="chrome hint">click the sea to spawn your own</p>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

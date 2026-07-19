@@ -137,6 +137,24 @@ timesteps (one field, `nt` = hourly steps, `tFrac` interpolates). Known caveat:
 event fields contain the real storm's own vortex — smooth/large-scale-filter the
 steering before baking, or document the contamination (design Open Question).
 
+### Track-diversity spike (design D10 / eng task T7) — `bake/spike_tracks.py`
+
+The pre-freeze spike (`bake/.venv/bin/python bake/spike_tracks.py`) integrates ~20
+pure-steering tracks from varied spawns and reports whether nearby spawns collapse
+onto rails (too-smooth monthly means). It is the reference implementation the TS
+steering integrator is checked against.
+
+**Status / honest gap:** it currently runs against `synth.steering_shear`
+(SYNTHETIC_V0), because ERA5 is blocked here — so it measures the *synthetic*
+field's diversity, not ERA5's. Against the shipped synthetic steering it reports a
+keep-ratio of ~21–26 % (below its 30 % rail threshold), i.e. the monthly-mean
+synthetic steering is moderately rail-prone — precisely the D10 signal. **RE-RUN it
+against the real ERA5 fields the moment they land, BEFORE the tuning pass.**
+Mitigation already in place: switching a field to 3–5 synoptic samples/month uses
+the `nt` timestep axis, so acting on a FAIL is a re-bake, not a format change. The
+spike is a standalone diagnostic; it is deliberately NOT wired into `bake.py`'s
+gate (no WebGL, no bake format — design D10).
+
 ## TODO: real HydroSHEDS flow accumulation (currently D8-from-DEM)
 
 `flowacc.bin` is computed by priority-flood D8 on the real GMRT DEM

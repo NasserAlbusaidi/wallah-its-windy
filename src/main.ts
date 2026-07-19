@@ -1,29 +1,62 @@
 /**
- * main.ts — the app shell + fixed-dt accumulator loop (eng task T2 seam).
+ * main.ts — the app shell + fixed-dt accumulator loop (eng task T2) + wiring.
  *
- * This is a SKELETON: it boots the chrome, opens a WebGL2 context, clears to a
- * dark instrument background, loads baked data progressively, and runs the
- * deterministic simulation clock. The sim / render / ui modules plug into the
- * clearly marked TODO seams — nothing here fakes their behaviour.
+ * This is the composition root: it boots the chrome, opens a WebGL2 context and a
+ * 2D overlay context, loads baked data progressively, constructs the sim engine
+ * and the render pipeline, and runs the deterministic simulation clock —
+ * delegating everything the human reads or clicks to the UiController in ./ui.
  *
- * Time model (design doc): 1 real second = 3 simulated hours. Physics advances
- * on a FIXED dt of 15 simulated minutes via an accumulator; the renderer
- * interpolates between steps with `alpha` so motion stays smooth at any FPS.
- * The fixed step is what makes the sim a pure function of (spawn, month, seed).
+ * Time model (design doc): 1 real second = 3 simulated hours by default, dropping
+ * to 1 real second = 1 sim hour for landfall-climax slow-mo (a pure timescale
+ * knob — see ui.timescaleHoursPerSec). Physics always advances on a FIXED dt of
+ * 15 simulated minutes via an accumulator; the renderer interpolates between
+ * steps with `alpha`. The fixed step is what makes the sim a pure function of
+ * (spawn, month, seed); slow-mo changes only wall-clock pacing, never the track.
+ *
+ * Parallel-build note: ./sim and ./render are authored by sibling builders. main
+ * constructs them behind try/catch so a half-done module that throws at
+ * construction or draw degrades to a still-usable instrument (chrome + loading +
+ * captions + ripples) instead of a blank crash. The render facade owns its own
+ * GPU textures + the 2D overlay (it clears the overlay and draws the track);
+ * main draws the land-click ripples on top afterwards.
  */
 
 import './style.css';
 import { injectCssVars, TOKENS } from './tokens';
-import { readHash } from './rng';
+import { readHash, writeHash } from './rng';
 import { DOMAIN, clipToLatLon, inBBox } from './grid';
-import type { FrameState, UiState, EnvTextures } from './types';
-import { AFTERMATH_FADE_MS } from './types';
+import { parseBin } from './loader';
+import type {
+  BinLayer,
+  EnvTextures,
+  FrameState,
+  LatLon,
+  ParsedBin,
+  RenderLayer,
+  SimEngine,
+  SpawnParams,
+  StormState,
+} from './types';
+import { UiController } from './ui';
+import { createSimEngine } from './sim';
+import { makeEnvSampler } from './env-sampler';
+// Render facade. The PUBLIC contract (types.ts, LAW) is createRenderLayers(gl):
+// RenderLayer[] — composited passes in luminance order (terrain -> env glow ->
+// rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
+// The render module's factory NAME was still oscillating during this parallel
+// build (createRenderLayers vs a richer createRenderer), so main resolves it by a
+// namespace probe (acquireRenderLayers) that accepts either name and normalizes
+// either return shape — building regardless of which the module currently exports
+// and wiring correctly once it settles on the types.ts contract. Data intake
+// (terrain/env GPU textures, month) is an unsettled render-side seam (see report);
+// storm particles + track render from FrameState.storm regardless.
+import * as renderModule from './render';
 
 // --- Time constants ---------------------------------------------------------
 const SIM_DT_MIN = 15; // fixed physics step, simulated minutes
-const SIM_HOURS_PER_REAL_SEC = 3; // 1 real s = 3 sim h
-const SIM_MINUTES_PER_REAL_MS = (SIM_HOURS_PER_REAL_SEC * 60) / 1000; // = 0.18
 const MAX_FRAME_MS = 250; // clamp long stalls (tab blur) so we never spiral
+const MAX_TICKS_PER_FRAME = 48; // hard cap on catch-up ticks per frame
+const DEMO_WARMUP_H = 18; // fast-forward the demo so it opens mid-life (design T1)
 
 // --- Boot -------------------------------------------------------------------
 injectCssVars();
@@ -51,6 +84,50 @@ const overlay = must(overlayCanvas.getContext('2d'), '2d overlay context');
 const clearColor = TOKENS.oceanDeep.rgba01;
 gl.clearColor(clearColor[0], clearColor[1], clearColor[2], 1);
 
+// --- UI controller (constructed first: sim depends on ui.isLand) ------------
+const ui = new UiController({
+  captionEl,
+  progressEl,
+  overlayCanvas,
+  overlayCtx: overlay,
+  monthSelect,
+  reducedMotion: prefersReducedMotion,
+});
+
+// --- Environment sampler (sim dependency) -----------------------------------
+// The sim requires an EnvSampler. It closes over a live holder: once env.bin
+// loads, `envBin` is set and the sampler reads the real baked fields (REAL OISST
+// SST + SYNTHETIC_V0 steering/shear — see bake/README.md); before it lands, or if
+// the fetch 404s, it falls back to a deterministic analytic Arabian-Sea
+// climatology so the demo and user storms still form, drift and die. Both
+// branches are pure in (lat,lon,month), so the sim stays a pure function of
+// (spawn,month,seed). See src/env-sampler.ts.
+let envBin: ParsedBin | null = null;
+const envSampler = makeEnvSampler(() => envBin);
+
+// --- Sim + render construction (defensive against half-done siblings) --------
+let engine: SimEngine | null = null;
+try {
+  engine = createSimEngine({ env: envSampler, isLand: (lat, lon) => ui.isLand(lat, lon) });
+} catch (err) {
+  console.warn('[boot] sim engine unavailable — running as a static map:', err);
+}
+
+let layers: RenderLayer[] = [];
+try {
+  layers = acquireRenderLayers(gl);
+  for (const layer of layers) {
+    try {
+      layer.init(gl);
+    } catch (err) {
+      console.warn('[boot] a render layer failed to init:', err);
+    }
+  }
+} catch (err) {
+  console.warn('[boot] render layers unavailable — map will not composite:', err);
+  layers = [];
+}
+
 // --- Canvas sizing ----------------------------------------------------------
 function resize(): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -63,26 +140,24 @@ function resize(): void {
     }
   }
   gl!.viewport(0, 0, w, h);
-  // TODO(render): forward resize(w, h) to every RenderLayer.
+  for (const layer of layers) {
+    try {
+      layer.resize(w, h);
+    } catch (err) {
+      console.warn('[resize] render layer resize failed:', err);
+    }
+  }
 }
 window.addEventListener('resize', resize);
 resize();
 
-// --- UI state ---------------------------------------------------------------
-let uiState: UiState = { kind: 'loading', progress: 0 };
-let selectedMonth = Number(monthSelect.value) || 5; // default June (index 5)
-
-/** Set the caption slot. Plain text only (no innerHTML) — `hint` dims it. */
-function setCaption(text: string, hint = false): void {
-  captionEl.textContent = text;
-  captionEl.classList.toggle('hint', hint);
-}
-
-// --- Progressive data loading ----------------------------------------------
+// --- Progressive data loading (design task T2 — map assembles as data arrives) --
 interface LoadItem {
   url: string;
   label: string;
-  /** approximate bytes, used to weight aggregate progress before headers arrive */
+  kind: 'bin' | 'json';
+  key: string;
+  /** approximate weight for aggregate progress before Content-Length is known */
   weight: number;
 }
 
@@ -90,27 +165,25 @@ function asset(path: string): string {
   return `${import.meta.env.BASE_URL}${path}`;
 }
 
-// TODO(data): add terrain.bin, env.bin, flowacc.bin here once bake.py emits them.
-// The mechanism below already handles per-file progress and aggregate weighting;
-// only this manifest grows. genesis.json ships now (see public/data/genesis.json).
-const MANIFEST: LoadItem[] = [{ url: asset('data/genesis.json'), label: 'genesis zones', weight: 1 }];
+// terrain/env/flowacc are listed now even though bake.py may not emit them yet:
+// loadWithProgress swallows a 404 and returns null, so a missing artifact cannot
+// brick the boot — the map simply assembles with whatever landed.
+const MANIFEST: LoadItem[] = [
+  { url: asset('data/terrain.bin'), label: 'terrain', kind: 'bin', key: 'terrain', weight: 3 },
+  { url: asset('data/env.bin'), label: 'environment', kind: 'bin', key: 'env', weight: 2 },
+  { url: asset('data/flowacc.bin'), label: 'wadi network', kind: 'bin', key: 'flowacc', weight: 2 },
+  { url: asset('data/genesis.json'), label: 'genesis zones', kind: 'json', key: 'genesis', weight: 1 },
+];
 
-const loadedBytes = new Map<string, number>();
+const loadedWeight = new Map<string, number>();
+let genesisPoints: LatLon[] = [];
 
 function reportProgress(): void {
   const total = MANIFEST.reduce((s, m) => s + m.weight, 0);
-  const done = MANIFEST.reduce((s, m) => s + Math.min(loadedBytes.get(m.url) ?? 0, m.weight), 0);
-  const frac = total > 0 ? done / total : 1;
-  progressEl.style.setProperty('--progress', String(frac));
-  if (uiState.kind === 'loading') uiState = { kind: 'loading', progress: frac };
+  const done = MANIFEST.reduce((s, m) => s + (loadedWeight.get(m.url) ?? 0), 0);
+  ui.reportProgress(total > 0 ? done / total : 1);
 }
 
-/**
- * Fetch one file, reporting fractional progress [0,1] for it via `onProgress`.
- * Falls back gracefully when Content-Length is absent (progress jumps to 1 on
- * completion). Returns null (and logs) on failure so one missing file cannot
- * brick the boot during the data-baking phase.
- */
 async function loadWithProgress(item: LoadItem, onProgress: (frac: number) => void): Promise<ArrayBuffer | null> {
   try {
     const res = await fetch(item.url);
@@ -149,93 +222,230 @@ async function loadWithProgress(item: LoadItem, onProgress: (frac: number) => vo
   }
 }
 
+/** Route one loaded buffer to its parsed home. Never throws — logs and skips. */
+function routeLoaded(item: LoadItem, buf: ArrayBuffer, bins: Map<string, ParsedBin>): void {
+  try {
+    if (item.kind === 'bin') {
+      bins.set(item.key, parseBin(buf));
+    } else {
+      const json = JSON.parse(new TextDecoder().decode(buf)) as unknown;
+      if (item.key === 'genesis') genesisPoints = parseGenesis(json);
+    }
+  } catch (err) {
+    console.warn(`[load] ${item.label} parsed badly, skipping:`, err);
+  }
+}
+
+/** Validate genesis.json into LatLon[] (BINARY-FORMATS.md schema). */
+function parseGenesis(json: unknown): LatLon[] {
+  if (!Array.isArray(json)) return [];
+  const out: LatLon[] = [];
+  for (const p of json as unknown[]) {
+    const rec = p as { lat?: unknown; lon?: unknown };
+    if (typeof rec.lat === 'number' && typeof rec.lon === 'number') out.push({ lat: rec.lat, lon: rec.lon });
+  }
+  return out;
+}
+
+/**
+ * Merge terrain.bin + flowacc.bin layers into one ParsedBin for the renderer,
+ * which looks up elev/land/acc/basin all inside its single `terrain` resource.
+ * If bake splits flow-accumulation/basin into flowacc.bin, this bridges them;
+ * if it bakes them into terrain.bin, flowacc's names simply don't overwrite.
+ */
+function mergedTerrain(bins: Map<string, ParsedBin>): ParsedBin | null {
+  const terr = bins.get('terrain');
+  const flow = bins.get('flowacc');
+  if (!terr && !flow) return null;
+  const layers = new Map<string, BinLayer>();
+  if (terr) for (const [k, v] of terr.layers) layers.set(k, v);
+  if (flow) for (const [k, v] of flow.layers) if (!layers.has(k)) layers.set(k, v);
+  return { version: terr?.version ?? flow?.version ?? 1, layers };
+}
+
+/** Find a land-mask layer in the parsed terrain bin, whatever it is named. */
+function findLandMask(terrain: ParsedBin | null): BinLayer | null {
+  if (!terrain) return null;
+  return terrain.layers.get('landmask') ?? terrain.layers.get('land') ?? null;
+}
+
 async function loadAll(): Promise<void> {
+  const bins = new Map<string, ParsedBin>();
   await Promise.all(
     MANIFEST.map(async (item) => {
       const buf = await loadWithProgress(item, (frac) => {
-        loadedBytes.set(item.url, frac * item.weight);
+        loadedWeight.set(item.url, frac * item.weight);
         reportProgress();
       });
-      // TODO(data): route buf into parseBin (for .bin) or JSON.parse (genesis),
-      // then hand parsed layers to the EnvSampler / render texture upload.
-      void buf;
+      if (buf) routeLoaded(item, buf, bins);
     }),
   );
-  progressEl.setAttribute('data-done', 'true');
-  // TODO(sim): spawn the ambient demo storm (fixed seed, dimmed) — design D3.
-  // If the URL hash carries a shared storm, spawn THAT instead of the demo.
+
+  // Hand parsed data to its consumers. terrain's land mask sharpens land-click
+  // detection + land decay; env.bin (when baked) drives the real sampler live;
+  // genesis points drive the faint glow the UI draws on the overlay. Uploading
+  // terrain/env layers to render GPU textures is the unsettled render data seam
+  // (see build report) — not wired here; storm particles/track still render.
+  const terrain = mergedTerrain(bins);
+  ui.setLandMask(findLandMask(terrain));
+  ui.setGenesis(genesisPoints);
+  envBin = bins.get('env') ?? null;
+
+  // First storm: a shared storm from the URL hash replays exactly; otherwise the
+  // ambient demo (design T1). The demo is fast-forwarded so it opens mid-life.
   const shared = readHash();
-  uiState = { kind: 'idle-demo' };
-  setCaption(
-    shared ? 'shared storm loaded — click the sea to spawn your own' : 'click the sea to spawn your own',
-    true,
-  );
+  const first = ui.finishLoading(shared);
+  doSpawn(first);
+  if (first.isDemo) warmUp(DEMO_WARMUP_H);
 }
 
-// --- Input seams ------------------------------------------------------------
-// Click to spawn. Convert screen -> clip -> lat/lon through grid.ts (the only
-// place coordinate math is allowed). Land clicks get a dim ripple, no storm.
+// --- Spawn + interpolation snapshots ----------------------------------------
+interface Head {
+  lat: number;
+  lon: number;
+  vKt: number;
+}
+let prevHead: Head | null = null;
+let currHead: Head | null = null;
+let accumulatorMin = 0;
+
+function headOf(s: StormState): Head {
+  return { lat: s.lat, lon: s.lon, vKt: s.vKt };
+}
+
+/** Spawn (replacing any active storm), reset interpolation, and share via the hash. */
+function doSpawn(params: SpawnParams): void {
+  if (!engine) return;
+  try {
+    engine.spawn(params);
+  } catch (err) {
+    console.warn('[spawn] engine.spawn threw:', err);
+    return;
+  }
+  const s = engine.getState();
+  currHead = s ? headOf(s) : null;
+  prevHead = currHead;
+  accumulatorMin = 0;
+  if (!params.isDemo) {
+    writeHash({ lat: params.lat, lon: params.lon, monthIndex: params.monthIndex, seed: params.seed });
+  }
+}
+
+/** Fast-forward the active storm so the demo opens mid-life. Stops on death. */
+function warmUp(hours: number): void {
+  if (!engine) return;
+  const steps = Math.floor((hours * 60) / SIM_DT_MIN);
+  for (let i = 0; i < steps; i++) {
+    let dead = false;
+    try {
+      const events = engine.tick(SIM_DT_MIN);
+      dead = events.some((e) => e.type === 'died');
+    } catch (err) {
+      console.warn('[warmup] tick threw:', err);
+      return;
+    }
+    if (dead) break;
+  }
+  const s = engine.getState();
+  currHead = s ? headOf(s) : null;
+  prevHead = currHead;
+}
+
+// --- Input ------------------------------------------------------------------
+// Click to spawn. Screen -> clip -> lat/lon through grid.ts (the only coordinate
+// owner). Ocean -> despawn + fresh spawn; land -> ripple, no storm (design T2).
 glCanvas.addEventListener('pointerdown', (e) => {
   const rect = glCanvas.getBoundingClientRect();
   const clipX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   const clipY = -(((e.clientY - rect.top) / rect.height) * 2 - 1); // screen y is flipped
   const { lat, lon } = clipToLatLon(clipX, clipY);
   if (!inBBox(lat, lon, DOMAIN)) return;
-  // TODO(sim/ui): if over land -> ripple (design D-land-click); else engine.spawn
-  //   ({ lat, lon, monthIndex: selectedMonth, seed: randomSeed(), isDemo: false })
-  //   then writeHash(...) and uiState = { kind: 'user-storm' }.
-  console.debug(`[spawn seam] lat=${lat.toFixed(2)} lon=${lon.toFixed(2)} month=${selectedMonth}`);
+  const params = ui.handlePointer(lat, lon, engine !== null, performance.now());
+  if (params) doSpawn(params);
 });
 
-// Space toggles pause.
+// Space toggles pause — but never when a form control is focused, so the native
+// month picker stays keyboard-operable (a11y floor, design task T6).
 let paused = false;
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') {
-    e.preventDefault();
-    paused = !paused;
-  }
+  if (e.code !== 'Space') return;
+  const t = e.target as HTMLElement | null;
+  if (t instanceof HTMLSelectElement || t instanceof HTMLInputElement || t instanceof HTMLButtonElement) return;
+  e.preventDefault();
+  paused = !paused;
 });
 
-// Month picker.
+// Month picker → re-spawn the active storm at the same point + seed in the new
+// month (deterministic June-vs-October compare). The new month reaches the sim
+// via SpawnParams.monthIndex; render's month-dependent SST tint is part of the
+// unsettled render data seam.
 monthSelect.addEventListener('change', () => {
-  selectedMonth = Number(monthSelect.value);
-  // TODO(sim): re-spawn the active storm in the new month at the same point.
+  const params = ui.onMonthChange();
+  if (params) doSpawn(params);
 });
 
 // --- The loop ---------------------------------------------------------------
-let accumulatorMin = 0;
 let lastMs = performance.now();
-let prevFrame: FrameState | null = null;
+let prevFrameStorm: StormState | null = null;
+// Public-contract field the render facade ignores (it owns its own textures);
+// still built every frame so FrameState conforms to types.ts.
 const envTextures: EnvTextures = new Map();
 
-function render(alpha: number, nowMs: number): void {
-  // Skeleton render: clear both canvases to the instrument background. Real
-  // RenderLayers composite here in luminance order (terrain -> env -> track ->
-  // particles -> rain), reading the FrameState below.
-  gl!.clear(gl!.COLOR_BUFFER_BIT);
-  overlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+/** Advance one fixed physics step and route its events to the UI. */
+function tickSim(nowMs: number): void {
+  if (!engine) return;
+  prevHead = currHead;
+  let events;
+  try {
+    events = engine.tick(SIM_DT_MIN);
+  } catch (err) {
+    console.warn('[tick] engine.tick threw:', err);
+    return;
+  }
+  const s = engine.getState();
+  currHead = s ? headOf(s) : null;
+  for (const ev of events) ui.onSimEvent(ev, nowMs);
+}
 
+/** Build the interpolated storm view for this frame from the fixed-step heads. */
+function buildStorm(): { storm: StormState | null; prev: StormState | null } {
+  const live = engine ? engine.getState() : null;
+  if (!live) return { storm: null, prev: null };
+  const prev: StormState =
+    prevHead && currHead
+      ? { ...live, lat: prevHead.lat, lon: prevHead.lon, vKt: prevHead.vKt }
+      : live;
+  return { storm: live, prev };
+}
+
+function render(alpha: number, nowMs: number): void {
+  const { storm, prev } = buildStorm();
   const frame: FrameState = {
-    storm: null, // TODO(sim): engine.getState()
-    prevStorm: prevFrame?.storm ?? null,
+    storm,
+    prevStorm: prev ?? prevFrameStorm,
     alpha,
     envTextures,
     reducedMotion: prefersReducedMotion,
-    isDemo: uiState.kind === 'idle-demo',
+    isDemo: storm?.isDemo ?? false,
     nowMs,
   };
-  // TODO(render): for (const layer of layers) layer.draw(frame);
-  prevFrame = frame;
 
-  // Aftermath fade bookkeeping seam.
-  if (uiState.kind === 'aftermath' && nowMs - uiState.fadeStartMs > AFTERMATH_FADE_MS) {
-    uiState = { kind: 'idle-demo' };
+  // main owns the base clear of both canvases (guards against any render layer
+  // forgetting to clear the overlay it draws the track on). Layers composite in
+  // luminance order; then the UI draws genesis glow + ripples on top.
+  gl!.clear(gl!.COLOR_BUFFER_BIT);
+  overlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  for (const layer of layers) {
+    try {
+      layer.draw(frame);
+    } catch (err) {
+      console.warn('[render] layer draw threw (skipping this frame):', err);
+    }
   }
-}
+  prevFrameStorm = storm;
 
-function tickSim(): void {
-  // TODO(sim): const events = engine.tick(SIM_DT_MIN); route events to ui (epitaph
-  // on 'died', pacing on 'landfall'). Fixed dt keeps the sim deterministic.
+  ui.drawOverlay(nowMs); // genesis glow + ripples, on top of the track
+  ui.update(nowMs); // expire the aftermath fade back to the rarity copy
 }
 
 function frame(nowMs: number): void {
@@ -243,16 +453,53 @@ function frame(nowMs: number): void {
   lastMs = nowMs;
 
   if (!paused) {
-    accumulatorMin += dtRealMs * SIM_MINUTES_PER_REAL_MS;
-    while (accumulatorMin >= SIM_DT_MIN) {
-      tickSim();
+    const live = engine ? engine.getState() : null;
+    const hoursPerSec = ui.timescaleHoursPerSec(live);
+    const simMinutesPerMs = (hoursPerSec * 60) / 1000;
+    accumulatorMin += dtRealMs * simMinutesPerMs;
+    let ticks = 0;
+    while (accumulatorMin >= SIM_DT_MIN && ticks < MAX_TICKS_PER_FRAME) {
+      tickSim(nowMs);
       accumulatorMin -= SIM_DT_MIN;
+      ticks++;
     }
+    if (ticks >= MAX_TICKS_PER_FRAME) accumulatorMin = 0; // shed backlog, stay real-time
   }
 
   const alpha = accumulatorMin / SIM_DT_MIN; // 0..1 between fixed steps
   render(alpha, nowMs);
   requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------------------
+// Render-facade resolution (defensive against the module's oscillating export)
+// ---------------------------------------------------------------------------
+
+function isRenderLayer(v: unknown): v is RenderLayer {
+  return (
+    !!v &&
+    typeof (v as RenderLayer).init === 'function' &&
+    typeof (v as RenderLayer).draw === 'function' &&
+    typeof (v as RenderLayer).resize === 'function'
+  );
+}
+
+/**
+ * Resolve the render module's factory by probing for either the public-contract
+ * name (`createRenderLayers`) or the richer-facade name (`createRenderer`), then
+ * normalize its result to a RenderLayer[] whether it returns an array or a single
+ * composite RenderLayer. A namespace import keeps the build green regardless of
+ * which name the module currently exports.
+ */
+function acquireRenderLayers(glCtx: WebGL2RenderingContext): RenderLayer[] {
+  const mod = renderModule as Record<string, unknown>;
+  const factory = (mod.createRenderLayers ?? mod.createRenderer) as
+    | ((gl: WebGL2RenderingContext) => unknown)
+    | undefined;
+  if (typeof factory !== 'function') return [];
+  const built = factory(glCtx);
+  if (Array.isArray(built)) return built.filter(isRenderLayer);
+  return isRenderLayer(built) ? [built] : [];
 }
 
 // --- Go ---------------------------------------------------------------------

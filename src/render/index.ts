@@ -1,0 +1,522 @@
+/**
+ * render/index.ts — the render facade behind which the layer modules live.
+ *
+ * The composition root (main.ts, a sibling builder authored in parallel) has been
+ * seen wiring rendering two different ways during the build. This facade supports
+ * BOTH so it stays green whichever main ships:
+ *
+ *   A. Injection    — createRenderer() then
+ *        r.init(gl, overlay2d, { terrain, env, genesis });  // resources injected
+ *        r.setResources({...}); r.setMonth(m); r.resize(w,h); r.draw(frame);
+ *      main hands over the merged terrain+flowacc ParsedBin, env.bin, genesis, the
+ *      2D overlay context, and the month.
+ *
+ *   B. Bare layers  — createRenderLayers(gl): RenderLayer[] then
+ *        layer.init(gl); layer.resize; layer.draw(frame); layer.dispose();
+ *      main gives ONLY gl + FrameState (data routed to sim/ui). The facade then
+ *      SELF-SOURCES: it fetches terrain.bin/flowacc.bin/env.bin/genesis.json (the
+ *      same URLs main loads — the HTTP cache dedupes the bytes), parses them via
+ *      loader.ts (the only .bin reader), acquires the #overlay-canvas 2D context
+ *      (getContext('2d') returns the same instance), and reads/follows #month.
+ *
+ * Either way the facade owns every GPU texture (built from the ParsedBins — the
+ * only place that knows the right internal formats; FrameState.envTextures is
+ * intentionally unused), clears BOTH surfaces when it draws, and composites in
+ * luminance order: terrain (opaque) -> SST/genesis glow -> rain wadi glow ->
+ * particles -> track+halo on the overlay (ui ripples land on top afterwards).
+ * ui.ts confirms this division: "the facade owns the overlay... draws the track"
+ * and "the genesis-zone glow is the render facade's job."
+ */
+
+import { AFTERMATH_FADE_MS } from '../types';
+import type { BinLayer, FrameState, LatLon, ParsedBin, RenderLayer, TrackPoint } from '../types';
+import { TOKENS } from '../tokens';
+import { DOMAIN, latLonToClip } from '../grid';
+import { parseBin } from '../loader';
+import { probeCaps } from './gl-utils';
+import type { GlCaps } from './gl-utils';
+import {
+  buildElevationTex,
+  buildR8Tex,
+  pickLayer,
+  planeMax,
+  SST_MAX_C,
+  SST_MIN_C,
+} from './textures';
+import { sampleLayerBilinear } from './sample';
+import type { DrawCtx, EnvAtStorm, GpuTextures } from './context';
+import { TerrainLayer } from './terrain';
+import { EnvLayer } from './env';
+import { ParticleLayer } from './particles';
+import { RainLayer } from './rain';
+import { TrackLayer } from './track';
+
+/** Baked data handed to the renderer (mode A); any field may arrive progressively. */
+export interface RenderResources {
+  /** terrain.bin + flowacc.bin merged: elev + landmask + flowacc + basin layers. */
+  terrain: ParsedBin | null;
+  /** env.bin: per-month named layers sst_MM/u_MM/v_MM/shr_MM (MM = 04..10). */
+  env: ParsedBin | null;
+  /** genesis.json points (historic genesis zones). */
+  genesis: LatLon[];
+}
+
+const ELEV_NAMES = ['elev', 'elevation', 'dem', 'z'];
+const LAND_NAMES = ['landmask', 'land', 'mask', 'lsm'];
+const ACC_NAMES = ['flowacc', 'acc', 'accum', 'facc'];
+const BASIN_NAMES = ['basin', 'basinid', 'basin_id', 'catchment'];
+
+const LOAD_FADE_MS = 700; // data-arrival fade-in (design D2)
+const MAX_DT_SEC = 0.05;
+
+function clamp01(x: number): number {
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
+/**
+ * env.bin encodes the month in the layer NAME: bake writes `sst_MM/u_MM/v_MM/shr_MM`
+ * where MM is the 0-indexed monthIndex (bake SEASON_MONTHS = [4..10] = May..Nov),
+ * zero-padded — so the suffix is monthIndex itself, NOT monthIndex+1. Off-season
+ * months clamp to the nearest season month. Mirror of env-sampler.envMonthSuffix.
+ */
+function envMonthNames(monthIndex: number): { sst: string; u: string; v: string; shr: string } {
+  const mm = String(Math.min(10, Math.max(4, monthIndex))).padStart(2, '0');
+  return { sst: `sst_${mm}`, u: `u_${mm}`, v: `v_${mm}`, shr: `shr_${mm}` };
+}
+
+function emptyGpu(): GpuTextures {
+  return {
+    terrainGrid: null,
+    elev: null,
+    land: null,
+    acc: null,
+    accMaxLog: 1,
+    basin: null,
+    hasBasin: false,
+    envGrid: null,
+    sst: null,
+    genesisClip: null,
+  };
+}
+
+/** Merge two ParsedBins (later loses on name collisions). Used to bridge B-mode. */
+function mergeBins(a: ParsedBin | null, b: ParsedBin | null): ParsedBin | null {
+  if (!a && !b) return null;
+  const layers = new Map<string, BinLayer>();
+  if (a) for (const [k, v] of a.layers) layers.set(k, v);
+  if (b) for (const [k, v] of b.layers) if (!layers.has(k)) layers.set(k, v);
+  return { version: a?.version ?? b?.version ?? 1, layers };
+}
+
+export class RenderPipeline implements RenderLayer {
+  private gl: WebGL2RenderingContext | null = null;
+  private overlay: CanvasRenderingContext2D | null = null;
+  private caps: GlCaps = { colorBufferFloat: false, floatLinear: false };
+  private res: RenderResources = { terrain: null, env: null, genesis: [] };
+  private gpu: GpuTextures = emptyGpu();
+  private monthIndex = 5;
+  private injected = false;
+
+  // Self-source (mode B) holders.
+  private monthSelect: HTMLSelectElement | null = null;
+  private terrBin: ParsedBin | null = null;
+  private flowBin: ParsedBin | null = null;
+
+  private terrain = new TerrainLayer();
+  private env = new EnvLayer();
+  private particles = new ParticleLayer();
+  private rain = new RainLayer();
+  private track = new TrackLayer();
+
+  private width = 1;
+  private height = 1;
+  private lastNowMs = -1;
+  private contextLost = false;
+  private terrainReadyMs = -1;
+  private glowReadyMs = -1;
+
+  private deathMs: number | null = null;
+  private memCenter: { x: number; y: number } | null = null;
+  private memTrack: TrackPoint[] | null = null;
+  private memVkt = 0;
+  private memIntensity = 0;
+  private memDemo = false;
+
+  // --- public RenderLayer contract (init/resize/draw/dispose) ----------------
+
+  init(gl: WebGL2RenderingContext, overlay?: CanvasRenderingContext2D, resources?: RenderResources): void {
+    this.gl = gl;
+    this.overlay = overlay ?? this.acquireOverlay();
+    if (resources) {
+      this.res = resources;
+      this.injected = true;
+    }
+    const canvas = gl.canvas as HTMLCanvasElement;
+    canvas.addEventListener('webglcontextlost', this.onLost);
+    canvas.addEventListener('webglcontextrestored', this.onRestored);
+    this.initGl();
+    if (!this.injected) {
+      this.acquireMonthFromDom();
+      void this.selfLoad();
+    }
+  }
+
+  resize(width: number, height: number): void {
+    this.width = Math.max(1, width);
+    this.height = Math.max(1, height);
+    this.env.resize(this.width, this.height);
+    this.particles.resize(this.width, this.height);
+    this.rain.resize(this.width, this.height);
+    this.track.resize(this.width, this.height);
+  }
+
+  draw(frame: FrameState): void {
+    const gl = this.gl;
+    if (!gl || this.contextLost) return;
+    const ctx = this.buildCtx(frame);
+    const terrainFade = this.fadeSince(this.terrainReadyMs, ctx.nowMs);
+    const glowFade = this.fadeSince(this.glowReadyMs, ctx.nowMs);
+
+    // The facade owns both surfaces: clear the GL base and the overlay. (A second
+    // clear from main in mode B is harmless.)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.width, this.height);
+    const bg = TOKENS.oceanDeep.rgba01;
+    gl.clearColor(bg[0], bg[1], bg[2], 1);
+    gl.disable(gl.BLEND);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // Luminance order (back to front). Rain updates offscreen, then composites.
+    this.terrain.draw(ctx, this.gpu, terrainFade);
+    this.env.draw(ctx, this.gpu, glowFade);
+    this.rain.update(ctx, this.gpu);
+    this.rain.composite(ctx, this.gpu, terrainFade);
+    if (!ctx.reduced) this.particles.draw(ctx);
+
+    if (this.overlay) {
+      this.overlay.clearRect(0, 0, this.width, this.height);
+      this.track.draw(ctx); // ripples land on top when ui.drawOverlay runs after
+    }
+  }
+
+  dispose(): void {
+    const gl = this.gl;
+    if (gl) {
+      const canvas = gl.canvas as HTMLCanvasElement;
+      canvas.removeEventListener('webglcontextlost', this.onLost);
+      canvas.removeEventListener('webglcontextrestored', this.onRestored);
+    }
+    if (this.monthSelect) this.monthSelect.removeEventListener('change', this.onMonthChange);
+    this.disposeTextures();
+    this.terrain.dispose();
+    this.env.dispose();
+    this.particles.dispose();
+    this.rain.dispose();
+    this.track.dispose();
+    this.gl = null;
+    this.overlay = null;
+  }
+
+  // --- data injection (mode A) ----------------------------------------------
+
+  setResources(resources: RenderResources): void {
+    this.injected = true;
+    this.res = resources;
+    this.rebuildAllTextures();
+  }
+
+  setMonth(monthIndex: number): void {
+    this.monthIndex = monthIndex;
+    this.applyEnv(); // only the SST tint depends on month
+  }
+
+  // --- self-source (mode B) --------------------------------------------------
+
+  private acquireOverlay(): CanvasRenderingContext2D | null {
+    const cv = typeof document !== 'undefined' ? (document.getElementById('overlay-canvas') as HTMLCanvasElement | null) : null;
+    return cv ? cv.getContext('2d') : null;
+  }
+
+  private acquireMonthFromDom(): void {
+    if (typeof document === 'undefined') return;
+    const sel = document.getElementById('month') as HTMLSelectElement | null;
+    if (!sel) return;
+    this.monthSelect = sel;
+    this.monthIndex = Number(sel.value) || 5;
+    sel.addEventListener('change', this.onMonthChange);
+  }
+
+  private onMonthChange = (): void => {
+    if (this.monthSelect) this.monthIndex = Number(this.monthSelect.value) || 5;
+    this.applyEnv();
+  };
+
+  private assetUrl(path: string): string {
+    const base = import.meta.env.BASE_URL || '/';
+    return `${base}${path}`;
+  }
+
+  private async fetchBin(path: string): Promise<ParsedBin | null> {
+    try {
+      const res = await fetch(this.assetUrl(path));
+      if (!res.ok) return null;
+      return parseBin(await res.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+
+  private async selfLoad(): Promise<void> {
+    await Promise.all([
+      this.fetchBin('data/terrain.bin').then((b) => {
+        this.terrBin = b;
+        this.mergeAndApplyTerrain();
+      }),
+      this.fetchBin('data/flowacc.bin').then((b) => {
+        this.flowBin = b;
+        this.mergeAndApplyTerrain();
+      }),
+      this.fetchBin('data/env.bin').then((b) => {
+        if (b) {
+          this.res.env = b;
+          this.applyEnv();
+        }
+      }),
+      this.loadGenesis().then((pts) => {
+        this.res.genesis = pts;
+        this.applyGenesis();
+      }),
+    ]);
+  }
+
+  private mergeAndApplyTerrain(): void {
+    this.res.terrain = mergeBins(this.terrBin, this.flowBin);
+    this.applyTerrain();
+  }
+
+  private async loadGenesis(): Promise<LatLon[]> {
+    try {
+      const res = await fetch(this.assetUrl('data/genesis.json'));
+      if (!res.ok) return [];
+      const json = (await res.json()) as unknown;
+      if (!Array.isArray(json)) return [];
+      const out: LatLon[] = [];
+      for (const p of json) {
+        const r = p as { lat?: unknown; lon?: unknown };
+        if (typeof r.lat === 'number' && typeof r.lon === 'number') out.push({ lat: r.lat, lon: r.lon });
+      }
+      return out;
+    } catch {
+      return [];
+    }
+  }
+
+  // --- GL + texture lifecycle ------------------------------------------------
+
+  private initGl(): void {
+    const gl = this.gl;
+    if (!gl) return;
+    this.caps = probeCaps(gl);
+    this.terrain.init(gl);
+    this.env.init(gl);
+    this.particles.init(gl);
+    this.rain.init(gl, this.caps);
+    if (this.overlay) this.track.init(this.overlay);
+    this.env.resize(this.width, this.height);
+    this.particles.resize(this.width, this.height);
+    this.rain.resize(this.width, this.height);
+    this.track.resize(this.width, this.height);
+    this.rebuildAllTextures();
+  }
+
+  private onLost = (e: Event): void => {
+    e.preventDefault(); // required so 'restored' fires
+    this.contextLost = true;
+  };
+
+  private onRestored = (): void => {
+    this.contextLost = false;
+    this.gpu = emptyGpu();
+    this.initGl(); // resources still held — rebuild GPU state, no re-fetch
+  };
+
+  private rebuildAllTextures(): void {
+    this.disposeTextures();
+    this.gpu = emptyGpu();
+    this.applyTerrain();
+    this.applyEnv();
+    this.applyGenesis();
+  }
+
+  /** elev + landmask + flowacc + basin all live in the merged `terrain` bin. */
+  private applyTerrain(): void {
+    const gl = this.gl;
+    const bin = this.res.terrain;
+    if (!gl || !bin) return;
+    const elevL = pickLayer(bin, ELEV_NAMES);
+    const landL = pickLayer(bin, LAND_NAMES);
+    const accL = pickLayer(bin, ACC_NAMES);
+    const basinL = pickLayer(bin, BASIN_NAMES);
+    for (const t of [this.gpu.elev, this.gpu.land, this.gpu.acc, this.gpu.basin]) if (t) gl.deleteTexture(t);
+    this.gpu.elev = this.gpu.land = this.gpu.acc = this.gpu.basin = null;
+    this.gpu.hasBasin = false;
+
+    const grid = elevL ?? landL ?? accL ?? basinL;
+    if (grid) this.gpu.terrainGrid = { nx: grid.nx, ny: grid.ny, bbox: grid.bbox };
+    if (elevL) this.gpu.elev = buildElevationTex(gl, elevL);
+    if (landL) this.gpu.land = buildR8Tex(gl, landL, 0, (v) => (v > 0.5 ? 1 : 0), gl.LINEAR);
+    if (accL) {
+      const mx = Math.log(1 + planeMax(accL)) || 1;
+      this.gpu.accMaxLog = mx;
+      this.gpu.acc = buildR8Tex(gl, accL, 0, (v) => Math.log(1 + Math.max(0, v)) / mx, gl.LINEAR);
+    }
+    if (basinL) {
+      this.gpu.basin = buildR8Tex(gl, basinL, 0, (v) => (Math.round(v) % 256) / 255, gl.NEAREST);
+      this.gpu.hasBasin = true;
+    }
+    if ((this.gpu.elev || this.gpu.land) && this.terrainReadyMs < 0) this.terrainReadyMs = performance.now();
+  }
+
+  private applyEnv(): void {
+    const gl = this.gl;
+    const bin = this.res.env;
+    if (!gl || !bin) return;
+    const n = envMonthNames(this.monthIndex);
+    const sstL = pickLayer(bin, [n.sst, 'sst']);
+    if (this.gpu.sst) gl.deleteTexture(this.gpu.sst);
+    this.gpu.sst = null;
+    if (sstL) {
+      this.gpu.envGrid = { nx: sstL.nx, ny: sstL.ny, bbox: sstL.bbox };
+      this.gpu.sst = buildR8Tex(gl, sstL, 0, (v) => (v - SST_MIN_C) / (SST_MAX_C - SST_MIN_C), gl.LINEAR);
+      if (this.glowReadyMs < 0) this.glowReadyMs = performance.now();
+    }
+  }
+
+  private applyGenesis(): void {
+    const pts = this.res.genesis;
+    if (!pts || pts.length === 0) {
+      this.gpu.genesisClip = null;
+      return;
+    }
+    const out = new Float32Array(pts.length * 2);
+    for (let i = 0; i < pts.length; i++) {
+      const c = latLonToClip(pts[i].lat, pts[i].lon, DOMAIN);
+      out[i * 2] = c.x;
+      out[i * 2 + 1] = c.y;
+    }
+    this.gpu.genesisClip = out;
+    if (this.glowReadyMs < 0) this.glowReadyMs = performance.now();
+  }
+
+  private disposeTextures(): void {
+    const gl = this.gl;
+    if (!gl) return;
+    const g = this.gpu;
+    for (const t of [g.elev, g.land, g.acc, g.basin, g.sst]) if (t) gl.deleteTexture(t);
+  }
+
+  // --- per-frame context -----------------------------------------------------
+
+  private sampleEnv(lat: number, lon: number): EnvAtStorm | null {
+    const bin = this.res.env;
+    if (!bin) return null;
+    const n = envMonthNames(this.monthIndex);
+    const sstL = pickLayer(bin, [n.sst, 'sst']);
+    const shearL = pickLayer(bin, [n.shr, 'shear']);
+    const uL = pickLayer(bin, [n.u, 'u']);
+    const vL = pickLayer(bin, [n.v, 'v']);
+    return {
+      sstC: sstL ? sampleLayerBilinear(sstL, 0, lat, lon) : 0,
+      shear: shearL ? sampleLayerBilinear(shearL, 0, lat, lon) : 0,
+      steerU: uL ? sampleLayerBilinear(uL, 0, lat, lon) : 0,
+      steerV: vL ? sampleLayerBilinear(vL, 0, lat, lon) : 0,
+    };
+  }
+
+  private buildCtx(frame: FrameState): DrawCtx {
+    const nowMs = frame.nowMs;
+    const dtSec = this.lastNowMs < 0 ? 0 : Math.min((nowMs - this.lastNowMs) / 1000, MAX_DT_SEC);
+    this.lastNowMs = nowMs;
+
+    let center: { x: number; y: number } | null = null;
+    let track: TrackPoint[] | null = null;
+    let vKt = 0;
+    let intensity = 0;
+    let aftermath = 0;
+    let demo = frame.isDemo;
+    let env: EnvAtStorm | null = null;
+
+    const s = frame.storm;
+    if (s) {
+      const pv = frame.prevStorm;
+      const a = frame.alpha;
+      const lat = pv ? pv.lat + (s.lat - pv.lat) * a : s.lat;
+      const lon = pv ? pv.lon + (s.lon - pv.lon) * a : s.lon;
+      vKt = pv ? pv.vKt + (s.vKt - pv.vKt) * a : s.vKt;
+      center = latLonToClip(lat, lon, DOMAIN);
+      track = s.trackPoints;
+      intensity = clamp01((vKt - 20) / 100);
+      demo = s.isDemo;
+      env = this.sampleEnv(lat, lon);
+      if (s.alive) {
+        aftermath = 1;
+        this.deathMs = null;
+      } else {
+        if (this.deathMs == null) this.deathMs = nowMs;
+        aftermath = 1 - clamp01((nowMs - this.deathMs) / AFTERMATH_FADE_MS);
+      }
+      this.memCenter = center;
+      this.memTrack = track;
+      this.memVkt = vKt;
+      this.memIntensity = intensity;
+      this.memDemo = demo;
+    } else if (this.memCenter) {
+      if (this.deathMs == null) this.deathMs = nowMs;
+      aftermath = 1 - clamp01((nowMs - this.deathMs) / AFTERMATH_FADE_MS);
+      if (aftermath <= 0) {
+        this.deathMs = null;
+        this.memCenter = null;
+        this.memTrack = null;
+      } else {
+        center = this.memCenter;
+        track = this.memTrack;
+        vKt = this.memVkt;
+        intensity = this.memIntensity;
+        demo = this.memDemo;
+      }
+    }
+
+    return {
+      gl: this.gl!,
+      frame,
+      width: this.width,
+      height: this.height,
+      aspect: this.width / this.height,
+      nowMs,
+      dtSec,
+      centerClip: center,
+      vKt,
+      intensity01: intensity,
+      demo,
+      reduced: frame.reducedMotion,
+      aftermath,
+      track,
+      env,
+    };
+  }
+
+  private fadeSince(readyMs: number, nowMs: number): number {
+    if (readyMs < 0) return 0;
+    return clamp01((nowMs - readyMs) / LOAD_FADE_MS);
+  }
+}
+
+/** Mode A entry: main injects gl + overlay + resources afterwards. */
+export function createRenderer(): RenderPipeline {
+  return new RenderPipeline();
+}
+
+/** Mode B entry: a single-element RenderLayer[]; the facade self-sources data. */
+export function createRenderLayers(_gl: WebGL2RenderingContext): RenderLayer[] {
+  return [new RenderPipeline()];
+}

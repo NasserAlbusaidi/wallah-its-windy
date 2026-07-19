@@ -18,7 +18,7 @@
  * v1.0 nt=1 climatology; live for v1.1 per-storm event files).
  */
 
-import { DOMAIN } from './grid';
+import { DOMAIN, latLonToCell } from './grid';
 import type { BinLayer, EnvSample, EnvSampler, ParsedBin } from './types';
 
 /** Season layer suffix for a monthIndex, clamped to bake's [4..10] and padded. */
@@ -40,16 +40,15 @@ function pickLayer(bin: ParsedBin, names: readonly string[]): BinLayer | null {
 }
 
 /**
- * Nearest-cell read of a layer with linear timestep interpolation. Row order is
- * north->south, matching BINARY-FORMATS.md and grid.ts (do not reimplement the
- * cell math elsewhere — this mirrors grid.latLonToCell for a single flat read).
+ * Nearest-cell read of a layer with linear timestep interpolation. The latlon->
+ * cell conversion is grid.latLonToCell (eng D1: ONE owner of coordinate math);
+ * row order is north->south per BINARY-FORMATS.md and grid.ts.
  */
 function nearestCell(layer: BinLayer, lat: number, lon: number, tFrac: number): number {
   const { nx, ny, nt, bbox, data } = layer;
-  const fx = ((lon - bbox.lonMin) / (bbox.lonMax - bbox.lonMin)) * nx - 0.5;
-  const fy = ((bbox.latMax - lat) / (bbox.latMax - bbox.latMin)) * ny - 0.5;
-  const col = clamp(Math.round(fx), 0, nx - 1);
-  const row = clamp(Math.round(fy), 0, ny - 1);
+  const cell = latLonToCell({ nx, ny, bbox }, lat, lon);
+  const col = clamp(Math.round(cell.col), 0, nx - 1);
+  const row = clamp(Math.round(cell.row), 0, ny - 1);
   const tf = clamp(tFrac * (nt - 1), 0, nt - 1);
   const t0 = Math.floor(tf);
   const t1 = Math.min(nt - 1, t0 + 1);

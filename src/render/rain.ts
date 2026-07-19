@@ -62,7 +62,7 @@ out vec4 o;
 uniform sampler2D u_src;    // previous accumulation (half-res)
 uniform sampler2D u_elev;   // R16F metres
 uniform sampler2D u_land;
-uniform sampler2D u_basin;
+uniform sampler2D u_basin;  // RG8 basin id (lo, hi) — compare BOTH channels
 uniform float u_hasBasin;
 uniform vec2 u_elevTexel;
 uniform vec2 u_rtexel;      // rain-FBO texel size
@@ -102,7 +102,7 @@ void main() {
   // amplifying. A copy-only pull would self-sustain (4*rate >> decay loss) and
   // light channels permanently; balancing gain against loss lets decay drain it,
   // so the flood fades after the rain stops. Legible, not hydrological.
-  float bh = texture(u_basin, uv).r;
+  vec2 bh = texture(u_basin, uv).rg;   // this cell's basin id, split across R+G
   vec2 offs[4] = vec2[4](
     vec2( u_rtexel.x, 0.0), vec2(-u_rtexel.x, 0.0),
     vec2(0.0,  u_rtexel.y), vec2(0.0, -u_rtexel.y));
@@ -111,8 +111,10 @@ void main() {
   for (int i = 0; i < 4; i++) {
     vec2 p = uv + offs[i];
     float en = elev(p);
-    float bn = texture(u_basin, p).r;
-    float sameB = u_hasBasin < 0.5 ? 1.0 : step(abs(bn - bh), 0.6 / 255.0);
+    vec2 bn = texture(u_basin, p).rg;
+    // Same basin only when BOTH id bytes match — no mod-256 aliasing.
+    float bdiff = abs(bn.r - bh.r) + abs(bn.g - bh.g);
+    float sameB = u_hasBasin < 0.5 ? 1.0 : step(bdiff, 0.6 / 255.0);
     inflow += texture(u_src, p).r * step(eh + 1.0, en) * sameB; // neighbour uphill
     outCount += step(en + 1.0, eh) * sameB;                     // neighbour downhill
   }
@@ -191,6 +193,11 @@ export class RainLayer {
   /** Advance the accumulator one frame (offscreen). Restores the screen FBO. */
   update(ctx: DrawCtx, gpu: GpuTextures): void {
     const gl = this.gl;
+    // Paused: the flood is sim-coupled output, so freeze the accumulator (no
+    // source, decay or transport) while the sim is stopped. composite() still
+    // draws the frozen state. Return before any GL state change (screen FBO is
+    // bound here) so nothing leaks.
+    if (ctx.frame.paused) return;
     const src = this.targets[this.cur];
     const dst = this.targets[1 - this.cur];
     if (!this.updProg || !src || !dst || !gpu.elev || !gpu.land || !gpu.terrainGrid) return;

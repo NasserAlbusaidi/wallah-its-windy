@@ -14,10 +14,16 @@
  *   B. Bare layers  — createRenderLayers(gl): RenderLayer[] then
  *        layer.init(gl); layer.resize; layer.draw(frame); layer.dispose();
  *      main gives ONLY gl + FrameState (data routed to sim/ui). The facade then
- *      SELF-SOURCES: it fetches terrain.bin/flowacc.bin/env.bin/genesis.json (the
- *      same URLs main loads — the HTTP cache dedupes the bytes), parses them via
- *      loader.ts (the only .bin reader), acquires the #overlay-canvas 2D context
- *      (getContext('2d') returns the same instance), and reads/follows #month.
+ *      SELF-SOURCES: it fetches terrain.bin/flowacc.bin/env.bin/genesis.json,
+ *      parses them via loader.ts (the only .bin reader), acquires the
+ *      #overlay-canvas 2D context (getContext('2d') returns the same instance),
+ *      and reads/follows #month.
+ *
+ *      Mode B is a DEGRADED FALLBACK: main prefers mode A, because concurrent
+ *      identical GETs are NOT coalesced by the browser cache — if both main AND
+ *      the facade fetched the four bins, first-load wire cost would double. With
+ *      mode A the facade never self-fetches (see init: selfLoad runs only when no
+ *      resources were injected).
  *
  * Either way the facade owns every GPU texture (built from the ParsedBins — the
  * only place that knows the right internal formats; FrameState.envTextures is
@@ -36,6 +42,7 @@ import { parseBin } from '../loader';
 import { probeCaps } from './gl-utils';
 import type { GlCaps } from './gl-utils';
 import {
+  buildBasinRG8Tex,
   buildElevationTex,
   buildR8Tex,
   pickLayer,
@@ -371,7 +378,10 @@ export class RenderPipeline implements RenderLayer {
       this.gpu.acc = buildR8Tex(gl, accL, 0, (v) => Math.log(1 + Math.max(0, v)) / mx, gl.LINEAR);
     }
     if (basinL) {
-      this.gpu.basin = buildR8Tex(gl, basinL, 0, (v) => (Math.round(v) % 256) / 255, gl.NEAREST);
+      // RG8 (id&255, id>>8): thousands of basins, so a single R8 channel would
+      // alias every 256th id and leak basin-glow transport across unrelated
+      // drainage boundaries. The rain shader compares both channels.
+      this.gpu.basin = buildBasinRG8Tex(gl, basinL, 0);
       this.gpu.hasBasin = true;
     }
     if ((this.gpu.elev || this.gpu.land) && this.terrainReadyMs < 0) this.terrainReadyMs = performance.now();

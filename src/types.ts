@@ -224,6 +224,8 @@ export interface FrameState {
   isDemo: boolean;
   /** Wall-clock ms since page start; drives fades and the aftermath timer. */
   nowMs: number;
+  /** Space-bar pause: the sim is frozen, so sim-coupled output (rain) must freeze too. */
+  paused: boolean;
 }
 
 /**

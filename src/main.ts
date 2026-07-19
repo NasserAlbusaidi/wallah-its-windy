@@ -40,16 +40,14 @@ import type {
 import { UiController } from './ui';
 import { createSimEngine } from './sim';
 import { makeEnvSampler } from './env-sampler';
-// Render facade. The PUBLIC contract (types.ts, LAW) is createRenderLayers(gl):
-// RenderLayer[] — composited passes in luminance order (terrain -> env glow ->
+// Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
-// The render module's factory NAME was still oscillating during this parallel
-// build (createRenderLayers vs a richer createRenderer), so main resolves it by a
-// namespace probe (acquireRenderLayers) that accepts either name and normalizes
-// either return shape — building regardless of which the module currently exports
-// and wiring correctly once it settles on the types.ts contract. Data intake
-// (terrain/env GPU textures, month) is an unsettled render-side seam (see report);
-// storm particles + track render from FrameState.storm regardless.
+// main resolves the module by a namespace probe (acquireRender) and PREFERS mode A
+// (createRenderer): main owns the single data-load path and injects the parsed
+// bins via setResources()/setMonth(), so the facade never self-fetches the same
+// four URLs (the double-download seam). It falls back to createRenderLayers (mode
+// B, self-sourcing) only if createRenderer is absent. Either way storm particles +
+// track render from FrameState.storm.
 import * as renderModule from './render';
 
 // --- Time constants ---------------------------------------------------------
@@ -114,11 +112,23 @@ try {
 }
 
 let layers: RenderLayer[] = [];
+let renderCtrl: RenderController | null = null;
 try {
-  layers = acquireRenderLayers(gl);
+  const acquired = acquireRender(gl);
+  layers = acquired.layers;
+  renderCtrl = acquired.ctrl;
+  const emptyResources: RenderResourcesLike = { terrain: null, env: null, genesis: [] };
   for (const layer of layers) {
     try {
-      layer.init(gl);
+      if (layer === renderCtrl) {
+        // Mode A: hand the facade the overlay + a present (empty-for-now)
+        // resources object so it marks itself INJECTED and does NOT self-fetch
+        // the four bins main is already loading (the double-download seam, eng
+        // review). Real data arrives via setResources() once loadAll() parses it.
+        renderCtrl.init(gl, overlay, emptyResources);
+      } else {
+        layer.init(gl);
+      }
     } catch (err) {
       console.warn('[boot] a render layer failed to init:', err);
     }
@@ -126,6 +136,7 @@ try {
 } catch (err) {
   console.warn('[boot] render layers unavailable — map will not composite:', err);
   layers = [];
+  renderCtrl = null;
 }
 
 // --- Canvas sizing ----------------------------------------------------------
@@ -233,6 +244,10 @@ function routeLoaded(item: LoadItem, buf: ArrayBuffer, bins: Map<string, ParsedB
     }
   } catch (err) {
     console.warn(`[load] ${item.label} parsed badly, skipping:`, err);
+    // A .bin that downloaded but won't parse is a stale/corrupt cached file
+    // (loader throws a version/magic error, decision D4). Surface one caption
+    // instead of silently degrading to the analytic fallback + sea-ring mask.
+    if (item.kind === 'bin') ui.notifyDataError();
   }
 }
 
@@ -291,10 +306,16 @@ async function loadAll(): Promise<void> {
   ui.setGenesis(genesisPoints);
   envBin = bins.get('env') ?? null;
 
+  // Inject the single parsed copy into the render facade (mode A): the exact
+  // bytes main just loaded feed BOTH the sim sampler and the GPU textures, so no
+  // URL is fetched twice and no bin is dequantized twice (the double-load seam).
+  renderCtrl?.setResources?.({ terrain, env: envBin, genesis: genesisPoints });
+
   // First storm: a shared storm from the URL hash replays exactly; otherwise the
   // ambient demo (design T1). The demo is fast-forwarded so it opens mid-life.
   const shared = readHash();
   const first = ui.finishLoading(shared);
+  renderCtrl?.setMonth?.(first.monthIndex); // SST tint follows the spawned month
   doSpawn(first);
   if (first.isDemo) warmUp(DEMO_WARMUP_H);
 }
@@ -380,6 +401,8 @@ window.addEventListener('keydown', (e) => {
 // via SpawnParams.monthIndex; render's month-dependent SST tint is part of the
 // unsettled render data seam.
 monthSelect.addEventListener('change', () => {
+  const m = Number(monthSelect.value);
+  if (Number.isInteger(m)) renderCtrl?.setMonth?.(m); // refresh SST tint even with no active storm
   const params = ui.onMonthChange();
   if (params) doSpawn(params);
 });
@@ -428,6 +451,7 @@ function render(alpha: number, nowMs: number): void {
     reducedMotion: prefersReducedMotion,
     isDemo: storm?.isDemo ?? false,
     nowMs,
+    paused,
   };
 
   // main owns the base clear of both canvases (guards against any render layer
@@ -484,22 +508,48 @@ function isRenderLayer(v: unknown): v is RenderLayer {
   );
 }
 
+/** Baked data injected into the render facade (mode A). Structural mirror of
+ *  render's RenderResources so main need not import across the build boundary. */
+interface RenderResourcesLike {
+  terrain: ParsedBin | null;
+  env: ParsedBin | null;
+  genesis: LatLon[];
+}
+
+/** A render facade that also accepts injected resources + a month (mode A). */
+type RenderController = RenderLayer & {
+  init(gl: WebGL2RenderingContext, overlay?: CanvasRenderingContext2D, resources?: RenderResourcesLike): void;
+  setResources?(resources: RenderResourcesLike): void;
+  setMonth?(monthIndex: number): void;
+};
+
+function hasInjectionApi(v: RenderLayer): v is RenderController {
+  const r = v as RenderController;
+  return typeof r.setResources === 'function' && typeof r.setMonth === 'function';
+}
+
 /**
- * Resolve the render module's factory by probing for either the public-contract
- * name (`createRenderLayers`) or the richer-facade name (`createRenderer`), then
- * normalize its result to a RenderLayer[] whether it returns an array or a single
- * composite RenderLayer. A namespace import keeps the build green regardless of
- * which name the module currently exports.
+ * Resolve the render module and prefer MODE A (`createRenderer`): main owns the
+ * single data-load path and injects the parsed bins via setResources(), so the
+ * facade never self-fetches the same four URLs (the double-download seam). Falls
+ * back to `createRenderLayers` (mode B, self-sourcing) only if createRenderer is
+ * absent — a degraded path kept for resilience. Returns the draw list plus the
+ * injectable controller (null in mode B).
  */
-function acquireRenderLayers(glCtx: WebGL2RenderingContext): RenderLayer[] {
+function acquireRender(glCtx: WebGL2RenderingContext): { layers: RenderLayer[]; ctrl: RenderController | null } {
   const mod = renderModule as Record<string, unknown>;
-  const factory = (mod.createRenderLayers ?? mod.createRenderer) as
-    | ((gl: WebGL2RenderingContext) => unknown)
-    | undefined;
-  if (typeof factory !== 'function') return [];
-  const built = factory(glCtx);
-  if (Array.isArray(built)) return built.filter(isRenderLayer);
-  return isRenderLayer(built) ? [built] : [];
+  const makeA = mod.createRenderer as (() => unknown) | undefined;
+  if (typeof makeA === 'function') {
+    const built = makeA();
+    if (isRenderLayer(built) && hasInjectionApi(built)) return { layers: [built], ctrl: built };
+  }
+  const makeB = mod.createRenderLayers as ((gl: WebGL2RenderingContext) => unknown) | undefined;
+  if (typeof makeB === 'function') {
+    const built = makeB(glCtx);
+    const layers = Array.isArray(built) ? built.filter(isRenderLayer) : isRenderLayer(built) ? [built] : [];
+    return { layers, ctrl: null };
+  }
+  return { layers: [], ctrl: null };
 }
 
 // --- Go ---------------------------------------------------------------------

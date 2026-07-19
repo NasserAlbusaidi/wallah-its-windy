@@ -1,6 +1,9 @@
 node_modules
 dist
 bake/.venv
+__pycache__/
+*.pyc
 data/raw
 *.log
 .DS_Store
+.gstack/

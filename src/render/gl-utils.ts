@@ -92,9 +92,11 @@ export interface RenderTarget {
  */
 export function makeRenderTarget(gl: WebGL2RenderingContext, w: number, h: number, caps: GlCaps): RenderTarget {
   const wantFloat = caps.colorBufferFloat;
-  // LINEAR upsamples the half-res accumulation smoothly; a 16F target only
-  // filters linearly with OES_texture_float_linear, so fall to NEAREST there.
-  const filter = wantFloat && !caps.floatLinear ? gl.NEAREST : gl.LINEAR;
+  // LINEAR upsamples the half-res accumulation smoothly. RGBA16F is texture-
+  // FILTERABLE in core WebGL2 (OES_texture_float_linear only gates 32-bit float
+  // filtering), and the RGBA8 fallback filters linearly too — so LINEAR is always
+  // valid here. caps.floatLinear stays probed for any future 32F target.
+  const filter = gl.LINEAR;
   const tex = gl.createTexture();
   if (!tex) throw new Error('render: createTexture returned null');
   gl.bindTexture(gl.TEXTURE_2D, tex);

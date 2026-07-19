@@ -1,16 +1,18 @@
 /**
  * env.ts — environment legibility (eng task T10, design D2/D11).
  *
- * Two faint always-on additive passes over the ocean:
- *   1. SST warmth tint — the warm-orange token, alpha ramped by SST above 26 °C,
- *      masked to ocean. This is the fuel the storm reads; it doubles as the dev
- *      debug view of where storms CAN intensify.
- *   2. Genesis-zone glow — soft amber splats at the historic genesis points
- *      (public/data/genesis.json), nudging spawns toward interesting outcomes
- *      without biasing the physics.
+ * One faint always-on additive pass over the ocean: the SST warmth tint — the
+ * warm-orange token, alpha ramped by SST above 26 °C, masked to ocean. This is
+ * the fuel the storm reads; it doubles as the dev debug view of where storms CAN
+ * intensify. It sits just above terrain in the luminance ranking. Colours are
+ * token uniforms; additive blend (SRC_ALPHA, ONE).
  *
- * Both sit just above terrain in the luminance ranking (SST tint > terrain,
- * genesis > SST). Colours are token uniforms; additive blend (SRC_ALPHA, ONE).
+ * The historic-genesis glow is NOT drawn here: it lives once, in ui.drawOverlay
+ * on the 2D overlay canvas (a token-sourced radial gradient). A GL point-splat
+ * copy used to live here too, but it (a) double-exposed the glow to ~2× its token
+ * luminance and (b) relied on a large gl_PointSize that WebGL2 does not guarantee
+ * (many GPUs clamp point size well below the ~100 px it needs), so it silently
+ * shrank to dots on those devices. Keeping only the 2D-canvas copy fixes both.
  */
 
 import { TOKENS } from '../tokens';
@@ -43,62 +45,19 @@ void main() {
   o = vec4(u_warm.rgb, a);
 }`;
 
-const GEN_VS = /* glsl */ `#version 300 es
-in vec2 a_pos;
-uniform float u_size;
-void main() {
-  gl_Position = vec4(a_pos, 0.0, 1.0);
-  gl_PointSize = u_size;
-}`;
-
-const GEN_FS = /* glsl */ `#version 300 es
-precision highp float;
-out vec4 o;
-uniform vec4 u_genesis;
-uniform float u_fade;
-void main() {
-  float d = length(gl_PointCoord - 0.5) * 2.0;
-  float a = smoothstep(1.0, 0.0, d);
-  o = vec4(u_genesis.rgb, u_genesis.a * a * a * u_fade);
-}`;
-
 export class EnvLayer implements RenderModule {
   private gl!: WebGL2RenderingContext;
   private sstProg: WebGLProgram | null = null;
   private sstVao: WebGLVertexArrayObject | null = null;
-  private genProg: WebGLProgram | null = null;
-  private genVao: WebGLVertexArrayObject | null = null;
-  private genBuf: WebGLBuffer | null = null;
-  private genCount = 0;
-  private genRef: Float32Array | null = null;
-  private height = 1;
 
   init(gl: WebGL2RenderingContext): void {
     this.gl = gl;
     this.sstProg = makeProgram(gl, SST_VS, SST_FS);
     this.sstVao = makeQuadVao(gl, this.sstProg);
-    this.genProg = makeProgram(gl, GEN_VS, GEN_FS);
-    this.genVao = gl.createVertexArray();
-    this.genBuf = gl.createBuffer();
   }
 
-  resize(_w: number, h: number): void {
-    this.height = h;
-  }
-
-  private ensureGenesis(clip: Float32Array | null): void {
-    const gl = this.gl;
-    if (clip === this.genRef) return;
-    this.genRef = clip;
-    this.genCount = clip ? clip.length / 2 : 0;
-    if (!clip || !this.genProg) return;
-    gl.bindVertexArray(this.genVao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.genBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, clip, gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(this.genProg, 'a_pos');
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    gl.bindVertexArray(null);
+  resize(_w: number, _h: number): void {
+    /* fullscreen pass — nothing resolution-dependent to cache */
   }
 
   draw(ctx: DrawCtx, gpu: GpuTextures, fade: number): void {
@@ -121,17 +80,6 @@ export class EnvLayer implements RenderModule {
       gl.uniform1f(gl.getUniformLocation(this.sstProg, 'u_fade'), fade);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
-
-    // Genesis-zone glow.
-    this.ensureGenesis(gpu.genesisClip);
-    if (this.genProg && this.genCount > 0) {
-      gl.useProgram(this.genProg);
-      gl.bindVertexArray(this.genVao);
-      gl.uniform1f(gl.getUniformLocation(this.genProg, 'u_size'), this.height * 0.075);
-      gl.uniform4fv(gl.getUniformLocation(this.genProg, 'u_genesis'), TOKENS.genesis.rgba01);
-      gl.uniform1f(gl.getUniformLocation(this.genProg, 'u_fade'), fade);
-      gl.drawArrays(gl.POINTS, 0, this.genCount);
-    }
     gl.bindVertexArray(null);
     void ctx;
   }
@@ -139,14 +87,8 @@ export class EnvLayer implements RenderModule {
   dispose(): void {
     const gl = this.gl;
     if (this.sstProg) gl.deleteProgram(this.sstProg);
-    if (this.genProg) gl.deleteProgram(this.genProg);
     if (this.sstVao) gl.deleteVertexArray(this.sstVao);
-    if (this.genVao) gl.deleteVertexArray(this.genVao);
-    if (this.genBuf) gl.deleteBuffer(this.genBuf);
-    this.sstProg = this.genProg = null;
-    this.sstVao = this.genVao = null;
-    this.genBuf = null;
-    this.genRef = null;
-    this.genCount = 0;
+    this.sstProg = null;
+    this.sstVao = null;
   }
 }

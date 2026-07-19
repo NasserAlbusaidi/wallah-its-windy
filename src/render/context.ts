@@ -29,7 +29,11 @@ export interface GpuTextures {
   elev: WebGLTexture | null;
   land: WebGLTexture | null;
   acc: WebGLTexture | null;
-  /** Max flow-accumulation (raw) used to log-normalise the acc texture. */
+  /**
+   * Normalisation max for the acc texture. NOTE: flowacc.bin already stores
+   * log10(1+acc) (bake/hydro.py), not raw counts — the WADI_LO/HI window in
+   * rain.ts is tuned against the shipped (currently double-logged) distribution.
+   */
   accMaxLog: number;
   basin: WebGLTexture | null;
   hasBasin: boolean;

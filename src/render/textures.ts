@@ -77,7 +77,35 @@ export function buildR8Tex(
     bytes[i] = n <= 0 ? 0 : n >= 1 ? 255 : Math.round(n * 255);
   }
   const tex = newTex(gl, filter);
+  // R8 rows are nx bytes wide; the default UNPACK_ALIGNMENT of 4 only works when
+  // nx % 4 === 0. Force 1 so a re-bake with any nx (headers are self-describing)
+  // cannot silently raise GL_INVALID_OPERATION and render the layer black.
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, layer.nx, layer.ny, 0, gl.RED, gl.UNSIGNED_BYTE, bytes);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return tex;
+}
+
+/**
+ * A two-channel RG8 texture packing an integer id per texel as (id & 255, id >> 8),
+ * so ids up to 65535 survive without the mod-256 aliasing an R8 texture forces.
+ * Used for the basin-id layer (thousands of basins): the rain shader compares BOTH
+ * channels for "same basin", so no two basins can collide. Always NEAREST — ids
+ * must not be interpolated.
+ */
+export function buildBasinRG8Tex(gl: WebGL2RenderingContext, layer: BinLayer, t: number): WebGLTexture {
+  const plane = planeOf(layer, t);
+  const bytes = new Uint8Array(plane.length * 2);
+  for (let i = 0; i < plane.length; i++) {
+    const id = Math.max(0, Math.min(65535, Math.round(plane[i])));
+    bytes[i * 2] = id & 0xff;
+    bytes[i * 2 + 1] = (id >> 8) & 0xff;
+  }
+  const tex = newTex(gl, gl.NEAREST);
+  // RG8 rows are 2*nx bytes; 2 divides into the default alignment of 4 only when
+  // nx is even. Force 1 to be dimension-agnostic (same rationale as buildR8Tex).
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, layer.nx, layer.ny, 0, gl.RG, gl.UNSIGNED_BYTE, bytes);
   gl.bindTexture(gl.TEXTURE_2D, null);
   return tex;
 }

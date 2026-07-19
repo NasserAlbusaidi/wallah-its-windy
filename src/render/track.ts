@@ -73,9 +73,11 @@ export class TrackLayer {
         const b = latLonToClip(track[i].lat, track[i].lon);
         const [ax, ay] = this.px(a.x, a.y);
         const [bx, by] = this.px(b.x, b.y);
-        // Older segments (earlier in the array) dimmer.
+        // Older segments (earlier in the array) dimmer. The whole line (base +
+        // age term) multiplies by `fade` so it drains smoothly to 0 during the
+        // ~10 s aftermath instead of flooring at 0.12 then popping to nothing.
         const ageFrac = i / (track.length - 1);
-        g.strokeStyle = trackRgba(0.12 + 0.5 * ageFrac * fade);
+        g.strokeStyle = trackRgba((0.12 + 0.5 * ageFrac) * fade);
         g.beginPath();
         g.moveTo(ax, ay);
         g.lineTo(bx, by);

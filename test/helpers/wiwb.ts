@@ -4,7 +4,7 @@
  * loader.ts is the only production reader of the self-describing binary format;
  * there is no production writer in the TS tree (the bake pipeline is Python). To
  * exercise the v1.1 event-bin time-axis path (nt = timesteps, sampled with
- * setSynopticIndex(-1)) end-to-end in node, this builds a tiny in-memory bin that
+ * explicit event-timeline sampling) end-to-end in node, this builds a tiny in-memory bin that
  * loader.parseBin round-trips. It writes float32 layers (scale 1, offset 0) so the
  * dequantized values equal the inputs exactly. Byte layout mirrors loader.ts /
  * BINARY-FORMATS.md: 8-byte header + 88-byte layer records + contiguous data.

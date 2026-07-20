@@ -10,13 +10,9 @@ env.bin should carry 3-5 synoptic samples per month instead. The env.bin `nt`
 timestep axis already supports that, so acting on a FAIL is a re-bake, not a format
 change (which is exactly why running this late is still cheap).
 
-STATUS — reads synth.steering_shear() (SYNTHETIC_V0), because ERA5 is blocked on
-this build machine (no CDS credentials; see the ERA5 TODO in bake/README.md). So it
-currently measures the diversity of the *shipped synthetic* steering, and it is the
-reference implementation the TS steering integrator is checked against. RE-RUN it
-against the real ERA5 fields the moment they land, BEFORE any tuning pass — swapping
-the field source is the same one-function swap as the bake
-(synth.steering_shear -> ERA5 reader).
+Uses real ERA5 fields when data/raw/era5_climatology.nc is present and falls back
+to the labeled synthetic field otherwise. Sampling mirrors the runtime's bilinear
+spatial interpolation so this diagnostic measures the tracks the browser ships.
 
 Run:  bake/.venv/bin/python bake/spike_tracks.py
 """
@@ -46,14 +42,19 @@ SPAWN_LONS = [54.0, 57.0, 60.0, 63.0, 66.0]
 SPAWN_LATS = [15.5, 17.5, 19.5, 21.5]
 
 
-def sample_nearest(field: np.ndarray, lat: float, lon: float) -> float:
-    """Nearest-cell read (mirror grid.latLonToCell; row 0 = north)."""
+def sample_bilinear(field: np.ndarray, lat: float, lon: float) -> float:
+    """Bilinear edge-clamped read (mirror raster-sampler.ts; row 0 = north)."""
     ny, nx = field.shape
-    col = round((lon - LON_MIN) / (LON_MAX - LON_MIN) * nx - 0.5)
-    row = round((LAT_MAX - lat) / (LAT_MAX - LAT_MIN) * ny - 0.5)
-    col = min(max(col, 0), nx - 1)
-    row = min(max(row, 0), ny - 1)
-    return float(field[row, col])
+    col = (lon - LON_MIN) / (LON_MAX - LON_MIN) * nx - 0.5
+    row = (LAT_MAX - lat) / (LAT_MAX - LAT_MIN) * ny - 0.5
+    col = min(max(col, 0.0), nx - 1.0)
+    row = min(max(row, 0.0), ny - 1.0)
+    c0, r0 = math.floor(col), math.floor(row)
+    c1, r1 = min(nx - 1, c0 + 1), min(ny - 1, r0 + 1)
+    fx, fy = col - c0, row - r0
+    north = field[r0, c0] * (1.0 - fx) + field[r0, c1] * fx
+    south = field[r1, c0] * (1.0 - fx) + field[r1, c1] * fx
+    return float(north * (1.0 - fy) + south * fy)
 
 
 def integrate(lat0: float, lon0: float, u: np.ndarray, v: np.ndarray) -> tuple[float, float, int]:
@@ -62,8 +63,8 @@ def integrate(lat0: float, lon0: float, u: np.ndarray, v: np.ndarray) -> tuple[f
     for step in range(STEPS):
         if not (LON_MIN <= lon <= LON_MAX and LAT_MIN <= lat <= LAT_MAX):
             return lat, lon, step
-        us = sample_nearest(u, lat, lon)
-        vs = sample_nearest(v, lat, lon)
+        us = sample_bilinear(u, lat, lon)
+        vs = sample_bilinear(v, lat, lon)
         # m/s -> deg/h, cos-lat correction on the zonal component (grid.ts).
         dlon = us * 3600.0 / (METERS_PER_DEG_LAT * math.cos(math.radians(lat)))
         dlat = vs * 3600.0 / METERS_PER_DEG_LAT

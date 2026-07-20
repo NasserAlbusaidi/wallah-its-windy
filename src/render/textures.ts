@@ -15,6 +15,16 @@ import type { BinLayer, ParsedBin } from '../types';
 export const SST_MIN_C = 10;
 export const SST_MAX_C = 35;
 
+/**
+ * flowacc.bin already stores log10(1 + upstream-cell-count). Normalize that
+ * baked logarithmic value linearly; applying another logarithm would distort
+ * the documented data contract.
+ */
+export function normalizeLoggedFlowAccumulation(value: number, maxValue: number): number {
+  if (!Number.isFinite(value) || !Number.isFinite(maxValue) || maxValue <= 0) return 0;
+  return Math.max(0, Math.min(1, value / maxValue));
+}
+
 /** Find a layer by any of `names` (exact first, then case-insensitive). */
 export function pickLayer(bin: ParsedBin | null, names: readonly string[]): BinLayer | null {
   if (!bin) return null;
@@ -110,7 +120,7 @@ export function buildBasinRG8Tex(gl: WebGL2RenderingContext, layer: BinLayer, t:
   return tex;
 }
 
-/** Largest finite value in a plane (for log-normalising flow accumulation). */
+/** Largest finite value in a plane (used to normalize scalar textures). */
 export function planeMax(layer: BinLayer, t = 0): number {
   const plane = planeOf(layer, t);
   let m = 0;

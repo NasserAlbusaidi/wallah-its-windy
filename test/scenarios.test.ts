@@ -5,10 +5,10 @@
  * The scenario runtime lives in main.ts (DOM + fetch + sim), but its DECISIONS are
  * pure functions in src/scenarios.ts so the load-bearing invariants are node-
  * testable without a DOM: (1) a malformed catalogue degrades to null (picker
- * disabled), individual bad entries drop; (2) the synoptic-index SIGN flips
- * correctly — event mode < 0 (tFrac time-interp), climatology >= 0 (seed%K regime
- * pick); (3) an event pins the month and threads the window horizon, counterfactual-
- * ing an active user storm or falling back to the canonical spawn.
+ * disabled), individual bad entries drop; (2) the environment-axis mode is
+ * explicit — event timelines interpolate tFrac, climatology freezes seed%K;
+ * (3) an event pins the month and threads the window horizon, counterfactual-ing
+ * an active user storm or falling back to the canonical spawn.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -16,7 +16,8 @@ import { readFileSync } from 'node:fs';
 import {
   parseScenarios,
   findScenario,
-  synopticIndexForSpawn,
+  samplingModeForSpawn,
+  eventTimeFraction,
   eventSpawn,
   restoredMonth,
   CLIMATOLOGY_ID,
@@ -116,23 +117,28 @@ describe('findScenario', () => {
   });
 });
 
-describe('synopticIndexForSpawn: the mode-switch SIGN invariant', () => {
-  it('event mode is always -1 (restores tFrac time-interp)', () => {
-    expect(synopticIndexForSpawn(true, 2007, 64)).toBe(-1);
-    expect(synopticIndexForSpawn(true, 0, 1)).toBe(-1);
-    // The seed must not leak a non-negative plane in event mode.
-    expect(synopticIndexForSpawn(true, 12345, 4)).toBeLessThan(0);
+describe('samplingModeForSpawn: explicit environment-axis semantics', () => {
+  it('distinguishes event timelines from seed-picked synoptic planes', () => {
+    expect(samplingModeForSpawn(true, 2007, 64)).toEqual({ kind: 'event-timeline' });
+    expect(samplingModeForSpawn(false, 71, 4)).toEqual({
+      kind: 'synoptic-plane',
+      plane: 71 % 4,
+    });
   });
 
-  it('climatology picks seed % planeCount (>= 0, D10 regime)', () => {
-    expect(synopticIndexForSpawn(false, 71, 4)).toBe(71 % 4);
-    expect(synopticIndexForSpawn(false, 2007, 4)).toBe(2007 % 4);
-    expect(synopticIndexForSpawn(false, 71, 4)).toBeGreaterThanOrEqual(0);
+  it('guards invalid climatology plane counts to plane 0', () => {
+    expect(samplingModeForSpawn(false, 71, 0)).toEqual({
+      kind: 'synoptic-plane',
+      plane: 0,
+    });
   });
+});
 
-  it('climatology guards planeCount < 1 to plane 0 (never divide by zero)', () => {
-    expect(synopticIndexForSpawn(false, 71, 0)).toBe(0);
-    expect(synopticIndexForSpawn(false, 71, 1)).toBe(0);
+describe('eventTimeFraction: renderer follows the event timeline', () => {
+  it('maps storm age onto the scenario window and clamps after the final plane', () => {
+    expect(eventTimeFraction(0, 192)).toBe(0);
+    expect(eventTimeFraction(48, 192)).toBe(0.25);
+    expect(eventTimeFraction(240, 192)).toBe(1);
   });
 });
 

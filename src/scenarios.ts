@@ -5,8 +5,8 @@
  * data/scenarios.json (writer B1, shape C3) names each replayable historic event:
  * its env bin, the month it rode, the time window that maps sim-hours onto
  * event-hours, and the canonical spawn. This module validates that file and holds
- * the PURE decisions the scenario runtime makes on a switch (which synoptic index
- * to select, what to spawn) so main.ts stays a thin shell and the invariants are
+ * the PURE decisions the scenario runtime makes on a switch (which environment
+ * mode to select, what to spawn) so main.ts stays a thin shell and the invariants are
  * node-testable without a DOM.
  *
  * Degradation contract (C8): a missing/404 scenarios.json is handled upstream (the
@@ -15,6 +15,8 @@
  * malformed entries are dropped, not fatal. The picker offers only climatology
  * when the catalogue is empty.
  */
+
+import type { EnvSamplingMode } from './types';
 
 /** The picker value + hash sentinel for the default (non-event) regime. */
 export const CLIMATOLOGY_ID = 'climatology';
@@ -122,17 +124,26 @@ export function findScenario(scenarios: readonly Scenario[], id: string | null |
 // ---------------------------------------------------------------------------
 
 /**
- * The synoptic-plane index to set on the sampler BEFORE spawn.
- *
- * Event mode uses -1 to restore tFrac time-interpolation (the event bin's nt IS a
- * time axis — env-sampler nearestCell). Climatology uses the D10 regime pick
- * seed % planeCount, so a shared seed replays the same plane. This is THE sign
- * flip the mode-switch invariant tests pin: event < 0, climatology >= 0.
+ * Interpret `nt` before spawning: chronological time for event bins, or one
+ * deterministic real-year regime for climatology bins.
  */
-export function synopticIndexForSpawn(inEvent: boolean, seed: number, planeCount: number): number {
-  if (inEvent) return -1;
+export function samplingModeForSpawn(
+  inEvent: boolean,
+  seed: number,
+  planeCount: number,
+): EnvSamplingMode {
+  if (inEvent) return { kind: 'event-timeline' };
   const k = Math.max(1, Math.floor(planeCount));
-  return (seed >>> 0) % k;
+  return {
+    kind: 'synoptic-plane',
+    plane: (seed >>> 0) % k,
+  };
+}
+
+/** Map simulated storm age onto a validated event window for render sampling. */
+export function eventTimeFraction(ageH: number, windowH: number): number {
+  if (!Number.isFinite(ageH) || !Number.isFinite(windowH) || windowH <= 0) return 0;
+  return Math.max(0, Math.min(1, ageH / windowH));
 }
 
 /** The spawn identity used when entering an event, minus isDemo/monthIndex glue. */

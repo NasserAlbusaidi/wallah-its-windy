@@ -40,10 +40,11 @@ const RAIN_DECAY = 0.985;
 const RAIN_GAIN = 45.0; // folds in the metres→slope scale of ∇h
 const TRANSPORT_RATE = 0.11; // fraction pulled from each uphill same-basin neighbour
 const RMAX_BASE = 0.11; // mirror of particles' base radius (clip units here)
-// Channel window on normalised-log-ACC: high enough that only the main wadi
-// threads light (the mockup's sparse network), not the whole dense drainage tree.
-const WADI_LO = 0.62;
-const WADI_HI = 0.92;
+// Channel window on the normalized baked log10(1+acc) values. These preserve the
+// old visual cutoffs after removing the renderer's accidental second logarithm:
+// old 0.62/0.92 in log1p-space map to ~0.41/0.84 in the honest linear space.
+const WADI_LO = 0.41;
+const WADI_HI = 0.84;
 const RAIN_TO_GLOW = 2.5; // maps small accumulated rain to flood brightness
 
 const QUAD_VS = /* glsl */ `#version 300 es

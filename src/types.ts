@@ -114,6 +114,17 @@ export interface EnvSampler {
   sample(lat: number, lon: number, monthIndex: number, tFrac: number): EnvSample;
 }
 
+/**
+ * How a multi-plane environment layer must interpret its `nt` axis.
+ *
+ * Climatology bins carry alternative synoptic regimes and freeze on one
+ * seed-picked plane. Historic-event bins carry a chronological timeline and
+ * interpolate it using the `tFrac` supplied to EnvSampler.sample().
+ */
+export type EnvSamplingMode =
+  | { kind: 'synoptic-plane'; plane: number }
+  | { kind: 'event-timeline' };
+
 // ---------------------------------------------------------------------------
 // Storm state + lifecycle
 // ---------------------------------------------------------------------------
@@ -235,12 +246,12 @@ export interface FrameState {
   /** Space-bar pause: the sim is frozen, so sim-coupled output (rain) must freeze too. */
   paused: boolean;
   /**
-   * Synoptic-sample plane the active storm rides (seed-picked, D10): env.bin
-   * u/v/shr layers carry nt=K real-year planes and the sim samples plane
-   * seed % K. Render cues that read env at the storm (shear smear) must read
-   * the SAME plane or cue and physics disagree. Absent/0 for nt=1 bakes.
+   * Explicit interpretation of the active environment's `nt` axis. Render cues
+   * must use the same mode as physics or event timelines freeze visually.
    */
-  synopticIndex?: number;
+  envSamplingMode: EnvSamplingMode;
+  /** Current normalized event time; ignored in synoptic-plane mode. */
+  envTFrac: number;
 }
 
 /**

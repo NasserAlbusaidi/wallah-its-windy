@@ -55,13 +55,13 @@ function trackRgba(a: number): string {
 
 /**
  * Fixed demo storm identity — same every visit. CURATED, not arbitrary: a seed
- * scan over the real ERA5-sampled May fields (test/ probe, 2026-07-20) picked
+ * scan over the bilinearly sampled real May fields (test probe, 2026-07-20) picked
  * the storm that makes Omani landfall with the wadi payoff: spawn (17.5N, 61E),
- * May, seed 71 (synoptic plane 3) -> ~12 d life, peak ~135 kt, dies over the
- * Sharqiya coast ~309 km from Muscat. The integration test pins this outcome so
+ * May, seed 671 (synoptic plane 3) -> ~7.7 d life, peak ~109 kt, dies over the
+ * Sharqiya coast ~246 km from Muscat. The integration test pins this outcome so
  * a re-bake that reshuffles sample years cannot silently kill the demo.
  */
-export const DEMO_SEED = 71;
+export const DEMO_SEED = 671;
 export const DEMO_GENESIS: LatLon = { lat: 17.5, lon: 61.0 };
 /** Demo month (May, 0-indexed 4): the real pre-monsoon cyclone window. */
 export const DEMO_MONTH = 4;

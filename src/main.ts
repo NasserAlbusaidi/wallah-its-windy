@@ -46,7 +46,8 @@ import {
   parseScenarios,
   findScenario,
   eventSpawn,
-  synopticIndexForSpawn,
+  samplingModeForSpawn,
+  eventTimeFraction,
   restoredMonth,
   CLIMATOLOGY_ID,
 } from './scenarios';
@@ -421,13 +422,16 @@ function headOf(s: StormState): Head {
 /** Spawn (replacing any active storm), reset interpolation, and share via the hash. */
 function doSpawn(params: SpawnParams): void {
   if (!engine) return;
-  // Synoptic-plane selection BEFORE spawn so the whole life rides one coherent env
-  // and sim = f(spawn, month, seed[, env]) holds. Climatology: seed % K picks a
-  // D10 real-year regime plane. Event mode: -1 restores tFrac time-interpolation
-  // (the event bin's nt IS a time axis — C4/C8); NEVER seed%K there or the storm
-  // would freeze on a single plane. The sign flip is the load-bearing invariant.
+  // Select the environment-axis meaning BEFORE spawn. Climatology freezes one
+  // seed-picked real-year regime; event mode treats nt as chronological time.
   const inEvent = activeScenario !== null;
-  envSampler.setSynopticIndex(synopticIndexForSpawn(inEvent, params.seed, synopticCount(envBin, params.monthIndex)));
+  envSampler.setSamplingMode(
+    samplingModeForSpawn(
+      inEvent,
+      params.seed,
+      synopticCount(envBin, params.monthIndex),
+    ),
+  );
   // In event mode, thread the scenario window as the tFrac horizon so sim-hours map
   // onto event-hours (C4). Ambient clicks in event mode inherit it too, so they
   // read the same time axis as the canonical replay.
@@ -693,7 +697,11 @@ function render(alpha: number, nowMs: number): void {
     isDemo: storm?.isDemo ?? false,
     nowMs,
     paused,
-    synopticIndex: Math.max(0, envSampler.getSynopticIndex()),
+    envSamplingMode: envSampler.getSamplingMode(),
+    envTFrac:
+      activeScenario && storm
+        ? eventTimeFraction(storm.ageH, activeScenario.windowH)
+        : 0,
   };
 
   // main owns the base clear of both canvases (guards against any render layer
@@ -806,18 +814,27 @@ function acquireRender(glCtx: WebGL2RenderingContext): { layers: RenderLayer[]; 
 // clock freezes and __cyc reads a static state — that is expected, not a hang;
 // the MAX_FRAME_MS clamp resumes cleanly on re-focus.
 Object.defineProperty(window, '__cyc', {
-  get: () => ({
-    paused,
-    accumulatorMin,
-    lastMs,
-    dbgFrames,
-    dbgTicks,
-    dbgLastDt,
-    hasEngine: engine !== null,
-    layerCount: layers.length,
-    hoursPerSec: ui.timescaleHoursPerSec(engine ? engine.getState() : null),
-    storm: engine ? engine.getState() : null,
-  }),
+  get: () => {
+    const storm = engine ? engine.getState() : null;
+    return {
+      paused,
+      accumulatorMin,
+      lastMs,
+      dbgFrames,
+      dbgTicks,
+      dbgLastDt,
+      hasEngine: engine !== null,
+      layerCount: layers.length,
+      hoursPerSec: ui.timescaleHoursPerSec(storm),
+      activeScenario: activeScenario?.id ?? null,
+      envSamplingMode: envSampler.getSamplingMode(),
+      envTFrac:
+        activeScenario && storm
+          ? eventTimeFraction(storm.ageH, activeScenario.windowH)
+          : 0,
+      storm,
+    };
+  },
 });
 requestAnimationFrame(frame);
 void loadAll();

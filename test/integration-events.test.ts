@@ -136,8 +136,8 @@ describe('scenarios.json', () => {
   // user storm active). A spawn ON the domain-entry edge or hard against the coast
   // dies at ageH~0 ("drifted off the map" / instant landfall) — the exact DOA the
   // v1.1 review caught. Replay each scenario end-to-end through the SAME wiring
-  // main.ts uses in event mode (setSynopticIndex(-1) so the bin's nt is a time
-  // axis, tFracHorizonH=windowH, the real terrain landmask) and assert a
+  // main.ts uses in event mode (explicit event-timeline sampling,
+  // tFracHorizonH=windowH, the real terrain landmask) and assert a
   // non-trivial life: the headline storm must survive and intensify, not epitaph.
   it('each canonical spawn replays into a real storm (survives + intensifies)', () => {
     const terrain = loadBin('terrain.bin');
@@ -151,7 +151,7 @@ describe('scenarios.json', () => {
     for (const s of scenarios!) {
       const bin = loadBin(s.bin.replace(/^data\//, ''));
       const sampler = makeEnvSampler(() => bin);
-      sampler.setSynopticIndex(-1); // event mode: nt is a time axis (C4/C8)
+      sampler.setSamplingMode({ kind: 'event-timeline' });
       const engine = createSimEngine({ env: sampler, isLand });
       engine.spawn({
         lat: s.spawn.lat,
@@ -171,7 +171,7 @@ describe('scenarios.json', () => {
         peakKt = Math.max(peakKt, st.vKt);
         for (const e of events) if (e.type === 'died') died = true;
       }
-      sampler.setSynopticIndex(-1);
+      sampler.setSamplingMode({ kind: 'event-timeline' });
       const ageH = (ticks * 15) / 60;
       // A DOA spawn dies at ageH<=4 h with peak ~30 kt (spawn intensity, no
       // spin-up). Require a clearly non-trivial life instead: > 24 sim-hours and a

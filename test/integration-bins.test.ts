@@ -17,7 +17,7 @@ import { parseBin } from '../src/loader';
 import { makeEnvSampler, envMonthSuffix, synopticCount } from '../src/env-sampler';
 import { DEMO_GENESIS, DEMO_MONTH, DEMO_SEED } from '../src/ui';
 import { createSimEngine, SIM } from '../src/sim';
-import { DOMAIN, inBBox, latLonToCell } from '../src/grid';
+import { cellToLatLon, DOMAIN, inBBox, latLonToCell } from '../src/grid';
 import { MUSCAT } from '../src/types';
 import type { BinLayer, ParsedBin, SimEvent } from '../src/types';
 
@@ -205,7 +205,7 @@ describe('November post-monsoon rescue (C6)', () => {
       if (b < calm) { calm = b; calmPlane = p; }
     }
     const sampler = makeEnvSampler(() => env);
-    sampler.setSynopticIndex(calmPlane);
+    sampler.setSamplingMode({ kind: 'synoptic-plane', plane: calmPlane });
     let reachedCat1 = 0;
     for (const g of gen) {
       const engine = createSimEngine({ env: sampler, isLand });
@@ -219,7 +219,7 @@ describe('November post-monsoon rescue (C6)', () => {
       }
       if (peak >= 64) reachedCat1++;
     }
-    sampler.setSynopticIndex(-1);
+    sampler.setSamplingMode({ kind: 'synoptic-plane', plane: 0 });
     // Observed ~29/71 on the shipped bin; assert a robust floor well clear of 0.
     expect(reachedCat1).toBeGreaterThanOrEqual(5);
   });
@@ -261,9 +261,16 @@ describe('bake <-> sim seam (the real env.bin drives the physics)', () => {
   const isLand = (lat: number, lon: number): boolean => nearest(land, lat, lon) > 0.5;
 
   it('the sampler reads REAL baked SST, not the analytic fallback', () => {
-    // June (monthIndex 5) must resolve to sst_05 and match its nearest cell.
-    const expected = nearest(env.layers.get('sst_05')!, 15.5, 64);
-    const got = sampler.sample(15.5, 64, 5, 0).sstC;
+    // June (monthIndex 5) must resolve to sst_05. Probe an exact raster-cell
+    // center so the raw baked value is an independent oracle even though the
+    // production sampler now interpolates between cells away from their centers.
+    const sst = env.layers.get('sst_05')!;
+    const probeCell = latLonToCell(sst, 15.5, 64);
+    const col = clampInt(probeCell.col, 0, sst.nx - 1);
+    const row = clampInt(probeCell.row, 0, sst.ny - 1);
+    const probe = cellToLatLon(sst, col, row);
+    const expected = sst.data[row * sst.nx + col];
+    const got = sampler.sample(probe.lat, probe.lon, 5, 0).sstC;
     expect(got).toBeCloseTo(expected, 5);
     // The analytic fallback caps SST at 31C; the real warm pool exceeds it, so a
     // >31C reading anywhere proves we are on the bin path, not the fallback.
@@ -279,7 +286,10 @@ describe('bake <-> sim seam (the real env.bin drives the physics)', () => {
   it('THE demo storm (ui.ts identity) lives long, gets strong, and lands on Oman', () => {
     // The ACTUAL ui.ts demo constants — editing them re-pins this test with it.
     const DEMO = { ...DEMO_GENESIS, monthIndex: DEMO_MONTH, seed: DEMO_SEED };
-    sampler.setSynopticIndex(DEMO.seed % synopticCount(env, DEMO.monthIndex));
+    sampler.setSamplingMode({
+      kind: 'synoptic-plane',
+      plane: DEMO.seed % synopticCount(env, DEMO.monthIndex),
+    });
     const engine = createSimEngine({ env: sampler, isLand });
     engine.spawn({ ...DEMO, isDemo: true });
 
@@ -301,7 +311,7 @@ describe('bake <-> sim seam (the real env.bin drives the physics)', () => {
         if (e.type === 'died') died = true;
       }
     }
-    sampler.setSynopticIndex(-1);
+    sampler.setSamplingMode({ kind: 'synoptic-plane', plane: 0 });
     expect(died).toBe(true);
     const s = engine.getState()!;
     expect(s.alive).toBe(false);
@@ -319,6 +329,10 @@ describe('bake <-> sim seam (the real env.bin drives the physics)', () => {
   });
 
   it('is deterministic: same spawn+seed reproduces the identical track', () => {
+    sampler.setSamplingMode({
+      kind: 'synoptic-plane',
+      plane: 12345 % synopticCount(env, 6),
+    });
     const run = () => {
       const engine = createSimEngine({ env: sampler, isLand });
       engine.spawn({ lat: 17, lon: 61, monthIndex: 6, seed: 12345, isDemo: false });
@@ -337,18 +351,18 @@ describe('bake <-> sim seam (the real env.bin drives the physics)', () => {
     const probes: Array<[number, number]> = [[16, 60], [18, 64], [20, 66], [22, 62]];
     let differs = false;
     for (const [lat, lon] of probes) {
-      sampler.setSynopticIndex(0);
+      sampler.setSamplingMode({ kind: 'synoptic-plane', plane: 0 });
       const a = sampler.sample(lat, lon, 5, 0);
-      sampler.setSynopticIndex(1);
+      sampler.setSamplingMode({ kind: 'synoptic-plane', plane: 1 });
       const b = sampler.sample(lat, lon, 5, 0);
       if (Math.abs(a.steerU - b.steerU) > 0.05 || Math.abs(a.steerV - b.steerV) > 0.05) differs = true;
     }
     expect(differs).toBe(true);
     // And the selection is part of determinism: same index -> identical sample.
-    sampler.setSynopticIndex(2);
+    sampler.setSamplingMode({ kind: 'synoptic-plane', plane: 2 });
     const x = sampler.sample(17, 61, 5, 0);
     const y = sampler.sample(17, 61, 5, 0);
     expect(x).toEqual(y);
-    sampler.setSynopticIndex(-1); // restore time-interp mode for other tests
+    sampler.setSamplingMode({ kind: 'synoptic-plane', plane: 0 });
   });
 });

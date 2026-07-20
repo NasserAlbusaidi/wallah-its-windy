@@ -47,10 +47,11 @@ import {
   buildR8Tex,
   pickLayer,
   planeMax,
+  normalizeLoggedFlowAccumulation,
   SST_MAX_C,
   SST_MIN_C,
 } from './textures';
-import { sampleLayerBilinear } from './sample';
+import { sampleEnvBin } from '../env-sampler';
 import type { DrawCtx, EnvAtStorm, GpuTextures } from './context';
 import { TerrainLayer } from './terrain';
 import { EnvLayer } from './env';
@@ -102,7 +103,6 @@ function emptyGpu(): GpuTextures {
     elev: null,
     land: null,
     acc: null,
-    accMaxLog: 1,
     basin: null,
     hasBasin: false,
     envGrid: null,
@@ -416,9 +416,14 @@ export class RenderPipeline implements RenderLayer {
     if (elevL) this.gpu.elev = buildElevationTex(gl, elevL);
     if (landL) this.gpu.land = buildR8Tex(gl, landL, 0, (v) => (v > 0.5 ? 1 : 0), gl.LINEAR);
     if (accL) {
-      const mx = Math.log(1 + planeMax(accL)) || 1;
-      this.gpu.accMaxLog = mx;
-      this.gpu.acc = buildR8Tex(gl, accL, 0, (v) => Math.log(1 + Math.max(0, v)) / mx, gl.LINEAR);
+      const mx = planeMax(accL) || 1;
+      this.gpu.acc = buildR8Tex(
+        gl,
+        accL,
+        0,
+        (v) => normalizeLoggedFlowAccumulation(v, mx),
+        gl.LINEAR,
+      );
     }
     if (basinL) {
       // RG8 (id&255, id>>8): thousands of basins, so a single R8 channel would
@@ -470,23 +475,22 @@ export class RenderPipeline implements RenderLayer {
 
   // --- per-frame context -----------------------------------------------------
 
-  /** Env at the storm centre. `plane` = the storm's seed-picked synoptic sample
-   *  (FrameState.synopticIndex) so the shear-smear cue reads the SAME regime the
-   *  physics rides; sampleLayerBilinear clamps it for nt=1 layers (SST). */
-  private sampleEnv(lat: number, lon: number, plane: number): EnvAtStorm | null {
+  /** Read the exact environment mode/time used by physics at the storm centre. */
+  private sampleEnv(
+    lat: number,
+    lon: number,
+    frame: FrameState,
+  ): EnvAtStorm | null {
     const bin = this.res.env;
     if (!bin) return null;
-    const n = envMonthNames(this.monthIndex);
-    const sstL = pickLayer(bin, [n.sst, 'sst']);
-    const shearL = pickLayer(bin, [n.shr, 'shear']);
-    const uL = pickLayer(bin, [n.u, 'u']);
-    const vL = pickLayer(bin, [n.v, 'v']);
-    return {
-      sstC: sstL ? sampleLayerBilinear(sstL, plane, lat, lon) : 0,
-      shear: shearL ? sampleLayerBilinear(shearL, plane, lat, lon) : 0,
-      steerU: uL ? sampleLayerBilinear(uL, plane, lat, lon) : 0,
-      steerV: vL ? sampleLayerBilinear(vL, plane, lat, lon) : 0,
-    };
+    return sampleEnvBin(
+      bin,
+      lat,
+      lon,
+      this.monthIndex,
+      frame.envTFrac,
+      frame.envSamplingMode,
+    );
   }
 
   private buildCtx(frame: FrameState): DrawCtx {
@@ -513,7 +517,7 @@ export class RenderPipeline implements RenderLayer {
       track = s.trackPoints;
       intensity = clamp01((vKt - 20) / 100);
       demo = s.isDemo;
-      env = this.sampleEnv(lat, lon, frame.synopticIndex ?? 0);
+      env = this.sampleEnv(lat, lon, frame);
       if (s.alive) {
         aftermath = 1;
         this.deathMs = null;

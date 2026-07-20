@@ -40,11 +40,11 @@ between the bake that wrote the file and the code that routes it:
 1. **Synoptic samples** (v1.0 climatology `env.bin` `u/v/shr`, `nt = 4`): each
    plane is a distinct real YEAR's month (bake/era5.py picks them; plane 0 =
    most typical). Consumers SELECT one plane per storm — the spawn seed picks
-   `seed % nt` via `env-sampler.setSynopticIndex()` — and `tFrac` is ignored.
+   `seed % nt` in explicit `synoptic-plane` mode — and `tFrac` is ignored.
    This is the D10 track-diversity remedy.
 2. **Time axis** (v1.1 event files, e.g. a Gonu `env` bake with hourly steps):
-   planes are consecutive timesteps; consumers clear the synoptic index (−1)
-   and `tFrac` linearly interpolates along `nt`.
+   planes are consecutive timesteps; consumers select explicit `event-timeline`
+   mode and `tFrac` linearly interpolates along `nt`.
 
 `sst_MM` stays `nt = 1` in mode 1 (OISST long-term mean).
 
@@ -202,7 +202,7 @@ The counterfactual mode (`bake/bake.py events`) adds four files:
   (version 1, identical 88-byte records, 40×24, int16 quant scale 0.01, north
   row 0). The ONLY difference is the `nt` mode-2 **time axis**: `u/v/shr` planes
   are consecutive 3-hourly steps (gonu `nt=64`, shaheen `nt=168`), consumed by
-  clearing the synoptic index (−1) and interpolating along `tFrac`. Layers keep
+  selecting `event-timeline` mode and interpolating along `tFrac`. Layers keep
   the month-suffix names (`sst_05,u_05,v_05,shr_05` for gonu; `..._08` for
   shaheen) so the existing sampler resolves them unchanged. `sst_MM` stays
   `nt=1`, copied verbatim from `env.bin` (the event fetch was winds-only). The

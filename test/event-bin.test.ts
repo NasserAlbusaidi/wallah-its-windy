@@ -2,12 +2,12 @@
  * event-bin.test.ts — the v1.1 event-bin TIME-AXIS path, end-to-end (C2/C4/C8).
  *
  * A scenario switch swaps the sampler onto a historic event bin whose nt is a TIME
- * axis and calls setSynopticIndex(-1) so tFrac linearly interpolates across the
+ * axis and selects event-timeline mode so tFrac linearly interpolates across the
  * timesteps (the counterfactual's sim-hours mapping onto event-hours). This builds
  * a tiny synthetic event bin with a test-only WIWB writer, parses it through the
  * PRODUCTION reader (loader.parseBin), and drives the PRODUCTION sampler
- * (makeEnvSampler) to prove: (1) index -1 time-interpolates; (2) a non-negative
- * index freezes on one plane and ignores tFrac (the mode-switch sign flip); (3) the
+ * (makeEnvSampler) to prove: (1) event mode time-interpolates; (2) synoptic mode
+ * freezes one plane and ignores tFrac; (3) the
  * sim actually runs on the event bin and terminates finitely.
  */
 
@@ -38,15 +38,15 @@ function buildEventBin(): ParsedBin {
   return parseBin(buf);
 }
 
-describe('event bin: nt is a time axis when setSynopticIndex(-1)', () => {
+describe('event bin: nt semantics are explicit', () => {
   it('synopticCount reports the steering layer nt', () => {
     expect(synopticCount(buildEventBin(), 5)).toBe(U_PLANES.length);
   });
 
-  it('tFrac linearly interpolates u across the timesteps (index -1)', () => {
+  it('event-timeline mode linearly interpolates u across the timesteps', () => {
     const bin = buildEventBin();
     const sampler = makeEnvSampler(() => bin);
-    sampler.setSynopticIndex(-1); // event mode: nt as time
+    sampler.setSamplingMode({ kind: 'event-timeline' });
     const lat = 21;
     const lon = 60;
     // tFrac 0 -> plane 0 (0), tFrac 1 -> plane 2 (20), tFrac 0.5 -> plane 1 (10).
@@ -57,14 +57,17 @@ describe('event bin: nt is a time axis when setSynopticIndex(-1)', () => {
     expect(sampler.sample(lat, lon, 5, 0.25).steerU).toBeCloseTo(5, 6);
   });
 
-  it('a non-negative index freezes on one plane and IGNORES tFrac (the sign flip)', () => {
+  it('synoptic-plane mode freezes one plane and ignores tFrac', () => {
     const bin = buildEventBin();
     const sampler = makeEnvSampler(() => bin);
-    sampler.setSynopticIndex(1); // climatology-style plane pick
+    sampler.setSamplingMode({ kind: 'synoptic-plane', plane: 1 });
     // tFrac now inert: every tFrac reads plane 1's value (10), not interpolation.
     expect(sampler.sample(21, 60, 5, 0).steerU).toBeCloseTo(10, 6);
     expect(sampler.sample(21, 60, 5, 1).steerU).toBeCloseTo(10, 6);
-    expect(sampler.getSynopticIndex()).toBe(1);
+    expect(sampler.getSamplingMode()).toEqual({
+      kind: 'synoptic-plane',
+      plane: 1,
+    });
   });
 });
 
@@ -72,7 +75,7 @@ describe('event bin: the sim runs on it and terminates finitely', () => {
   it('spawns, ticks, and dies without producing non-finite state', () => {
     const bin = buildEventBin();
     const sampler = makeEnvSampler(() => bin);
-    sampler.setSynopticIndex(-1); // event mode
+    sampler.setSamplingMode({ kind: 'event-timeline' });
     const engine = createSimEngine({ env: sampler, isLand: () => false });
     engine.spawn({ lat: 18, lon: 62, monthIndex: 5, seed: 2007, isDemo: false });
     let died = false;

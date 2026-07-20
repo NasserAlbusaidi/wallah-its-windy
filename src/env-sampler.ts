@@ -19,14 +19,20 @@
  *
  * SYNOPTIC SAMPLES (D10): a v1.0 climatology bake may instead carry nt=K
  * distinct real-year planes per u/v/shr layer (bake/era5.py). Those planes are
- * ALTERNATIVE regimes to pick per spawn (seed % K, set via setSynopticIndex),
- * NOT a time axis — so while an index is set, nearestCell reads that one plane
- * and ignores tFrac. Clearing the index (setSynopticIndex(-1)) restores tFrac
- * interpolation for v1.1 event files, whose nt IS time.
+ * ALTERNATIVE regimes to pick per spawn (seed % K), NOT a time axis. The
+ * explicit EnvSamplingMode discriminates those frozen planes from v1.1 event
+ * files, whose nt IS chronological time.
  */
 
-import { DOMAIN, latLonToCell } from './grid';
-import type { BinLayer, EnvSample, EnvSampler, ParsedBin } from './types';
+import { DOMAIN } from './grid';
+import { sampleLayerBilinear } from './raster-sampler';
+import type {
+  BinLayer,
+  EnvSample,
+  EnvSampler,
+  EnvSamplingMode,
+  ParsedBin,
+} from './types';
 
 /** Season layer suffix for a monthIndex, clamped to bake's [4..10] and padded. */
 export function envMonthSuffix(monthIndex: number): string {
@@ -47,27 +53,26 @@ function pickLayer(bin: ParsedBin, names: readonly string[]): BinLayer | null {
 }
 
 /**
- * Nearest-cell read of a layer. The latlon->cell conversion is grid.latLonToCell
- * (eng D1: ONE owner of coordinate math); row order is north->south per
- * BINARY-FORMATS.md and grid.ts. Plane semantics: a non-negative sampleIndex
- * selects one synoptic plane (D10 regime pick, tFrac ignored); a negative index
- * means nt is a TIME axis and tFrac linearly interpolates along it.
+ * Bilinear spatial read of a layer. Synoptic mode selects one plane and ignores
+ * tFrac; event mode treats nt as time and interpolates two spatial samples.
  */
-function nearestCell(layer: BinLayer, lat: number, lon: number, tFrac: number, sampleIndex: number): number {
-  const { nx, ny, nt, bbox, data } = layer;
-  const cell = latLonToCell({ nx, ny, bbox }, lat, lon);
-  const col = clamp(Math.round(cell.col), 0, nx - 1);
-  const row = clamp(Math.round(cell.row), 0, ny - 1);
-  if (sampleIndex >= 0) {
-    const t = clamp(Math.floor(sampleIndex), 0, nt - 1);
-    return data[(t * ny + row) * nx + col];
+function sampleLayer(
+  layer: BinLayer,
+  lat: number,
+  lon: number,
+  tFrac: number,
+  mode: EnvSamplingMode,
+): number {
+  const { nt } = layer;
+  if (mode.kind === 'synoptic-plane') {
+    return sampleLayerBilinear(layer, mode.plane, lat, lon);
   }
   const tf = clamp(tFrac * (nt - 1), 0, nt - 1);
   const t0 = Math.floor(tf);
   const t1 = Math.min(nt - 1, t0 + 1);
   const w = tf - t0;
-  const a = data[(t0 * ny + row) * nx + col];
-  const b = data[(t1 * ny + row) * nx + col];
+  const a = sampleLayerBilinear(layer, t0, lat, lon);
+  const b = sampleLayerBilinear(layer, t1, lat, lon);
   return a + (b - a) * w;
 }
 
@@ -82,7 +87,7 @@ export function sampleEnvBin(
   lon: number,
   monthIndex: number,
   tFrac: number,
-  sampleIndex = -1,
+  mode: EnvSamplingMode,
 ): EnvSample | null {
   const mm = envMonthSuffix(monthIndex);
   const sst = pickLayer(bin, [`sst_${mm}`, 'sst']);
@@ -91,11 +96,11 @@ export function sampleEnvBin(
   const sh = pickLayer(bin, [`shr_${mm}`, 'shear', 'shr']);
   if (!sst || !su || !sv || !sh) return null;
   return {
-    // SST bakes nt=1, so the synoptic index degenerates to plane 0 there.
-    sstC: nearestCell(sst, lat, lon, tFrac, sampleIndex),
-    steerU: nearestCell(su, lat, lon, tFrac, sampleIndex),
-    steerV: nearestCell(sv, lat, lon, tFrac, sampleIndex),
-    shear: nearestCell(sh, lat, lon, tFrac, sampleIndex),
+    // SST bakes nt=1, so either mode degenerates to its only plane.
+    sstC: sampleLayer(sst, lat, lon, tFrac, mode),
+    steerU: sampleLayer(su, lat, lon, tFrac, mode),
+    steerV: sampleLayer(sv, lat, lon, tFrac, mode),
+    shear: sampleLayer(sh, lat, lon, tFrac, mode),
   };
 }
 
@@ -108,10 +113,10 @@ export function synopticCount(bin: ParsedBin | null, monthIndex: number): number
 
 /** An EnvSampler whose synoptic plane can be re-pointed per spawn (seed % K). */
 export interface SelectableEnvSampler extends EnvSampler {
-  /** Select the plane storms read (>= 0), or -1 to restore tFrac time-interp. */
-  setSynopticIndex(index: number): void;
-  /** The currently selected plane (-1 = time-interp mode). */
-  getSynopticIndex(): number;
+  /** Explicitly select whether `nt` is a frozen synoptic plane or event time. */
+  setSamplingMode(mode: EnvSamplingMode): void;
+  /** The active interpretation of the environment layer's `nt` axis. */
+  getSamplingMode(): EnvSamplingMode;
 }
 
 /**
@@ -119,24 +124,27 @@ export interface SelectableEnvSampler extends EnvSampler {
  * holder so it starts working the instant the file lands) and falls back to a
  * coarse analytic Arabian-Sea climatology when it is absent. The fallback is a
  * deterministic function of (lat, lon, month) and every output is finite.
- * The synoptic index is spawn state: main sets it from the seed BEFORE
- * engine.spawn, so sim = f(spawn, month, seed) still holds exactly.
+ * The sampling mode is spawn state: main sets it from scenario + seed BEFORE
+ * engine.spawn, so sim = f(spawn, month, seed[, env]) still holds exactly.
  */
 export function makeEnvSampler(getBin: () => ParsedBin | null): SelectableEnvSampler {
-  let synopticIndex = -1;
+  let samplingMode: EnvSamplingMode = { kind: 'synoptic-plane', plane: 0 };
   return {
-    setSynopticIndex(index: number): void {
-      synopticIndex = Math.floor(index);
+    setSamplingMode(mode: EnvSamplingMode): void {
+      samplingMode =
+        mode.kind === 'synoptic-plane'
+          ? { kind: 'synoptic-plane', plane: Math.max(0, Math.floor(mode.plane)) }
+          : { kind: 'event-timeline' };
     },
-    getSynopticIndex(): number {
-      return synopticIndex;
+    getSamplingMode(): EnvSamplingMode {
+      return samplingMode;
     },
     sample(lat: number, lon: number, monthIndex: number, tFrac: number): EnvSample {
       const la = clamp(lat, DOMAIN.latMin, DOMAIN.latMax);
       const lo = clamp(lon, DOMAIN.lonMin, DOMAIN.lonMax);
       const bin = getBin();
       if (bin) {
-        const sampled = sampleEnvBin(bin, la, lo, monthIndex, tFrac, synopticIndex);
+        const sampled = sampleEnvBin(bin, la, lo, monthIndex, tFrac, samplingMode);
         if (sampled) return sampled;
       }
       const phase = (monthIndex / 12) * Math.PI * 2;

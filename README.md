@@ -57,19 +57,36 @@ bake/.venv/bin/python bake/bake.py          # ~15s; writes public/data/*
   tracks (`genesis.json`), D8 flow-accumulation from the real DEM (`flowacc.bin`).
 - Raw downloads cache under `data/raw/` (gitignored); the venv under `bake/.venv`.
 
-### Provenance caveat — steering/shear are `SYNTHETIC_V0`
+### Provenance — steering/shear are REAL ERA5 (with synoptic samples)
 
-`env.bin`'s **SST is real** (OISST). Its **steering (`u`/`v`) and shear are a
-documented synthetic Arabian-Sea climatology** (`bake/synth.py`, with a loud
-banner at bake time), because ERA5 needs Copernicus CDS credentials that were not
-available on the build machine. It is a one-function swap: replace
-`synth.steering_shear()` with an ERA5 reader — the exact `cdsapi` request and the
-HydroSHEDS drop-in are written up in `bake/README.md`.
+`env.bin` is now **fully real**: SST from OISST, steering (`u`/`v`) and shear
+from the **ERA5 1991–2020 monthly climatology** (`bake/era5.py`; deep-layer mean
+of 850/500/250 hPa, shear = |V200 − V850| averaged as mean-of-magnitudes).
+`bake/synth.py` remains only as the loudly-bannered fallback when
+`data/raw/era5_climatology.nc` is absent.
+
+**Synoptic samples (D10):** the track-diversity spike measured pure monthly
+means as rail-prone (keep-ratio 16 % in June < the 30 % gate), so each month's
+`u`/`v`/`shr` layer carries `nt = 4` planes — four real, coherent YEARS chosen
+by deterministic farthest-point selection (one typical + three diverse; the
+years print at bake time). At runtime the spawn **seed picks the plane**
+(`seed % 4`, `src/env-sampler.ts`), so re-clicking the same spot summons
+genuinely different environments while `sim = f(spawn, month, seed)` holds
+(spike keep-ratio with samples: 50–65 % — PASS). SST stays `nt = 1`. Hourly
+Gonu (Jun 2007) and Shaheen (Sep–Oct 2021) event fields are already downloaded
+under `data/raw/` for the v1.1 counterfactual bake, where `nt` is a TIME axis
+(`tFrac` interpolation — the sampler's other mode).
 
 `env.bin` encodes the month in the layer **name** (`sst_MM/u_MM/v_MM/shr_MM`,
 `MM` = 0-indexed `monthIndex`, `04`=May … `10`=Nov). Consumers resolve it with
 `clamp(monthIndex, 4, 10)`; `src/env-sampler.ts` (sim) and `src/render/index.ts`
-(tint) both do, and `test/integration-bins.test.ts` guards the mapping.
+(tint) both do, and `test/integration-bins.test.ts` guards the mapping, the
+plane count, and plane distinctness.
+
+**Physics note:** the shear penalty (`src/sim.ts`) is calibrated for
+monthly-mean-of-magnitudes input (threshold 14 m/s), NOT instantaneous shear
+(~10 m/s) — monthly aggregation biases magnitudes high. Recalibrate if the env
+source ever moves to daily/hourly fields.
 
 ## Layout
 

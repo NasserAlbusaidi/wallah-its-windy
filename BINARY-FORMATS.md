@@ -32,6 +32,22 @@ index = ((t * ny) + row) * nx + col
 `src/grid.ts` owns the cell↔latlon math for this convention (`cellToLatLon`
 puts row 0 at the north edge). Nothing else may reimplement it.
 
+### `nt` semantics — two modes, decided by the consumer, not the header
+
+The byte layout is identical either way; what the planes MEAN is a contract
+between the bake that wrote the file and the code that routes it:
+
+1. **Synoptic samples** (v1.0 climatology `env.bin` `u/v/shr`, `nt = 4`): each
+   plane is a distinct real YEAR's month (bake/era5.py picks them; plane 0 =
+   most typical). Consumers SELECT one plane per storm — the spawn seed picks
+   `seed % nt` via `env-sampler.setSynopticIndex()` — and `tFrac` is ignored.
+   This is the D10 track-diversity remedy.
+2. **Time axis** (v1.1 event files, e.g. a Gonu `env` bake with hourly steps):
+   planes are consecutive timesteps; consumers clear the synoptic index (−1)
+   and `tFrac` linearly interpolates along `nt`.
+
+`sst_MM` stays `nt = 1` in mode 1 (OISST long-term mean).
+
 ---
 
 ## File layout

@@ -236,6 +236,109 @@ def load_genesis_points() -> tuple[list[dict[str, float]], int, int]:
     return points, len(points), len(order)
 
 
+# ---------------------------------------------------------------------------
+# Event tracks: full IBTrACS polylines for the two named counterfactual storms.
+# Distinct from genesis dots (load_genesis_points): this keeps EVERY fix with its
+# time + intensity, for the ghost-track overlay (C7) and sim tuning (C5).
+# ---------------------------------------------------------------------------
+
+# Each storm is disambiguated by SEASON + a NAME token set (never NAME alone —
+# multiple seasons can reuse a name). Empirically ibtracs.NI.csv gives ONE SID
+# per system: GONU is 2007151N14072; the Gulab->Shaheen system is the single SID
+# 2021267N18094 named "GULAB:SHAHEEN-GU" (one row group, no stitch needed). The
+# loader still merges + de-dupes across multiple SIDs defensively, so a future
+# archive that splits the system into two SIDs stitches transparently.
+EVENT_STORMS = (
+    {"id": "gonu2007", "name": "gonu", "year": 2007, "tokens": ("GONU",)},
+    {"id": "shaheen2021", "name": "shaheen", "year": 2021, "tokens": ("SHAHEEN", "GULAB")},
+)
+
+
+def _iso_z(raw: str) -> str:
+    """IBTrACS 'YYYY-MM-DD HH:MM:SS' -> ISO-8601 UTC 'YYYY-MM-DDTHH:MM:SSZ'."""
+    s = raw.strip().replace(" ", "T")
+    if not s.endswith("Z"):
+        s += "Z"
+    return s
+
+
+def _int_or_none(cell: str) -> int | None:
+    cell = cell.strip()
+    if not cell:
+        return None
+    try:
+        return int(round(float(cell)))
+    except ValueError:
+        return None
+
+
+def load_event_tracks(csv_path: str | None = None) -> list[dict]:
+    """Return the per-storm track polylines for EVENT_STORMS (C1 shape, minus the
+    envelope): a list of {id, name, year, points:[{iso,lat,lon,windKt,presMb}]}.
+
+    Points keep ALL fixes (including off-domain Bay-of-Bengal segments — canvas
+    clipping handles them), time-ordered, lat/lon rounded to 3 dp, windKt/presMb
+    integers or None when the CSV cell is blank. Rows are matched by SEASON + a
+    NAME token; multiple SIDs for one system are merged and de-duped by ISO_TIME.
+    """
+    path = csv_path or ensure_download(URL_IBTRACS_NI, "ibtracs.NI.csv")
+
+    # storm-id -> {iso -> (lat, lon, windKt, presMb)} (dict de-dupes by timestamp).
+    collected: dict[str, dict[str, tuple[float, float, int | None, int | None]]] = {
+        s["id"]: {} for s in EVENT_STORMS
+    }
+    with open(path, newline="") as fh:
+        reader = csv.reader(fh)
+        header = next(reader)
+        i_sid = header.index("SID")
+        i_season = header.index("SEASON")
+        i_name = header.index("NAME")
+        i_iso = header.index("ISO_TIME")
+        i_lat = header.index("LAT")
+        i_lon = header.index("LON")
+        i_wind = header.index("WMO_WIND")
+        i_pres = header.index("WMO_PRES")
+        need = max(i_sid, i_season, i_name, i_iso, i_lat, i_lon, i_wind, i_pres)
+        for rowv in reader:
+            if len(rowv) <= need:
+                continue
+            sid = rowv[i_sid].strip()
+            if not sid or sid == "SID":  # skip blanks + the units row
+                continue
+            try:  # units row also fails the float() guard
+                la = float(rowv[i_lat])
+                lo = float(rowv[i_lon])
+            except ValueError:
+                continue
+            if lo > 180.0:  # IBTrACS uses -180..180; guard anyway
+                lo -= 360.0
+            season = rowv[i_season].strip()
+            name_u = rowv[i_name].strip().upper()
+            for spec in EVENT_STORMS:
+                if season != str(spec["year"]):
+                    continue
+                if not any(tok in name_u for tok in spec["tokens"]):
+                    continue
+                iso = _iso_z(rowv[i_iso])
+                collected[spec["id"]][iso] = (
+                    round(la, 3), round(lo, 3),
+                    _int_or_none(rowv[i_wind]), _int_or_none(rowv[i_pres]),
+                )
+                break
+
+    storms: list[dict] = []
+    for spec in EVENT_STORMS:
+        fixes = collected[spec["id"]]
+        points = [
+            {"iso": iso, "lat": la, "lon": lo, "windKt": w, "presMb": p}
+            for iso, (la, lo, w, p) in sorted(fixes.items())  # ISO strings sort chronologically
+        ]
+        storms.append(
+            {"id": spec["id"], "name": spec["name"], "year": spec["year"], "points": points}
+        )
+    return storms
+
+
 if __name__ == "__main__":  # smoke test
     e, lm = load_terrain()
     print("terrain", e.shape, "elev[m] min/max", int(e.min()), int(e.max()),

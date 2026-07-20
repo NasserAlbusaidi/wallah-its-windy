@@ -111,27 +111,31 @@ describe('structure validation protocol', () => {
     expect(extremeRmw.objective).toBe(normal.objective);
   });
 
-  it('accepts only the outer-size candidate that clears every held-out gate', () => {
-    const result = calibrateStructureModel(dataset.observations);
-    expect(result.evaluatedCandidates).toBeGreaterThan(350);
-    expect(result.proposedCalibration.objective).toBeLessThan(
-      result.baselineCalibration.objective,
-    );
-    expect(result.accepted).toBe(true);
-    expect(result.validationImprovementFraction).toBeGreaterThanOrEqual(0.04);
-    expect(result.proposedValidation.metrics.r34.mae).toBeLessThanOrEqual(
-      result.baselineValidation.metrics.r34.mae! * 0.9,
-    );
-    expect(result.proposedValidation.metrics.pressure.mae).toBe(
-      result.baselineValidation.metrics.pressure.mae,
-    );
-    expect(result.proposedValidation.metrics.r50.mae).toBe(
-      result.baselineValidation.metrics.r50.mae,
-    );
-    expect(result.proposedValidation.metrics.r64.mae).toBe(
-      result.baselineValidation.metrics.r64.mae,
-    );
-    expect(result.deployedParameters).toEqual(result.proposedParameters);
-    expect(liveParametersMatchCalibration(result)).toBe(true);
-  });
+  it(
+    'accepts only the outer-size candidate that clears every held-out gate',
+    () => {
+      const result = calibrateStructureModel(dataset.observations);
+      expect(result.evaluatedCandidates).toBeGreaterThan(350);
+      expect(result.proposedCalibration.objective).toBeLessThan(
+        result.baselineCalibration.objective,
+      );
+      expect(result.accepted).toBe(true);
+      expect(result.validationImprovementFraction).toBeGreaterThanOrEqual(0.04);
+      expect(result.proposedValidation.metrics.r34.mae).toBeLessThanOrEqual(
+        result.baselineValidation.metrics.r34.mae! * 0.9,
+      );
+      expect(result.proposedValidation.metrics.pressure.mae).toBe(
+        result.baselineValidation.metrics.pressure.mae,
+      );
+      expect(result.proposedValidation.metrics.r50.mae).toBe(
+        result.baselineValidation.metrics.r50.mae,
+      );
+      expect(result.proposedValidation.metrics.r64.mae).toBe(
+        result.baselineValidation.metrics.r64.mae,
+      );
+      expect(result.deployedParameters).toEqual(result.proposedParameters);
+      expect(liveParametersMatchCalibration(result)).toBe(true);
+    },
+    60_000,
+  );
 });

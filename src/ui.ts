@@ -246,6 +246,41 @@ export class UiController {
   }
 
   /**
+   * The active NON-demo user storm's spawn identity, or null. B4 uses it to build
+   * the counterfactual on a scenario switch (re-run the same lat/lon/seed under the
+   * event's month + env) and to restore the storm when returning to climatology.
+   * The ambient demo is excluded — a scenario switch replaces it with the event's
+   * canonical spawn, not a counterfactual of the demo.
+   */
+  activeUserSpawn(): SpawnParams | null {
+    return this.lastSpawn && !this.lastSpawn.isDemo ? { ...this.lastSpawn } : null;
+  }
+
+  /** Transient status while an event bin is fetched, e.g. "loading gonu 2007…". */
+  scenarioLoading(label: string): void {
+    this.setCaption(`loading ${label}…`, true);
+  }
+
+  /** Status once an event is live (the counterfactual is spawned). Lowercase tone. */
+  scenarioEntered(label: string): void {
+    this.setCaption(`${label} — the counterfactual. click the sea to place your own.`, true);
+  }
+
+  /**
+   * The event bin was missing/404 (mid-session toggle or a shared event URL opened
+   * before the bake shipped it). Visible, pinned message — never a silent replay of
+   * the wrong physics — while the app stays on / falls back to climatology.
+   */
+  scenarioError(label: string): void {
+    this.setCaption(`${label} data unavailable — showing climatology.`, false);
+  }
+
+  /** Status when a user storm is restored into climatology after an event. */
+  climatologyRestored(): void {
+    this.setCaption(RARITY_COPY, true);
+  }
+
+  /**
    * Month picker changed. Re-spawn the active storm at the same point + seed in
    * the new month (deterministic new track); returns the params for main, or null
    * when nothing is active. A fresh seed is NOT drawn — only the month varies, so

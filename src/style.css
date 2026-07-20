@@ -119,7 +119,12 @@ body {
   opacity: 0.6;
   margin-bottom: calc(var(--space, 8px) / 2);
 }
-#month {
+/* The Scenario label sits above its own select, spaced from the Month block. */
+#month-picker label[for='scenario'] {
+  margin-top: var(--space, 8px);
+}
+#month,
+#scenario {
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 500;
@@ -132,7 +137,14 @@ body {
   appearance: none;
   min-width: 8ch;
 }
-#month:focus-visible {
+/* Pinned month during an event replay (or an unavailable scenario catalogue). */
+#month:disabled,
+#scenario:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+#month:focus-visible,
+#scenario:focus-visible {
   outline: 1px solid var(--accent, #ffb74d);
   outline-offset: 2px;
 }

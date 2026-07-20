@@ -37,6 +37,17 @@
           <option value="9">October</option>
           <option value="10">November</option>
         </select>
+
+        <!-- Scenario picker (C8): climatology sandbox, or replay a historic event
+             (Gonu 2007 / Shaheen 2021) as a counterfactual. main.ts owns the change
+             listener + lazy env-bin fetch; the picker disables itself when the
+             scenario catalogue (data/scenarios.json) is absent. -->
+        <label for="scenario">Scenario</label>
+        <select id="scenario" aria-label="Scenario">
+          <option value="climatology" selected>climatology</option>
+          <option value="gonu">gonu 2007</option>
+          <option value="shaheen">shaheen 2021</option>
+        </select>
       </div>
 
       <!-- caption / epitaph slot -->

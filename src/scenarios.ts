@@ -71,6 +71,12 @@ function parseScenario(v: unknown): Scenario | null {
   if (!nonEmptyStr(v.id) || !nonEmptyStr(v.label) || !nonEmptyStr(v.bin)) return null;
   if (!nonEmptyStr(v.startIso) || !nonEmptyStr(v.ghostId)) return null;
   if (!finiteNum(v.monthIndex) || !finiteNum(v.stepH) || !finiteNum(v.windowH)) return null;
+  // Range-check the numerics the runtime trusts: monthIndex indexes the env
+  // layer suffix (0..11; anything else would silently clamp to a wrong month), and
+  // a non-positive stepH/windowH would make tFrac = ageH/windowH divide-by-zero or
+  // run the time axis backwards.
+  if (!Number.isInteger(v.monthIndex) || v.monthIndex < 0 || v.monthIndex > 11) return null;
+  if (v.stepH <= 0 || v.windowH <= 0) return null;
   const spawn = parseSpawn(v.spawn);
   if (!spawn) return null;
   return {

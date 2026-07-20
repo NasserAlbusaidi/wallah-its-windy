@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseBin } from '../src/loader';
 import { makeEnvSampler, envMonthSuffix, synopticCount } from '../src/env-sampler';
+import { DEMO_GENESIS, DEMO_MONTH, DEMO_SEED } from '../src/ui';
 import { createSimEngine } from '../src/sim';
 import { DOMAIN, inBBox, latLonToCell } from '../src/grid';
 import { MUSCAT } from '../src/types';
@@ -134,13 +135,18 @@ describe('env.bin', () => {
         expect(layer.nt, `${field}_${mm} nt`).toBeGreaterThanOrEqual(3);
         expect(allFinite(layer.data)).toBe(true);
       }
-      // Planes must be genuinely different regimes, not copies: the mean |u|
-      // difference between plane 0 and plane 1 should be clearly nonzero.
+      // Planes must be genuinely different regimes, not copies: every adjacent
+      // pair of planes must differ clearly in mean |u| (catches duplicated or
+      // zero-filled tail planes, not just a bad plane 1).
       const u = bin.layers.get(`u_${mm}`)!;
       const planeSize = u.nx * u.ny;
-      let diff = 0;
-      for (let i = 0; i < planeSize; i++) diff += Math.abs(u.data[i] - u.data[planeSize + i]);
-      expect(diff / planeSize, `u_${mm} plane0 vs plane1`).toBeGreaterThan(0.1);
+      for (let p = 0; p + 1 < u.nt; p++) {
+        let diff = 0;
+        const a = p * planeSize;
+        const b = (p + 1) * planeSize;
+        for (let i = 0; i < planeSize; i++) diff += Math.abs(u.data[a + i] - u.data[b + i]);
+        expect(diff / planeSize, `u_${mm} plane${p} vs plane${p + 1}`).toBeGreaterThan(0.1);
+      }
       // SST stays a single climatology plane.
       expect(bin.layers.get(`sst_${mm}`)!.nt).toBe(1);
     }
@@ -199,13 +205,14 @@ describe('bake <-> sim seam (the real env.bin drives the physics)', () => {
   });
 
   it('THE demo storm (ui.ts identity) lives long, gets strong, and lands on Oman', () => {
-    // Mirrors ui.demoSpawnParams + main.doSpawn exactly: seed picks the plane.
-    const DEMO = { lat: 17.5, lon: 61.0, monthIndex: 4, seed: 71 };
+    // The ACTUAL ui.ts demo constants — editing them re-pins this test with it.
+    const DEMO = { ...DEMO_GENESIS, monthIndex: DEMO_MONTH, seed: DEMO_SEED };
     sampler.setSynopticIndex(DEMO.seed % synopticCount(env, DEMO.monthIndex));
     const engine = createSimEngine({ env: sampler, isLand });
     engine.spawn({ ...DEMO, isDemo: true });
 
     let died = false;
+    let sawLandfall = false;
     let ticks = 0;
     let maxV = 0;
     const MAX_TICKS = 4000; // ~41 sim-days; any real storm dies well before this
@@ -217,17 +224,23 @@ describe('bake <-> sim seam (the real env.bin drives the physics)', () => {
       expect(Number.isFinite(s!.lon)).toBe(true);
       expect(Number.isFinite(s!.vKt)).toBe(true);
       maxV = Math.max(maxV, s!.vKt);
-      died = events.some((e) => e.type === 'died');
+      for (const e of events) {
+        if (e.type === 'landfall') sawLandfall = true;
+        if (e.type === 'died') died = true;
+      }
     }
     sampler.setSynopticIndex(-1);
     expect(died).toBe(true);
     const s = engine.getState()!;
     expect(s.alive).toBe(false);
     // The demo is the first thing every visitor sees — pin its quality: a
-    // multi-day major that ends over the Omani landmass (wadi payoff on screen).
+    // multi-day major that actually CROSSES the coast (wadi payoff on screen)
+    // and dies over the Omani landmass, not merely inside a sea-heavy box.
+    expect(sawLandfall).toBe(true);
+    expect(isLand(s.lat, s.lon)).toBe(true);
     expect((ticks * 15) / 60 / 24).toBeGreaterThan(4); // > 4 sim-days
     expect(maxV).toBeGreaterThan(90); // a major, not a fizzle
-    expect(s.lon).toBeGreaterThan(52.5); // ends on the Omani landmass box
+    expect(s.lon).toBeGreaterThan(52.5); // the Omani landmass box (not Makran/Iran)
     expect(s.lon).toBeLessThan(60.0);
     expect(s.lat).toBeGreaterThan(16.5);
     expect(s.lat).toBeLessThan(26.5);

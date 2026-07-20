@@ -36,6 +36,18 @@ TAG = "ERA5-CLIM-1991-2020"
 # genuinely different synoptic regimes while sim = f(spawn, month, seed) holds.
 SAMPLES_PER_MONTH = 4
 
+# Post-monsoon rescue (C6 nov_remedy, data-side). Farthest-point sampling on the
+# STEERING field alone can strand a month with no calm-shear plane even when calm
+# years exist in the record — November's diversity picks were all >=14 m/s belt
+# shear, so seed%K never escaped a hostile regime and 0/32 test storms reached
+# Cat-1. Fix: if a genuinely calm year exists (belt shear < CALM_BELT_SHEAR_MS)
+# but no current pick captured it, swap the calmest real year in for the least-
+# typical pick. Gated so ONLY all-hostile months change; June's calmest belt
+# shear (~18.5) stays above the threshold, so June/May/Jul/Aug/Sep/Oct picks are
+# byte-identical (zero blast radius on existing seeds, URLs, and the demo pin).
+GENESIS_BELT_LAT_MAX = 19.0  # deg N; the low-latitude genesis belt
+CALM_BELT_SHEAR_MS = 13.0    # below this a plane is a survivable regime
+
 STEER_LEVELS = (850.0, 500.0, 250.0)
 SHEAR_LEVELS = (850.0, 200.0)
 
@@ -154,12 +166,30 @@ def _load() -> None:
     _yearly = yearly
 
 
-def _pick_sample_years(u_y: np.ndarray, v_y: np.ndarray, k: int) -> list[int]:
+def _belt_shear_per_year(shear_y: np.ndarray) -> np.ndarray:
+    """Per-year mean shear (m/s) in the low-latitude genesis belt (native cells,
+    lat <= GENESIS_BELT_LAT_MAX). Domain-band proxy for the per-year post-monsoon
+    calm test — cheaper than sampling genesis points and monotone with them."""
+    assert _axes is not None
+    lat, _lon = _axes
+    mask = lat <= GENESIS_BELT_LAT_MAX
+    if not mask.any():
+        mask = np.ones_like(lat, dtype=bool)
+    return shear_y[:, mask, :].mean(axis=(1, 2))
+
+
+def _pick_sample_years(u_y: np.ndarray, v_y: np.ndarray, shear_y: np.ndarray, k: int) -> list[int]:
     """Indices of k diverse-but-real years via deterministic farthest-point pick.
 
     Seed with the most TYPICAL year (closest to the mean field), then greedily
     add the year farthest (RMS over the concatenated u,v field) from all picks —
     one representative regime plus the spread of real alternatives.
+
+    Post-monsoon rescue (C6): if a genuinely calm-shear year exists in the record
+    (belt shear < CALM_BELT_SHEAR_MS) but no steering-diversity pick captured one,
+    replace the least-typical pick with the calmest real year, so seed%K can land
+    on a survivable regime. Gated on the calmest-year value, so months whose calm
+    floor is above the threshold (e.g. June) keep byte-identical picks.
     """
     n = u_y.shape[0]
     flat = np.concatenate([u_y.reshape(n, -1), v_y.reshape(n, -1)], axis=1)
@@ -171,6 +201,18 @@ def _pick_sample_years(u_y: np.ndarray, v_y: np.ndarray, k: int) -> list[int]:
         )
         dmin[picks] = -1.0
         picks.append(int(np.argmax(dmin)))
+    if len(picks) > 1:
+        belt = _belt_shear_per_year(shear_y)
+        calmest = int(np.argmin(belt))
+        picked_floor = min(float(belt[p]) for p in picks)
+        if (
+            float(belt[calmest]) < CALM_BELT_SHEAR_MS
+            and picked_floor >= CALM_BELT_SHEAR_MS
+            and calmest not in picks
+        ):
+            # Keep plane 0 (typical) and the earlier diversity planes; the last
+            # (most-extreme) pick is the one traded for the calm regime.
+            picks[-1] = calmest
     return picks
 
 
@@ -214,7 +256,7 @@ def steering_shear_samples(
     if month not in _yearly:
         raise KeyError(f"month {month} not in ERA5 climatology (has {sorted(_yearly)})")
     yr, u_y, v_y, shear_y = _yearly[month]
-    idx = _pick_sample_years(u_y, v_y, SAMPLES_PER_MONTH)
+    idx = _pick_sample_years(u_y, v_y, shear_y, SAMPLES_PER_MONTH)
     u = np.stack([_to_env_grid(u_y[i], elat, elon) for i in idx])
     v = np.stack([_to_env_grid(v_y[i], elat, elon) for i in idx])
     s = np.stack([_to_env_grid(shear_y[i], elat, elon) for i in idx])

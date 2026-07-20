@@ -23,7 +23,7 @@
 
 import './style.css';
 import { injectCssVars, TOKENS } from './tokens';
-import { readHash, writeHash } from './rng';
+import { readHash, writeHash, isEnvHashKey } from './rng';
 import { DOMAIN, clipToLatLon, inBBox } from './grid';
 import { parseBin } from './loader';
 import type {
@@ -37,11 +37,31 @@ import type {
   SpawnParams,
   StormState,
 } from './types';
-import { UiController } from './ui';
+import { UiController, DEMO_MONTH } from './ui';
 import { createSimEngine } from './sim';
 import { makeEnvSampler, synopticCount } from './env-sampler';
 import { parseTracks, toGhostPolylines, computeLabelAnchors } from './tracks';
 import type { GhostPolyline, StormTrack } from './tracks';
+import {
+  parseScenarios,
+  findScenario,
+  eventSpawn,
+  synopticIndexForSpawn,
+  restoredMonth,
+  CLIMATOLOGY_ID,
+} from './scenarios';
+import type { Scenario } from './scenarios';
+
+/**
+ * SpawnParams plus the OPTIONAL event-window horizon (C4). B2 adds `tFracHorizonH`
+ * to types.ts SpawnParams on his branch; this worktree (B3's) predates that merge,
+ * so B4 threads it via this local extension. sim.tick() on B2's branch reads it as
+ * `spawn.tFracHorizonH ?? SIM.EVENT_TFRAC_HORIZON_H`; until integration merges B2
+ * the field is inert here (sim uses the fixed 240 h horizon), so the counterfactual
+ * time-axis mapping is only 1:1 post-merge — see contract_deviations.
+ * TODO(integration): drop this alias once SpawnParams carries tFracHorizonH.
+ */
+type SpawnParamsX = SpawnParams & { tFracHorizonH?: number };
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
 // main resolves the module by a namespace probe (acquireRender) and PREFERS mode A
@@ -73,6 +93,7 @@ const overlayCanvas = must(document.getElementById('overlay-canvas') as HTMLCanv
 const progressEl = must(document.getElementById('progress'), '#progress');
 const captionEl = must(document.getElementById('caption'), '#caption');
 const monthSelect = must(document.getElementById('month') as HTMLSelectElement | null, '#month');
+const scenarioSelect = must(document.getElementById('scenario') as HTMLSelectElement | null, '#scenario');
 
 const gl = glCanvas.getContext('webgl2', { antialias: true, alpha: false });
 if (!gl) {
@@ -102,8 +123,25 @@ const ui = new UiController({
 // climatology so the demo and user storms still form, drift and die. Both
 // branches are pure in (lat,lon,month), so the sim stays a pure function of
 // (spawn,month,seed). See src/env-sampler.ts.
+// `envBin` is the LIVE holder the sampler closes over: reassigning it (never
+// rebuilding the sampler) instantly re-points the sim at a new env (climatology
+// vs a historic event bin — C8). `climatologyBin` retains the default env.bin so
+// returning from an event restores it.
 let envBin: ParsedBin | null = null;
+let climatologyBin: ParsedBin | null = null;
 const envSampler = makeEnvSampler(() => envBin);
+
+// --- Scenario runtime (counterfactual event replays, C8) --------------------
+/** Validated scenario catalogue (data/scenarios.json); empty disables the picker. */
+let scenarios: Scenario[] = [];
+/** Parsed event bins, cached so re-toggling a scenario never refetches. */
+const eventBinCache = new Map<string, ParsedBin>();
+/** The active event, or null for climatology (the default sandbox). */
+let activeScenario: Scenario | null = null;
+/** The month the picker showed when the user LEFT climatology, to restore on return. */
+let preEventMonth: number | null = null;
+/** Monotonic guard so a slow event fetch can't clobber a newer switch. */
+let scenarioReqSeq = 0;
 
 // --- Sim + render construction (defensive against half-done siblings) --------
 let engine: SimEngine | null = null;
@@ -191,12 +229,20 @@ const MANIFEST: LoadItem[] = [
   { url: asset('data/genesis.json'), label: 'genesis zones', kind: 'json', key: 'genesis', weight: 1 },
   // Historic ghost tracks (C7). Missing/404 degrades to null -> no ghosts, no labels.
   { url: asset('data/tracks.json'), label: 'historic tracks', kind: 'json', key: 'tracks', weight: 1 },
+  // Scenario catalogue (C8). Missing/404 -> null -> the scenario picker disables.
+  { url: asset('data/scenarios.json'), label: 'scenarios', kind: 'json', key: 'scenarios', weight: 1 },
 ];
 
 const loadedWeight = new Map<string, number>();
 let genesisPoints: LatLon[] = [];
 /** Parsed historic tracks, or null when the file is absent/malformed (no ghosts). */
 let parsedTracks: StormTrack[] | null = null;
+/** Parsed scenario catalogue, or null when the file is absent/malformed. */
+let parsedScenarios: Scenario[] | null = null;
+/** Merged terrain+flowacc bin, retained so a scenario switch can re-inject it. */
+let mergedTerrainBin: ParsedBin | null = null;
+/** Ghost polylines for the render facade, retained across scenario switches. */
+let ghostTracks: GhostPolyline[] = [];
 
 function reportProgress(): void {
   const total = MANIFEST.reduce((s, m) => s + m.weight, 0);
@@ -251,6 +297,7 @@ function routeLoaded(item: LoadItem, buf: ArrayBuffer, bins: Map<string, ParsedB
       const json = JSON.parse(new TextDecoder().decode(buf)) as unknown;
       if (item.key === 'genesis') genesisPoints = parseGenesis(json);
       else if (item.key === 'tracks') parsedTracks = parseTracks(json);
+      else if (item.key === 'scenarios') parsedScenarios = parseScenarios(json);
     }
   } catch (err) {
     console.warn(`[load] ${item.label} parsed badly, skipping:`, err);
@@ -311,24 +358,49 @@ async function loadAll(): Promise<void> {
   // genesis points drive the faint glow the UI draws on the overlay. Uploading
   // terrain/env layers to render GPU textures is the unsettled render data seam
   // (see build report) — not wired here; storm particles/track still render.
-  const terrain = mergedTerrain(bins);
-  ui.setLandMask(findLandMask(terrain));
+  mergedTerrainBin = mergedTerrain(bins);
+  ui.setLandMask(findLandMask(mergedTerrainBin));
   ui.setGenesis(genesisPoints);
-  envBin = bins.get('env') ?? null;
+  climatologyBin = bins.get('env') ?? null;
+  envBin = climatologyBin;
 
   // Ghost tracks (C7): the facade draws the polylines; ui owns the DOM labels.
   // parsedTracks is null when tracks.json is absent/malformed -> empty everywhere.
-  const ghostTracks: GhostPolyline[] = parsedTracks ? toGhostPolylines(parsedTracks) : [];
+  ghostTracks = parsedTracks ? toGhostPolylines(parsedTracks) : [];
   ui.setGhostLabels(parsedTracks ? computeLabelAnchors(parsedTracks) : []);
+
+  // Scenario catalogue (C8): an absent/empty catalogue disables the picker (only
+  // climatology is reachable — we have no event bin paths to fetch).
+  scenarios = parsedScenarios ?? [];
+  scenarioSelect.disabled = scenarios.length === 0;
 
   // Inject the single parsed copy into the render facade (mode A): the exact
   // bytes main just loaded feed BOTH the sim sampler and the GPU textures, so no
   // URL is fetched twice and no bin is dequantized twice (the double-load seam).
-  renderCtrl?.setResources?.({ terrain, env: envBin, genesis: genesisPoints, tracks: ghostTracks });
+  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: envBin, genesis: genesisPoints, tracks: ghostTracks });
 
-  // First storm: a shared storm from the URL hash replays exactly; otherwise the
-  // ambient demo (design T1). The demo is fast-forwarded so it opens mid-life.
+  // First storm. A shared storm from the URL hash replays exactly; if it carries a
+  // known scenario key, fetch that event bin BEFORE the first spawn so the replay
+  // rides the right physics (never a silent climatology fallback — C8). Otherwise
+  // the ambient demo (design T1), fast-forwarded so it opens mid-life.
   const shared = readHash();
+  const sharedScenario = shared ? findScenario(scenarios, shared.env) : null;
+  if (shared && sharedScenario) {
+    const bin = await loadEventBin(sharedScenario);
+    if (bin) {
+      const first = ui.finishLoading(shared); // establishes user-storm state + lastSpawn
+      applyEventEnv(sharedScenario, bin); // pins the picker to the event month (authoritative)
+      // Force the event's canonical month: the event bin's layers are suffixed with
+      // it, and the picker is disabled — a mismatched hand-crafted `month=` in the
+      // hash must not resolve to a missing layer + silent analytic fallback.
+      doSpawn({ ...first, monthIndex: sharedScenario.monthIndex, tFracHorizonH: sharedScenario.windowH });
+      return;
+    }
+    // Event bin unbaked/404: visible caption, then replay in climatology so the
+    // storm still forms (the caption makes the wrong-env replay non-silent).
+    ui.scenarioError(sharedScenario.label);
+    scenarioSelect.value = CLIMATOLOGY_ID;
+  }
   const first = ui.finishLoading(shared);
   renderCtrl?.setMonth?.(first.monthIndex); // SST tint follows the spawned month
   doSpawn(first);
@@ -350,14 +422,24 @@ function headOf(s: StormState): Head {
 }
 
 /** Spawn (replacing any active storm), reset interpolation, and share via the hash. */
-function doSpawn(params: SpawnParams): void {
+function doSpawn(params: SpawnParamsX): void {
   if (!engine) return;
-  // Seed picks the synoptic regime (D10): env.bin u/v/shr carry nt=K real-year
-  // planes; select BEFORE spawn so the whole life (incl. warmup ticks) rides one
-  // coherent regime and sim = f(spawn, month, seed) holds. K=1 -> always plane 0.
-  envSampler.setSynopticIndex(params.seed % synopticCount(envBin, params.monthIndex));
+  // Synoptic-plane selection BEFORE spawn so the whole life rides one coherent env
+  // and sim = f(spawn, month, seed[, env]) holds. Climatology: seed % K picks a
+  // D10 real-year regime plane. Event mode: -1 restores tFrac time-interpolation
+  // (the event bin's nt IS a time axis — C4/C8); NEVER seed%K there or the storm
+  // would freeze on a single plane. The sign flip is the load-bearing invariant.
+  const inEvent = activeScenario !== null;
+  envSampler.setSynopticIndex(synopticIndexForSpawn(inEvent, params.seed, synopticCount(envBin, params.monthIndex)));
+  // In event mode, thread the scenario window as the tFrac horizon so sim-hours map
+  // onto event-hours (C4). Ambient clicks in event mode inherit it too, so they
+  // read the same time axis as the canonical replay.
+  const spawn: SpawnParamsX =
+    inEvent && params.tFracHorizonH === undefined
+      ? { ...params, tFracHorizonH: activeScenario!.windowH }
+      : params;
   try {
-    engine.spawn(params);
+    engine.spawn(spawn);
   } catch (err) {
     console.warn('[spawn] engine.spawn threw:', err);
     return;
@@ -366,8 +448,11 @@ function doSpawn(params: SpawnParams): void {
   currHead = s ? headOf(s) : null;
   prevHead = currHead;
   accumulatorMin = 0;
-  if (!params.isDemo) {
-    writeHash({ lat: params.lat, lon: params.lon, monthIndex: params.monthIndex, seed: params.seed });
+  if (!spawn.isDemo) {
+    // The scenario id doubles as the hash env key (gonu/shaheen); validate it so a
+    // catalogue that ever adds an id outside the known set can't emit a bad hash.
+    const env = activeScenario && isEnvHashKey(activeScenario.id) ? activeScenario.id : undefined;
+    writeHash({ lat: spawn.lat, lon: spawn.lon, monthIndex: spawn.monthIndex, seed: spawn.seed, env });
   }
 }
 
@@ -389,6 +474,125 @@ function warmUp(hours: number): void {
   const s = engine.getState();
   currHead = s ? headOf(s) : null;
   prevHead = currHead;
+}
+
+// --- Scenario switching (counterfactual event replays, C8) ------------------
+
+/**
+ * Lazily fetch + parse a scenario's event bin, cached so re-toggling never
+ * refetches. Re-shows the thin loading line for the duration. Returns null on a
+ * 404 or a parse failure (the caller shows a visible caption and stays put) —
+ * loadWithProgress already swallows the network error into a null buffer.
+ */
+async function loadEventBin(scenario: Scenario): Promise<ParsedBin | null> {
+  const cached = eventBinCache.get(scenario.id);
+  if (cached) return cached;
+  const item: LoadItem = { url: asset(scenario.bin), label: scenario.label, kind: 'bin', key: 'event', weight: 2 };
+  progressEl.removeAttribute('data-done'); // re-reveal the progress line for the toggle
+  const buf = await loadWithProgress(item, (frac) => ui.reportProgress(frac));
+  progressEl.setAttribute('data-done', 'true');
+  if (!buf) return null;
+  try {
+    const bin = parseBin(buf);
+    eventBinCache.set(scenario.id, bin);
+    return bin;
+  } catch (err) {
+    console.warn(`[scenario] ${scenario.label} bin parsed badly:`, err);
+    return null;
+  }
+}
+
+/**
+ * Apply an event's environment WITHOUT spawning: swap the live env holder (never
+ * rebuild the sampler), pin + disable the month picker at the historic month, feed
+ * the render facade the event env + month, and light the active ghost + its label.
+ * Captures the pre-event month once, on the transition out of climatology.
+ */
+function applyEventEnv(scenario: Scenario, bin: ParsedBin): void {
+  if (!activeScenario) preEventMonth = readPickerMonth();
+  activeScenario = scenario;
+  envBin = bin; // sampler live-swap — the sim reads the event env on its next tick
+  monthSelect.value = String(scenario.monthIndex);
+  monthSelect.disabled = true; // a historic event is pinned to its real month
+  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: bin, genesis: genesisPoints, tracks: ghostTracks });
+  renderCtrl?.setMonth?.(scenario.monthIndex);
+  renderCtrl?.setActiveGhost?.(scenario.ghostId);
+  ui.highlightGhost(scenario.ghostId);
+}
+
+/** Enter an event interactively (from the picker): apply its env, then spawn the
+ *  counterfactual (active user storm re-run in the event) or the canonical spawn. */
+function enterScenario(scenario: Scenario, bin: ParsedBin): void {
+  applyEventEnv(scenario, bin);
+  doSpawn(eventSpawn(scenario, ui.activeUserSpawn()));
+  ui.scenarioEntered(scenario.label);
+}
+
+/**
+ * Return to the climatology sandbox: restore the default env, re-enable + restore
+ * the month picker, clear the ghost highlight, and re-spawn — the active user storm
+ * at the restored month (so it becomes an ordinary storm again), or the ambient
+ * demo when none was active.
+ */
+function returnToClimatology(): void {
+  if (!activeScenario) return; // already climatology
+  activeScenario = null;
+  envBin = climatologyBin;
+  monthSelect.disabled = false;
+  renderCtrl?.setActiveGhost?.(null);
+  ui.highlightGhost(null);
+  const user = ui.activeUserSpawn();
+  const month = restoredMonth(preEventMonth, user ? user.monthIndex : null, DEMO_MONTH);
+  preEventMonth = null;
+  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: climatologyBin, genesis: genesisPoints, tracks: ghostTracks });
+  if (user) {
+    monthSelect.value = String(month);
+    renderCtrl?.setMonth?.(month);
+    doSpawn({ lat: user.lat, lon: user.lon, monthIndex: month, seed: user.seed, isDemo: false });
+    ui.climatologyRestored();
+  } else {
+    // No user storm to restore -> the ambient demo (which force-pins its own month).
+    const demo = ui.demoSpawnParams();
+    renderCtrl?.setMonth?.(demo.monthIndex);
+    doSpawn(demo);
+    warmUp(DEMO_WARMUP_H);
+  }
+}
+
+/** Snap the picker back to whatever is actually active (after a failed/aborted switch). */
+function revertScenarioPicker(): void {
+  scenarioSelect.value = activeScenario ? activeScenario.id : CLIMATOLOGY_ID;
+}
+
+/** The picker changed. Climatology returns home; a known event lazy-loads then
+ *  switches; an unknown value or a 404 reverts the picker with a visible caption. */
+async function onScenarioChange(id: string): Promise<void> {
+  const seq = ++scenarioReqSeq;
+  if (id === CLIMATOLOGY_ID) {
+    returnToClimatology();
+    return;
+  }
+  const scenario = findScenario(scenarios, id);
+  if (!scenario) {
+    revertScenarioPicker();
+    return;
+  }
+  ui.scenarioLoading(scenario.label);
+  const bin = await loadEventBin(scenario);
+  if (seq !== scenarioReqSeq) return; // a newer switch superseded this one
+  if (!bin) {
+    // Mid-session 404: stay on the current env, say so, revert the selection.
+    ui.scenarioError(scenario.label);
+    revertScenarioPicker();
+    return;
+  }
+  enterScenario(scenario, bin);
+}
+
+/** Read the month picker as a valid 0-indexed month, else the demo month. */
+function readPickerMonth(): number {
+  const v = Number(monthSelect.value);
+  return Number.isInteger(v) && v >= 0 && v <= 11 ? v : DEMO_MONTH;
 }
 
 // --- Input ------------------------------------------------------------------
@@ -424,6 +628,13 @@ monthSelect.addEventListener('change', () => {
   if (Number.isInteger(m)) renderCtrl?.setMonth?.(m); // refresh SST tint even with no active storm
   const params = ui.onMonthChange();
   if (params) doSpawn(params);
+});
+
+// Scenario picker → switch environment regime (climatology sandbox vs a historic
+// event replay). main owns the change listener + the async event-bin fetch (C8);
+// the swap re-points the live env holder without rebuilding the sampler.
+scenarioSelect.addEventListener('change', () => {
+  void onScenarioChange(scenarioSelect.value);
 });
 
 // --- The loop ---------------------------------------------------------------

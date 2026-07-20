@@ -152,6 +152,35 @@ body {
   opacity: 0.6;
 }
 
+/* Historic ghost-track labels (C7). DOM type, not canvas — lowercase, faint,
+   pinned at each ghost's peak-wind in-domain point by ui.layoutGhostLabels().
+   The wrapper never intercepts clicks (spawns must fall through to the map). */
+.ghost-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.ghost-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text, #7fd4e8);
+  opacity: 0.32;
+  white-space: nowrap;
+  pointer-events: none;
+  /* sit just above-left of the anchor point so the line stays readable */
+  transform: translate(-50%, -150%);
+  transition: opacity 300ms ease;
+}
+.ghost-label.active {
+  opacity: 0.72;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ghost-label {
+    transition: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   #progress {
     transition: none;

@@ -29,6 +29,7 @@ import { DeathReason, AFTERMATH_FADE_MS } from './types';
 import { randomSeed, type HashState } from './rng';
 import { latLonToCell, latLonToClip } from './grid';
 import { TOKENS } from './tokens';
+import type { GhostLabelAnchor } from './tracks';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -121,6 +122,14 @@ export class UiController {
   private ackTimer: number | null = null;
   /** A baked file failed to parse (stale/corrupt): pin an error caption over hints. */
   private dataError = false;
+  /** Ghost-track label anchors (peak-wind in-domain point per historic storm). */
+  private ghostAnchors: GhostLabelAnchor[] = [];
+  /** DOM label elements keyed by storm id, inside {@link ghostContainer}. */
+  private ghostLabels = new Map<string, HTMLElement>();
+  /** Lazily-created wrapper that holds the ghost label elements. */
+  private ghostContainer: HTMLElement | null = null;
+  /** Which ghost is the active scenario (brighter label); null = none. */
+  private activeGhostId: string | null = null;
 
   constructor(host: UiHost) {
     this.host = host;
@@ -307,6 +316,69 @@ export class UiController {
   /** Wire the historic genesis points (from genesis.json) for the faint glow. */
   setGenesis(points: LatLon[]): void {
     this.genesis = points;
+  }
+
+  // -------------------------------------------------------------------------
+  // Ghost-track labels (C7) — DOM `.chrome` type, NOT canvas text
+  // -------------------------------------------------------------------------
+
+  /**
+   * Wire the historic-storm labels ("gonu 2007", "shaheen 2021"). ui owns these
+   * DOM elements (the facade owns the ghost polyline pixels — the owners don't
+   * overlap). Each anchor pins one lowercase, low-opacity `.chrome` label at the
+   * storm's peak-wind in-domain point. Called once after tracks.json parses;
+   * pass [] to clear. Positioning happens in {@link layoutGhostLabels}.
+   */
+  setGhostLabels(anchors: GhostLabelAnchor[]): void {
+    this.ghostAnchors = anchors;
+    if (!this.ghostContainer) {
+      const parent = this.host.overlayCanvas.parentElement ?? document.body;
+      const c = document.createElement('div');
+      c.className = 'ghost-labels';
+      parent.appendChild(c);
+      this.ghostContainer = c;
+    }
+    // Rebuild the element set (labels are few + static, so a full rebuild is fine).
+    this.ghostContainer.replaceChildren();
+    this.ghostLabels.clear();
+    for (const a of anchors) {
+      const el = document.createElement('span');
+      el.className = 'chrome ghost-label';
+      el.textContent = a.text;
+      if (a.id === this.activeGhostId) el.classList.add('active');
+      this.ghostContainer.appendChild(el);
+      this.ghostLabels.set(a.id, el);
+    }
+    this.layoutGhostLabels();
+  }
+
+  /**
+   * Reposition the ghost labels in CSS pixels. DOM elements do not auto-reproject
+   * like the canvas layers, so main calls this on every resize. Uses the canvas's
+   * CLIENT size (CSS px), not its device-pixel backing size, so dpr is handled by
+   * the browser — the same grid.ts projection as the overlay, just in CSS units.
+   */
+  layoutGhostLabels(): void {
+    if (this.ghostAnchors.length === 0) return;
+    const cv = this.host.overlayCanvas;
+    const w = cv.clientWidth;
+    const h = cv.clientHeight;
+    for (const a of this.ghostAnchors) {
+      const el = this.ghostLabels.get(a.id);
+      if (!el) continue;
+      el.style.left = `${this.pxX(a.lon, w)}px`;
+      el.style.top = `${this.pxY(a.lat, h)}px`;
+    }
+  }
+
+  /**
+   * Highlight one ghost's label as the active scenario (B4 calls this on a
+   * scenario switch); null clears the highlight. The GhostLayer draws the matching
+   * polyline brighter via its own setActiveGhostId — this only styles the label.
+   */
+  highlightGhost(id: string | null): void {
+    this.activeGhostId = id;
+    for (const [gid, el] of this.ghostLabels) el.classList.toggle('active', gid === id);
   }
 
   private addRipple(lat: number, lon: number, nowMs: number): void {

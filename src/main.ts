@@ -40,6 +40,8 @@ import type {
 import { UiController } from './ui';
 import { createSimEngine } from './sim';
 import { makeEnvSampler, synopticCount } from './env-sampler';
+import { parseTracks, toGhostPolylines, computeLabelAnchors } from './tracks';
+import type { GhostPolyline, StormTrack } from './tracks';
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
 // main resolves the module by a namespace probe (acquireRender) and PREFERS mode A
@@ -117,7 +119,7 @@ try {
   const acquired = acquireRender(gl);
   layers = acquired.layers;
   renderCtrl = acquired.ctrl;
-  const emptyResources: RenderResourcesLike = { terrain: null, env: null, genesis: [] };
+  const emptyResources: RenderResourcesLike = { terrain: null, env: null, genesis: [], tracks: [] };
   for (const layer of layers) {
     try {
       if (layer === renderCtrl) {
@@ -158,6 +160,9 @@ function resize(): void {
       console.warn('[resize] render layer resize failed:', err);
     }
   }
+  // DOM ghost labels are positioned in CSS px and do not auto-reproject like the
+  // canvas layers — re-layout them on every resize so they track the map.
+  ui.layoutGhostLabels();
 }
 window.addEventListener('resize', resize);
 resize();
@@ -184,10 +189,14 @@ const MANIFEST: LoadItem[] = [
   { url: asset('data/env.bin'), label: 'environment', kind: 'bin', key: 'env', weight: 2 },
   { url: asset('data/flowacc.bin'), label: 'wadi network', kind: 'bin', key: 'flowacc', weight: 2 },
   { url: asset('data/genesis.json'), label: 'genesis zones', kind: 'json', key: 'genesis', weight: 1 },
+  // Historic ghost tracks (C7). Missing/404 degrades to null -> no ghosts, no labels.
+  { url: asset('data/tracks.json'), label: 'historic tracks', kind: 'json', key: 'tracks', weight: 1 },
 ];
 
 const loadedWeight = new Map<string, number>();
 let genesisPoints: LatLon[] = [];
+/** Parsed historic tracks, or null when the file is absent/malformed (no ghosts). */
+let parsedTracks: StormTrack[] | null = null;
 
 function reportProgress(): void {
   const total = MANIFEST.reduce((s, m) => s + m.weight, 0);
@@ -241,6 +250,7 @@ function routeLoaded(item: LoadItem, buf: ArrayBuffer, bins: Map<string, ParsedB
     } else {
       const json = JSON.parse(new TextDecoder().decode(buf)) as unknown;
       if (item.key === 'genesis') genesisPoints = parseGenesis(json);
+      else if (item.key === 'tracks') parsedTracks = parseTracks(json);
     }
   } catch (err) {
     console.warn(`[load] ${item.label} parsed badly, skipping:`, err);
@@ -306,10 +316,15 @@ async function loadAll(): Promise<void> {
   ui.setGenesis(genesisPoints);
   envBin = bins.get('env') ?? null;
 
+  // Ghost tracks (C7): the facade draws the polylines; ui owns the DOM labels.
+  // parsedTracks is null when tracks.json is absent/malformed -> empty everywhere.
+  const ghostTracks: GhostPolyline[] = parsedTracks ? toGhostPolylines(parsedTracks) : [];
+  ui.setGhostLabels(parsedTracks ? computeLabelAnchors(parsedTracks) : []);
+
   // Inject the single parsed copy into the render facade (mode A): the exact
   // bytes main just loaded feed BOTH the sim sampler and the GPU textures, so no
   // URL is fetched twice and no bin is dequantized twice (the double-load seam).
-  renderCtrl?.setResources?.({ terrain, env: envBin, genesis: genesisPoints });
+  renderCtrl?.setResources?.({ terrain, env: envBin, genesis: genesisPoints, tracks: ghostTracks });
 
   // First storm: a shared storm from the URL hash replays exactly; otherwise the
   // ambient demo (design T1). The demo is fast-forwarded so it opens mid-life.
@@ -525,6 +540,7 @@ interface RenderResourcesLike {
   terrain: ParsedBin | null;
   env: ParsedBin | null;
   genesis: LatLon[];
+  tracks: GhostPolyline[];
 }
 
 /** A render facade that also accepts injected resources + a month (mode A). */

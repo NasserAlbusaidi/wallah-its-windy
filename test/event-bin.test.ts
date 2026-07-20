@@ -24,8 +24,8 @@ import { DOMAIN } from '../src/grid';
 import type { ParsedBin, SimEvent } from '../src/types';
 import type { Scenario } from '../src/scenarios';
 
-// A June (monthIndex 5) event bin: sst_05 is a single climatological plane; the
-// steering and shear-vector fields carry 3 time planes. u_05 ramps 0 -> 10 -> 20
+// A June (monthIndex 5) event bin: all eight physical fields carry the same
+// chronological axis. u_05 ramps 0 -> 10 -> 20
 // across the timesteps so tFrac reads
 // are unambiguous. Grid is 2x2 over the domain (cell choice is irrelevant — every
 // cell in a plane holds the same value).
@@ -36,12 +36,14 @@ const U_PLANES = [0, 10, 20];
 
 function buildEventBin(): ParsedBin {
   const buf = buildWiwbBin([
-    { name: `sst_${MM}`, nx: NX, ny: NY, nt: 1, bbox: DOMAIN, data: constantPlanes(NX, NY, [29]) },
+    { name: `sst_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [29, 29, 29]) },
     { name: `u_${MM}`, nx: NX, ny: NY, nt: U_PLANES.length, bbox: DOMAIN, data: constantPlanes(NX, NY, U_PLANES) },
     { name: `v_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [1, 1, 1]) },
     { name: `shr_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [4, 4, 4]) },
     { name: `shu_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [0, 0, 0]) },
     { name: `shv_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [4, 4, 4]) },
+    { name: `rh_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [70, 70, 70]) },
+    { name: `ohc_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [60, 60, 60]) },
   ]);
   return parseBin(buf);
 }
@@ -56,6 +58,7 @@ const SCENARIO: Scenario = {
   startIso: '2000-01-01T00:00:00Z',
   spawn: { lat: 18, lon: 62, seed: 1 },
   ghostId: 'test2000',
+  hindcast: null,
 };
 
 describe('event-bin scenario compatibility', () => {
@@ -67,7 +70,7 @@ describe('event-bin scenario compatibility', () => {
     const wrongMonth = { ...SCENARIO, monthIndex: 6 };
 
     expect(validateEventBinForScenario(buildEventBin(), wrongMonth)).toMatch(
-      /missing u_06/,
+      /missing sst_06/,
     );
   });
 
@@ -75,7 +78,7 @@ describe('event-bin scenario compatibility', () => {
     const wrongWindow = { ...SCENARIO, windowH: 9 };
 
     expect(validateEventBinForScenario(buildEventBin(), wrongWindow)).toMatch(
-      /u_05 nt=3, expected 4/,
+      /sst_05 nt=3, expected 4/,
     );
   });
 
@@ -91,7 +94,7 @@ describe('event-bin scenario compatibility', () => {
 
     expect(accepted).toBeNull();
     expect(warnings).toEqual([
-      'test event bin mismatch: u_05 nt=3, expected 4',
+      'test event bin mismatch: sst_05 nt=3, expected 4',
     ]);
   });
 });

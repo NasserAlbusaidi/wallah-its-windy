@@ -9,10 +9,11 @@
  * "Additive blending" is realised as this in-shader add so decay and transport —
  * which hardware ONE,ONE blending cannot express — become possible.
  *
- * Rain source = intensity · max(0, w⃗·∇h): w⃗ is the SAME analytic Holland vortex
- * inflow the particles ride (vortex.ts, in clip east/north), ∇h from the R16F
- * elevation texture. max(0,·) clamps lee slopes to zero — orographic-only by
- * design.
+ * Rain source is explicitly separated into (1) an eyewall ring at RMW,
+ * (2) spiral outer rainbands, and (3) an upslope enhancement from the SAME
+ * analytic Holland vortex inflow the particles ride. The sim supplies distinct
+ * mm/h component rates from intensity, humidity, and persistent organization;
+ * the shader supplies their spatial structure and terrain interaction.
  *
  * Timed DIR routing (v1.2): flowacc.bin now carries official HydroSHEDS ACC+DIR
  * plus `travmin`, the visualization-scale travel time to the next 2 km cell.
@@ -42,7 +43,7 @@ import type { DrawCtx, GpuTextures } from './context';
 
 /** Per-frame decay multiply — THE knob (eng task T5, valid 0.90–1.00). */
 const RAIN_DECAY_PER_H = 0.72;
-const RAIN_GAIN = 45.0; // folds in the metres→slope scale of ∇h
+const RAIN_GAIN = 0.0025; // metres of local relief -> bounded upslope multiplier
 const FALLBACK_TRANSPORT_PER_H = 0.44;
 const RMAX_BASE = 0.11; // mirror of particles' base radius (clip units here)
 const HALF_DOMAIN_HEIGHT_KM =
@@ -92,7 +93,10 @@ uniform float u_outerBlendFullFraction;
 uniform vec2 u_shear;
 uniform float u_shearAsymmetry;
 uniform float u_inflow;
-uniform float u_rainAmount; // storm intensity, 0 when no storm (decay-only)
+uniform float u_metricX;
+uniform float u_eyewallRain;
+uniform float u_rainbandRain;
+uniform float u_orographicRain;
 
 ${VORTEX_GLSL}
 
@@ -136,8 +140,24 @@ void main() {
   float eS = elev(uv + vec2(0.0,  u_elevTexel.y));
   vec2 grad = vec2(eE - eW, eN - eS);
   float upslope = max(0.0, dot(w, grad));
-  float rainRate = u_rainAmount * upslope * u_gain * step(0.5, land);
-  float rain = min(rainRate, 0.6) * u_dtH;
+
+  // Metric radial coordinate: clip x spans 20 lon degrees while clip y spans
+  // 12 latitude degrees; u_metricX includes the centre-latitude cosine.
+  vec2 radial = vec2((cell.x - u_center.x) * u_metricX, cell.y - u_center.y);
+  float radius = length(radial);
+  float q = radius / max(0.006, u_rMax);
+  float eyewall = exp(-pow((q - 1.0) / 0.38, 2.0));
+  float bandEnvelope =
+    smoothstep(1.45, 2.0, q) * (1.0 - smoothstep(6.0, 8.0, q));
+  float azimuth = atan(radial.y, radial.x);
+  float spiral = 0.68 + 0.32 * sin(3.0 * azimuth - 1.35 * q);
+  float rainband = bandEnvelope * max(0.18, spiral);
+  float orographic = u_orographicRain * clamp(upslope * u_gain, 0.0, 2.0);
+  float rainRateMmH =
+    u_eyewallRain * eyewall +
+    u_rainbandRain * rainband +
+    orographic;
+  float rain = min(rainRateMmH * 0.012, 0.6) * u_dtH * step(0.5, land);
 
   // Exact D8 transport: only neighbours whose arrow points toward this cell can
   // contribute. Each routed cell loses exactly one corresponding share.
@@ -341,10 +361,21 @@ export class RainLayer {
       structure?.shearAsymmetryFraction ?? 0,
     );
     gl.uniform1f(u('u_inflow'), INFLOW_RAD);
-    // Only a live storm over the map produces rain; after death the last state
-    // remains renderable, but must drive decay + downstream transport only.
-    const raining = c && ctx.frame.storm?.alive && ctx.vKt > 0 ? ctx.intensity01 : 0;
-    gl.uniform1f(u('u_rainAmount'), raining);
+    const centreLat = c ? clipToLatLon(c.x, c.y, DOMAIN).lat : 21;
+    gl.uniform1f(
+      u('u_metricX'),
+      ((DOMAIN.lonMax - DOMAIN.lonMin) * Math.cos((centreLat * Math.PI) / 180)) /
+        (DOMAIN.latMax - DOMAIN.latMin),
+    );
+    // Only a live storm produces new rain; aftermath retains routing + decay.
+    const raining = Boolean(c && ctx.frame.storm?.alive && ctx.vKt > 0);
+    const d = ctx.frame.storm?.diagnostics;
+    gl.uniform1f(u('u_eyewallRain'), raining ? (d?.eyewallRainMmH ?? 0) : 0);
+    gl.uniform1f(u('u_rainbandRain'), raining ? (d?.rainbandRainMmH ?? 0) : 0);
+    gl.uniform1f(
+      u('u_orographicRain'),
+      raining ? (d?.orographicRainMmH ?? 0) : 0,
+    );
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
 

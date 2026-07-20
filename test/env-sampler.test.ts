@@ -22,7 +22,7 @@ function layer(name: string, planes: readonly (readonly number[])[]): BinLayer {
 
 function envBin(planes: readonly (readonly number[])[]): ParsedBin {
   const layers = new Map<string, BinLayer>();
-  for (const field of ['sst', 'u', 'v', 'shr', 'shu', 'shv']) {
+  for (const field of ['sst', 'u', 'v', 'shr', 'shu', 'shv', 'rh', 'ohc']) {
     const name = `${field}_04`;
     layers.set(name, layer(name, planes));
   }
@@ -49,6 +49,8 @@ describe('sampleEnvBin spatial interpolation', () => {
       shear: 15,
       shearU: 15,
       shearV: 15,
+      midlevelRhPct: 15,
+      ohcKjCm2: 15,
     });
   });
 
@@ -74,6 +76,8 @@ describe('sampleEnvBin spatial interpolation', () => {
       shear: 40,
       shearU: 40,
       shearV: 40,
+      midlevelRhPct: 40,
+      ohcKjCm2: 40,
     });
   });
 

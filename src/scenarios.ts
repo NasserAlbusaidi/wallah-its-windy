@@ -1,5 +1,5 @@
 /**
- * scenarios.ts — historic-event scenario catalogue + counterfactual decision
+ * scenarios.ts — historic-event catalogue + hindcast/counterfactual decisions
  * helpers (C8, the DOM-free half).
  *
  * data/scenarios.json (writer B1, shape C3) names each replayable historic event:
@@ -29,6 +29,19 @@ export interface ScenarioSpawn {
   seed: number;
 }
 
+export type EventRunMode = 'hindcast' | 'counterfactual';
+
+/** Observed tropical-storm fix used to initialize a scored hindcast. */
+export interface HindcastInitialization {
+  startIso: string;
+  lat: number;
+  lon: number;
+  initialWindKt: number;
+  initialOrganization: number;
+  /** Hours from the event bin's first plane to startIso. */
+  envOffsetH: number;
+}
+
 /** One replayable historic event (shape C3). */
 export interface Scenario {
   /** Stable id: the picker value AND the URL hash `env` key (e.g. "gonu"). */
@@ -49,6 +62,8 @@ export interface Scenario {
   spawn: ScenarioSpawn;
   /** The tracks.json storm id to highlight as the active ghost (e.g. "gonu2007"). */
   ghostId: string;
+  /** Null only for legacy catalogues; production events carry this. */
+  hindcast: HindcastInitialization | null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -67,6 +82,36 @@ function parseSpawn(v: unknown): ScenarioSpawn | null {
   if (!isRecord(v)) return null;
   if (!finiteNum(v.lat) || !finiteNum(v.lon) || !finiteNum(v.seed)) return null;
   return { lat: v.lat, lon: v.lon, seed: v.seed };
+}
+
+function parseHindcast(v: unknown): HindcastInitialization | null {
+  if (!isRecord(v)) return null;
+  if (
+    !nonEmptyStr(v.startIso) ||
+    !finiteNum(v.lat) ||
+    !finiteNum(v.lon) ||
+    !finiteNum(v.initialWindKt) ||
+    !finiteNum(v.initialOrganization) ||
+    !finiteNum(v.envOffsetH)
+  ) {
+    return null;
+  }
+  if (
+    v.initialWindKt <= 0 ||
+    v.initialOrganization < 0 ||
+    v.initialOrganization > 1 ||
+    v.envOffsetH < 0
+  ) {
+    return null;
+  }
+  return {
+    startIso: v.startIso,
+    lat: v.lat,
+    lon: v.lon,
+    initialWindKt: v.initialWindKt,
+    initialOrganization: v.initialOrganization,
+    envOffsetH: v.envOffsetH,
+  };
 }
 
 function parseScenario(v: unknown): Scenario | null {
@@ -92,6 +137,7 @@ function parseScenario(v: unknown): Scenario | null {
     startIso: v.startIso,
     spawn,
     ghostId: v.ghostId,
+    hindcast: parseHindcast(v.hindcast),
   };
 }
 
@@ -130,7 +176,7 @@ export function validateEventBinForScenario(
   if (!Number.isInteger(expectedNt)) {
     return `scenario windowH=${scenario.windowH} and stepH=${scenario.stepH} imply non-integer nt=${expectedNt}`;
   }
-  for (const field of ['u', 'v', 'shr', 'shu', 'shv']) {
+  for (const field of ['sst', 'u', 'v', 'shr', 'shu', 'shv', 'rh', 'ohc']) {
     const name = `${field}_${mm}`;
     const layer = bin.layers.get(name);
     if (!layer) return `missing ${name}`;
@@ -191,6 +237,10 @@ export interface EventSpawn {
   seed: number;
   /** The event window horizon threaded into SpawnParams (C4/C8). */
   tFracHorizonH: number;
+  tFracOffsetH?: number;
+  initialWindKt?: number;
+  initialOrganization?: number;
+  disableWander?: boolean;
   isDemo: false;
 }
 
@@ -208,7 +258,26 @@ export interface StormIdentity {
  * historic point. The month is always PINNED to the scenario's, and windowH is
  * threaded as the tFrac horizon so sim-hours map onto event-hours.
  */
-export function eventSpawn(scenario: Scenario, userStorm: StormIdentity | null): EventSpawn {
+export function eventSpawn(
+  scenario: Scenario,
+  userStorm: StormIdentity | null,
+  mode: EventRunMode = 'counterfactual',
+): EventSpawn {
+  if (mode === 'hindcast' && scenario.hindcast) {
+    const init = scenario.hindcast;
+    return {
+      lat: init.lat,
+      lon: init.lon,
+      monthIndex: scenario.monthIndex,
+      seed: scenario.spawn.seed,
+      tFracHorizonH: scenario.windowH,
+      tFracOffsetH: init.envOffsetH,
+      initialWindKt: init.initialWindKt,
+      initialOrganization: init.initialOrganization,
+      disableWander: true,
+      isDemo: false,
+    };
+  }
   const base = userStorm
     ? { lat: userStorm.lat, lon: userStorm.lon, seed: userStorm.seed }
     : { lat: scenario.spawn.lat, lon: scenario.spawn.lon, seed: scenario.spawn.seed };

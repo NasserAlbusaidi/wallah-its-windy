@@ -104,6 +104,10 @@ export interface EnvSample {
   /** 200–850 hPa shear vector, upper minus lower wind, east/north m/s. */
   shearU: number;
   shearV: number;
+  /** ERA5 600/700-hPa mean relative humidity, percent. */
+  midlevelRhPct: number;
+  /** WOA23 tropical-cyclone heat potential above 26 C, kJ/cm². */
+  ohcKjCm2: number;
 }
 
 /**
@@ -146,7 +150,17 @@ export interface TrackPoint {
  * values are non-negative losses, all in knots per simulated hour.
  */
 export interface StormDiagnostics {
+  /** Undisturbed environmental SST before the storm's own wake, Celsius. */
   sstC: number;
+  /** SST available to the vortex after its persistent cold wake, Celsius. */
+  effectiveSstC: number;
+  midlevelRhPct: number;
+  ohcKjCm2: number;
+  /** Persistent convective-core health, 0=collapsed and 1=fully organized. */
+  organization: number;
+  organizationTarget: number;
+  /** Storm-induced centre cooling sampled from the persistent wake, Celsius. */
+  coldWakeC: number;
   mpiKt: number;
   steerU: number;
   steerV: number;
@@ -160,6 +174,11 @@ export interface StormDiagnostics {
   landKtPerH: number;
   dryAirKtPerH: number;
   netKtPerH: number;
+  /** Separated precipitation components used by the rainfall renderer. */
+  eyewallRainMmH: number;
+  rainbandRainMmH: number;
+  orographicRainMmH: number;
+  totalRainMmH: number;
 }
 
 /** Maximum radial extent of a wind threshold in each geographic quadrant. */
@@ -226,6 +245,10 @@ export interface StormState {
   alive: boolean;
   /** The ambient first-load demo storm renders dimmed; user storms full. */
   isDemo: boolean;
+  /** Persistent convective organization state carried between physics ticks. */
+  organization: number;
+  /** Storm-induced cooling under the current centre, Celsius. */
+  coldWakeC: number;
   /** Why the storm is strengthening or weakening at this instant. */
   diagnostics: StormDiagnostics;
   /** Pressure, eyewall scale, motion asymmetry, and threshold wind radii. */
@@ -242,9 +265,18 @@ export interface SpawnParams {
   seed: number;
   /** Marks the ambient demo storm (dimmed render, cleared on first user click). */
   isDemo: boolean;
+  /** Observed initialization used by hindcasts; default is SIM.SPAWN_VKT. */
+  initialWindKt?: number;
+  /** Optional observed/core-state initialization in [0,1]. */
+  initialOrganization?: number;
+  /** Offset into an event timeline, hours from its first baked plane. */
+  tFracOffsetH?: number;
+  /** Hindcasts disable stochastic wander while sandbox runs retain it. */
+  disableWander?: boolean;
   /**
-   * Optional age→tFrac horizon, hours. tick() maps tFrac = clamp01(ageH/horizon)
-   * onto the env layer's timestep axis. Omitted for climatology storms (falls
+   * Optional age→tFrac horizon, hours. tick() maps
+   * `clamp01((ageH + tFracOffsetH) / horizon)` onto the environment axis.
+   * Omitted for climatology storms (falls
    * back to SIM.EVENT_TFRAC_HORIZON_H); event mode passes the scenario's windowH
    * so sim-hours map 1:1 onto the event's real timesteps (C4). Past the window
    * the storm rides the final plane (persistence).

@@ -8,6 +8,12 @@ function diagnostics(
 ): StormDiagnostics {
   return {
     sstC: 29,
+    effectiveSstC: 29,
+    midlevelRhPct: 70,
+    ohcKjCm2: 60,
+    organization: 0.7,
+    organizationTarget: 0.8,
+    coldWakeC: 0,
     mpiKt: 110,
     steerU: 1,
     steerV: 1,
@@ -20,6 +26,10 @@ function diagnostics(
     landKtPerH: 0,
     dryAirKtPerH: 0,
     netKtPerH: 1,
+    eyewallRainMmH: 10,
+    rainbandRainMmH: 4,
+    orographicRainMmH: 2,
+    totalRainMmH: 16,
     ...values,
   };
 }

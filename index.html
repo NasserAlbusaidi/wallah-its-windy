@@ -51,8 +51,13 @@
           <option value="gonu">gonu 2007 environment</option>
           <option value="shaheen">shaheen 2021 environment</option>
         </select>
+        <label id="scenario-mode-label" for="scenario-mode" hidden>Run</label>
+        <select id="scenario-mode" aria-label="Event run mode" hidden>
+          <option value="hindcast" selected>observed hindcast</option>
+          <option value="counterfactual">counterfactual sandbox</option>
+        </select>
         <p id="scenario-contract" role="status" hidden>
-          counterfactual environment — not a historical reconstruction
+          observed initialization · freely simulated · scored against IBTrACS
         </p>
       </div>
 
@@ -108,6 +113,18 @@
             <dt>steering</dt>
             <dd><output id="flight-steering">—</output></dd>
           </div>
+          <div class="flight-readout">
+            <dt>core / rh</dt>
+            <dd><output id="flight-core-rh">—</output></dd>
+          </div>
+          <div class="flight-readout">
+            <dt>ohc / wake</dt>
+            <dd><output id="flight-ocean-depth">—</output></dd>
+          </div>
+          <div class="flight-readout">
+            <dt>eye / band / oro</dt>
+            <dd><output id="flight-rain">—</output></dd>
+          </div>
         </dl>
 
         <dl
@@ -145,6 +162,17 @@
             <div><dt>landfall</dt><dd id="debrief-landfall">—</dd></div>
             <div id="debrief-compare-row"><dt>history</dt><dd id="debrief-compare">—</dd></div>
           </dl>
+
+          <section id="hindcast-score" aria-label="Historical hindcast score" hidden>
+            <h2>observed-fix verification</h2>
+            <dl class="comparison-grid">
+              <div><dt>track mae</dt><dd id="hindcast-track">—</dd></div>
+              <div><dt>intensity mae</dt><dd id="hindcast-intensity">—</dd></div>
+              <div><dt>pressure mae</dt><dd id="hindcast-pressure">—</dd></div>
+              <div><dt>peak bias</dt><dd id="hindcast-peak">—</dd></div>
+            </dl>
+            <p id="hindcast-samples">—</p>
+          </section>
 
           <section id="run-comparison" aria-label="Controlled comparison" hidden>
             <h2 id="comparison-heading">same storm · two environments</h2>
@@ -229,12 +257,13 @@
         <section>
           <h3>Deliberate simplifications</h3>
           <p>
-            Track and intensity remain a point-storm model. A parametric Holland
-            wind field derives pressure, eyewall scale, a persistent outer-core
-            size, and quadrant wind radii; those are simulated structure, not
-            aircraft observations. Dry air is a geometric coastal proxy. Wadi
-            light follows timed HydroSHEDS D8 routes, but it is not a discharge
-            or inundation model.
+            Track and intensity remain a deterministic point-storm model. ERA5
+            mid-level humidity, WOA23 upper-ocean heat content, persistent core
+            organization, and a storm-generated cold wake now couple into
+            intensity. A parametric Holland wind field derives pressure,
+            eyewall scale, outer-core size, and wind radii; none are aircraft
+            observations. Wadi light follows timed HydroSHEDS D8 routes, but it
+            is not a discharge or inundation model.
           </p>
         </section>
         <section>
@@ -243,7 +272,8 @@
             The amber ring marks radius of maximum wind. Cyan contours show the
             parametric 34- and 64-knot footprints. Forward motion strengthens
             the right side; deep-layer shear stretches the outer wind field and
-            shifts rainfall downshear-left. The RMW climatology is an
+            shifts separate eyewall and spiral-rainband rain downshear-left;
+            terrain adds an upslope rainfall component. The RMW climatology is an
             Atlantic-derived proxy, explicitly bounded for this North Indian
             Ocean sandbox.
           </p>
@@ -251,9 +281,11 @@
         <section>
           <h3>Historic environments</h3>
           <p>
-            Gonu and Shaheen modes replay their environmental timelines around
-            your simulated vortex. The faint line is the observed track. These
-            are counterfactual experiments, not historical reconstructions.
+            Observed hindcasts start from the first in-domain tropical-storm fix,
+            simulate freely with no track nudging, and score the result against
+            the faint observed track. Counterfactual sandbox mode instead places
+            your storm into the same event environment. Neither is an operational
+            forecast or full atmospheric reconstruction.
           </p>
         </section>
       </form>

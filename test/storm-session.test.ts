@@ -5,6 +5,12 @@ import { deriveStormStructure } from '../src/structure';
 
 const diagnostics: StormDiagnostics = {
   sstC: 29,
+  effectiveSstC: 29,
+  midlevelRhPct: 70,
+  ohcKjCm2: 60,
+  organization: 0.7,
+  organizationTarget: 0.8,
+  coldWakeC: 0,
   mpiKt: 100,
   steerU: 1,
   steerV: 2,
@@ -17,6 +23,10 @@ const diagnostics: StormDiagnostics = {
   landKtPerH: 0,
   dryAirKtPerH: 0,
   netKtPerH: 1,
+  eyewallRainMmH: 10,
+  rainbandRainMmH: 4,
+  orographicRainMmH: 2,
+  totalRainMmH: 16,
 };
 
 function state(ageH: number, alive = true): StormState {
@@ -27,6 +37,8 @@ function state(ageH: number, alive = true): StormState {
     ageH,
     alive,
     isDemo: false,
+    organization: diagnostics.organization,
+    coldWakeC: diagnostics.coldWakeC,
     diagnostics,
     structure: deriveStormStructure({
       vKt: alive ? 40 + ageH : 19,

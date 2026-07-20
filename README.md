@@ -1,9 +1,10 @@
 # Wallah It's Windy
 
 An Arabian Sea tropical-cyclone sandbox that runs in the browser. Click the sea
-to spawn a storm, then **let it take course** — sea-surface temperature, steering
-winds, wind shear, and terrain decide its fate. When a storm makes landfall on
-the Omani coast, the Hajar mountains wring out the rain and the wadis light up.
+to spawn a storm, then **let it take course** — sea-surface temperature,
+upper-ocean heat content, mid-level humidity, steering, wind shear, and terrain
+decide its fate. When a storm makes landfall on the Omani coast, the Hajar
+mountains wring out the rain and the wadis light up.
 
 No joystick, no dragging the storm: you author it, physics finishes it.
 
@@ -16,6 +17,8 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > share any storm by its URL. User storms carry a live flight recorder that
 > explains each intensity change in numbers and plain language, then becomes a
 > debrief, controlled-comparison lab, export station, and replay timeline.
+> Gonu and Shaheen also have deterministic, observed-initialization hindcasts
+> with honest track/intensity/pressure scoring and a separate counterfactual mode.
 
 ## Stack
 
@@ -52,7 +55,7 @@ npm test          # vitest run (physics, grid, loader golden vector, rng, bake<-
 - Save a 1600×900 PNG debrief card or a 10-second WebM replay. Both render from
   the immutable flight tape with no runtime dependency or server upload.
 - Open **model notes** for the observed inputs, deliberate simplifications, and
-  the counterfactual-event contract.
+  the hindcast/counterfactual contracts.
 
 The live map shows three structure contours: amber is the radius of maximum
 wind, faint cyan is the 34-kt footprint, and bright white-cyan is the 64-kt
@@ -85,49 +88,52 @@ bake/.venv/bin/python bake/bake.py          # ~15s; writes public/data/*
 - Sources (all auth-free): **GMRT** bathymetry+topography (`terrain.bin`),
   **NOAA OISST** SST climatology (`env.bin` SST — real), **IBTrACS** North-Indian
   tracks (`genesis.json`), and official **HydroSHEDS v1.1** ACC+DIR hydrography
-  with per-cell travel time (`flowacc.bin`).
+  with per-cell travel time (`flowacc.bin`). ERA5 supplies steering, shear, and
+  600/700-hPa relative humidity; NOAA WOA23 supplies OHC26.
 - Raw downloads cache under `data/raw/` (gitignored); the venv under `bake/.venv`.
 
 ### Provenance — steering/shear are REAL ERA5 (with synoptic samples)
 
-`env.bin` is now **fully real**: SST from OISST, steering (`u`/`v`) and shear
-from **ERA5 1991–2020 monthly means** (`bake/era5.py`; deep-layer mean of
+`env.bin` is now **fully observed/climatological**: SST from OISST, steering
+(`u`/`v`), shear, and 600/700-hPa relative humidity from **ERA5 1991–2020
+monthly means** (`bake/era5.py`, `bake/era5_humidity.py`; deep-layer mean of
 850/500/250 hPa; each shipped plane's shear = |V200 − V850| of that YEAR's
-monthly-mean winds). `bake/synth.py` remains only as the loudly-bannered
-fallback when `data/raw/era5_climatology.nc` is absent.
+monthly-mean winds), and OHC26 from **NOAA WOA23** (`bake/woa23.py`). A normal
+bake requires the real ERA5 wind and humidity files; the analytic environment is
+only a browser asset-404 fallback.
 
 **Synoptic samples (D10):** the track-diversity spike measured pure monthly
 means as rail-prone (keep-ratio 16 % in June < the 30 % gate), so each month's
-`u`/`v`/`shr`/`shu`/`shv` layer carries `nt = 4` planes — four real, coherent
-YEARS chosen
+`u`/`v`/`shr`/`shu`/`shv`/`rh` layer carries `nt = 4` planes — four real,
+coherent YEARS chosen
 by deterministic farthest-point selection (one typical + three diverse; the
 years print at bake time). At runtime the spawn **seed picks the plane**
 (`seed % 4`, `src/env-sampler.ts`), so re-clicking the same spot summons
 genuinely different environments while `sim = f(spawn, month, seed)` holds
-(spike keep-ratio with samples: June 50 %, October 65 % — PASS). SST stays `nt = 1`. Hourly
-Gonu (Jun 2007) and Shaheen (Sep–Oct 2021) event fields are already downloaded
-under `data/raw/` for the v1.1 counterfactual bake, where `nt` is a TIME axis
-(`tFrac` interpolation — the sampler's other mode).
+(spike keep-ratio with samples: June 50 %, October 65 % — PASS). OISST SST and
+WOA23 OHC stay `nt = 1`. November replaces the old wind-only “calm” selection
+with two real years selected jointly for survivable shear and mid-level
+moisture.
 
-**Event replay contract:** event mode is a counterfactual, not a hindcast. The
-historical ghost shows the observed storm; the live parametric storm answers how a
-spawn evolves in vortex-filtered ERA5 steering and shear with climatological
-OISST. Its track and peak intensity need not match the ghost. We deliberately
-keep this distinction instead of tuning one physics model to reproduce two
-storms. See `bake/README.md` for the intensity sensitivity measurements and the
-requirements for a future hindcast mode.
+**Event contracts:** every event bin carries aligned 3-hourly ERA5 SST,
+600/700-hPa RH, steering, and shear plus midpoint-interpolated WOA23 OHC. “Observed
+hindcast” starts at the first in-domain observed ≥34-kt fix, uses the matching
+event-time offset, disables stochastic wander, then runs freely with no track or
+intensity nudging. The debrief scores track MAE/RMSE, intensity MAE/bias,
+pressure MAE, and peak bias against IBTrACS fixes. “Counterfactual sandbox”
+keeps the original what-if workflow for a user-authored storm. The observed
+ghost remains visible in both modes.
 
-That contract is also visible in the interface: event options are labelled as
-environments, the picker displays “not a historical reconstruction,” and every
-event flight tape carries a counterfactual marker. Scientific limitations are
-not hidden in documentation: the in-app model notes identify the point-storm
-track/intensity core, empirical intensity equation, parametric Holland wind
-structure, Atlantic-derived RMW proxy, geometric dry-air proxy, and the fact that
-downstream flood light is timed D8 routing—not a discharge, infiltration, or
-inundation model.
+Scientific limitations are not hidden: this is still a deterministic point-vortex
+track/intensity model, not an operational atmospheric model. Its convection,
+ocean coupling, and rain rates are bounded parameterizations; WOA23 is monthly
+climatology rather than an event-specific subsurface ocean analysis; the
+Holland wind structure and Atlantic-derived RMW relation are parametric; and
+downstream flood light is timed D8 routing—not discharge, infiltration, or
+inundation.
 
 `env.bin` encodes the month in the layer **name**
-(`sst_MM/u_MM/v_MM/shr_MM/shu_MM/shv_MM`,
+(`sst_MM/u_MM/v_MM/shr_MM/shu_MM/shv_MM/rh_MM/ohc_MM`,
 `MM` = 0-indexed `monthIndex`, `04`=May … `10`=Nov). Consumers resolve it with
 `clamp(monthIndex, 4, 10)`; `src/env-sampler.ts` (sim) and `src/render/index.ts`
 (tint) both do, and `test/integration-bins.test.ts` guards the mapping, the
@@ -140,6 +146,14 @@ smoother than instantaneous shear yet runs persistently high wherever the flow
 is steady (the monsoon). Recalibrate from scratch if the env source ever moves
 to daily/hourly fields. A young storm gets a 12 h shear-grace ramp so hostile
 regimes kill it watchably (~15–20 sim-h), not before the cause can render.
+
+**Core and ocean coupling:** convective organization is a persistent state, not
+an instantaneous multiplier. Warm/moist/deep-ocean/low-shear environments build
+it slowly; shear, land, and dry ventilation break it down faster. Intensity
+growth depends nonlinearly on that core health and OHC. A strong slow storm
+deposits spatial cold-wake patches that decay over five days; the vortex samples
+its own accumulated cooling on later steps. This is deterministic and fixed-step
+stable, but remains a compact parameterization rather than a mixed-layer model.
 
 **Physical structure:** `src/structure.ts` converts each simulated intensity
 state into a coherent [Holland-style radial wind
@@ -173,13 +187,12 @@ npm run calibrate:structure  # regenerate machine + human reports
 npm run calibrate:check      # CI regression gate; no network required
 ```
 
-**Dry air (v1.1):** a fourth decay term models desert-air entrainment as a pure
-geometric proxy — no humidity field exists, so the penalty grows as the Arabian
-landmass nears the storm along its dry N/NW/W bearings (an `isLand` ray probe out
-to ~190 km, mirroring `ui.nearCoast`). It stays off during open-sea spin-up and
-bites only on the final coastal approach, so a strong storm weakens recognizably
-near Oman instead of holding Cat-4 to the beach (tuned against IBTrACS Gonu 2007,
-127→77 kt on approach). A dry-air-dominated death earns its own epitaph.
+**Moisture and rainfall:** dry-air weakening now uses the actual ERA5 600/700-hPa
+RH, with shear providing a ventilation pathway into a weakly organized core.
+The former geometric coast-distance helper remains exported only for compatibility
+with older diagnostics; it does not drive the engine. Rain is separated into an
+organization-sensitive metric eyewall ring, broader spiral rainbands, and an
+upslope terrain component. Only land accumulation feeds the wadi visualization.
 
 ## Layout
 
@@ -198,6 +211,7 @@ src/
   structure-validation.ts offline scoring, storm split, calibration acceptance
   storm-session.ts    recording, pause/seek/replay transport, comparison baseline
   flight-recorder.ts  immutable per-tick tape + debrief/snapshot construction
+  hindcast.ts         observed-fix interpolation + track/intensity/pressure scores
   comparison.ts       same-identity paired-run validation and result deltas
   narrative.ts        exact intensity budget -> plain-language dominant cause
   export.ts           dependency-free PNG card + WebM replay renderer

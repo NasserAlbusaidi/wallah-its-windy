@@ -18,14 +18,14 @@ bake/.venv/bin/python bake/bake.py
 
 macOS, Python 3.14, numpy 2.x. Raw downloads cache under `data/raw/` (gitignored);
 a second run reuses them. Total runtime ≈ 15 s after downloads. The script prints
-its progress, both bake-time asserts, and a loud SYNTHETIC banner (see below).
+its progress, selected real years, thermodynamic ranges, and bake-time asserts.
 
 ## Outputs (`public/data/`, ~6.5 MB raw, budget ≤ 7 MB)
 
 | file | layers | grid | source |
 |------|--------|------|--------|
 | `terrain.bin` | `elev` (int16 m), `landmask` (uint8) | 1040×668 (~2 km) | GMRT (real bathy+topo) |
-| `env.bin` | `sst_MM`,`u_MM`,`v_MM`,`shr_MM`,`shu_MM`,`shv_MM` × 7 months | 40×24 (0.5°) | OISST + ERA5 |
+| `env.bin` | `sst_MM`,`u_MM`,`v_MM`,`shr_MM`,`shu_MM`,`shv_MM`,`rh_MM`,`ohc_MM` × 7 months | 40×24 (0.5°) | OISST + ERA5 + WOA23 |
 | `flowacc.bin` | `flowacc` (uint16 log), `flowdir` (uint8 D8), `travmin` (uint8 minutes), `basin` (uint16 compatibility) | 1040×668 | HydroSHEDS v1.1 ACC+DIR |
 | `genesis.json` | `[{lat,lon}]` | — | IBTrACS North Indian |
 | `tracks.json` | two observed ghost-track polylines | — | IBTrACS North Indian |
@@ -44,9 +44,9 @@ one-minute wind, pressure, RMW, and quadrant radii.
 
 ### `env.bin` layer naming (the EnvSampler must know this)
 
-One layer **per field per month**. SST has `nt = 1`; the five wind fields have
-`nt = 4` coherent real-year synoptic planes. Names (≤ 8-byte limit forces the
-short forms):
+One layer **per field per month**. SST and OHC have `nt = 1`; the five wind
+fields and RH have `nt = 4` aligned, coherent real-year planes. Names (≤ 8-byte
+limit forces the short forms):
 
 ```
 sst_MM   SST °C          int16 quant scale 0.01 offset 20.0   (real OISST)
@@ -55,13 +55,15 @@ v_MM     steering V m/s  int16 quant scale 0.01 offset 0.0    (ERA5)
 shr_MM   shear mag m/s   int16 quant scale 0.01 offset 0.0    (ERA5)
 shu_MM   shear U m/s     int16 quant scale 0.01 offset 0.0    (ERA5 V200−V850)
 shv_MM   shear V m/s     int16 quant scale 0.01 offset 0.0    (ERA5 V200−V850)
+rh_MM    mean RH %       int16 quant scale 0.01 offset 0.0    (ERA5 600/700 hPa)
+ohc_MM   OHC26 kJ/cm²    int16 quant scale 0.01 offset 0.0    (NOAA WOA23)
 ```
 
 `MM` is the **0-indexed calendar month, zero-padded**: May=`04` … Nov=`10` (only
 these 7 exist). **Month and the timestep axis (`nt`) are orthogonal**: `monthIndex`
-picks the layer. In climatology mode, the seed freezes one of the wind layers'
-synoptic planes and `tFrac` is ignored; in event mode, `tFrac` interpolates
-chronological planes without any format change. Recommended sampler lookup:
+picks the layer. In climatology mode, the seed freezes one aligned wind/RH
+real-year plane and `tFrac` is ignored; in event mode, `tFrac` interpolates all
+eight chronological fields without any format change. Recommended sampler lookup:
 
 ```
 name = `sst_${String(clamp(monthIndex,4,10)).padStart(2,'0')}`
@@ -89,6 +91,11 @@ Months outside May–Nov are not baked (no Arabian-Sea cyclone season) — clamp
   *Eos* 89(10).
 - **ERA5** pressure-level winds for climatological samples and event windows —
   see the active pipeline below.
+- **ERA5** 600/700-hPa relative humidity and event-time SST, fetched by
+  `bake/fetch_era5.py` with the same domain/time axes as the winds.
+- **NOAA World Ocean Atlas 2023**, monthly 1° temperature profiles. `bake/woa23.py`
+  downloads NCSS subsets and integrates heat above 26 °C as
+  `rho * cp * integral(max(T−26,0) dz) / 1e7` to kJ/cm².
 
 ## Downsample rules (eng task T3)
 
@@ -109,7 +116,7 @@ Months outside May–Nov are not baked (no Arabian-Sea cyclone season) — clamp
 
 ---
 
-## Real ERA5 steering + shear — ACTIVE (2026-07-20)
+## Real ERA5 steering, shear, and humidity — ACTIVE (2026-07-20)
 
 `bake/era5.py` reads `data/raw/era5_climatology.nc` (fetched by
 `bake/fetch_era5.py`) and replaces `synth` automatically when the file exists
@@ -132,49 +139,17 @@ samples the spike PASSes (June 50 %, October 65 %). NOTE: `src/sim.ts`'s shear
 penalty is calibrated empirically for this monthly-mean-wind shear (threshold
 14 m/s, not the instantaneous ~10) — see the README physics note.
 
-Gonu (Jun 2007) + Shaheen (Sep 20 – Oct 10 2021) hourly event fields are
-already under `data/raw/` for the v1.1 counterfactual bake (`nt` = TIME there).
+The RH file uses the same year axis as the wind file. November's two tail planes
+are selected jointly from real years with genesis-belt shear below 17 m/s,
+ranked by RH; this avoids mistaking a calm but exceptionally dry year for a
+productive post-monsoon regime.
 
-The original request, for reproducing from scratch (`bake/fetch_era5.py`
-automates exactly this):
+`bake/fetch_era5.py` is the executable CDS request specification. It downloads
+monthly winds and RH plus hourly Gonu/Shaheen wind, RH, and SST files. It requires
+a configured CDS API token and accepted Copernicus licence. WOA23 needs no
+credentials and is fetched lazily by `bake/woa23.py`.
 
-```python
-import cdsapi
-c = cdsapi.Client()
-
-# 1) Monthly climatology for steering (deep-layer mean 850/500/250) + shear (850,200)
-c.retrieve("reanalysis-era5-pressure-levels-monthly-means", {
-    "product_type": "monthly_averaged_reanalysis",
-    "variable": ["u_component_of_wind", "v_component_of_wind"],
-    "pressure_level": ["200", "250", "500", "850"],
-    "year": [str(y) for y in range(1991, 2021)],
-    "month": ["05","06","07","08","09","10","11"],
-    "time": "00:00",
-    "area": [27, 50, 15, 70],   # N, W, S, E
-    "grid": [0.5, 0.5],
-    "format": "netcdf",
-}, "data/raw/era5_climatology.nc")
-
-# 2) Event windows, hourly — Gonu (Jun 2007) and Gulab->Shaheen (Sep-Oct 2021)
-for tag, yr, mons, days in [
-    ("gonu_2007",  "2007", ["06"], [f"{d:02d}" for d in range(1, 8)]),
-    ("shaheen_2021","2021", ["09","10"], [f"{d:02d}" for d in range(1, 32)]),
-]:
-    c.retrieve("reanalysis-era5-pressure-levels", {
-        "product_type": "reanalysis",
-        "variable": ["u_component_of_wind", "v_component_of_wind"],
-        "pressure_level": ["200", "250", "500", "850"],
-        "year": yr, "month": mons, "day": days,
-        "time": [f"{h:02d}:00" for h in range(24)],
-        "area": [27, 50, 15, 70], "grid": [0.5, 0.5], "format": "netcdf",
-    }, f"data/raw/era5_{tag}.nc")
-```
-
-Deep-layer steering = mass-weighted mean of the 850/500/250 winds; shear
-magnitude = `|V(200) − V(850)|`. Event files feed the v1.1 counterfactual env
-bins (below).
-
-### Event bake (v1.1 counterfactual scenarios) — `bake/era5_event.py`
+### Event bake — `bake/era5_event.py`
 
 Opt-in, NOT part of the default bake (it must never touch env.bin/terrain.bin/
 flowacc.bin/genesis.json):
@@ -185,17 +160,15 @@ bake/.venv/bin/python bake/bake.py events
 
 emits `public/data/env_gonu.bin`, `public/data/env_shaheen.bin`, and
 `public/data/scenarios.json`. The env bins are the **same WIWB format** as
-env.bin (version 1, identical 88-byte records) — only the `nt` semantics differ:
-`u/v/shr/shu/shv` carry a **time axis** (`nt` = 3-hourly steps, `tFrac` interpolates)
-instead of the climatology's synoptic samples. Layers keep the month-suffix
-convention so the existing sampler resolves them unchanged: gonu → `sst_05,
-u_05, v_05, shr_05`; shaheen → `..._08`. Gonu = `era5_gonu_2007.nc` (192 h → 64
-planes, windowH 189). Shaheen = `era5_shaheen_2021_09.nc` + `_10.nc` stitched by
-`valid_time` into one continuous 504 h series (→ 168 planes, windowH 501).
+env.bin (version 1, identical 88-byte records) — only the `nt` semantics differ.
+All eight fields (`sst/u/v/shr/shu/shv/rh/ohc`) share a 3-hourly chronological
+axis and are interpolated by `tFrac`. Gonu has 64 planes (`windowH=189`);
+Shaheen's September/October inputs are stitched by `valid_time` into 168 planes
+(`windowH=501`).
 
 **Vortex filter (why, and the diagnostic).** Event winds contain the real
-storm's own vortex; baked verbatim they would replay the historical track rather
-than provide a clean counterfactual steering environment. We wash the vortex out
+storm's own vortex; baked verbatim they would feed the observed circulation back
+as environmental steering. We wash the vortex out
 with `scipy.ndimage.gaussian_filter`, **sigma = 3 native cells (1.5°)** on the
 0.5° grid, applied to all steering/shear fields per time plane before regridding
 to 40×24. The
@@ -205,37 +178,27 @@ vs far 0.7 m/s** — the filter removes the tight vortex (near ≫ far, and far
 matches the ~0.7 m/s residual of the preserved large-scale monsoon flow). Gonu's
 larger near value reflects its far stronger (127 kt) vortex. Fallback if a filter
 ever visibly wrecks the monsoon flow: drop sigma to 2; never ship unfiltered
-without this diagnostic.
+without this diagnostic. RH is smoothed at the same spatial scale to remove the
+tight storm imprint; SST remains unsmoothed so the event surface and observed
+wake signal are retained. Coastal ERA5 SST gaps are filled from the nearest
+valid ocean cell only at the bake boundary.
 
-**SST provenance.** The event fetch was **winds-only**, so `sst_MM` is *not* from
-the event: it is copied verbatim (`nt=1`) from the committed `env.bin`'s
-climatological `sst_05` / `sst_08` layer (OISST 1991–2020 long-term mean).
+**Upper ocean.** Each chronological plane receives WOA23 OHC26 linearly
+interpolated between adjacent monthly midpoints. This captures climatological
+mixed-layer depth and a continuous September-to-October transition, but it is
+not an event-specific subsurface analysis. The runtime adds its own persistent
+storm-generated cold wake.
 
-**Intensity fidelity decision (2026-07-20).** Event mode remains a
-counterfactual, not a historical-intensity hindcast. A canonical replay with the
-shipped fields peaks at 88.6 kt for Gonu and 81.5 kt for Shaheen. A sensitivity
-run produced:
+**Two explicit run modes.** The observed hindcast initializes from the first
+in-domain IBTrACS fix at or above 34 kt, starts at the matching environment
+offset, disables stochastic wander, and is then freely integrated—there is no
+track or intensity nudging. Afterward it is scored against all eligible observed
+fixes. Counterfactual mode retains the user-authored “what if this storm saw this
+event environment?” workflow.
 
-| Forcing experiment | Gonu peak | Shaheen peak |
-| --- | ---: | ---: |
-| Shipped fields | 88.6 kt | 81.5 kt |
-| SST +1.0 °C everywhere | 98.1 kt | 94.3 kt |
-| Shear reduced 20% everywhere | 103.6 kt | 81.5 kt |
-| Both changes | 116.7 kt | 94.3 kt |
-
-These broad adjustments still fail to reproduce both historical peaks and would
-silently tune the sandbox to two storms. The shipped replay therefore keeps
-climatological SST and the existing vortex filter. `tracks.json` supplies the
-observed reference; the simulated storm is expected only to survive and
-intensify plausibly. A future hindcast mode must fetch time-resolved event SST,
-define how it removes the observed vortex without erasing environmental shear,
-and validate against a larger storm set. It should be a separate named mode,
-not a retune of this counterfactual.
-
-`scenarios.json` (`{version, scenarios:[{id,label,bin,monthIndex,stepH,windowH,
-startIso,spawn,ghostId}]}`) pins each scenario's sim window: `windowH =
-(planes−1)·stepH` is **computed**, and `spawn` = the storm's first IBTrACS fix
-inside the playable DOMAIN (same first-in-domain rule as genesis).
+`scenarios.json` stores both the sandbox spawn and a `hindcast` block with
+`startIso`, position, observed wind, derived initial organization, and
+`envOffsetH`. `windowH = (planes−1)·stepH` is computed from the bin.
 
 ### Ghost tracks — `public/data/tracks.json`
 

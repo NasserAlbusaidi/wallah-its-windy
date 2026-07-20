@@ -1,4 +1,4 @@
-"""Submit the three ERA5 requests (design step 0) and download when ready.
+"""Submit the ERA5 wind + thermodynamic requests and download when ready.
 
 Prereqs (one-time, human):
   1. ~/.cdsapirc with:
@@ -11,11 +11,13 @@ Run: bake/.venv/bin/python bake/fetch_era5.py
 CDS queues can take minutes to hours; the script blocks per request until each
 file lands in data/raw/. Re-running skips files that already exist.
 
-1) Monthly climatology 1991-2020 May-Nov -> steering (deep-layer mean 850/500/250)
-   + shear (|V200 - V850|). Feeds bake.py's swap of synth.steering_shear().
-2) Gonu hourly event window (Jun 1-8 2007)          -> v1.1 counterfactual env.
-3) Shaheen hourly event window (Sep 20 - Oct 10 2021, covers the Arabian Sea
-   re-formation of Gulab's remnant through dissipation) -> v1.1 counterfactual env.
+1) Monthly climatology 1991-2020 May-Nov:
+   - winds -> steering (deep-layer mean 850/500/250) + |V200 - V850| shear;
+   - 600/700-hPa relative humidity -> a real mid-level moisture field.
+2) Gonu hourly event window (Jun 1-8 2007):
+   - winds + mid-level humidity + event-time sea-surface temperature.
+3) Shaheen hourly event window (Sep 20 - Oct 10 2021):
+   - winds + mid-level humidity + event-time sea-surface temperature.
 
 Windows are trimmed vs "whole months" to be kind to the queue; widen here if the
 counterfactual ever needs more lead-in. Area/grid match env.bin: 50-70E/15-27N, 0.5 deg.
@@ -33,6 +35,9 @@ AREA = [27, 50, 15, 70]  # N, W, S, E
 GRID = [0.5, 0.5]
 LEVELS = ["200", "250", "500", "850"]
 WINDS = ["u_component_of_wind", "v_component_of_wind"]
+HUMIDITY_LEVELS = ["600", "700"]
+HUMIDITY = ["relative_humidity"]
+SST = ["sea_surface_temperature"]
 
 REQUESTS: list[tuple[str, str, dict]] = [
     (
@@ -42,6 +47,22 @@ REQUESTS: list[tuple[str, str, dict]] = [
             "product_type": "monthly_averaged_reanalysis",
             "variable": WINDS,
             "pressure_level": LEVELS,
+            "year": [str(y) for y in range(1991, 2021)],
+            "month": ["05", "06", "07", "08", "09", "10", "11"],
+            "time": "00:00",
+            "area": AREA,
+            "grid": GRID,
+            "data_format": "netcdf",
+            "download_format": "unarchived",
+        },
+    ),
+    (
+        "era5_rh_climatology.nc",
+        "reanalysis-era5-pressure-levels-monthly-means",
+        {
+            "product_type": "monthly_averaged_reanalysis",
+            "variable": HUMIDITY,
+            "pressure_level": HUMIDITY_LEVELS,
             "year": [str(y) for y in range(1991, 2021)],
             "month": ["05", "06", "07", "08", "09", "10", "11"],
             "time": "00:00",
@@ -69,6 +90,39 @@ REQUESTS: list[tuple[str, str, dict]] = [
         },
     ),
     (
+        "era5_rh_gonu_2007.nc",
+        "reanalysis-era5-pressure-levels",
+        {
+            "product_type": "reanalysis",
+            "variable": HUMIDITY,
+            "pressure_level": HUMIDITY_LEVELS,
+            "year": "2007",
+            "month": "06",
+            "day": [f"{d:02d}" for d in range(1, 9)],
+            "time": [f"{h:02d}:00" for h in range(24)],
+            "area": AREA,
+            "grid": GRID,
+            "data_format": "netcdf",
+            "download_format": "unarchived",
+        },
+    ),
+    (
+        "era5_sst_gonu_2007.nc",
+        "reanalysis-era5-single-levels",
+        {
+            "product_type": "reanalysis",
+            "variable": SST,
+            "year": "2007",
+            "month": "06",
+            "day": [f"{d:02d}" for d in range(1, 9)],
+            "time": [f"{h:02d}:00" for h in range(24)],
+            "area": AREA,
+            "grid": GRID,
+            "data_format": "netcdf",
+            "download_format": "unarchived",
+        },
+    ),
+    (
         "era5_shaheen_2021.nc",
         "reanalysis-era5-pressure-levels",
         {
@@ -78,6 +132,39 @@ REQUESTS: list[tuple[str, str, dict]] = [
             "year": "2021",
             "month": ["09", "10"],
             "day": [f"{d:02d}" for d in range(1, 32)],  # server drops invalid dates
+            "time": [f"{h:02d}:00" for h in range(24)],
+            "area": AREA,
+            "grid": GRID,
+            "data_format": "netcdf",
+            "download_format": "unarchived",
+        },
+    ),
+    (
+        "era5_rh_shaheen_2021.nc",
+        "reanalysis-era5-pressure-levels",
+        {
+            "product_type": "reanalysis",
+            "variable": HUMIDITY,
+            "pressure_level": HUMIDITY_LEVELS,
+            "year": "2021",
+            "month": ["09", "10"],
+            "day": [f"{d:02d}" for d in range(1, 32)],
+            "time": [f"{h:02d}:00" for h in range(24)],
+            "area": AREA,
+            "grid": GRID,
+            "data_format": "netcdf",
+            "download_format": "unarchived",
+        },
+    ),
+    (
+        "era5_sst_shaheen_2021.nc",
+        "reanalysis-era5-single-levels",
+        {
+            "product_type": "reanalysis",
+            "variable": SST,
+            "year": "2021",
+            "month": ["09", "10"],
+            "day": [f"{d:02d}" for d in range(1, 32)],
             "time": [f"{h:02d}:00" for h in range(24)],
             "area": AREA,
             "grid": GRID,
@@ -103,11 +190,16 @@ def main() -> int:
         if target.exists() and target.stat().st_size > 0:
             print(f"[skip] {filename} already present ({target.stat().st_size / 1e6:.1f} MB)")
             continue
-        if filename == "era5_shaheen_2021.nc":
+        if filename in {
+            "era5_shaheen_2021.nc",
+            "era5_rh_shaheen_2021.nc",
+            "era5_sst_shaheen_2021.nc",
+        }:
             # Two per-month windows -> two part-files merged at bake time by
             # xarray/netCDF concat; simpler: one request per month window.
             for mon, days in SHAHEEN_DAYS.items():
-                part = RAW / f"era5_shaheen_2021_{mon}.nc"
+                stem = filename.removesuffix(".nc")
+                part = RAW / f"{stem}_{mon}.nc"
                 if part.exists() and part.stat().st_size > 0:
                     print(f"[skip] {part.name} already present")
                     continue

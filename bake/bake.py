@@ -4,15 +4,14 @@ bake.py — build the baked map data for "Wallah It's Windy".
 
 Produces five files the browser loads by default (BINARY-FORMATS.md is the contract):
   public/data/terrain.bin   elevation (int16 m) + land mask, ~2 km grid
-  public/data/env.bin       SST + steering + shear magnitude/vector, 0.5 deg,
+  public/data/env.bin       SST + steering/shear + RH + OHC, 0.5 deg,
                             per-(field,month) layers for May..Nov
   public/data/flowacc.bin   HydroSHEDS ACC + DIR + travel time on the terrain grid
   public/data/genesis.json  IBTrACS first-fix points of storms that reached Oman
   public/data/tracks.json   IBTrACS full polylines for the ghost-track overlay
 
-And, opt-in via `bake/.venv/bin/python bake/bake.py events`, the v1.1
-counterfactual artifacts (event steering with a real TIME axis, vortex washed
-out — see era5_event.py):
+And, opt-in via `bake/.venv/bin/python bake/bake.py events`, aligned event
+forcing for observed-initialization hindcasts and counterfactuals:
   public/data/env_gonu.bin  public/data/env_shaheen.bin  public/data/scenarios.json
 
 Run:  bake/.venv/bin/python bake/bake.py           (default 5-file bake)
@@ -22,10 +21,10 @@ bake/README.md. Zero-auth sources; raw downloads cache under data/raw/.
 
 env.bin LAYER NAMING (consumed by the EnvSampler): one layer per field per month,
 with month-named fields. Names: "sst_MM", "u_MM", "v_MM", "shr_MM", "shu_MM",
-"shv_MM", where MM is the 0-indexed calendar month zero-padded (May=04 ..
+"shv_MM", "rh_MM", "ohc_MM", where MM is the 0-indexed calendar month zero-padded (May=04 ..
 Nov=10). Month and the timestep axis (nt) are ORTHOGONAL: monthIndex picks the
-layer; SST has nt=1, climatology winds have K frozen synoptic planes, and event
-winds use nt as chronological time.
+layer; climatology SST/OHC have nt=1, winds/RH have K frozen real-year planes,
+and all event fields use nt as chronological time.
 """
 
 from __future__ import annotations
@@ -33,19 +32,22 @@ from __future__ import annotations
 import json
 import os
 import sys
+import datetime as dt
 
 import numpy as np
 
 import binfmt
 import era5
 import era5_event
+import era5_humidity
 import hydro
 import hydrosheds
 import sources
 import synth
+import woa23
 from binfmt import Layer
 
-# Event scenarios (v1.1 counterfactual mode). Each references the storm's ghost
+# Event scenarios. Each references the storm's ghost
 # track (C1), its event env bin (C2), and the sim time window (C3, windowH is
 # COMPUTED from the baked plane count, never hardcoded). nc files are the
 # committed data/raw/era5_{tag}*.nc; Shaheen spans two months (_09 + _10).
@@ -66,10 +68,14 @@ from binfmt import Layer
 EVENT_SCENARIOS = (
     {"id": "gonu", "label": "gonu 2007", "tag": "gonu", "monthIndex": 5,
      "seed": 2007, "ghostId": "gonu2007", "spawn": (20.5, 64.5),
-     "nc": ("era5_gonu_2007.nc",)},
+     "nc": ("era5_gonu_2007.nc",),
+     "rh_nc": ("era5_rh_gonu_2007.nc",),
+     "sst_nc": ("era5_sst_gonu_2007.nc",)},
     {"id": "shaheen", "label": "shaheen 2021", "tag": "shaheen", "monthIndex": 8,
      "seed": 2021, "ghostId": "shaheen2021", "spawn": (24.0, 61.5),
-     "nc": ("era5_shaheen_2021_09.nc", "era5_shaheen_2021_10.nc")},
+     "nc": ("era5_shaheen_2021_09.nc", "era5_shaheen_2021_10.nc"),
+     "rh_nc": ("era5_rh_shaheen_2021_09.nc", "era5_rh_shaheen_2021_10.nc"),
+     "sst_nc": ("era5_sst_shaheen_2021_09.nc", "era5_sst_shaheen_2021_10.nc")},
 )
 
 # Steering/shear source: real ERA5 climatology when its download exists, else the
@@ -102,7 +108,13 @@ def build_terrain() -> str:
 
 
 def build_env() -> str:
-    print(f"[2/5] env.bin  (OISST SST [REAL] + steering/shear [{ENV_SRC.TAG}], 0.5 deg)")
+    if not era5_humidity.available():
+        raise FileNotFoundError(
+            "data/raw/era5_rh_climatology.nc is required; run bake/fetch_era5.py"
+        )
+    print(
+        f"[2/5] env.bin  (OISST SST + ERA5 steering/shear/RH + WOA23 OHC, 0.5 deg)"
+    )
     sst_by_month = sources.load_sst_by_month()
     elat = sources.lat_centers(sources.ENV_NY)
     elon = sources.lon_centers(sources.ENV_NX)
@@ -130,12 +142,15 @@ def build_env() -> str:
                 ENV_SRC.steering_shear_samples_vector(ELAT, ELON, m)
             )
             sample_years[m] = years
+            rh = era5_humidity.samples_for_years(ELAT, ELON, m, years)
         else:
             u1, v1, shr1, shu1, shv1 = ENV_SRC.steering_shear_vector(
                 ELAT, ELON, m
             )
             u, v, shr = u1[None], v1[None], shr1[None]
             shu, shv = shu1[None], shv1[None]
+            raise RuntimeError("real ERA5 sample years are required for humidity alignment")
+        ohc = woa23.load_ohc(m)
         nt = u.shape[0]
         mm = f"{m:02d}"
         layers.append(Layer(f"sst_{mm}", "int16", True, nx, ny, 1, DOMAIN, 0.01, 20.0, q_i16(sst, 0.01, 20.0)))
@@ -144,12 +159,14 @@ def build_env() -> str:
         layers.append(Layer(f"shr_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(shr, 0.01, 0.0)))
         layers.append(Layer(f"shu_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(shu, 0.01, 0.0)))
         layers.append(Layer(f"shv_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(shv, 0.01, 0.0)))
+        layers.append(Layer(f"rh_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(rh, 0.01, 0.0)))
+        layers.append(Layer(f"ohc_{mm}", "int16", True, nx, ny, 1, DOMAIN, 0.01, 0.0, q_i16(ohc, 0.01, 0.0)))
 
     path = os.path.join(OUT_DIR, "env.bin")
     binfmt.write_bin(path, layers)
     # Report the seasonal signal so the synthetic field is inspectable.
-    print(f"      grid {nx}x{ny} | {len(layers)} layers ({len(sources.SEASON_MONTHS)} months x 6 fields) | {_mb(path)}")
-    print(f"      SST [REAL] {sst_lo:.1f}..{sst_hi:.1f} degC | steering+shear [{ENV_SRC.TAG}]:")
+    print(f"      grid {nx}x{ny} | {len(layers)} layers ({len(sources.SEASON_MONTHS)} months x 8 fields) | {_mb(path)}")
+    print(f"      SST {sst_lo:.1f}..{sst_hi:.1f} degC | steering+shear [{ENV_SRC.TAG}]:")
     for m in sources.SEASON_MONTHS:
         u, v, shr = ENV_SRC.steering_shear(ELAT, ELON, m)
         spd = float(np.hypot(u, v).mean())
@@ -246,24 +263,80 @@ def _first_in_domain(points: list[dict]) -> dict | None:
     return None
 
 
+def _hindcast_initialization(points: list[dict], event_start_iso: str) -> dict:
+    """First in-domain observed tropical-storm fix, aligned to the event axis."""
+    lo_min, lo_max, la_min, la_max = sources.DOMAIN
+    event_start = dt.datetime.strptime(
+        event_start_iso, "%Y-%m-%dT%H:%M:%SZ"
+    ).replace(tzinfo=dt.timezone.utc)
+    for point in points:
+        wind = point.get("windKt")
+        if wind is None or wind < 34:
+            continue
+        if not (
+            lo_min <= point["lon"] <= lo_max
+            and la_min <= point["lat"] <= la_max
+        ):
+            continue
+        start = dt.datetime.strptime(
+            point["iso"], "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=dt.timezone.utc)
+        offset_h = (start - event_start).total_seconds() / 3600
+        if offset_h < 0:
+            continue
+        from scipy.interpolate import RegularGridInterpolator
+
+        month_index = start.month - 1
+        ohc = woa23.load_ohc(month_index)
+        env_lat = sources.lat_centers(sources.ENV_NY)
+        env_lon = sources.lon_centers(sources.ENV_NX)
+        ohc_at_fix = float(
+            RegularGridInterpolator(
+                (env_lat[::-1], env_lon),
+                ohc[::-1],
+                bounds_error=False,
+                fill_value=None,
+            )([[point["lat"], point["lon"]]])[0]
+        )
+        shallow_adjustment = 0.05 * min(
+            1.0, max(0.0, (45.0 - ohc_at_fix) / 25.0)
+        )
+        return {
+            "startIso": point["iso"],
+            "lat": point["lat"],
+            "lon": point["lon"],
+            "initialWindKt": wind,
+            "initialOrganization": round(
+                min(
+                    0.9,
+                    0.4
+                    + shallow_adjustment
+                    + max(0.0, wind - 34.0) * 0.004,
+                ),
+                3,
+            ),
+            "envOffsetH": offset_h,
+        }
+    raise ValueError("no in-domain >=34 kt observed fix for hindcast initialization")
+
+
 def build_events() -> tuple[list[str], list[dict]]:
     """Event env bins (C2) + scenarios.json (C3). Opt-in: NOT in the default
-    bake. Reuses the committed env.bin for climatological SST and reads the
-    per-event ERA5 winds from data/raw. windowH is derived from the baked plane
-    count. Prints the vortex-filter diagnostic per storm."""
-    print("[events] event env bins + scenarios.json (v1.1 counterfactual mode)")
+    bake. Reads aligned ERA5 wind/RH/SST plus WOA23 OHC. windowH is derived
+    from the baked plane count. Prints the vortex-filter diagnostic per storm."""
+    print("[events] event env bins + scenarios.json (hindcast + counterfactual)")
     print("[assert] " + binfmt.assert_golden_vector())
     storms = {s["id"]: s for s in sources.load_event_tracks()}
-    env_bin = os.path.join(OUT_DIR, "env.bin")
-
     scenarios: list[dict] = []
     out_paths: list[str] = []
     diags: list[dict] = []
     for spec in EVENT_SCENARIOS:
         nc_paths = [os.path.join(sources.RAW_DIR, n) for n in spec["nc"]]
+        rh_paths = [os.path.join(sources.RAW_DIR, n) for n in spec["rh_nc"]]
+        sst_paths = [os.path.join(sources.RAW_DIR, n) for n in spec["sst_nc"]]
         ghost = storms[spec["ghostId"]]
         d = era5_event.build_event_env(
-            spec["tag"], spec["monthIndex"], nc_paths, OUT_DIR, env_bin,
+            spec["tag"], spec["monthIndex"], nc_paths, rh_paths, sst_paths, OUT_DIR,
             track_points=ghost["points"],
         )
         diags.append(d)
@@ -287,6 +360,9 @@ def build_events() -> tuple[list[str], list[dict]]:
             "startIso": d["start_iso"],
             "spawn": {"lat": spawn["lat"], "lon": spawn["lon"], "seed": spec["seed"]},
             "ghostId": spec["ghostId"],
+            "hindcast": _hindcast_initialization(
+                ghost["points"], d["start_iso"]
+            ),
         })
 
     spath = os.path.join(OUT_DIR, "scenarios.json")
@@ -304,9 +380,8 @@ def build_events() -> tuple[list[str], list[dict]]:
 def main() -> int:
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    # Opt-in event bake: `python bake/bake.py events` builds the counterfactual
-    # env bins + scenarios ONLY (reuses the committed env.bin for SST). Kept out
-    # of the default path so the fast/offline 5-file bake never touches events.
+    # Opt-in event bake builds aligned event bins + scenarios only. Kept out of
+    # the default path so the fast climatology bake never touches event assets.
     if "events" in sys.argv[1:]:
         paths, _ = build_events()
         total = sum(os.path.getsize(p) for p in paths)

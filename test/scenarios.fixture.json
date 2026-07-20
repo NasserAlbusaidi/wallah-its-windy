@@ -10,7 +10,15 @@
       "windowH": 189,
       "startIso": "2007-06-01T00:00:00Z",
       "spawn": { "lat": 16.2, "lon": 63.4, "seed": 2007 },
-      "ghostId": "gonu2007"
+      "ghostId": "gonu2007",
+      "hindcast": {
+        "startIso": "2007-06-02T09:00:00Z",
+        "lat": 15.1,
+        "lon": 67.1,
+        "initialWindKt": 35,
+        "initialOrganization": 0.41,
+        "envOffsetH": 33
+      }
     },
     {
       "id": "shaheen",

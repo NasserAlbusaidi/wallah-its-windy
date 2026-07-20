@@ -22,6 +22,9 @@ import {
   dryAirPenaltyKtPerH,
   intensityRateKtPerH,
   betaDriftMs,
+  organizationTarget,
+  advanceOrganization,
+  precipitationRates,
 } from '../src/sim';
 
 // --- Synthetic environment stubs -------------------------------------------
@@ -33,6 +36,8 @@ const BASE: EnvSample = {
   shear: 0,
   shearU: 0,
   shearV: 0,
+  midlevelRhPct: 75,
+  ohcKjCm2: 70,
 };
 
 /** Uniform environment everywhere. */
@@ -170,7 +175,14 @@ describe('live storm diagnostics', () => {
     expect(diagnostics.steerV).toBe(4);
     expect(diagnostics.shearMs).toBe(20);
     expect(diagnostics.overLand).toBe(false);
-    expect(diagnostics.mpiKt).toBeCloseTo(mpiKt(30), 8);
+    expect(diagnostics.effectiveSstC).toBeCloseTo(30, 8);
+    expect(diagnostics.midlevelRhPct).toBe(75);
+    expect(diagnostics.ohcKjCm2).toBe(70);
+    expect(diagnostics.mpiKt).toBeLessThan(mpiKt(30));
+    expect(diagnostics.mpiKt).toBeCloseTo(mpiKt(30) * 0.96, 8);
+    expect(diagnostics.organization).toBeGreaterThan(0);
+    expect(diagnostics.organizationTarget).toBeGreaterThanOrEqual(0);
+    expect(diagnostics.coldWakeC).toBe(0);
     expect(diagnostics.oceanKtPerH).toBeGreaterThan(0);
     expect(diagnostics.shearKtPerH).toBeGreaterThan(0);
     expect(diagnostics.landKtPerH).toBe(0);
@@ -192,16 +204,16 @@ describe('live storm diagnostics', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Dry-air term (v1.1, design D12): geometric upwind-land proxy
+// Compatibility helper: the pre-RH geometric upwind-land proxy
 // ---------------------------------------------------------------------------
 
-describe('dryAirPenaltyKtPerH: distance-to-Arabian-landmass upwind proxy', () => {
+describe('legacy dryAirPenaltyKtPerH geometric diagnostic', () => {
   // A synthetic Arabian landmass to the N and W (the dry bearings): land north
   // of 23N or west of 57E, open sea to the SE. Mirrors Oman's real geometry
   // relative to the genesis belt.
   const NW_COAST = (lat: number, lon: number) => lat >= 23 || lon <= 57;
 
-  it('is active in v1.1 (DRYAIR_K > 0) and off when the seam is disabled', () => {
+  it('remains deterministic for older consumers', () => {
     expect(SIM.DRYAIR_K).toBeGreaterThan(0);
     // With no land anywhere the proxy finds nothing within range → zero penalty.
     expect(dryAirPenaltyKtPerH(20, 62, 5, NO_LAND)).toBe(0);
@@ -237,6 +249,181 @@ describe('dryAirPenaltyKtPerH: distance-to-Arabian-landmass upwind proxy', () =>
     // Land ONLY to the south-east (a non-dry bearing) must not trigger the term.
     const SE_COAST = (lat: number, lon: number) => lat <= 17 && lon >= 63;
     expect(dryAirPenaltyKtPerH(18, 62, 5, SE_COAST)).toBe(0);
+  });
+});
+
+describe('persistent convective organization', () => {
+  it('targets warm, moist, deep-ocean, low-shear environments', () => {
+    const favorable = organizationTarget(
+      { shear: 5, midlevelRhPct: 80, ohcKjCm2: 90 },
+      30,
+      false,
+    );
+    const hostile = organizationTarget(
+      { shear: 25, midlevelRhPct: 35, ohcKjCm2: 10 },
+      25,
+      false,
+    );
+    expect(favorable).toBeGreaterThan(0.8);
+    expect(hostile).toBeLessThan(0.1);
+    expect(
+      organizationTarget(
+        { shear: 5, midlevelRhPct: 80, ohcKjCm2: 90 },
+        30,
+        true,
+      ),
+    ).toBe(0.02);
+  });
+
+  it('collapses faster than it recovers and remains bounded', () => {
+    const disrupted = advanceOrganization(0.8, 0.1, 6);
+    const recovered = advanceOrganization(0.1, 0.8, 6);
+    expect(0.8 - disrupted).toBeGreaterThan(recovered - 0.1);
+    expect(advanceOrganization(-5, 2, 500)).toBeGreaterThanOrEqual(0);
+    expect(advanceOrganization(-5, 2, 500)).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('thermodynamic intensity coupling', () => {
+  const common = {
+    vKt: 45,
+    sstC: 29,
+    shearMs: 18,
+    overLand: false,
+    lat: 18,
+    lon: 62,
+    monthIndex: 5,
+    ageH: 24,
+  };
+
+  it('real mid-level dry air ventilates a weak core more than moist air', () => {
+    const moist = intensityRateKtPerH({
+      ...common,
+      midlevelRhPct: 80,
+      ohcKjCm2: 60,
+      organization: 0.2,
+    });
+    const dry = intensityRateKtPerH({
+      ...common,
+      midlevelRhPct: 25,
+      ohcKjCm2: 60,
+      organization: 0.2,
+    });
+    expect(dry).toBeLessThan(moist);
+  });
+
+  it('deep upper-ocean heat content supports more intensification', () => {
+    const shallow = intensityRateKtPerH({
+      ...common,
+      shearMs: 5,
+      midlevelRhPct: 80,
+      ohcKjCm2: 15,
+      organization: 0.8,
+    });
+    const deep = intensityRateKtPerH({
+      ...common,
+      shearMs: 5,
+      midlevelRhPct: 80,
+      ohcKjCm2: 100,
+      organization: 0.8,
+    });
+    expect(deep).toBeGreaterThan(shallow);
+  });
+});
+
+describe('separated rainfall components', () => {
+  it('requires tropical-storm winds for an eyewall but retains rainbands', () => {
+    const depression = precipitationRates(30, 0.5, 75);
+    expect(depression.eyewallMmH).toBe(0);
+    expect(depression.rainbandMmH).toBeGreaterThan(0);
+    expect(depression.orographicMmH).toBeGreaterThan(0);
+  });
+
+  it('strengthens organized, moist eyewall and rainband rain', () => {
+    const weakCore = precipitationRates(90, 0.2, 40);
+    const healthyCore = precipitationRates(90, 0.9, 80);
+    expect(healthyCore.eyewallMmH).toBeGreaterThan(weakCore.eyewallMmH);
+    expect(healthyCore.rainbandMmH).toBeGreaterThan(weakCore.rainbandMmH);
+    expect(healthyCore.totalMmH).toBeCloseTo(
+      healthyCore.eyewallMmH +
+        healthyCore.rainbandMmH +
+        healthyCore.orographicMmH,
+      10,
+    );
+  });
+});
+
+describe('storm-generated cold wake', () => {
+  function wakeAfter24H(ohcKjCm2: number): number {
+    const beta = betaDriftMs();
+    const engine = createSimEngine({
+      env: env({
+        sstC: 30,
+        steerU: -beta.u,
+        steerV: -beta.v,
+        shear: 0,
+        midlevelRhPct: 80,
+        ohcKjCm2,
+      }),
+      isLand: NO_LAND,
+    });
+    engine.spawn(
+      spawnParams({
+        initialWindKt: 90,
+        initialOrganization: 0.9,
+        disableWander: true,
+      }),
+    );
+    for (let i = 0; i < 96; i++) engine.tick(DT);
+    return engine.getState()!.coldWakeC;
+  }
+
+  it('develops under a strong slow storm and is buffered by deep OHC', () => {
+    const shallowWake = wakeAfter24H(15);
+    const deepWake = wakeAfter24H(100);
+    expect(shallowWake).toBeGreaterThan(0.1);
+    expect(shallowWake).toBeGreaterThan(deepWake);
+    expect(shallowWake).toBeLessThanOrEqual(SIM.COLD_WAKE_MAX_C);
+  });
+
+  it('retains sub-threshold deposits for moving storms without timestep cliffs', () => {
+    function movingWake(dtMin: number, hours = 36): number {
+      const engine = createSimEngine({
+        env: env({
+          sstC: 30,
+          steerU: 5,
+          steerV: 0,
+          shear: 0,
+          midlevelRhPct: 80,
+          ohcKjCm2: 70,
+        }),
+        isLand: NO_LAND,
+      });
+      engine.spawn(
+        spawnParams({
+          lat: 18,
+          lon: 60,
+          initialWindKt: 100,
+          initialOrganization: 0.9,
+          disableWander: true,
+        }),
+      );
+      const steps = Math.round((hours * 60) / dtMin);
+      let peakWake = 0;
+      for (let i = 0; i < steps; i++) {
+        engine.tick(dtMin);
+        peakWake = Math.max(peakWake, engine.getState()!.coldWakeC);
+      }
+      return peakWake;
+    }
+
+    const early = movingWake(15, 2);
+    const production = movingWake(15);
+    const hourly = movingWake(60);
+    expect(early).toBeGreaterThan(0);
+    expect(production).toBeGreaterThan(0.05);
+    expect(hourly).toBeGreaterThan(0.05);
+    expect(Math.abs(production - hourly) / production).toBeLessThan(0.15);
   });
 });
 
@@ -311,18 +498,33 @@ describe('lifecycle: despawn under 20 kt with honest cause of death', () => {
   });
 
   it('dry-air-dominated weakening at sea → dies of dry air (not cold/shear)', () => {
-    // SST=25.5 → MPI ~40 kt: warm enough that the storm never exceeds MPI (so the
-    // cold channel stays 0), but low enough that the dry-air bite drags it below
-    // 20 kt while still offshore. No shear, no landfall — only dry air can be the
-    // cause. A synthetic Arabian coast to the N and W supplies the upwind land.
-    const NW_COAST = (lat: number, lon: number) => lat >= 23 || lon <= 57;
-    const engine = createSimEngine({ env: env({ sstC: 25.5, shear: 0, steerU: 0, steerV: 0 }), isLand: NW_COAST });
-    engine.spawn(spawnParams({ lat: 22, lon: 58 })); // hugging the coast, still at sea
+    // Very dry ERA5-like mid-level air reaches a weak core through modest
+    // ventilation below the explicit shear-decay threshold. Motion cancels beta
+    // drift, land is absent, and MPI remains just above the storm, isolating the
+    // humidity pathway for attribution.
+    const beta = betaDriftMs();
+    const engine = createSimEngine({
+      env: env({
+        sstC: 26,
+        shear: 13.9,
+        steerU: -beta.u,
+        steerV: -beta.v,
+        midlevelRhPct: 20,
+        ohcKjCm2: 15,
+      }),
+      isLand: NO_LAND,
+    });
+    engine.spawn(
+      spawnParams({
+        initialWindKt: 30,
+        initialOrganization: 0.05,
+        disableWander: true,
+      }),
+    );
     const events = run(engine, 2000);
     const death = firstDeath(events);
     expect(death).not.toBeNull();
     expect(death!.reason).toBe(DeathReason.DryAir);
-    // It really died offshore of dry air, not by wandering onto the coast.
     expect(events.some((e) => e.type === 'landfall')).toBe(false);
   });
 });

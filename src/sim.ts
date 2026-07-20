@@ -1,8 +1,9 @@
 /**
  * sim.ts — the physics core (eng tasks T2, T6; design steps 4 + D12 seam).
  *
- * A storm centre advected by climatological steering + beta drift + a gentle
- * seeded wander, with a DeMaria–Kaplan intensity ODE and a deterministic
+ * A storm centre advected by baked steering + beta drift + optional seeded
+ * wander, with persistent convective organization, ERA5 humidity, WOA23 OHC, a
+ * spatial cold wake, a DeMaria–Kaplan-based intensity ODE, and a deterministic
  * Holland-style pressure/wind structure. The whole thing is
  * a PURE function of (spawn, month, seed): given the same SpawnParams and the
  * same fixed-dt tick sequence it always produces the identical track. All
@@ -16,7 +17,7 @@
  * --- Dependency seam -------------------------------------------------------
  * The SimEngine interface in types.ts specifies no constructor, so this module
  * owns how the engine is built. `createSimEngine(deps)` takes the baked
- * EnvSampler (SST/steering/shear) plus an `isLand(lat,lon)` predicate (from the
+ * EnvSampler (SST/OHC/RH/steering/shear) plus an `isLand(lat,lon)` predicate (from the
  * terrain.bin land mask). main.ts must supply both when it wires the engine —
  * EnvSample carries no land flag, so land detection cannot come through it.
  * See BUILDREPORT-sim.md.
@@ -58,11 +59,11 @@ export const SIM = {
 
   // -- Intensity ODE: dV/dt = k*(MPI(SST) - V) - shear - land - dryair --------
   /**
-   * Relaxation rate toward MPI, per hour. Time constant ~83 h: a storm over
-   * 30 °C water climbs from spawn to ~85 kt in ~2 sim-days and ~105 kt in
-   * ~3 sim-days — "spins up over 2–3 sim days" per the task.
+   * Base relaxation rate toward thermodynamically adjusted MPI. Persistent
+   * organization and OHC multiply this rate nonlinearly, so 0.08 is not itself
+   * a storm-wide e-folding time.
    */
-  INTENSIFY_K_PER_H: 0.012,
+  INTENSIFY_K_PER_H: 0.08,
   /**
    * Deep-layer shear below this (m/s) does no harm. The classic instantaneous
    * onset is ~10 m/s, but env.bin's per-year planes carry |V200 - V850| of
@@ -74,17 +75,16 @@ export const SIM = {
    * ~23 lethal); Jul-Aug ~27-32 -> everything shredded. Recalibrate from
    * scratch if the env source ever moves to daily/hourly fields.
    *
-   * November (v1.1 diagnosis, C6): the shr_10 planes ORIGINALLY all sat
+   * November diagnosis (C6): the original shr_10 planes all sat
    * 14.7-19.6 m/s in the genesis belt, so seed%K could never land on a calm
    * regime and 0/32 probe storms reached Cat-1 — the "November fizzle". This was
    * NOT a constant to tune here: Nov's hostile band (14-19) overlaps June's
    * surviving planes (18-20), so no SHEAR_THRESHOLD_MS/SHEAR_K change lifts Nov
    * without also un-shredding June/Sep. The fix was DATA-SIDE: the raw ERA5
-   * record DOES hold calm Novembers (2011 8.6 m/s, 2020 9.8), and the v1.1 bake's
-   * calm-year plane selection (bake/era5.py) now ships a ~12.8 m/s belt plane, so
-   * the committed env.bin carries a survivable November — pinned by
-   * integration-bins' "November post-monsoon rescue" guard. DRYAIR_K below is
-   * unrelated to this.
+   * record does hold survivable November regimes. Once RH became explicit, the
+   * wind-only calmest year proved too dry; the current bake jointly selects two
+   * real years for low shear and moisture. The integration guard intentionally
+   * pins a narrow, multi-plane Cat-1 tail rather than a broad artificial rescue.
    */
   SHEAR_THRESHOLD_MS: 14,
   /** Weakening per m/s of shear above threshold, kt/h (same recalibration). */
@@ -100,6 +100,14 @@ export const SIM = {
   SHEAR_GRACE_H: 12,
   /** Fractional intensity lost per hour over land (rapid decay, ~9 h e-fold). */
   LAND_DECAY_PER_H: 0.1,
+
+  // -- Persistent convective organization ----------------------------------
+  /** Core-health recovery is deliberately slower than disruption. */
+  ORGANIZATION_RECOVERY_H: 30,
+  ORGANIZATION_DISRUPTION_H: 10,
+  /** Mid-level humidity below this begins a ventilation/dry-air penalty. */
+  RH_DRY_THRESHOLD_PCT: 58,
+  RH_DRY_RANGE_PCT: 28,
 
   // -- MPI: DeMaria & Kaplan (1994) empirical SST fit ------------------------
   // V_mpi(m/s) = A + B*exp(C*(T - T0)); source coefficients below.
@@ -136,33 +144,29 @@ export const SIM = {
   WANDER_STEP_MS: 0.28,
   WANDER_REVERT: 0.05,
 
-  // -- v1.1 dry-air term (design D12) ----------------------------------------
+  // -- ERA5 humidity / ventilation -------------------------------------------
   /**
-   * Nominal dry-air weakening coefficient, kt/h, scaling the geometric proximity
-   * as the Arabian landmass nears the storm along a dry (N/NW/W) bearing. Because
-   * the upwind probe starts one DRYAIR_STEP_KM out, proximity tops out near ~0.82
-   * (see dryLandProximity), so the EFFECTIVE peak weakening is ~0.74 kt/h, not the
-   * full 0.9 — a tuning pass shifts the real ceiling by only ~82% of any change to
-   * this constant. A GEOMETRIC proxy for
-   * desert-air entrainment: EnvSample carries no humidity, so "how close is the
-   * upwind coast" stands in for it. Tuned against IBTrACS Gonu (2007), which fell
-   * 127→77 kt over its final ~330 km NW approach to Oman: on the real env.bin the
-   * DEMO_SEED May storm (whose track hugs the Omani coast at Cat-4) now peaks
-   * ~113 kt and makes landfall near ~90 kt — a recognizable coastal weakening
-   * instead of holding 131 kt to the beach — while clearing integration-bins'
-   * >90 kt-and-landfall pin with margin. RANGE deliberately keeps the term OFF
-   * during open-sea spin-up (>190 km from upwind land) so the peak is unharmed;
-   * it only bites on the final approach. Co-tuned with DRYAIR_RANGE_KM.
+   * Nominal dry-air weakening coefficient, kt/h. The live engine multiplies it
+   * by ERA5 RH deficit, shear ventilation, and weak-core exposure.
    */
   DRYAIR_K: 0.9,
   /**
-   * Dry desert air reaches this far offshore (km); zero penalty beyond it. Set
-   * narrow on purpose: a wider reach caps intensification far out to sea and
-   * fizzles storms (and the demo) before they ever approach the coast.
+   * Compatibility-only knobs for dryAirPenaltyKtPerH's old geometric diagnostic.
+   * The engine no longer calls that helper; these do not affect live intensity.
    */
   DRYAIR_RANGE_KM: 190,
-  /** Ray-probe step (km) for the upwind isLand walk. ~RANGE/STEP probes/bearing. */
+  /** Compatibility-only ray step for the legacy geometric diagnostic. */
   DRYAIR_STEP_KM: 34,
+
+  // -- Coupled upper ocean / storm wake -------------------------------------
+  /** Peak local cooling tendency for a strong, slow storm over modest OHC. */
+  COLD_WAKE_K_C_PER_H: 0.035,
+  /** Exponential recovery time of a deposited wake patch. */
+  COLD_WAKE_RECOVERY_H: 120,
+  /** Hard physical/numerical ceiling on combined centre cooling. */
+  COLD_WAKE_MAX_C: 4,
+  /** Patches older than this are both negligible and removed. */
+  COLD_WAKE_MAX_AGE_H: 360,
 
   // -- Bookkeeping ----------------------------------------------------------
   /** EMA retention per tick for "which term dominated recent decay". */
@@ -237,14 +241,15 @@ const DRY_BEARINGS: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /**
- * Geometric dry-air proxy in [0,1]: how close the nearest upwind (N/NW/W) coast
- * is. Walks isLand outward along each dry bearing in DRYAIR_STEP_KM increments up
+ * Legacy geometric dry-air diagnostic in [0,1]. Retained for older exported
+ * tests/tools; the engine uses ERA5 RH and never calls it. Walks isLand outward
+ * along each dry bearing in DRYAIR_STEP_KM increments up
  * to DRYAIR_RANGE_KM (via grid.offsetKm — no inline lat/lon math here); the min
  * hit distance across bearings sets proximity = (RANGE − dist)/RANGE. 0 when no
  * land within range (open sea); the probe starts one DRYAIR_STEP_KM out, so the
  * nearest resolvable land sits that step away and proximity tops out near
  * (RANGE − STEP)/RANGE ≈ 0.82 — never a full 1. Deterministic: a fixed step
- * grid, no RNG, no wall-clock — safe in the tick path.
+ * grid, no RNG, and no wall-clock.
  */
 function dryLandProximity(
   lat: number,
@@ -265,11 +270,8 @@ function dryLandProximity(
 }
 
 /**
- * Dry-air intrusion penalty — kt/h, ≥ 0. A geometric proxy (design D12): the
- * penalty grows as the storm nears the Arabian landmass along its dry (N/NW/W)
- * upwind bearings, standing in for desert-air entrainment (EnvSample carries no
- * humidity). Pure f(position, isLand); `monthIndex` is reserved for a future
- * seasonal modulation. Returns 0 when SIM.DRYAIR_K is 0 (term disabled).
+ * Compatibility-only geometric dry-air diagnostic, kt/h. Live intensity uses
+ * the ERA5 RH ventilation term in intensityTerms instead.
  */
 export function dryAirPenaltyKtPerH(
   lat: number,
@@ -297,12 +299,12 @@ interface IntensityArgs {
   monthIndex: number;
   /** Storm age in hours; omitted = mature (full shear penalty, no grace). */
   ageH?: number;
-  /**
-   * Land-mask predicate for the dry-air upwind probe. Omitted = no dry-air term
-   * (open-ocean unit tests that don't care about the coast); the engine always
-   * threads its real isLand through.
-   */
-  isLand?: (lat: number, lon: number) => boolean;
+  /** ERA5 600/700-hPa mean RH; omitted tests assume a moist environment. */
+  midlevelRhPct?: number;
+  /** WOA23 OHC26; omitted tests assume robust upper-ocean support. */
+  ohcKjCm2?: number;
+  /** Persistent convective organization in [0,1]. */
+  organization?: number;
 }
 
 /** The four ODE terms plus their net dV/dt (kt/h). Internal — drives attribution. */
@@ -318,16 +320,114 @@ interface IntensityTerms {
 function intensityTerms(a: IntensityArgs): IntensityTerms {
   // Over land there is no ocean heat source, so MPI collapses to 0 regardless of
   // whatever SST the sampler returns there — the relaxation term then decays V.
-  const mpi = a.overLand ? 0 : mpiKt(a.sstC);
-  const relax = SIM.INTENSIFY_K_PER_H * (mpi - a.vKt);
+  const organization = clamp01(a.organization ?? 1);
+  const ohcSupport = clamp01(((a.ohcKjCm2 ?? 70) - 10) / 70);
+  const mpi = a.overLand
+    ? 0
+    : mpiKt(a.sstC) * (0.72 + 0.28 * ohcSupport);
+  const potentialGap = mpi - a.vKt;
+  const organizedExcess = clamp01((organization - 0.45) / 0.1);
+  const organizationCoupling =
+    potentialGap >= 0
+      ? 0.08 + 0.5 * organizedExcess * organizedExcess
+      : 1;
+  const oceanDepthCoupling =
+    potentialGap >= 0
+      ? 0.8 + 0.55 * clamp01(((a.ohcKjCm2 ?? 70) - 40) / 35)
+      : 1;
+  const coreCoupling = organizationCoupling * oceanDepthCoupling;
+  const relax = SIM.INTENSIFY_K_PER_H * potentialGap * coreCoupling;
   const graceRamp = a.ageH === undefined ? 1 : Math.min(1, a.ageH / SIM.SHEAR_GRACE_H);
-  const shearPen = graceRamp * shearPenaltyKtPerH(a.shearMs);
+  const shearPen =
+    graceRamp *
+    shearPenaltyKtPerH(a.shearMs) *
+    (1.15 - 0.3 * organization);
   const landPen = a.overLand ? landDecayKtPerH(a.vKt) : 0;
-  // Dry-air needs the coast geometry; without an isLand probe (bare unit tests)
-  // the term is off, matching the pre-v1.1 open-ocean behaviour.
-  const dryPen = a.isLand ? dryAirPenaltyKtPerH(a.lat, a.lon, a.monthIndex, a.isLand) : 0;
+  const dryFraction = clamp01(
+    (SIM.RH_DRY_THRESHOLD_PCT - (a.midlevelRhPct ?? 75)) /
+      SIM.RH_DRY_RANGE_PCT,
+  );
+  // Ambient dry air only reaches the inner core efficiently when shear opens a
+  // ventilation pathway and organization is already weak. This prevents a dry
+  // monthly-mean free troposphere from unrealistically killing an otherwise
+  // vertically aligned cyclone in calm flow.
+  const coreExposure = Math.pow(1 - organization, 1.5);
+  const shearExposure = clamp01((a.shearMs - 12) / 8);
+  const dryPen =
+    a.overLand
+      ? 0
+      : SIM.DRYAIR_K *
+        dryFraction *
+        (0.25 + 1.5 * coreExposure) *
+        shearExposure;
   const net = relax - shearPen - landPen - dryPen;
   return { mpi, relax, shearPen, landPen, dryPen, net };
+}
+
+/** Equilibrium convective organization implied by the current environment. */
+export function organizationTarget(
+  sample: Pick<EnvSample, 'shear' | 'midlevelRhPct' | 'ohcKjCm2'>,
+  effectiveSstC: number,
+  overLand: boolean,
+): number {
+  if (overLand) return 0.02;
+  const warmth = clamp01((effectiveSstC - 25.5) / 3.5);
+  const moisture = clamp01((sample.midlevelRhPct - 35) / 45);
+  const oceanDepth = clamp01((sample.ohcKjCm2 - 15) / 65);
+  const shearVentilation = 1 - clamp01((sample.shear - 7) / 23);
+  return clamp01(
+    (0.45 * warmth + 0.25 * moisture + 0.3 * oceanDepth) *
+      shearVentilation,
+  );
+}
+
+/** Asymmetric relaxation: cores collapse quickly and rebuild slowly. */
+export function advanceOrganization(
+  current: number,
+  target: number,
+  dtH: number,
+): number {
+  const tau =
+    target < current
+      ? SIM.ORGANIZATION_DISRUPTION_H
+      : SIM.ORGANIZATION_RECOVERY_H;
+  const weight = 1 - Math.exp(-Math.max(0, dtH) / tau);
+  return clamp01(current + (target - current) * weight);
+}
+
+export interface RainRates {
+  eyewallMmH: number;
+  rainbandMmH: number;
+  orographicMmH: number;
+  totalMmH: number;
+}
+
+/** Separated, bounded precipitation components for rendering and debrief. */
+export function precipitationRates(
+  vKt: number,
+  organization: number,
+  midlevelRhPct: number,
+): RainRates {
+  const moisture = clamp01((midlevelRhPct - 30) / 50);
+  const core = 0.15 + 0.85 * clamp01(organization);
+  const eyewallMmH =
+    vKt < 34
+      ? 0
+      : Math.min(32, (5.5 + 0.16 * (vKt - 34)) * core * moisture);
+  const rainbandMmH = Math.min(
+    13,
+    (1.2 + 0.048 * Math.max(0, vKt)) * (0.35 + 0.65 * core) * moisture,
+  );
+  const orographicMmH = Math.min(
+    7,
+    (0.7 + 0.026 * Math.max(0, vKt)) * (0.5 + 0.5 * core) * moisture,
+  );
+  return {
+    eyewallMmH,
+    rainbandMmH,
+    orographicMmH,
+    totalMmH: eyewallMmH + rainbandMmH + orographicMmH,
+  };
 }
 
 /** Net intensity change rate, kt/h (dV/dt). Positive = intensifying. */
@@ -359,14 +459,25 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   let seed = 0;
   let demo = false;
   let tFracHorizonH: number = SIM.EVENT_TFRAC_HORIZON_H;
+  let tFracOffsetH = 0;
+  let stochasticWander = true;
 
   let lat = 0;
   let lon = 0;
   let vKt = 0;
   let ageH = 0;
   let alive = false;
+  let organization = 0.3;
+  let organizationTargetValue = 0.3;
+  let coldWakeC = 0;
   let diagnostics: StormDiagnostics = {
     sstC: 0,
+    effectiveSstC: 0,
+    midlevelRhPct: 0,
+    ohcKjCm2: 0,
+    organization: 0,
+    organizationTarget: 0,
+    coldWakeC: 0,
     mpiKt: 0,
     steerU: 0,
     steerV: 0,
@@ -379,6 +490,10 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     landKtPerH: 0,
     dryAirKtPerH: 0,
     netKtPerH: 0,
+    eyewallRainMmH: 0,
+    rainbandRainMmH: 0,
+    orographicRainMmH: 0,
+    totalRainMmH: 0,
   };
   let structure: StormStructure = deriveStormStructure({
     vKt: 0,
@@ -392,6 +507,15 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   // wander (steering-velocity perturbation, m/s)
   let pu = 0;
   let pv = 0;
+
+  interface WakePatch {
+    lat: number;
+    lon: number;
+    coolingC: number;
+    radiusKm: number;
+    ageH: number;
+  }
+  let wakePatches: WakePatch[] = [];
 
   // death attribution — EMAs of each decay channel's recent contribution
   let recentCold = 0;
@@ -416,6 +540,8 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     guardFinite(e.shear, 'env.shear');
     guardFinite(e.shearU, 'env.shearU');
     guardFinite(e.shearV, 'env.shearV');
+    guardFinite(e.midlevelRhPct, 'env.midlevelRhPct');
+    guardFinite(e.ohcKjCm2, 'env.ohcKjCm2');
     return e;
   }
 
@@ -440,6 +566,8 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       trackPoints: track,
       alive,
       isDemo: demo,
+      organization,
+      coldWakeC,
       diagnostics: { ...diagnostics },
       structure: cloneStormStructure(structure),
     };
@@ -447,11 +575,19 @@ export function createSimEngine(deps: SimDeps): SimEngine {
 
   function updateDiagnostics(
     sample: EnvSample,
+    effectiveSstC: number,
     overLand: boolean,
     terms: IntensityTerms,
   ): void {
+    const rain = precipitationRates(vKt, organization, sample.midlevelRhPct);
     diagnostics = {
       sstC: sample.sstC,
+      effectiveSstC,
+      midlevelRhPct: sample.midlevelRhPct,
+      ohcKjCm2: sample.ohcKjCm2,
+      organization,
+      organizationTarget: organizationTargetValue,
+      coldWakeC,
       mpiKt: terms.mpi,
       steerU: sample.steerU,
       steerV: sample.steerV,
@@ -464,7 +600,96 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       landKtPerH: terms.landPen,
       dryAirKtPerH: terms.dryPen,
       netKtPerH: terms.net,
+      eyewallRainMmH: rain.eyewallMmH,
+      rainbandRainMmH: rain.rainbandMmH,
+      orographicRainMmH: rain.orographicMmH,
+      totalRainMmH: rain.totalMmH,
     };
+  }
+
+  function decayWake(dtH: number): void {
+    const decay = Math.exp(-dtH / SIM.COLD_WAKE_RECOVERY_H);
+    for (const patch of wakePatches) {
+      patch.coolingC *= decay;
+      patch.ageH += dtH;
+    }
+    wakePatches = wakePatches.filter(
+      (patch) =>
+        patch.ageH <= SIM.COLD_WAKE_MAX_AGE_H && patch.coolingC >= 1e-9,
+    );
+  }
+
+  function sampleWake(atLat: number, atLon: number): number {
+    let cooling = 0;
+    for (const patch of wakePatches) {
+      const distance = greatCircleKm(
+        { lat: atLat, lon: atLon },
+        { lat: patch.lat, lon: patch.lon },
+      );
+      const sigma = Math.max(20, patch.radiusKm * 0.5);
+      cooling +=
+        patch.coolingC *
+        Math.exp(-(distance * distance) / (2 * sigma * sigma));
+    }
+    return Math.min(SIM.COLD_WAKE_MAX_C, Math.max(0, cooling));
+  }
+
+  function depositWake(
+    atLat: number,
+    atLon: number,
+    sample: EnvSample,
+    motionSpeedMs: number,
+    radiusKm: number,
+    dtH: number,
+  ): void {
+    if (isLand(atLat, atLon) || vKt < 25) return;
+    const intensity = clamp01((vKt - 20) / 90);
+    const shallowOcean = Math.max(
+      0.35,
+      Math.min(2, 50 / Math.max(10, sample.ohcKjCm2)),
+    );
+    const stagnation = Math.max(
+      0.35,
+      Math.min(2, 5 / Math.max(1, motionSpeedMs + 0.5)),
+    );
+    const added =
+      SIM.COLD_WAKE_K_C_PER_H *
+      intensity *
+      intensity *
+      shallowOcean *
+      stagnation *
+      dtH;
+    if (added <= 0) return;
+
+    let nearest: WakePatch | null = null;
+    let nearestKm = Infinity;
+    for (const patch of wakePatches) {
+      const distance = greatCircleKm(
+        { lat: atLat, lon: atLon },
+        { lat: patch.lat, lon: patch.lon },
+      );
+      if (distance < nearestKm) {
+        nearest = patch;
+        nearestKm = distance;
+      }
+    }
+    const mergeRadiusKm = Math.max(15, radiusKm * 0.2);
+    if (nearest && nearestKm <= mergeRadiusKm) {
+      nearest.coolingC = Math.min(
+        SIM.COLD_WAKE_MAX_C,
+        nearest.coolingC + added,
+      );
+      nearest.radiusKm = Math.max(nearest.radiusKm, radiusKm);
+      nearest.ageH = 0;
+    } else {
+      wakePatches.push({
+        lat: atLat,
+        lon: atLon,
+        coolingC: added,
+        radiusKm: Math.max(45, radiusKm),
+        ageH: 0,
+      });
+    }
   }
 
   function recordTrackPoint(): void {
@@ -510,13 +735,27 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       params.tFracHorizonH > 0
         ? params.tFracHorizonH
         : SIM.EVENT_TFRAC_HORIZON_H;
+    tFracOffsetH =
+      params.tFracOffsetH !== undefined &&
+      Number.isFinite(params.tFracOffsetH) &&
+      params.tFracOffsetH >= 0
+        ? params.tFracOffsetH
+        : 0;
+    stochasticWander = params.disableWander !== true;
 
     rng = makeRng(seed);
-    vKt = SIM.SPAWN_VKT;
+    vKt =
+      params.initialWindKt !== undefined &&
+      Number.isFinite(params.initialWindKt) &&
+      params.initialWindKt > 0
+        ? params.initialWindKt
+        : SIM.SPAWN_VKT;
     ageH = 0;
     alive = true;
     pu = 0;
     pv = 0;
+    wakePatches = [];
+    coldWakeC = 0;
     recentCold = 0;
     recentShear = 0;
     recentLand = 0;
@@ -525,20 +764,37 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     prevVKtForPeak = vKt;
     rising = false;
     prevOverLand = isLand(lat, lon);
-    const initialEnv = sampleEnv(lat, lon, 0);
+    const initialTFrac = clamp01(tFracOffsetH / tFracHorizonH);
+    const initialEnv = sampleEnv(lat, lon, initialTFrac);
+    organizationTargetValue = organizationTarget(
+      initialEnv,
+      initialEnv.sstC,
+      prevOverLand,
+    );
+    organization =
+      params.initialOrganization !== undefined &&
+      Number.isFinite(params.initialOrganization)
+        ? clamp01(params.initialOrganization)
+        : clamp01(
+            0.34 +
+              0.34 * organizationTargetValue +
+              0.32 * clamp01((vKt - 20) / 80),
+          );
     const initialTerms = intensityTerms({
       vKt,
       sstC: initialEnv.sstC,
       shearMs: initialEnv.shear,
+      midlevelRhPct: initialEnv.midlevelRhPct,
+      ohcKjCm2: initialEnv.ohcKjCm2,
+      organization,
       overLand: prevOverLand,
       lat,
       lon,
       monthIndex,
       ageH,
-      isLand,
     });
-    updateDiagnostics(initialEnv, prevOverLand, initialTerms);
-    const initialMotion = motionAt(lat, lon, 0);
+    updateDiagnostics(initialEnv, initialEnv.sstC, prevOverLand, initialTerms);
+    const initialMotion = motionAt(lat, lon, initialTFrac);
     structure = deriveStormStructure({
       vKt,
       lat,
@@ -568,11 +824,17 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     }
 
     const dtH = dtMin / 60;
-    const tFrac = clamp01(ageH / tFracHorizonH);
+    const tFrac = clamp01((ageH + tFracOffsetH) / tFracHorizonH);
 
     // 1) Advance the wander ONCE per tick (2 draws) — used for both RK2 stages.
-    pu += (rng.next() * 2 - 1) * SIM.WANDER_STEP_MS - pu * SIM.WANDER_REVERT;
-    pv += (rng.next() * 2 - 1) * SIM.WANDER_STEP_MS - pv * SIM.WANDER_REVERT;
+    if (stochasticWander) {
+      pu +=
+        (rng.next() * 2 - 1) * SIM.WANDER_STEP_MS -
+        pu * SIM.WANDER_REVERT;
+      pv +=
+        (rng.next() * 2 - 1) * SIM.WANDER_STEP_MS -
+        pv * SIM.WANDER_REVERT;
+    }
 
     // 2) RK2 (midpoint) position integration, in lat/lon degrees.
     const k1 = motionAt(lat, lon, tFrac);
@@ -588,18 +850,32 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     // 3) Intensity ODE at the new position.
     const e = sampleEnv(lat, lon, tFrac);
     const overLand = isLand(lat, lon);
+    decayWake(dtH);
+    coldWakeC = overLand ? 0 : sampleWake(lat, lon);
+    const effectiveSstC = e.sstC - coldWakeC;
+    organizationTargetValue = organizationTarget(
+      e,
+      effectiveSstC,
+      overLand,
+    );
+    organization = advanceOrganization(
+      organization,
+      organizationTargetValue,
+      dtH,
+    );
     const terms = intensityTerms({
       vKt,
-      sstC: e.sstC,
+      sstC: effectiveSstC,
       shearMs: e.shear,
+      midlevelRhPct: e.midlevelRhPct,
+      ohcKjCm2: e.ohcKjCm2,
+      organization,
       overLand,
       lat,
       lon,
       monthIndex,
       ageH,
-      isLand,
     });
-    updateDiagnostics(e, overLand, terms);
     vKt = guardFinite(Math.max(0, vKt + terms.net * dtH), 'vKt');
     structure = deriveStormStructure({
       vKt,
@@ -615,6 +891,15 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       previousOuterSizeKm: structure.outerSizeKm,
       deltaHours: dtH,
     });
+    depositWake(
+      lat,
+      lon,
+      e,
+      Math.hypot(k2.u, k2.v),
+      structure.outerSizeKm,
+      dtH,
+    );
+    updateDiagnostics(e, effectiveSstC, overLand, terms);
 
     // 4) Attribute this tick's weakening to a channel (recent-weighted EMA).
     const coldHere = overLand ? 0 : Math.max(0, -terms.relax);

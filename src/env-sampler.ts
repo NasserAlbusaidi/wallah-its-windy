@@ -1,7 +1,8 @@
 /**
  * env-sampler.ts — the EnvSampler the sim runs on (integration seam).
  *
- * The physics core (sim.ts) reads SST + deep-layer steering + shear through an
+ * The physics core (sim.ts) reads SST, upper-ocean heat content, mid-level
+ * humidity, deep-layer steering, and shear through an
  * EnvSampler. This module builds one that prefers the baked env.bin and falls
  * back to a deterministic analytic Arabian-Sea climatology when the file is
  * absent (a 404 during load must not brick the demo). Both branches are pure
@@ -9,7 +10,7 @@
  * (spawn, month, seed); every output is finite (the sim guards on NaN).
  *
  * env.bin encodes the month in the layer NAME, not a timestep axis: bake writes
- * `sst_MM / u_MM / v_MM / shr_MM / shu_MM / shv_MM`, where MM is the
+ * `sst_MM / u_MM / v_MM / shr_MM / shu_MM / shv_MM / rh_MM / ohc_MM`, where MM is the
  * 0-indexed monthIndex, zero-padded, for the season it bakes
  * (bake/bake.py SEASON_MONTHS = [4..10] =
  * May..Nov). This is the ONE place the sim resolves those names — it must agree
@@ -78,7 +79,7 @@ function sampleLayer(
 }
 
 /**
- * Read all four env fields for a month from the baked bin, or null if the
+ * Read all eight environment fields for a month from the baked bin, or null if the
  * expected season layers are absent (caller then uses the analytic fallback).
  * Un-suffixed names are accepted as a courtesy for a future single-month bake.
  */
@@ -97,15 +98,19 @@ export function sampleEnvBin(
   const sh = pickLayer(bin, [`shr_${mm}`, 'shear', 'shr']);
   const shU = pickLayer(bin, [`shu_${mm}`, 'shearU', 'shearu']);
   const shV = pickLayer(bin, [`shv_${mm}`, 'shearV', 'shearv']);
-  if (!sst || !su || !sv || !sh || !shU || !shV) return null;
+  const rh = pickLayer(bin, [`rh_${mm}`, 'rh']);
+  const ohc = pickLayer(bin, [`ohc_${mm}`, 'ohc']);
+  if (!sst || !su || !sv || !sh || !shU || !shV || !rh || !ohc) return null;
   return {
-    // SST bakes nt=1, so either mode degenerates to its only plane.
+    // In climatology SST/OHC have nt=1; event bins align every field in time.
     sstC: sampleLayer(sst, lat, lon, tFrac, mode),
     steerU: sampleLayer(su, lat, lon, tFrac, mode),
     steerV: sampleLayer(sv, lat, lon, tFrac, mode),
     shear: sampleLayer(sh, lat, lon, tFrac, mode),
     shearU: sampleLayer(shU, lat, lon, tFrac, mode),
     shearV: sampleLayer(shV, lat, lon, tFrac, mode),
+    midlevelRhPct: sampleLayer(rh, lat, lon, tFrac, mode),
+    ohcKjCm2: sampleLayer(ohc, lat, lon, tFrac, mode),
   };
 }
 
@@ -167,7 +172,29 @@ export function makeEnvSampler(getBin: () => ParsedBin | null): SelectableEnvSam
       const shearAngle = (20 + 35 * Math.max(0, Math.cos((monthIndex - 7) * (Math.PI / 6)))) * Math.PI / 180;
       const shearU = shear * Math.cos(shearAngle);
       const shearV = shear * Math.sin(shearAngle);
-      return { sstC, steerU, steerV, shear, shearU, shearV };
+      // Degraded-mode analytic fields remain physically named and bounded. The
+      // committed production bin carries ERA5 RH + WOA23 OHC; these are only for
+      // an asset 404, not a substitute in the normal path.
+      const midlevelRhPct = clamp(
+        66 - 0.9 * (la - 18) - 8 * Math.max(0, Math.sin((monthIndex - 6) * Math.PI / 6)),
+        28,
+        82,
+      );
+      const ohcKjCm2 = clamp(
+        55 + 18 * Math.cos((monthIndex - 5) * Math.PI / 6) - 1.2 * (la - 18),
+        15,
+        95,
+      );
+      return {
+        sstC,
+        steerU,
+        steerV,
+        shear,
+        shearU,
+        shearV,
+        midlevelRhPct,
+        ohcKjCm2,
+      };
     },
   };
 }

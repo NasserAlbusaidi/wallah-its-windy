@@ -37,17 +37,17 @@ puts row 0 at the north edge). Nothing else may reimplement it.
 The byte layout is identical either way; what the planes MEAN is a contract
 between the bake that wrote the file and the code that routes it:
 
-1. **Synoptic samples** (v1.0 climatology `env.bin`
-   `u/v/shr/shu/shv`, `nt = 4`): each
+1. **Synoptic samples** (climatology `env.bin`
+   `u/v/shr/shu/shv/rh`, `nt = 4`): each
    plane is a distinct real YEAR's month (bake/era5.py picks them; plane 0 =
    most typical). Consumers SELECT one plane per storm — the spawn seed picks
    `seed % nt` in explicit `synoptic-plane` mode — and `tFrac` is ignored.
    This is the D10 track-diversity remedy.
-2. **Time axis** (v1.1 event files, e.g. a Gonu `env` bake with hourly steps):
+2. **Time axis** (event files, e.g. a Gonu `env` bake with 3-hourly steps):
    planes are consecutive timesteps; consumers select explicit `event-timeline`
    mode and `tFrac` linearly interpolates along `nt`.
 
-`sst_MM` stays `nt = 1` in mode 1 (OISST long-term mean).
+`sst_MM` and `ohc_MM` stay `nt = 1` in mode 1 (OISST/WOA23 climatology).
 
 ---
 
@@ -214,25 +214,26 @@ from IBTrACS for storms that actually reached Oman.
 
 ---
 
-## Event scenarios (v1.1) — `env_gonu.bin`, `env_shaheen.bin`, `scenarios.json`, `tracks.json`
+## Event scenarios — `env_gonu.bin`, `env_shaheen.bin`, `scenarios.json`, `tracks.json`
 
-The counterfactual mode (`bake/bake.py events`) adds four files:
+The event bake (`bake/bake.py events`) adds four files:
 
 - **`env_gonu.bin` / `env_shaheen.bin`** — the SAME WIWB format as `env.bin`
   (version 1, identical 88-byte records, 40×24, int16 quant scale 0.01, north
   row 0). The ONLY difference is the `nt` mode-2 **time axis**:
-  `u/v/shr/shu/shv` planes
+  `sst/u/v/shr/shu/shv/rh/ohc` planes
   are consecutive 3-hourly steps (gonu `nt=64`, shaheen `nt=168`), consumed by
   selecting `event-timeline` mode and interpolating along `tFrac`. Layers keep
-  the month-suffix names (`sst_05,u_05,v_05,shr_05` for gonu; `..._08` for
-  shaheen) so the existing sampler resolves them unchanged. `sst_MM` stays
-  `nt=1`, copied verbatim from `env.bin` (the event fetch was winds-only). The
-  real-storm vortex is washed out at bake time (gaussian_filter σ=3 cells); see
-  `bake/README.md`.
+  the month-suffix names (`sst_05,u_05,v_05,shr_05,rh_05,ohc_05` for gonu;
+  `..._08` for shaheen) so the existing sampler resolves them unchanged.
+  SST/RH are event-time ERA5 fields; OHC linearly interpolates adjacent WOA23
+  monthly means. The real-storm wind vortex is washed out at bake time
+  (gaussian_filter σ=3 cells); see `bake/README.md`.
 - **`scenarios.json`** — JSON (tiny). `{"version":1,"scenarios":[{id,label,bin,
-  monthIndex,stepH,windowH,startIso,spawn:{lat,lon,seed},ghostId}]}`. `windowH =
-  (planes−1)·stepH`, computed. `spawn` = the storm's first IBTrACS fix inside the
-  playable DOMAIN.
+  monthIndex,stepH,windowH,startIso,spawn:{lat,lon,seed},ghostId,hindcast:{
+  startIso,lat,lon,initialWindKt,initialOrganization,envOffsetH}}]}`. `windowH =
+  (planes−1)·stepH`, computed. `hindcast` is derived from the first in-domain
+  observed ≥34-kt fix and aligns it to the bin's time axis.
 - **`tracks.json`** — JSON. `{"version":1,"storms":[{id,name,year,points:[{iso,
   lat,lon,windKt,presMb}]}]}`; the historic ghost-track polylines. `lat/lon`
   rounded to 3 dp; `windKt/presMb` are integers or `null` when the CSV cell is

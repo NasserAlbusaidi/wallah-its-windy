@@ -251,6 +251,56 @@ def _pick_sample_years(u_y: np.ndarray, v_y: np.ndarray, shear_y: np.ndarray, k:
     return picks
 
 
+def _post_monsoon_thermodynamic_rescue(
+    years: np.ndarray,
+    shear_y: np.ndarray,
+    picks: list[int],
+) -> list[int]:
+    """Guarantee two real November regimes jointly support moisture + low shear.
+
+    Wind-only diversity previously selected the absolutely calmest 2020 plane,
+    but ERA5 shows that plane was exceptionally dry aloft. Once RH became a real
+    model input, that "rescue" was no rescue at all. Rank real years by genesis-
+    belt RH subject to observed belt shear <17 m/s and use the best two as the
+    tail planes, preserving the typical/diverse head planes.
+    """
+    import era5_humidity
+
+    era5_humidity._load()
+    assert era5_humidity._yearly is not None
+    humidity_years, humidity_y = era5_humidity._yearly[10]
+    if not np.array_equal(humidity_years, years):
+        raise ValueError("November ERA5 wind/RH years are not aligned")
+    assert _axes is not None
+    lat, _lon = _axes
+    belt = lat <= GENESIS_BELT_LAT_MAX
+    shear_mean = shear_y[:, belt, :].mean(axis=(1, 2))
+    humidity_mean = humidity_y[:, belt, :].mean(axis=(1, 2))
+    viable = [
+        index
+        for index in range(len(years))
+        if float(shear_mean[index]) < 17.0
+    ]
+    viable.sort(
+        key=lambda index: (
+            -float(humidity_mean[index]),
+            float(shear_mean[index]),
+            int(years[index]),
+        )
+    )
+    rescued = viable[: min(2, len(viable))]
+    if len(rescued) < 2 or len(picks) < 2:
+        return picks
+    head = [index for index in picks if index not in rescued][: len(picks) - 2]
+    # If a rescued year was already in the head, fill from the original picks.
+    for index in picks:
+        if len(head) >= len(picks) - 2:
+            break
+        if index not in head and index not in rescued:
+            head.append(index)
+    return head + rescued
+
+
 def _to_env_grid(field: np.ndarray, elat: np.ndarray, elon: np.ndarray) -> np.ndarray:
     """Bilinear-interpolate one native-grid field onto the env cell centers."""
     from scipy.interpolate import RegularGridInterpolator
@@ -319,6 +369,8 @@ def steering_shear_samples_vector(
         raise KeyError(f"month {month} not in ERA5 climatology (has {sorted(_yearly)})")
     yr, u_y, v_y, shear_y, shear_u_y, shear_v_y = _yearly[month]
     idx = _pick_sample_years(u_y, v_y, shear_y, SAMPLES_PER_MONTH)
+    if month == 10:
+        idx = _post_monsoon_thermodynamic_rescue(yr, shear_y, idx)
     u = np.stack([_to_env_grid(u_y[i], elat, elon) for i in idx])
     v = np.stack([_to_env_grid(v_y[i], elat, elon) for i in idx])
     s = np.stack([_to_env_grid(shear_y[i], elat, elon) for i in idx])

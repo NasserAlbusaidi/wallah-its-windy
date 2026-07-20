@@ -1,25 +1,27 @@
 /**
  * integration-events.test.ts — the v1.1 event-artifact bake<->runtime drift guard.
  *
- * Sibling of integration-bins.test.ts, but for the counterfactual-mode artifacts
+ * Sibling of integration-bins.test.ts, but for the event-mode artifacts
  * produced by the event bake (bake/sources.py + bake/era5_event.py): the real
  * public/data/tracks.json, scenarios.json, env_gonu.bin, env_shaheen.bin. Loads
  * each through the SAME production readers the app uses (parseBin, parseTracks,
  * parseScenarios) and asserts the cross-pipeline invariants the contracts pin:
  * ghost tracks are the right storms in time order; each scenario's windowH equals
  * (planes-1)*stepH of its bin; event bins carry a real time axis (nt>1) in
- * physical range; the vortex filter left steering distinct from climatology; and
- * the event SST plane is the climatology month copied verbatim (C2).
+ * physical range; the vortex filter left steering distinct from climatology;
+ * and the event thermodynamic fields share the same chronological axis.
  */
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseBin } from '../src/loader';
 import { parseTracks } from '../src/tracks';
-import { parseScenarios } from '../src/scenarios';
+import { eventSpawn, parseScenarios } from '../src/scenarios';
 import { makeEnvSampler, envMonthSuffix } from '../src/env-sampler';
 import { createSimEngine } from '../src/sim';
 import { DOMAIN, latLonToCell } from '../src/grid';
+import { FlightRecorder } from '../src/flight-recorder';
+import { scoreHindcast } from '../src/hindcast';
 import type { BinLayer, ParsedBin, SimEvent } from '../src/types';
 
 const DATA_DIR = 'public/data';
@@ -45,6 +47,34 @@ function planeMeanAbs(layer: BinLayer): number {
   let s = 0;
   for (let i = 0; i < n; i++) s += Math.abs(layer.data[i]);
   return s / n;
+}
+
+function planesDiffer(layer: BinLayer, a: number, b: number): boolean {
+  const planeSize = layer.nx * layer.ny;
+  const a0 = a * planeSize;
+  const b0 = b * planeSize;
+  let meanAbsDiff = 0;
+  for (let i = 0; i < planeSize; i++) {
+    meanAbsDiff += Math.abs(layer.data[a0 + i] - layer.data[b0 + i]);
+  }
+  return meanAbsDiff / planeSize > 0.001;
+}
+
+function maxAdjacentPlaneMeanDiff(layer: BinLayer): number {
+  const planeSize = layer.nx * layer.ny;
+  let maximum = 0;
+  for (let plane = 1; plane < layer.nt; plane++) {
+    let difference = 0;
+    const previous = (plane - 1) * planeSize;
+    const current = plane * planeSize;
+    for (let i = 0; i < planeSize; i++) {
+      difference += Math.abs(
+        layer.data[current + i] - layer.data[previous + i],
+      );
+    }
+    maximum = Math.max(maximum, difference / planeSize);
+  }
+  return maximum;
 }
 
 describe('tracks.json (ghost polylines)', () => {
@@ -132,6 +162,19 @@ describe('scenarios.json', () => {
     }
   });
 
+  it('ships an observed tropical-storm initialization for every scored hindcast', () => {
+    for (const s of scenarios!) {
+      expect(s.hindcast, `${s.id} hindcast metadata`).not.toBeNull();
+      expect(s.hindcast!.initialWindKt).toBeGreaterThanOrEqual(34);
+      expect(s.hindcast!.initialOrganization).toBeGreaterThanOrEqual(0);
+      expect(s.hindcast!.initialOrganization).toBeLessThanOrEqual(1);
+      expect(s.hindcast!.envOffsetH).toBeGreaterThanOrEqual(0);
+      expect(Date.parse(s.hindcast!.startIso)).toBeGreaterThanOrEqual(
+        Date.parse(s.startIso),
+      );
+    }
+  });
+
   // The canonical spawn is the default replay on the picker's flagship path (no
   // user storm active). A spawn ON the domain-entry edge or hard against the coast
   // dies at ageH~0 ("drifted off the map" / instant landfall) — the exact DOA the
@@ -175,10 +218,84 @@ describe('scenarios.json', () => {
       const ageH = (ticks * 15) / 60;
       // A DOA spawn dies at ageH<=4 h with peak ~30 kt (spawn intensity, no
       // spin-up). Require a clearly non-trivial life instead: > 24 sim-hours and
-      // a storm that strengthened past a strong tropical storm. The ghost track
-      // owns historical intensity; this vortex-filtered replay is not a hindcast.
+      // a storm that strengthened past a strong tropical storm. This test is
+      // explicitly the counterfactual path; the scored hindcast is pinned below.
       expect(ageH, `${s.id} canonical replay lifetime`).toBeGreaterThan(24);
       expect(peakKt, `${s.id} canonical replay peak`).toBeGreaterThanOrEqual(60);
+    }
+  });
+
+  it('runs deterministic free hindcasts and scores them against observed fixes', () => {
+    const terrain = loadBin('terrain.bin');
+    const land = terrain.layers.get('landmask')!;
+    const isLand = (lat: number, lon: number): boolean => {
+      const { col, row } = latLonToCell(
+        { nx: land.nx, ny: land.ny, bbox: land.bbox },
+        lat,
+        lon,
+      );
+      const c = Math.max(0, Math.min(land.nx - 1, Math.round(col)));
+      const r = Math.max(0, Math.min(land.ny - 1, Math.round(row)));
+      return land.data[r * land.nx + c] > 0.5;
+    };
+    const tracks = parseTracks(loadJson('tracks.json'))!;
+
+    for (const scenario of scenarios!) {
+      const bin = loadBin(scenario.bin.replace(/^data\//, ''));
+      const runOnce = () => {
+        const sampler = makeEnvSampler(() => bin);
+        sampler.setSamplingMode({ kind: 'event-timeline' });
+        const engine = createSimEngine({ env: sampler, isLand });
+        const spawn = eventSpawn(scenario, null, 'hindcast');
+        engine.spawn(spawn);
+        const recorder = new FlightRecorder();
+        recorder.start(
+          {
+            spawn,
+            environmentId: scenario.id,
+            monthIndex: scenario.monthIndex,
+            seed: spawn.seed,
+            isDemo: false,
+            label: `${scenario.label} hindcast`,
+            counterfactual: false,
+            hindcast: true,
+            hindcastStartIso: scenario.hindcast!.startIso,
+          },
+          engine.getState()!,
+        );
+        for (let tick = 0; tick < 4000; tick++) {
+          const events = engine.tick(15);
+          recorder.record(engine.getState()!, events);
+          if (events.some((event) => event.type === 'died')) break;
+        }
+        return { spawn, snapshot: recorder.snapshot()! };
+      };
+
+      const first = runOnce();
+      const second = runOnce();
+      expect(first.spawn).toMatchObject({
+        lat: scenario.hindcast!.lat,
+        lon: scenario.hindcast!.lon,
+        initialWindKt: scenario.hindcast!.initialWindKt,
+        initialOrganization: scenario.hindcast!.initialOrganization,
+        tFracOffsetH: scenario.hindcast!.envOffsetH,
+        disableWander: true,
+      });
+      expect(first.snapshot.track).toEqual(second.snapshot.track);
+
+      const observed = tracks.find((track) => track.id === scenario.ghostId)!;
+      const score = scoreHindcast(
+        first.snapshot.frames,
+        observed,
+        scenario.hindcast!.startIso,
+      )!;
+      expect(score.trackSamples, `${scenario.id} track samples`).toBeGreaterThan(5);
+      expect(score.intensitySamples, `${scenario.id} intensity samples`).toBeGreaterThan(5);
+      expect(score.trackMaeKm, `${scenario.id} track MAE`).not.toBeNull();
+      expect(score.trackMaeKm!, `${scenario.id} track MAE`).toBeLessThan(100);
+      expect(score.intensityMaeKt, `${scenario.id} intensity MAE`).not.toBeNull();
+      expect(score.intensityMaeKt!, `${scenario.id} intensity MAE`).toBeLessThan(30);
+      expect(Math.abs(score.peakBiasKt!), `${scenario.id} peak bias`).toBeLessThan(35);
     }
   });
 });
@@ -195,11 +312,13 @@ describe('event env bins (byte-format-identical to env.bin, nt as a time axis)',
       const bin = loadBin(c.file);
       const mm = envMonthSuffix(c.monthIndex);
 
-      it('steering and shear vectors carry a real, finite time axis', () => {
-        for (const field of ['u', 'v', 'shr', 'shu', 'shv']) {
+      it('all eight fields carry one aligned, finite chronological axis', () => {
+        const referenceNt = bin.layers.get(`u_${mm}`)!.nt;
+        for (const field of ['sst', 'u', 'v', 'shr', 'shu', 'shv', 'rh', 'ohc']) {
           const layer = bin.layers.get(`${field}_${mm}`);
           expect(layer, `${field}_${mm}`).toBeDefined();
           expect(layer!.nt, `${field}_${mm} nt`).toBeGreaterThan(1);
+          expect(layer!.nt, `${field}_${mm} nt alignment`).toBe(referenceNt);
           expect(allFinite(layer!.data)).toBe(true);
         }
         // Steering components stay sane (< 60 m/s); shear non-negative, bounded.
@@ -211,6 +330,17 @@ describe('event env bins (byte-format-identical to env.bin, nt as a time axis)',
         for (let i = 0; i < shr.length; i++) {
           expect(shr[i]).toBeGreaterThanOrEqual(0);
           expect(shr[i]).toBeLessThan(120);
+        }
+        const sst = bin.layers.get(`sst_${mm}`)!.data;
+        const rh = bin.layers.get(`rh_${mm}`)!.data;
+        const ohc = bin.layers.get(`ohc_${mm}`)!.data;
+        for (let i = 0; i < sst.length; i++) {
+          expect(sst[i]).toBeGreaterThanOrEqual(15);
+          expect(sst[i]).toBeLessThanOrEqual(35);
+          expect(rh[i]).toBeGreaterThanOrEqual(0);
+          expect(rh[i]).toBeLessThanOrEqual(100);
+          expect(ohc[i]).toBeGreaterThanOrEqual(0);
+          expect(ohc[i]).toBeLessThanOrEqual(300);
         }
       });
 
@@ -237,14 +367,24 @@ describe('event env bins (byte-format-identical to env.bin, nt as a time axis)',
         expect(Math.abs(planeMeanAbs(evU) - planeMeanAbs(climU))).toBeGreaterThan(0.01);
       });
 
-      it('SST is the climatology month copied verbatim (nt=1, byte-identical)', () => {
+      it('uses event-time ERA5 SST/RH rather than copied monthly climatology', () => {
         const climSst = clim.layers.get(`sst_${mm}`)!;
         const evSst = bin.layers.get(`sst_${mm}`)!;
-        expect(evSst.nt).toBe(1);
-        expect(evSst.data.length).toBe(climSst.data.length);
-        for (let i = 0; i < evSst.data.length; i++) {
-          expect(evSst.data[i]).toBe(climSst.data[i]);
-        }
+        const evRh = bin.layers.get(`rh_${mm}`)!;
+        expect(evSst.nt).toBeGreaterThan(1);
+        expect(evRh.nt).toBe(evSst.nt);
+        expect(planesDiffer(evSst, 0, evSst.nt - 1)).toBe(true);
+        expect(planesDiffer(evRh, 0, evRh.nt - 1)).toBe(true);
+        expect(Math.abs(planeMeanAbs(evSst) - planeMeanAbs(climSst))).toBeGreaterThan(0.001);
+      });
+
+      it('evolves monthly WOA23 OHC continuously without a calendar-boundary step', () => {
+        const ohc = bin.layers.get(`ohc_${mm}`)!;
+        expect(planesDiffer(ohc, 0, ohc.nt - 1)).toBe(true);
+        // Three-hourly interpolation between monthly midpoints should move by a
+        // small fraction of a kJ/cm² on average, never jump by a whole monthly
+        // field at 00Z on day one.
+        expect(maxAdjacentPlaneMeanDiff(ohc)).toBeLessThan(1);
       });
     });
   }

@@ -53,7 +53,7 @@ import {
   restoredMonth,
   CLIMATOLOGY_ID,
 } from './scenarios';
-import type { Scenario } from './scenarios';
+import type { EventRunMode, Scenario } from './scenarios';
 import { StormSession } from './storm-session';
 import {
   downloadBlob,
@@ -64,6 +64,7 @@ import {
 import { chooseRenderProfile } from './performance';
 import { TapGesture } from './tap-gesture';
 import { cloneStormStructure } from './structure';
+import { scoreHindcast, type HindcastScore } from './hindcast';
 
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
@@ -97,6 +98,14 @@ const progressEl = must(document.getElementById('progress'), '#progress');
 const captionEl = must(document.getElementById('caption'), '#caption');
 const monthSelect = must(document.getElementById('month') as HTMLSelectElement | null, '#month');
 const scenarioSelect = must(document.getElementById('scenario') as HTMLSelectElement | null, '#scenario');
+const scenarioModeSelect = must(
+  document.getElementById('scenario-mode') as HTMLSelectElement | null,
+  '#scenario-mode',
+);
+const scenarioModeLabel = must(
+  document.getElementById('scenario-mode-label') as HTMLLabelElement | null,
+  '#scenario-mode-label',
+);
 const flightToggle = must(document.getElementById('flight-toggle') as HTMLButtonElement | null, '#flight-toggle');
 const flightScrubber = must(document.getElementById('flight-scrubber') as HTMLInputElement | null, '#flight-scrubber');
 const flightStart = must(document.getElementById('flight-start') as HTMLButtonElement | null, '#flight-start');
@@ -153,6 +162,7 @@ let scenarios: Scenario[] = [];
 const eventBinCache = new Map<string, ParsedBin>();
 /** The active event, or null for climatology (the default sandbox). */
 let activeScenario: Scenario | null = null;
+let activeRunMode: EventRunMode = 'counterfactual';
 /** The month the picker showed when the user LEFT climatology, to restore on return. */
 let preEventMonth: number | null = null;
 /** Monotonic guard so a slow event fetch can't clobber a newer switch. */
@@ -413,7 +423,9 @@ async function loadAll(): Promise<void> {
     const bin = await loadEventBin(sharedScenario);
     if (bin) {
       const first = ui.finishLoading(shared); // establishes user-storm state + lastSpawn
-      applyEventEnv(sharedScenario, bin); // pins the picker to the event month (authoritative)
+      // Preserve legacy shared-event URL semantics: hashes created before the
+      // hindcast selector existed remain counterfactual experiments.
+      applyEventEnv(sharedScenario, bin, 'counterfactual');
       // Force the event's canonical month: the event bin's layers are suffixed with
       // it, and the picker is disabled — a mismatched hand-crafted `month=` in the
       // hash must not resolve to a missing layer + silent analytic fallback.
@@ -449,6 +461,8 @@ let prevHead: Head | null = null;
 let currHead: Head | null = null;
 let accumulatorMin = 0;
 let currentRunLabel = '';
+let hindcastScoreCache: HindcastScore | null = null;
+let hindcastScoreFrameCount = -1;
 const pendingMapCaptures: Array<(canvas: HTMLCanvasElement) => void> = [];
 
 function headOf(s: StormState): Head {
@@ -485,7 +499,7 @@ function flushMapCaptures(): void {
 }
 
 function labelForRun(params: SpawnParams): string {
-  if (activeScenario) return `${activeScenario.label} counterfactual`;
+  if (activeScenario) return `${activeScenario.label} ${activeRunMode}`;
   const option = Array.from(monthSelect.options).find(
     (candidate) => Number(candidate.value) === params.monthIndex,
   );
@@ -502,10 +516,40 @@ function activeHistoricalPeakKt(): number | undefined {
   return winds.length > 0 ? Math.max(...winds) : undefined;
 }
 
+function activeHindcastScore(): HindcastScore | null {
+  if (
+    !activeScenario ||
+    activeRunMode !== 'hindcast' ||
+    !activeScenario.hindcast ||
+    !parsedTracks
+  ) {
+    return null;
+  }
+  if (
+    hindcastScoreFrameCount === session.recorder.frameCount &&
+    hindcastScoreCache
+  ) {
+    return hindcastScoreCache;
+  }
+  const run = session.recorder.snapshot();
+  if (!run) return null;
+  const track = parsedTracks.find(
+    (candidate) => candidate.id === activeScenario!.ghostId,
+  );
+  if (!track) return null;
+  hindcastScoreCache = scoreHindcast(
+    run.frames,
+    track,
+    activeScenario.hindcast.startIso,
+  );
+  hindcastScoreFrameCount = session.recorder.frameCount;
+  return hindcastScoreCache;
+}
+
 /** Spawn (replacing any active storm), reset interpolation, and share via the hash. */
 function doSpawn(
   params: SpawnParams,
-  options: { preserveComparison?: boolean } = {},
+  options: { preserveComparison?: boolean; rememberAsUser?: boolean } = {},
 ): void {
   if (!engine) return;
   // Select the environment-axis meaning BEFORE spawn. Climatology freezes one
@@ -533,7 +577,6 @@ function doSpawn(
   }
   const s = engine.getState();
   currentRunLabel = labelForRun(spawn);
-  ui.rememberSpawn(spawn);
   if (s) {
     session.start(
       {
@@ -543,13 +586,26 @@ function doSpawn(
         seed: spawn.seed,
         isDemo: spawn.isDemo,
         label: currentRunLabel,
-        counterfactual: activeScenario !== null,
+        counterfactual:
+          activeScenario !== null && activeRunMode === 'counterfactual',
+        hindcast: activeScenario !== null && activeRunMode === 'hindcast',
+        hindcastStartIso:
+          activeRunMode === 'hindcast'
+            ? activeScenario?.hindcast?.startIso
+            : undefined,
         historicalPeakKt: activeHistoricalPeakKt(),
       },
       s,
       options.preserveComparison ?? false,
     );
   }
+  ui.rememberSpawn(
+    spawn,
+    options.rememberAsUser ??
+      !(activeScenario !== null && activeRunMode === 'hindcast'),
+  );
+  hindcastScoreCache = null;
+  hindcastScoreFrameCount = -1;
   currHead = s ? headOf(s) : null;
   prevHead = currHead;
   accumulatorMin = 0;
@@ -621,9 +677,14 @@ async function loadEventBin(scenario: Scenario): Promise<ParsedBin | null> {
  * the render facade the event env + month, and light the active ghost + its label.
  * Captures the pre-event month once, on the transition out of climatology.
  */
-function applyEventEnv(scenario: Scenario, bin: ParsedBin): void {
+function applyEventEnv(
+  scenario: Scenario,
+  bin: ParsedBin,
+  mode: EventRunMode,
+): void {
   if (!activeScenario) preEventMonth = readPickerMonth();
   activeScenario = scenario;
+  activeRunMode = mode;
   envBin = bin; // sampler live-swap — the sim reads the event env on its next tick
   // Sync the scenario picker to the active event (C8 fidelity). On the shared-URL
   // boot path nothing else sets it, so without this the picker keeps its DOM
@@ -631,21 +692,29 @@ function applyEventEnv(scenario: Scenario, bin: ParsedBin): void {
   // already-shown 'climatology' fires no 'change', the user can't leave the event.
   // On interactive switches the value already matches, so this stays idempotent.
   scenarioSelect.value = scenario.id;
+  const canHindcast = scenario.hindcast !== null;
+  scenarioModeLabel.hidden = !canHindcast;
+  scenarioModeSelect.hidden = !canHindcast;
+  scenarioModeSelect.value = canHindcast ? mode : 'counterfactual';
   monthSelect.value = String(scenario.monthIndex);
   monthSelect.disabled = true; // a historic event is pinned to its real month
   renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: bin, genesis: genesisPoints, tracks: ghostTracks });
   renderCtrl?.setMonth?.(scenario.monthIndex);
   renderCtrl?.setActiveGhost?.(scenario.ghostId);
   ui.highlightGhost(scenario.ghostId);
-  ui.setScenarioContext(scenario.label);
+  ui.setScenarioContext(scenario.label, mode);
 }
 
 /** Enter an event interactively (from the picker): apply its env, then spawn the
  *  counterfactual (active user storm re-run in the event) or the canonical spawn. */
 function enterScenario(scenario: Scenario, bin: ParsedBin): void {
-  applyEventEnv(scenario, bin);
-  doSpawn(eventSpawn(scenario, ui.activeUserSpawn()));
-  ui.scenarioEntered(scenario.label);
+  const mode: EventRunMode = scenario.hindcast ? 'hindcast' : 'counterfactual';
+  const userStorm = ui.activeUserSpawn();
+  applyEventEnv(scenario, bin, mode);
+  doSpawn(eventSpawn(scenario, userStorm, mode), {
+    rememberAsUser: mode !== 'hindcast',
+  });
+  ui.scenarioEntered(scenario.label, mode);
 }
 
 /**
@@ -656,10 +725,13 @@ function enterScenario(scenario: Scenario, bin: ParsedBin): void {
  */
 function applyClimatologyEnv(month: number): void {
   activeScenario = null;
+  activeRunMode = 'counterfactual';
   envBin = climatologyBin;
   monthSelect.disabled = false;
   monthSelect.value = String(month);
   scenarioSelect.value = CLIMATOLOGY_ID;
+  scenarioModeLabel.hidden = true;
+  scenarioModeSelect.hidden = true;
   renderCtrl?.setActiveGhost?.(null);
   ui.highlightGhost(null);
   ui.setScenarioContext(null);
@@ -754,7 +826,14 @@ glCanvas.addEventListener('pointerup', (e) => {
   const { lat, lon } = clipToLatLon(clipX, clipY);
   if (!inBBox(lat, lon, DOMAIN)) return;
   const params = ui.handlePointer(lat, lon, engine !== null, performance.now());
-  if (params) doSpawn(params);
+  if (params) {
+    if (activeScenario) {
+      activeRunMode = 'counterfactual';
+      scenarioModeSelect.value = 'counterfactual';
+      ui.setScenarioContext(activeScenario.label, 'counterfactual');
+    }
+    doSpawn(params);
+  }
 });
 
 // Space toggles pause — but never when a form control is focused, so the native
@@ -862,8 +941,10 @@ async function runControlledComparison(): Promise<void> {
       compareRun.disabled = false;
       return;
     }
-    applyEventEnv(scenario, bin);
-    doSpawn(eventSpawn(scenario, identity), { preserveComparison: true });
+    applyEventEnv(scenario, bin, 'counterfactual');
+    doSpawn(eventSpawn(scenario, identity, 'counterfactual'), {
+      preserveComparison: true,
+    });
     ui.comparisonMessage(
       `comparison running · same genesis and seed in the ${scenario.label} environment.`,
     );
@@ -939,6 +1020,20 @@ monthSelect.addEventListener('change', () => {
 // the swap re-points the live env holder without rebuilding the sampler.
 scenarioSelect.addEventListener('change', () => {
   void onScenarioChange(scenarioSelect.value);
+});
+scenarioModeSelect.addEventListener('change', () => {
+  if (!activeScenario) return;
+  const mode: EventRunMode =
+    scenarioModeSelect.value === 'hindcast' && activeScenario.hindcast
+      ? 'hindcast'
+      : 'counterfactual';
+  const userStorm = ui.activeUserSpawn();
+  activeRunMode = mode;
+  ui.setScenarioContext(activeScenario.label, mode);
+  doSpawn(eventSpawn(activeScenario, userStorm, mode), {
+    rememberAsUser: mode !== 'hindcast',
+  });
+  ui.scenarioEntered(activeScenario.label, mode);
 });
 
 // --- The loop ---------------------------------------------------------------
@@ -1035,7 +1130,10 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
     paused: session.paused,
     replayMode: session.replayMode,
     replayPlaying: session.replayPlaying,
-    counterfactual: activeScenario !== null,
+    counterfactual:
+      activeScenario !== null && activeRunMode === 'counterfactual',
+    hindcast: activeScenario !== null && activeRunMode === 'hindcast',
+    hindcastScore: activeHindcastScore(),
     comparisonActive: session.comparisonBaseline !== null,
     comparison: session.comparison(),
   });

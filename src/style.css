@@ -146,11 +146,13 @@ body {
   margin-bottom: calc(var(--space, 8px) / 2);
 }
 /* The Scenario label sits above its own select, spaced from the Month block. */
-#month-picker label[for='scenario'] {
+#month-picker label[for='scenario'],
+#scenario-mode-label {
   margin-top: var(--space, 8px);
 }
 #month,
-#scenario {
+#scenario,
+#scenario-mode {
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 500;
@@ -165,12 +167,14 @@ body {
 }
 /* Pinned month during an event replay (or an unavailable scenario catalogue). */
 #month:disabled,
-#scenario:disabled {
+#scenario:disabled,
+#scenario-mode:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 #month:focus-visible,
-#scenario:focus-visible {
+#scenario:focus-visible,
+#scenario-mode:focus-visible {
   outline: 1px solid var(--accent, #ffb74d);
   outline-offset: 2px;
 }
@@ -183,6 +187,10 @@ body {
   opacity: 0.82;
 }
 #scenario-contract[hidden] {
+  display: none;
+}
+#scenario-mode[hidden],
+#scenario-mode-label[hidden] {
   display: none;
 }
 
@@ -354,6 +362,7 @@ body {
 #flight-jumps[hidden],
 #debrief-compare-row[hidden],
 #run-comparison[hidden],
+#hindcast-score[hidden],
 #compare-clear[hidden] {
   display: none;
 }
@@ -373,19 +382,27 @@ body {
   grid-template-columns: 0.7fr 0.7fr 0.85fr 1.25fr;
 }
 
-#run-comparison {
+#run-comparison,
+#hindcast-score {
   margin-top: 9px;
   padding: 9px;
   background: linear-gradient(90deg, rgba(255, 183, 77, 0.08), transparent);
   border-left: 2px solid color-mix(in srgb, var(--accent, #ffb74d) 68%, transparent);
 }
-#run-comparison h2 {
+#run-comparison h2,
+#hindcast-score h2 {
   margin: 0;
   color: var(--accent, #ffb74d);
   font-size: 9px;
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+#hindcast-samples {
+  margin: 6px 0 0;
+  color: var(--text, #7fd4e8);
+  font-size: 8px;
+  opacity: 0.54;
 }
 #comparison-labels {
   margin: 3px 0 7px;

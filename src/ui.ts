@@ -38,6 +38,8 @@ import {
 } from './flight-recorder';
 import { explainIntensity } from './narrative';
 import { maxWindRadiusKm } from './structure';
+import type { HindcastScore } from './hindcast';
+import type { EventRunMode } from './scenarios';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -125,6 +127,8 @@ export interface FlightRecorderView {
   replayMode: boolean;
   replayPlaying: boolean;
   counterfactual: boolean;
+  hindcast: boolean;
+  hindcastScore: HindcastScore | null;
   comparisonActive: boolean;
   comparison: RunComparison | null;
 }
@@ -156,6 +160,9 @@ export class UiController {
     shear: HTMLOutputElement;
     landDry: HTMLOutputElement;
     steering: HTMLOutputElement;
+    coreRh: HTMLOutputElement;
+    oceanDepth: HTMLOutputElement;
+    rain: HTMLOutputElement;
     pressure: HTMLOutputElement;
     rmw: HTMLOutputElement;
     windRadii: HTMLOutputElement;
@@ -176,6 +183,12 @@ export class UiController {
     comparisonMuscat: HTMLElement;
     comparisonLandfall: HTMLElement;
     compareClear: HTMLButtonElement;
+    hindcastScore: HTMLElement;
+    hindcastTrack: HTMLElement;
+    hindcastIntensity: HTMLElement;
+    hindcastPressure: HTMLElement;
+    hindcastPeak: HTMLElement;
+    hindcastSamples: HTMLElement;
     toggle: HTMLButtonElement;
     scrubber: HTMLInputElement;
     jumps: HTMLElement;
@@ -185,6 +198,8 @@ export class UiController {
   private ripples: Ripple[] = [];
   /** Identity of the currently active storm, for month re-spawn + share hash. */
   private lastSpawn: SpawnParams | null = null;
+  /** Last human/shared sandbox identity; hindcast initialization must not replace it. */
+  private lastUserSpawn: SpawnParams | null = null;
   /** Baked land mask once terrain.bin lands; until then the analytic fallback runs. */
   private landMask: BinLayer | null = null;
   /** Historic genesis points (IBTrACS); drawn as a faint glow on the overlay. */
@@ -220,6 +235,9 @@ export class UiController {
       shear: dom('flight-shear'),
       landDry: dom('flight-land-dry'),
       steering: dom('flight-steering'),
+      coreRh: dom('flight-core-rh'),
+      oceanDepth: dom('flight-ocean-depth'),
+      rain: dom('flight-rain'),
       pressure: dom('flight-pressure'),
       rmw: dom('flight-rmw'),
       windRadii: dom('flight-wind-radii'),
@@ -240,6 +258,12 @@ export class UiController {
       comparisonMuscat: dom('comparison-muscat'),
       comparisonLandfall: dom('comparison-landfall'),
       compareClear: dom('compare-clear'),
+      hindcastScore: dom('hindcast-score'),
+      hindcastTrack: dom('hindcast-track'),
+      hindcastIntensity: dom('hindcast-intensity'),
+      hindcastPressure: dom('hindcast-pressure'),
+      hindcastPeak: dom('hindcast-peak'),
+      hindcastSamples: dom('hindcast-samples'),
       toggle: dom('flight-toggle'),
       scrubber: dom('flight-scrubber'),
       jumps: dom('flight-jumps'),
@@ -300,12 +324,14 @@ export class UiController {
         isDemo: false,
       };
       this.lastSpawn = params;
+      this.lastUserSpawn = params;
       this.state = { kind: 'user-storm' };
       if (!this.dataError) this.setCaption(SHARED_HINT, true);
       return params;
     }
     const params = this.demoSpawnParams();
     this.lastSpawn = params;
+    this.lastUserSpawn = null;
     this.state = { kind: 'idle-demo' };
     if (!this.dataError) this.setCaption(FIRST_HINT, true);
     return params;
@@ -362,6 +388,7 @@ export class UiController {
       isDemo: false,
     };
     this.lastSpawn = params;
+    this.lastUserSpawn = params;
     this.ripples = []; // a fresh storm clears lingering acks instantly (design T3)
     this.clearAck();
     this.state = { kind: 'user-storm' };
@@ -377,21 +404,27 @@ export class UiController {
    * canonical spawn, not a counterfactual of the demo.
    */
   activeUserSpawn(): SpawnParams | null {
-    return this.lastSpawn && !this.lastSpawn.isDemo ? { ...this.lastSpawn } : null;
+    return this.lastUserSpawn ? { ...this.lastUserSpawn } : null;
   }
 
   /** Keep deterministic identity aligned when main starts a comparison directly. */
-  rememberSpawn(params: SpawnParams): void {
+  rememberSpawn(params: SpawnParams, rememberAsUser = true): void {
     this.lastSpawn = { ...params };
+    if (rememberAsUser && !params.isDemo) this.lastUserSpawn = { ...params };
     if (!params.isDemo) this.state = { kind: 'user-storm' };
   }
 
   /** Visible event-mode contract; documentation alone is not sufficient. */
-  setScenarioContext(label: string | null): void {
+  setScenarioContext(
+    label: string | null,
+    mode: EventRunMode = 'counterfactual',
+  ): void {
     const contract = dom('scenario-contract');
     contract.hidden = label === null;
     contract.textContent = label
-      ? `${label} environment · counterfactual, not a historical reconstruction`
+      ? mode === 'hindcast'
+        ? `${label} · observed initialization · freely simulated · scored`
+        : `${label} environment · counterfactual, not a reconstruction`
       : '';
   }
 
@@ -428,8 +461,13 @@ export class UiController {
   }
 
   /** Status once an event is live (the counterfactual is spawned). Lowercase tone. */
-  scenarioEntered(label: string): void {
-    this.setCaption(`${label} — the counterfactual. click the sea to place your own.`, true);
+  scenarioEntered(label: string, mode: EventRunMode): void {
+    this.setCaption(
+      mode === 'hindcast'
+        ? `${label} hindcast — initialized from the observed storm; no track nudging.`
+        : `${label} — the counterfactual. click the sea to place your own.`,
+      true,
+    );
   }
 
   /**
@@ -456,10 +494,18 @@ export class UiController {
    * June-vs-October at one click is a controlled comparison.
    */
   onMonthChange(): SpawnParams | null {
-    if (!this.lastSpawn) return null;
-    const monthIndex = this.readMonth(this.lastSpawn.monthIndex);
-    const params: SpawnParams = { ...this.lastSpawn, monthIndex };
+    // A hindcast must never replace the remembered sandbox identity, but the
+    // opening ambient demo still needs to respond to the month picker. Only use
+    // lastSpawn as a fallback when it is that curated demo—not an observed
+    // hindcast initialization.
+    const base =
+      this.lastUserSpawn ??
+      (this.lastSpawn?.isDemo ? this.lastSpawn : null);
+    if (!base) return null;
+    const monthIndex = this.readMonth(base.monthIndex);
+    const params: SpawnParams = { ...base, monthIndex };
     this.lastSpawn = params;
+    if (!params.isDemo) this.lastUserSpawn = params;
     return params;
   }
 
@@ -524,7 +570,10 @@ export class UiController {
     f.explanation.dataset.tone = explanation.tone;
     f.explanationHeadline.textContent = explanation.headline;
     f.explanationDetail.textContent = explanation.detail;
-    f.contract.hidden = !view.counterfactual;
+    f.contract.hidden = !view.counterfactual && !view.hindcast;
+    f.contract.textContent = view.hindcast
+      ? 'hindcast tape · observed initialization · no track nudging'
+      : 'counterfactual tape · the observed storm is the faint ghost track';
     f.trend.textContent = `${signed(d.netKtPerH)} kt/h`;
     f.trend.dataset.sign = d.netKtPerH > 0.05 ? 'up' : d.netKtPerH < -0.05 ? 'down' : 'flat';
     f.ocean.textContent = signed(d.oceanKtPerH);
@@ -533,6 +582,13 @@ export class UiController {
     f.landDry.textContent = `${loss(d.landKtPerH)} / ${loss(d.dryAirKtPerH)}`;
     const steerSpeed = Math.hypot(d.steerU, d.steerV);
     f.steering.textContent = `${compactDirection(d.steerU, d.steerV)} · ${steerSpeed.toFixed(1)} m/s`;
+    f.coreRh.textContent =
+      `${Math.round(d.organization * 100)}% · ${Math.round(d.midlevelRhPct)}%`;
+    f.oceanDepth.textContent =
+      `${Math.round(d.ohcKjCm2)} kJ/cm² · −${d.coldWakeC.toFixed(1)}°c`;
+    f.rain.textContent =
+      `${d.eyewallRainMmH.toFixed(1)} / ${d.rainbandRainMmH.toFixed(1)} / ` +
+      `${d.orographicRainMmH.toFixed(1)}`;
     const structure = storm.structure;
     const motionSpeed = Math.hypot(
       structure.motionUms,
@@ -589,6 +645,28 @@ export class UiController {
         summary.historicalDeltaKt ?? 0,
         summary.historicalPeakKt,
       );
+    }
+
+    const score = view.hindcastScore;
+    f.hindcastScore.hidden = !view.hindcast || score === null;
+    if (score) {
+      f.hindcastTrack.textContent =
+        score.trackMaeKm === null ? '—' : `${Math.round(score.trackMaeKm)} km`;
+      f.hindcastIntensity.textContent =
+        score.intensityMaeKt === null
+          ? '—'
+          : `${score.intensityMaeKt.toFixed(1)} kt`;
+      f.hindcastPressure.textContent =
+        score.pressureMaeHpa === null
+          ? '—'
+          : `${score.pressureMaeHpa.toFixed(1)} hPa`;
+      f.hindcastPeak.textContent =
+        score.peakBiasKt === null
+          ? '—'
+          : `${score.peakBiasKt >= 0 ? '+' : '−'}${Math.abs(score.peakBiasKt).toFixed(1)} kt`;
+      f.hindcastSamples.textContent =
+        `${score.trackSamples} track · ${score.intensitySamples} intensity · ` +
+        `${score.pressureSamples} pressure fixes`;
     }
 
     f.comparisonRoot.hidden = view.comparison === null;

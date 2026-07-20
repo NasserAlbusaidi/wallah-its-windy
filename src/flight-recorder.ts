@@ -27,13 +27,18 @@ export interface FlightRunMeta {
   seed: number;
   isDemo: boolean;
   label: string;
-  /** Event environments are counterfactual experiments, never hindcasts. */
+  /** True only for the user-authored event-environment sandbox. */
   counterfactual: boolean;
+  /** Observed initialization, free simulation, and post-run fix scoring. */
+  hindcast?: boolean;
+  hindcastStartIso?: string;
   historicalPeakKt?: number;
 }
 
 export interface FlightFrame extends TrackPoint {
   alive: boolean;
+  organization: number;
+  coldWakeC: number;
   diagnostics: StormDiagnostics;
   structure: StormStructure;
 }
@@ -98,6 +103,8 @@ function frameOf(state: StormState): FlightFrame {
     vKt: state.vKt,
     ageH: state.ageH,
     alive: state.alive,
+    organization: state.organization,
+    coldWakeC: state.coldWakeC,
     diagnostics: { ...state.diagnostics },
     structure: cloneStormStructure(state.structure),
   };
@@ -159,6 +166,8 @@ export class FlightRecorder {
       trackPoints,
       alive: frame.alive,
       isDemo: this.meta.isDemo,
+      organization: frame.organization,
+      coldWakeC: frame.coldWakeC,
       diagnostics: { ...frame.diagnostics },
       structure: cloneStormStructure(frame.structure),
     };

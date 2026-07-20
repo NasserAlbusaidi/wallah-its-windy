@@ -1,10 +1,9 @@
-"""era5_event.py — v1.1 event steering/shear bake (counterfactual env bins).
+"""era5_event.py — aligned event forcing for hindcasts and counterfactuals.
 
-Reads the per-EVENT ERA5 hourly winds (data/raw/era5_{gonu_2007,shaheen_2021_09,
-shaheen_2021_10}.nc) and emits a WIWB env bin whose steering/shear layers carry a TIME
-axis (nt = decimated hourly planes, BINARY-FORMATS.md mode 2) instead of the
-climatology's synoptic samples. Format bytes are IDENTICAL to env.bin — only the
-nt semantics differ, and that is a consumer-side routing convention.
+Reads per-event ERA5 hourly winds, 600/700-hPa RH, and SST plus WOA23 OHC. It
+emits a WIWB env bin whose eight layers share one 3-hourly TIME axis instead of
+the climatology's frozen real-year samples. Format bytes are IDENTICAL to
+env.bin; only the consumer-side nt interpretation differs.
 
 Derivation reuses era5.py exactly (same deep-layer steering weights, same shear
 definition, same lat-descending -> north-first row order):
@@ -15,13 +14,14 @@ VORTEX FILTER (lead decision, C2): the event winds contain the real storm's own
 vortex. We wash it out with scipy.ndimage.gaussian_filter, sigma=3 cells (=1.5°)
 on the NATIVE 0.5° grid, applied to every wind field per time plane BEFORE
 regridding, so
-the baked field is the large-scale STEERING environment a counterfactual storm
-would feel — not a replay of the historical track. Spatial filtering is
+the baked wind field is the large-scale environment a free simulated vortex
+would feel, not its observed vortex fed back as steering. RH is smoothed at the
+same scale; SST retains the observed event-time surface signal. Spatial filtering is
 independent per plane, so we decimate to 3-hourly first (cheaper), then filter,
 then regrid; the result is identical to filter-then-decimate.
 
-SST is climatological: the event fetch was winds-only, so sst_MM is copied
-verbatim (nt=1) from the committed public/data/env.bin.
+WOA23 OHC is monthly climatology selected by each chronological plane's calendar
+month; it is not an event-specific subsurface ocean analysis.
 """
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ from scipy import ndimage
 import binfmt
 import era5
 import sources
+import woa23
 from binfmt import Layer
 
 VORTEX_SIGMA = 3.0  # gaussian_filter sigma in native 0.5-deg cells (=1.5 deg)
@@ -59,6 +60,38 @@ def _read_uv(nc_path: str):
     return vt, u, v, lat, lon, levels
 
 
+def _read_rh(nc_path: str):
+    """(valid_time, mean 600/700-hPa RH[T,ny,nx], lat, lon)."""
+    import h5py
+
+    with h5py.File(nc_path, "r") as f:
+        vt = np.asarray(f["valid_time"][...], dtype=np.int64)
+        levels = np.asarray(f["pressure_level"][...], dtype=np.float64)
+        lat = np.asarray(f["latitude"][...], dtype=np.float64)
+        lon = np.asarray(f["longitude"][...], dtype=np.float64)
+        rh4 = era5._unpack(f["r"])
+    wanted = [_level_index(levels, 600.0), _level_index(levels, 700.0)]
+    rh = np.nanmean(rh4[:, wanted], axis=1)
+    return vt, rh, lat, lon
+
+
+def _read_sst(nc_path: str):
+    """(valid_time, SST Celsius[T,ny,nx], lat, lon)."""
+    import h5py
+
+    with h5py.File(nc_path, "r") as f:
+        vt = np.asarray(f["valid_time"][...], dtype=np.int64)
+        lat = np.asarray(f["latitude"][...], dtype=np.float64)
+        lon = np.asarray(f["longitude"][...], dtype=np.float64)
+        sst = era5._unpack(f["sst"])
+    if sst.ndim == 4 and sst.shape[1] == 1:
+        sst = sst[:, 0]
+    if sst.ndim != 3:
+        raise ValueError(f"{nc_path}: expected sst[time,lat,lon], got {sst.shape}")
+    # ERA5 SST is Kelvin.
+    return vt, sst - 273.15, lat, lon
+
+
 def _load_series(nc_paths: list[str]):
     """Concatenate one or more event files along time into a single continuous
     hourly series, sorted by valid_time. Asserts a strictly increasing hourly
@@ -78,6 +111,22 @@ def _load_series(nc_paths: list[str]):
     if vt.size > 1 and not np.all(dt == 3600):
         raise ValueError(f"non-hourly / discontinuous valid_time (diffs seen: {set(dt.tolist())})")
     return vt, u, v, lat, lon, levels
+
+
+def _load_scalar_series(nc_paths: list[str], reader):
+    parts = [reader(path) for path in nc_paths]
+    lat, lon = parts[0][2], parts[0][3]
+    for _, _, la, lo in parts[1:]:
+        if not (np.array_equal(la, lat) and np.array_equal(lo, lon)):
+            raise ValueError("event scalar files disagree on grid; cannot concatenate")
+    vt = np.concatenate([part[0] for part in parts])
+    field = np.concatenate([part[1] for part in parts], axis=0)
+    order = np.argsort(vt, kind="stable")
+    vt, field = vt[order], field[order]
+    dt = np.diff(vt)
+    if vt.size > 1 and not np.all(dt == 3600):
+        raise ValueError(f"non-hourly / discontinuous scalar valid_time: {set(dt.tolist())}")
+    return vt, field, lat, lon
 
 
 def _level_index(levels: np.ndarray, p: float) -> int:
@@ -130,6 +179,25 @@ def _regrid_series(field3d: np.ndarray, lat_native: np.ndarray, lon_native: np.n
     return out
 
 
+def _nearest_valid_fill_series(field3d: np.ndarray) -> np.ndarray:
+    """Fill land/missing cells from the nearest valid ocean cell per plane."""
+    out = np.asarray(field3d, dtype=np.float64).copy()
+    for plane_index in range(out.shape[0]):
+        plane = out[plane_index]
+        missing = ~np.isfinite(plane)
+        if not missing.any():
+            continue
+        if missing.all():
+            raise ValueError("event scalar plane contains no valid cells")
+        nearest = ndimage.distance_transform_edt(
+            missing,
+            return_distances=False,
+            return_indices=True,
+        )
+        out[plane_index] = plane[tuple(nearest)]
+    return out
+
+
 def _q_i16(a: np.ndarray, scale: float, offset: float) -> np.ndarray:
     raw = np.round((a - offset) / scale)
     if raw.min() < -32768 or raw.max() > 32767:
@@ -137,22 +205,89 @@ def _q_i16(a: np.ndarray, scale: float, offset: float) -> np.ndarray:
     return np.clip(raw, -32768, 32767).astype(np.int16).ravel(order="C")
 
 
-def assemble_event_layers(mm: str, sst_raw_i16: np.ndarray,
+def _interpolated_ohc(timestamp: int) -> np.ndarray:
+    """Linearly interpolate WOA23 monthly means between month midpoints.
+
+    A monthly analysed field represents conditions near the middle of its month,
+    not a step at 00Z on day one. Interpolating adjacent month centres prevents
+    an artificial three-hour OHC cliff in event bins that cross a month boundary.
+    """
+    when = _dt.datetime.fromtimestamp(int(timestamp), _dt.timezone.utc)
+    centre = _dt.datetime(
+        when.year,
+        when.month,
+        15,
+        12,
+        tzinfo=_dt.timezone.utc,
+    )
+    if when >= centre:
+        if when.month == 12:
+            neighbour = _dt.datetime(
+                when.year + 1,
+                1,
+                15,
+                12,
+                tzinfo=_dt.timezone.utc,
+            )
+        else:
+            neighbour = _dt.datetime(
+                when.year,
+                when.month + 1,
+                15,
+                12,
+                tzinfo=_dt.timezone.utc,
+            )
+        first_month = when.month - 1
+        second_month = neighbour.month - 1
+        weight = (when - centre).total_seconds() / (
+            neighbour - centre
+        ).total_seconds()
+    else:
+        if when.month == 1:
+            neighbour = _dt.datetime(
+                when.year - 1,
+                12,
+                15,
+                12,
+                tzinfo=_dt.timezone.utc,
+            )
+        else:
+            neighbour = _dt.datetime(
+                when.year,
+                when.month - 1,
+                15,
+                12,
+                tzinfo=_dt.timezone.utc,
+            )
+        first_month = neighbour.month - 1
+        second_month = when.month - 1
+        weight = (when - neighbour).total_seconds() / (
+            centre - neighbour
+        ).total_seconds()
+    first = woa23.load_ohc(first_month)
+    second = woa23.load_ohc(second_month)
+    return first + (second - first) * min(1.0, max(0.0, weight))
+
+
+def assemble_event_layers(mm: str, sst_env: np.ndarray,
                           u_env: np.ndarray, v_env: np.ndarray,
                           shr_env: np.ndarray, shu_env: np.ndarray,
-                          shv_env: np.ndarray) -> list[Layer]:
-    """Build six month-suffixed layers; SST has nt=1, winds use event time."""
+                          shv_env: np.ndarray, rh_env: np.ndarray,
+                          ohc_env: np.ndarray) -> list[Layer]:
+    """Build eight month-suffixed layers on one chronological event axis."""
     nx, ny = sources.ENV_NX, sources.ENV_NY
     nt = u_env.shape[0]
     dom = sources.DOMAIN
     return [
-        Layer(f"sst_{mm}", "int16", True, nx, ny, 1, dom, QUANT_SCALE, SST_OFFSET,
-              np.asarray(sst_raw_i16, dtype=np.int16).ravel(order="C")),
+        Layer(f"sst_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, SST_OFFSET,
+              _q_i16(sst_env, QUANT_SCALE, SST_OFFSET)),
         Layer(f"u_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(u_env, QUANT_SCALE, 0.0)),
         Layer(f"v_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(v_env, QUANT_SCALE, 0.0)),
         Layer(f"shr_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(shr_env, QUANT_SCALE, 0.0)),
         Layer(f"shu_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(shu_env, QUANT_SCALE, 0.0)),
         Layer(f"shv_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(shv_env, QUANT_SCALE, 0.0)),
+        Layer(f"rh_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(rh_env, QUANT_SCALE, 0.0)),
+        Layer(f"ohc_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(ohc_env, QUANT_SCALE, 0.0)),
     ]
 
 
@@ -202,14 +337,21 @@ def _vortex_diagnostic(vt_dec, lat_native, lon_native, u_raw, v_raw, u_sm, v_sm,
 
 
 def build_event_env(tag: str, month_index: int, nc_paths: list[str],
-                    out_dir: str, env_bin_path: str, track_points=None) -> dict:
+                    rh_paths: list[str], sst_paths: list[str],
+                    out_dir: str, track_points=None) -> dict:
     """Bake one event env bin. Returns a diagnostics dict (path, planes, windowH,
     layer names, quant ranges, vortex near/far diagnostic)."""
     vt, u4, v4, lat_native, lon_native, levels = _load_series(nc_paths)
+    rh_vt, rh3, rh_lat, rh_lon = _load_scalar_series(rh_paths, _read_rh)
+    sst_vt, sst3, sst_lat, sst_lon = _load_scalar_series(sst_paths, _read_sst)
+    if not (np.array_equal(vt, rh_vt) and np.array_equal(vt, sst_vt)):
+        raise ValueError("wind, humidity, and SST event time axes disagree")
 
     # 3-hourly decimation first (spatial filter is per-plane; order-independent).
     vt_dec = vt[::DECIMATE]
     u4d, v4d = u4[::DECIMATE], v4[::DECIMATE]
+    rh3d = rh3[::DECIMATE]
+    sst3d = sst3[::DECIMATE]
 
     u_raw, v_raw, shr_raw, shu_raw, shv_raw = native_steer_shear(
         u4d, v4d, levels
@@ -228,17 +370,44 @@ def build_event_env(tag: str, month_index: int, nc_paths: list[str],
     shr_env = _regrid_series(shr_sm, lat_native, lon_native, ELAT, ELON)
     shu_env = _regrid_series(shu_sm, lat_native, lon_native, ELAT, ELON)
     shv_env = _regrid_series(shv_sm, lat_native, lon_native, ELAT, ELON)
+    # Wash out the storm-moistened core just like the wind vortex; SST is kept
+    # unsmoothed because the observed cold wake is a desired hindcast signal.
+    rh_env = _regrid_series(
+        _vortex_filter(rh3d),
+        rh_lat,
+        rh_lon,
+        ELAT,
+        ELON,
+    )
+    rh_env = np.clip(rh_env, 0.0, 100.0)
+    sst_env = _regrid_series(
+        _nearest_valid_fill_series(sst3d),
+        sst_lat,
+        sst_lon,
+        ELAT,
+        ELON,
+    )
+
+    # WOA23 supplies monthly subsurface profiles. Interpolate between month
+    # centres so a calendar boundary cannot introduce an artificial OHC step.
+    ohc_env = np.stack(
+        [
+            _interpolated_ohc(int(timestamp))
+            for timestamp in vt_dec
+        ]
+    )
 
     mm = f"{month_index:02d}"
-    sst_raw = _sst_raw_from_env(env_bin_path, mm)
     layers = assemble_event_layers(
         mm,
-        sst_raw,
+        sst_env,
         u_env,
         v_env,
         shr_env,
         shu_env,
         shv_env,
+        rh_env,
+        ohc_env,
     )
 
     path = os.path.join(out_dir, f"env_{tag}.bin")
@@ -252,6 +421,9 @@ def build_event_env(tag: str, month_index: int, nc_paths: list[str],
         "layers": [ly.name for ly in layers],
         "u_range": (float(u_env.min()), float(u_env.max())),
         "shr_range": (float(shr_env.min()), float(shr_env.max())),
+        "rh_range": (float(rh_env.min()), float(rh_env.max())),
+        "sst_range": (float(sst_env.min()), float(sst_env.max())),
+        "ohc_range": (float(ohc_env.min()), float(ohc_env.max())),
         "vortex_near_far": diag,
         "start_iso": _dt.datetime.fromtimestamp(int(vt[0]), _dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }

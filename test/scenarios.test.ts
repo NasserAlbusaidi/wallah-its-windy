@@ -41,6 +41,14 @@ describe('parseScenarios: valid fixture', () => {
     expect(gonu.windowH).toBe(189);
     expect(gonu.spawn).toEqual({ lat: 16.2, lon: 63.4, seed: 2007 });
     expect(gonu.ghostId).toBe('gonu2007');
+    expect(gonu.hindcast).toEqual({
+      startIso: '2007-06-02T09:00:00Z',
+      lat: 15.1,
+      lon: 67.1,
+      initialWindKt: 35,
+      initialOrganization: 0.41,
+      envOffsetH: 33,
+    });
   });
 });
 
@@ -163,6 +171,23 @@ describe('eventSpawn: counterfactual vs canonical, month pinned, window threaded
     expect(s.seed).toBe(987654); // storm identity preserved
     expect(s.monthIndex).toBe(gonu.monthIndex); // but re-run in the event's month
     expect(s.tFracHorizonH).toBe(gonu.windowH);
+  });
+
+  it('hindcast uses observed initialization, event offset, and no wander', () => {
+    const user = { lat: 20.1, lon: 59.2, seed: 987654 };
+    const s = eventSpawn(gonu, user, 'hindcast');
+    expect(s).toMatchObject({
+      lat: 15.1,
+      lon: 67.1,
+      seed: 2007,
+      monthIndex: gonu.monthIndex,
+      tFracHorizonH: gonu.windowH,
+      tFracOffsetH: 33,
+      initialWindKt: 35,
+      initialOrganization: 0.41,
+      disableWander: true,
+      isDemo: false,
+    });
   });
 });
 

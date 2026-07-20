@@ -70,15 +70,17 @@ export const SIM = {
    * ~23 lethal); Jul-Aug ~27-32 -> everything shredded. Recalibrate from
    * scratch if the env source ever moves to daily/hourly fields.
    *
-   * November (v1.1 diagnosis, C6): every baked shr_10 plane sits 14.7-19.6 m/s
-   * in the genesis belt, so seed%K can NEVER land on a calm regime and 0/32
-   * probe storms reach Cat-1 — the "November fizzle". This is NOT a constant to
-   * tune here: Nov's hostile band (14-19) overlaps June's surviving planes
-   * (18-20), so no SHEAR_THRESHOLD_MS/SHEAR_K change lifts Nov without also
-   * un-shredding June/Sep. The raw ERA5 record DOES hold calm Novembers (2011
-   * 8.6 m/s, 2020 9.8) — the bake's steering-only plane picker just never
-   * selected one. Remedy is DATA-SIDE (bake/era5.py _pick_sample_years); see the
-   * build report's nov_remedy. DRYAIR_K below is unrelated to this.
+   * November (v1.1 diagnosis, C6): the shr_10 planes ORIGINALLY all sat
+   * 14.7-19.6 m/s in the genesis belt, so seed%K could never land on a calm
+   * regime and 0/32 probe storms reached Cat-1 — the "November fizzle". This was
+   * NOT a constant to tune here: Nov's hostile band (14-19) overlaps June's
+   * surviving planes (18-20), so no SHEAR_THRESHOLD_MS/SHEAR_K change lifts Nov
+   * without also un-shredding June/Sep. The fix was DATA-SIDE: the raw ERA5
+   * record DOES hold calm Novembers (2011 8.6 m/s, 2020 9.8), and the v1.1 bake's
+   * calm-year plane selection (bake/era5.py) now ships a ~12.8 m/s belt plane, so
+   * the committed env.bin carries a survivable November — pinned by
+   * integration-bins' "November post-monsoon rescue" guard. DRYAIR_K below is
+   * unrelated to this.
    */
   SHEAR_THRESHOLD_MS: 14,
   /** Weakening per m/s of shear above threshold, kt/h (same recalibration). */

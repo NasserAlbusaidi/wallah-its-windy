@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { parseBin } from '../src/loader';
 import { makeEnvSampler, envMonthSuffix, synopticCount } from '../src/env-sampler';
 import { DEMO_GENESIS, DEMO_MONTH, DEMO_SEED } from '../src/ui';
-import { createSimEngine } from '../src/sim';
+import { createSimEngine, SIM } from '../src/sim';
 import { DOMAIN, inBBox, latLonToCell } from '../src/grid';
 import { MUSCAT } from '../src/types';
 import type { BinLayer, ParsedBin, SimEvent } from '../src/types';
@@ -42,6 +42,15 @@ function nearest(layer: BinLayer, lat: number, lon: number): number {
   const c = clampInt(col, 0, layer.nx - 1);
   const r = clampInt(row, 0, layer.ny - 1);
   return layer.data[r * layer.nx + c];
+}
+
+/** Nearest-cell read of one time/synoptic plane (for per-plane belt stats). */
+function nearestPlane(layer: BinLayer, lat: number, lon: number, plane: number): number {
+  const { col, row } = latLonToCell({ nx: layer.nx, ny: layer.ny, bbox: layer.bbox }, lat, lon);
+  const c = clampInt(col, 0, layer.nx - 1);
+  const r = clampInt(row, 0, layer.ny - 1);
+  const p = clampInt(plane, 0, layer.nt - 1);
+  return layer.data[(p * layer.ny + r) * layer.nx + c];
 }
 
 function allFinite(data: Float32Array): boolean {
@@ -150,6 +159,69 @@ describe('env.bin', () => {
       // SST stays a single climatology plane.
       expect(bin.layers.get(`sst_${mm}`)!.nt).toBe(1);
     }
+  });
+});
+
+describe('November post-monsoon rescue (C6)', () => {
+  // v1.1 fixed the "November fizzle": every shipped shr_10 plane sat 14-20 m/s in
+  // the genesis belt, above SHEAR_THRESHOLD_MS, so seed%K could never land a
+  // survivable November and 0 probe storms reached Cat-1. The remedy was
+  // data-side (bake/era5.py calm-year selection). NOTHING in the committed suite
+  // pinned it — a future bake (refreshed ERA5 cache, a belt-mask tweak) could
+  // re-ship an all-hostile November and stay green. These are that guard.
+  const env = loadBin('env.bin');
+  const gen = JSON.parse(readFileSync(`${DATA_DIR}/genesis.json`, 'utf8')) as Array<{ lat: number; lon: number }>;
+  const shr = env.layers.get('shr_10')!;
+
+  /** Mean of a shr_10 plane sampled at the real genesis.json points (the belt). */
+  function genesisBeltShear(plane: number): number {
+    let sum = 0;
+    for (const g of gen) sum += nearestPlane(shr, g.lat, g.lon, plane);
+    return sum / gen.length;
+  }
+
+  it('at least one shr_10 plane is calm enough in the genesis belt to survive', () => {
+    // The whole point of the rescue: min over planes of the genesis-belt mean
+    // shear must sit BELOW the threshold where shear starts killing storms, so
+    // seed%K can land a survivable regime. Before the rescue every plane was above
+    // it. This is the direct data-level regression guard.
+    let minBelt = Infinity;
+    for (let p = 0; p < shr.nt; p++) minBelt = Math.min(minBelt, genesisBeltShear(p));
+    expect(minBelt).toBeLessThan(SIM.SHEAR_THRESHOLD_MS);
+  });
+
+  it('the calm November plane actually yields Cat-1 storms (live spot check)', () => {
+    // Find the calmest plane, then confirm the physics agrees with the field: a
+    // fair share of genesis-seeded November storms on that plane intensify to
+    // Cat-1 (>=64 kt). Guards against a calm-looking field that still can't spin
+    // a storm up (the observable symptom the rescue was about).
+    const terrain = loadBin('terrain.bin');
+    const land = terrain.layers.get('landmask')!;
+    const isLand = (lat: number, lon: number) => nearest(land, lat, lon) > 0.5;
+    let calmPlane = 0;
+    let calm = Infinity;
+    for (let p = 0; p < shr.nt; p++) {
+      const b = genesisBeltShear(p);
+      if (b < calm) { calm = b; calmPlane = p; }
+    }
+    const sampler = makeEnvSampler(() => env);
+    sampler.setSynopticIndex(calmPlane);
+    let reachedCat1 = 0;
+    for (const g of gen) {
+      const engine = createSimEngine({ env: sampler, isLand });
+      engine.spawn({ lat: g.lat, lon: g.lon, monthIndex: 10, seed: 7, isDemo: false });
+      let peak = 0;
+      for (let i = 0; i < 4000; i++) {
+        engine.tick(15);
+        const s = engine.getState()!;
+        peak = Math.max(peak, s.vKt);
+        if (!s.alive) break;
+      }
+      if (peak >= 64) reachedCat1++;
+    }
+    sampler.setSynopticIndex(-1);
+    // Observed ~29/71 on the shipped bin; assert a robust floor well clear of 0.
+    expect(reachedCat1).toBeGreaterThanOrEqual(5);
   });
 });
 

@@ -269,10 +269,13 @@ export class UiController {
   /**
    * The event bin was missing/404 (mid-session toggle or a shared event URL opened
    * before the bake shipped it). Visible, pinned message — never a silent replay of
-   * the wrong physics — while the app stays on / falls back to climatology.
+   * the wrong physics. The copy makes no claim about what IS on screen: a
+   * mid-session event->event 404 stays on the current event, while the shared-URL
+   * path falls back to climatology, so "showing climatology" would be false in the
+   * first case. State only that the requested event is unavailable.
    */
   scenarioError(label: string): void {
-    this.setCaption(`${label} data unavailable — showing climatology.`, false);
+    this.setCaption(`${label} data unavailable.`, false);
   }
 
   /** Status when a user storm is restored into climatology after an event. */

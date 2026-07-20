@@ -190,38 +190,46 @@ describe('November post-monsoon rescue (C6)', () => {
     expect(minBelt).toBeLessThan(SIM.SHEAR_THRESHOLD_MS);
   });
 
-  it('the calm November plane actually yields Cat-1 storms (live spot check)', () => {
-    // Find the calmest plane, then confirm the physics agrees with the field: a
-    // fair share of genesis-seeded November storms on that plane intensify to
-    // Cat-1 (>=64 kt). Guards against a calm-looking field that still can't spin
-    // a storm up (the observable symptom the rescue was about).
+  it('November produces Cat-1 storms across more than one plane in aggregate', () => {
+    // Sweep EVERY plane instead of selecting the calmest best case. The shipped
+    // picks intentionally contain one genuinely calm year (2020, genesis-belt
+    // mean 11.82 m/s); 1998 has a hostile belt mean (~15.4 m/s) but survivable
+    // sub-regions. Both produce Cat-1 storms. Pin the observable aggregate so a
+    // future bake cannot regress back to one productive plane and stay green.
     const terrain = loadBin('terrain.bin');
     const land = terrain.layers.get('landmask')!;
     const isLand = (lat: number, lon: number) => nearest(land, lat, lon) > 0.5;
-    let calmPlane = 0;
-    let calm = Infinity;
-    for (let p = 0; p < shr.nt; p++) {
-      const b = genesisBeltShear(p);
-      if (b < calm) { calm = b; calmPlane = p; }
-    }
     const sampler = makeEnvSampler(() => env);
-    sampler.setSamplingMode({ kind: 'synoptic-plane', plane: calmPlane });
-    let reachedCat1 = 0;
-    for (const g of gen) {
-      const engine = createSimEngine({ env: sampler, isLand });
-      engine.spawn({ lat: g.lat, lon: g.lon, monthIndex: 10, seed: 7, isDemo: false });
-      let peak = 0;
-      for (let i = 0; i < 4000; i++) {
-        engine.tick(15);
-        const s = engine.getState()!;
-        peak = Math.max(peak, s.vKt);
-        if (!s.alive) break;
+    let totalCat1 = 0;
+    let totalStorms = 0;
+    let productivePlanes = 0;
+    for (let plane = 0; plane < shr.nt; plane++) {
+      sampler.setSamplingMode({ kind: 'synoptic-plane', plane });
+      let planeCat1 = 0;
+      for (const g of gen) {
+        for (const seed of [0, 1, 2]) {
+          const engine = createSimEngine({ env: sampler, isLand });
+          engine.spawn({ lat: g.lat, lon: g.lon, monthIndex: 10, seed, isDemo: false });
+          let peak = 0;
+          for (let i = 0; i < 4000; i++) {
+            engine.tick(15);
+            const s = engine.getState()!;
+            peak = Math.max(peak, s.vKt);
+            if (!s.alive) break;
+          }
+          if (peak >= 64) planeCat1++;
+          totalStorms++;
+        }
       }
-      if (peak >= 64) reachedCat1++;
+      totalCat1 += planeCat1;
+      if (planeCat1 > 0) productivePlanes++;
     }
     sampler.setSamplingMode({ kind: 'synoptic-plane', plane: 0 });
-    // Observed ~29/71 on the shipped bin; assert a robust floor well clear of 0.
-    expect(reachedCat1).toBeGreaterThanOrEqual(5);
+    // Observed with bilinear runtime sampling: p0 0%, p1 0%, p2 10.3%,
+    // p3 33.8%; aggregate 11.0%. Floors leave re-bake tolerance but catch the
+    // old all-hostile regression and any return to a single lucky plane.
+    expect(productivePlanes).toBeGreaterThanOrEqual(2);
+    expect(totalCat1 / totalStorms).toBeGreaterThanOrEqual(0.1);
   });
 });
 

@@ -41,6 +41,20 @@ function allFinite(data: Float32Array): boolean {
   return true;
 }
 
+function firstValueOutside(
+  data: Float32Array,
+  minimum: number,
+  maximum: number,
+  absolute = false,
+): { index: number; value: number } | null {
+  for (let i = 0; i < data.length; i++) {
+    const raw = data[i];
+    const value = absolute ? Math.abs(raw) : raw;
+    if (value < minimum || value > maximum) return { index: i, value: raw };
+  }
+  return null;
+}
+
 /** Mean of the first plane (nt=1 layers, or plane 0 of a time-axis layer). */
 function planeMeanAbs(layer: BinLayer): number {
   const n = layer.nx * layer.ny;
@@ -324,24 +338,31 @@ describe('event env bins (byte-format-identical to env.bin, nt as a time axis)',
         // Steering components stay sane (< 60 m/s); shear non-negative, bounded.
         for (const field of ['u', 'v', 'shu', 'shv']) {
           const d = bin.layers.get(`${field}_${mm}`)!.data;
-          for (let i = 0; i < d.length; i++) expect(Math.abs(d[i])).toBeLessThan(60);
+          expect(
+            firstValueOutside(d, 0, 60, true),
+            `${field}_${mm} first value outside ±60 m/s`,
+          ).toBeNull();
         }
         const shr = bin.layers.get(`shr_${mm}`)!.data;
-        for (let i = 0; i < shr.length; i++) {
-          expect(shr[i]).toBeGreaterThanOrEqual(0);
-          expect(shr[i]).toBeLessThan(120);
-        }
+        expect(
+          firstValueOutside(shr, 0, 120),
+          `shr_${mm} first value outside 0–120 m/s`,
+        ).toBeNull();
         const sst = bin.layers.get(`sst_${mm}`)!.data;
         const rh = bin.layers.get(`rh_${mm}`)!.data;
         const ohc = bin.layers.get(`ohc_${mm}`)!.data;
-        for (let i = 0; i < sst.length; i++) {
-          expect(sst[i]).toBeGreaterThanOrEqual(15);
-          expect(sst[i]).toBeLessThanOrEqual(35);
-          expect(rh[i]).toBeGreaterThanOrEqual(0);
-          expect(rh[i]).toBeLessThanOrEqual(100);
-          expect(ohc[i]).toBeGreaterThanOrEqual(0);
-          expect(ohc[i]).toBeLessThanOrEqual(300);
-        }
+        expect(
+          firstValueOutside(sst, 15, 35),
+          `sst_${mm} first value outside 15–35 °C`,
+        ).toBeNull();
+        expect(
+          firstValueOutside(rh, 0, 100),
+          `rh_${mm} first value outside 0–100%`,
+        ).toBeNull();
+        expect(
+          firstValueOutside(ohc, 0, 300),
+          `ohc_${mm} first value outside 0–300 kJ/cm²`,
+        ).toBeNull();
       });
 
       it('time planes are genuinely distinct (adjacent |u| mean differs)', () => {

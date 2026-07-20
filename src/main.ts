@@ -548,6 +548,8 @@ type RenderController = RenderLayer & {
   init(gl: WebGL2RenderingContext, overlay?: CanvasRenderingContext2D, resources?: RenderResourcesLike): void;
   setResources?(resources: RenderResourcesLike): void;
   setMonth?(monthIndex: number): void;
+  /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
+  setActiveGhost?(id: string | null): void;
 };
 
 function hasInjectionApi(v: RenderLayer): v is RenderController {

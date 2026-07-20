@@ -253,6 +253,12 @@ export class RenderPipeline implements RenderLayer {
     this.applyEnv(); // only the SST tint depends on month
   }
 
+  /** Highlight one ghost polyline (~2x alpha) as the active scenario; null clears
+   *  it. The matching DOM label is highlighted separately via ui.highlightGhost. */
+  setActiveGhost(id: string | null): void {
+    this.ghosts.setActiveGhostId(id);
+  }
+
   // --- self-source (mode B) --------------------------------------------------
 
   private acquireOverlay(): CanvasRenderingContext2D | null {

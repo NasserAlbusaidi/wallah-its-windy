@@ -145,9 +145,54 @@ describe('penalty helpers', () => {
     expect(landDecayKtPerH(0)).toBe(0);
     expect(landDecayKtPerH(-5)).toBe(0);
   });
-  it('dry-air term is a v1.0 no-op (seam for eng task T11)', () => {
-    expect(dryAirPenaltyKtPerH(23, 58, 5)).toBe(0);
-    expect(SIM.DRYAIR_K).toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// Dry-air term (v1.1, design D12): geometric upwind-land proxy
+// ---------------------------------------------------------------------------
+
+describe('dryAirPenaltyKtPerH: distance-to-Arabian-landmass upwind proxy', () => {
+  // A synthetic Arabian landmass to the N and W (the dry bearings): land north
+  // of 23N or west of 57E, open sea to the SE. Mirrors Oman's real geometry
+  // relative to the genesis belt.
+  const NW_COAST = (lat: number, lon: number) => lat >= 23 || lon <= 57;
+
+  it('is active in v1.1 (DRYAIR_K > 0) and off when the seam is disabled', () => {
+    expect(SIM.DRYAIR_K).toBeGreaterThan(0);
+    // With no land anywhere the proxy finds nothing within range → zero penalty.
+    expect(dryAirPenaltyKtPerH(20, 62, 5, NO_LAND)).toBe(0);
+  });
+
+  it('is zero far out at sea (no upwind coast within range)', () => {
+    // Deep in the SE corner: the NW coast is hundreds of km beyond DRYAIR_RANGE.
+    expect(dryAirPenaltyKtPerH(15.5, 66, 5, NW_COAST)).toBe(0);
+  });
+
+  it('rises monotonically as the storm nears the upwind coast', () => {
+    const far = dryAirPenaltyKtPerH(17, 63, 5, NW_COAST); // coast > RANGE away → 0
+    const mid = dryAirPenaltyKtPerH(22, 58, 5, NW_COAST); // ~100 km upwind
+    const near = dryAirPenaltyKtPerH(22.6, 57.4, 5, NW_COAST); // hugging the coast
+    expect(far).toBe(0);
+    expect(mid).toBeGreaterThan(far);
+    expect(near).toBeGreaterThan(mid);
+  });
+
+  it('is bounded to [0, DRYAIR_K] and finite everywhere, even over land', () => {
+    const probes: Array<[number, number]> = [
+      [15.5, 66], [18, 62], [21, 59], [22.5, 57.5], [24, 55], // last is over land
+    ];
+    for (const [lat, lon] of probes) {
+      const p = dryAirPenaltyKtPerH(lat, lon, 5, NW_COAST);
+      expect(Number.isFinite(p)).toBe(true);
+      expect(p).toBeGreaterThanOrEqual(0);
+      expect(p).toBeLessThanOrEqual(SIM.DRYAIR_K);
+    }
+  });
+
+  it('only probes the dry N/NW/W bearings, ignoring land to the SE', () => {
+    // Land ONLY to the south-east (a non-dry bearing) must not trigger the term.
+    const SE_COAST = (lat: number, lon: number) => lat <= 17 && lon >= 63;
+    expect(dryAirPenaltyKtPerH(18, 62, 5, SE_COAST)).toBe(0);
   });
 });
 
@@ -220,6 +265,22 @@ describe('lifecycle: despawn under 20 kt with honest cause of death', () => {
     expect(death!.reason).toBe(DeathReason.Land);
     expect(events.some((e) => e.type === 'landfall')).toBe(true);
   });
+
+  it('dry-air-dominated weakening at sea → dies of dry air (not cold/shear)', () => {
+    // SST=25.5 → MPI ~40 kt: warm enough that the storm never exceeds MPI (so the
+    // cold channel stays 0), but low enough that the dry-air bite drags it below
+    // 20 kt while still offshore. No shear, no landfall — only dry air can be the
+    // cause. A synthetic Arabian coast to the N and W supplies the upwind land.
+    const NW_COAST = (lat: number, lon: number) => lat >= 23 || lon <= 57;
+    const engine = createSimEngine({ env: env({ sstC: 25.5, shear: 0, steerU: 0, steerV: 0 }), isLand: NW_COAST });
+    engine.spawn(spawnParams({ lat: 22, lon: 58 })); // hugging the coast, still at sea
+    const events = run(engine, 2000);
+    const death = firstDeath(events);
+    expect(death).not.toBeNull();
+    expect(death!.reason).toBe(DeathReason.DryAir);
+    // It really died offshore of dry air, not by wandering onto the coast.
+    expect(events.some((e) => e.type === 'landfall')).toBe(false);
+  });
 });
 
 describe('lifecycle: clean domain exit at all four edges (no NaN, reason exited)', () => {
@@ -283,6 +344,62 @@ describe('determinism', () => {
     const a = track(42, 150);
     const b = track(42, 150);
     expect(a.map((p) => p.vKt)).toEqual(b.map((p) => p.vKt));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tFracHorizonH: per-storm age→tFrac mapping (C4, event mode)
+// ---------------------------------------------------------------------------
+
+describe('SpawnParams.tFracHorizonH maps age onto the env timestep axis', () => {
+  /** Warm, calm, no-land env that records the last tFrac it was asked for. */
+  function recordingEnv(): { sampler: EnvSampler; lastTFrac: () => number } {
+    let last = 0;
+    return {
+      sampler: { sample: (_la, _lo, _mi, tFrac) => ((last = tFrac), { ...BASE, sstC: 29 }) },
+      lastTFrac: () => last,
+    };
+  }
+
+  it('a short horizon reaches tFrac=1 (clamped) while the default stays low', () => {
+    // 200 ticks * 15 min = 50 sim-hours.
+    const shortEnv = recordingEnv();
+    const shortEng = createSimEngine({ env: shortEnv.sampler, isLand: NO_LAND });
+    shortEng.spawn(spawnParams({ tFracHorizonH: 24 }));
+    for (let i = 0; i < 200; i++) shortEng.tick(DT);
+    // 50 h age well past the 24 h horizon → clamped to 1.
+    expect(shortEng.getState()!.alive).toBe(true);
+    expect(shortEnv.lastTFrac()).toBe(1);
+
+    const defEnv = recordingEnv();
+    const defEng = createSimEngine({ env: defEnv.sampler, isLand: NO_LAND });
+    defEng.spawn(spawnParams()); // no horizon → SIM.EVENT_TFRAC_HORIZON_H (240 h)
+    for (let i = 0; i < 200; i++) defEng.tick(DT);
+    // ~49.75 h / 240 h ≈ 0.21 — nowhere near 1.
+    const t = defEnv.lastTFrac();
+    expect(t).toBeGreaterThan(0);
+    expect(t).toBeLessThan(0.3);
+  });
+
+  it('tFrac grows linearly with age up to the horizon', () => {
+    const rec = recordingEnv();
+    const eng = createSimEngine({ env: rec.sampler, isLand: NO_LAND });
+    eng.spawn(spawnParams({ tFracHorizonH: 48 })); // 48 h horizon
+    for (let i = 0; i < 96; i++) eng.tick(DT); // 24 sim-hours = half the horizon
+    // Last tick computed tFrac at age 23.75 h → ~0.495.
+    expect(rec.lastTFrac()).toBeGreaterThan(0.45);
+    expect(rec.lastTFrac()).toBeLessThan(0.5);
+  });
+
+  it('a zero/negative horizon falls back to the default (no divide-by-zero)', () => {
+    const rec = recordingEnv();
+    const eng = createSimEngine({ env: rec.sampler, isLand: NO_LAND });
+    eng.spawn(spawnParams({ tFracHorizonH: 0 }));
+    for (let i = 0; i < 40; i++) eng.tick(DT);
+    const t = rec.lastTFrac();
+    expect(Number.isFinite(t)).toBe(true);
+    expect(t).toBeGreaterThanOrEqual(0);
+    expect(t).toBeLessThan(1); // used the 240 h default, not 0
   });
 });
 

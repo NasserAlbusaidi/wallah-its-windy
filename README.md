@@ -91,6 +91,14 @@ is steady (the monsoon). Recalibrate from scratch if the env source ever moves
 to daily/hourly fields. A young storm gets a 12 h shear-grace ramp so hostile
 regimes kill it watchably (~15–20 sim-h), not before the cause can render.
 
+**Dry air (v1.1):** a fourth decay term models desert-air entrainment as a pure
+geometric proxy — no humidity field exists, so the penalty grows as the Arabian
+landmass nears the storm along its dry N/NW/W bearings (an `isLand` ray probe out
+to ~190 km, mirroring `ui.nearCoast`). It stays off during open-sea spin-up and
+bites only on the final coastal approach, so a strong storm weakens recognizably
+near Oman instead of holding Cat-4 to the beach (tuned against IBTrACS Gonu 2007,
+127→77 kt on approach). A dry-air-dominated death earns its own epitaph.
+
 ## Layout
 
 ```

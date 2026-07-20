@@ -151,6 +151,14 @@ export interface SpawnParams {
   seed: number;
   /** Marks the ambient demo storm (dimmed render, cleared on first user click). */
   isDemo: boolean;
+  /**
+   * Optional age→tFrac horizon, hours. tick() maps tFrac = clamp01(ageH/horizon)
+   * onto the env layer's timestep axis. Omitted for climatology storms (falls
+   * back to SIM.EVENT_TFRAC_HORIZON_H); event mode passes the scenario's windowH
+   * so sim-hours map 1:1 onto the event's real timesteps (C4). Past the window
+   * the storm rides the final plane (persistence).
+   */
+  tFracHorizonH?: number;
 }
 
 /** Why a storm stopped being a storm. Drives the epitaph copy. */

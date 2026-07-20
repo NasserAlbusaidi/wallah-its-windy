@@ -11,5 +11,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/**/*.test.ts'],
+    // Data-integration tests parse the full baked rasters and can exceed
+    // Vitest's 5 s default on shared GitHub runners.
+    testTimeout: 20_000,
   },
 });

@@ -59,10 +59,18 @@ export const SIM = {
    * ~3 sim-days — "spins up over 2–3 sim days" per the task.
    */
   INTENSIFY_K_PER_H: 0.012,
-  /** Deep-layer shear below this (m/s) does no harm (classic ~10 m/s onset). */
-  SHEAR_THRESHOLD_MS: 10,
-  /** Weakening per m/s of shear above threshold, kt/h. */
-  SHEAR_K_KT_PER_H_PER_MS: 0.6,
+  /**
+   * Deep-layer shear below this (m/s) does no harm. The classic instantaneous
+   * onset is ~10 m/s, but env.bin feeds MONTHLY-MEAN-OF-MAGNITUDES ERA5 shear,
+   * which is biased high vs the synoptic windows storms actually use (a calm
+   * fortnight and a jet fortnight average to "hostile"). Recalibrated against
+   * the real fields so the seasonal shape matches climatology: May regimes
+   * (median 4-11) intensify freely, June/Oct split by sampled year (14-16
+   * marginal vs ~29 lethal), Jul-Aug (18-26) shred everything.
+   */
+  SHEAR_THRESHOLD_MS: 14,
+  /** Weakening per m/s of shear above threshold, kt/h (same recalibration). */
+  SHEAR_K_KT_PER_H_PER_MS: 0.45,
   /** Fractional intensity lost per hour over land (rapid decay, ~9 h e-fold). */
   LAND_DECAY_PER_H: 0.1,
 

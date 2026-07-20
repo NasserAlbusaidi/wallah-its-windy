@@ -60,10 +60,10 @@ bake/.venv/bin/python bake/bake.py          # ~15s; writes public/data/*
 ### Provenance — steering/shear are REAL ERA5 (with synoptic samples)
 
 `env.bin` is now **fully real**: SST from OISST, steering (`u`/`v`) and shear
-from the **ERA5 1991–2020 monthly climatology** (`bake/era5.py`; deep-layer mean
-of 850/500/250 hPa, shear = |V200 − V850| averaged as mean-of-magnitudes).
-`bake/synth.py` remains only as the loudly-bannered fallback when
-`data/raw/era5_climatology.nc` is absent.
+from **ERA5 1991–2020 monthly means** (`bake/era5.py`; deep-layer mean of
+850/500/250 hPa; each shipped plane's shear = |V200 − V850| of that YEAR's
+monthly-mean winds). `bake/synth.py` remains only as the loudly-bannered
+fallback when `data/raw/era5_climatology.nc` is absent.
 
 **Synoptic samples (D10):** the track-diversity spike measured pure monthly
 means as rail-prone (keep-ratio 16 % in June < the 30 % gate), so each month's
@@ -72,7 +72,7 @@ by deterministic farthest-point selection (one typical + three diverse; the
 years print at bake time). At runtime the spawn **seed picks the plane**
 (`seed % 4`, `src/env-sampler.ts`), so re-clicking the same spot summons
 genuinely different environments while `sim = f(spawn, month, seed)` holds
-(spike keep-ratio with samples: 50–65 % — PASS). SST stays `nt = 1`. Hourly
+(spike keep-ratio with samples: June 50 %, October 65 % — PASS). SST stays `nt = 1`. Hourly
 Gonu (Jun 2007) and Shaheen (Sep–Oct 2021) event fields are already downloaded
 under `data/raw/` for the v1.1 counterfactual bake, where `nt` is a TIME axis
 (`tFrac` interpolation — the sampler's other mode).
@@ -83,10 +83,13 @@ under `data/raw/` for the v1.1 counterfactual bake, where `nt` is a TIME axis
 (tint) both do, and `test/integration-bins.test.ts` guards the mapping, the
 plane count, and plane distinctness.
 
-**Physics note:** the shear penalty (`src/sim.ts`) is calibrated for
-monthly-mean-of-magnitudes input (threshold 14 m/s), NOT instantaneous shear
-(~10 m/s) — monthly aggregation biases magnitudes high. Recalibrate if the env
-source ever moves to daily/hourly fields.
+**Physics note:** the shear penalty (`src/sim.ts`, threshold 14 m/s vs the
+classic instantaneous ~10) is calibrated EMPIRICALLY against the shipped
+monthly-mean-wind shear distribution: |V200 − V850| of monthly means is
+smoother than instantaneous shear yet runs persistently high wherever the flow
+is steady (the monsoon). Recalibrate from scratch if the env source ever moves
+to daily/hourly fields. A young storm gets a 12 h shear-grace ramp so hostile
+regimes kill it watchably (~15–20 sim-h), not before the cause can render.
 
 ## Layout
 

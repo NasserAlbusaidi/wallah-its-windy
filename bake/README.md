@@ -92,16 +92,19 @@ Months outside May–Nov are not baked (no Arabian-Sea cyclone season) — clamp
 `bake/fetch_era5.py`) and replaces `synth` automatically when the file exists
 (`bake.py`/`spike_tracks.py` pick `era5 if era5.available() else synth`).
 Definitions: deep-layer steering = pressure-weighted mean of 850/500/250 hPa
-winds (0.531/0.313/0.156); shear = |V200 − V850| per year-month, then averaged
-(mean-of-magnitudes — opposing years must not cancel to calm).
+winds (0.531/0.313/0.156); shear = |V200 − V850| of monthly-mean winds,
+computed per year-month. The SHIPPED planes are single years (no cross-year
+averaging); the 30-yr climatological mean (mean-of-magnitudes, so opposing
+years cannot cancel to calm) exists only in `era5.steering_shear()` for the
+bake report and the spike baseline.
 
 **Synoptic samples (D10):** monthly means alone FAILed the spike (June
 keep-ratio 16 % < 30 %), so `steering_shear_samples()` ships 4 real YEARS per
 month as `nt=4` planes (deterministic farthest-point pick: one typical + three
 diverse; years print at bake). The runtime seed selects the plane. With
-samples the spike PASSes at 50–65 %. NOTE: `src/sim.ts`'s shear penalty is
-calibrated for monthly-mean-of-magnitudes input (threshold 14 m/s, not the
-instantaneous ~10) — see the README physics note.
+samples the spike PASSes (June 50 %, October 65 %). NOTE: `src/sim.ts`'s shear
+penalty is calibrated empirically for this monthly-mean-wind shear (threshold
+14 m/s, not the instantaneous ~10) — see the README physics note.
 
 Gonu (Jun 2007) + Shaheen (Sep 20 – Oct 10 2021) hourly event fields are
 already under `data/raw/` for the v1.1 counterfactual bake (`nt` = TIME there).
@@ -158,8 +161,8 @@ steering integrator is checked against.
 means the spike FAILed (June keep-ratio 16 %, worse than the synthetic's
 21–26 %) — the exact rails D10 predicted. The remedy was applied: 4 real-year
 synoptic samples per month (`nt=4` planes, seed-selected at runtime). Re-run
-with runtime-like per-sample assignment, the spike PASSes: May 50 %, Sep 65 %
-(gate ≥ 30 %). The spike stays a standalone diagnostic, deliberately NOT wired
+with runtime-like per-sample assignment, the spike PASSes: June 50 %, October
+65 % (gate ≥ 30 %). The spike stays a standalone diagnostic, deliberately NOT wired
 into `bake.py`'s gate (no WebGL, no bake format — design D10).
 
 ## TODO: real HydroSHEDS flow accumulation (currently D8-from-DEM)

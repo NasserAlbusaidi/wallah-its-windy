@@ -145,10 +145,60 @@ for tag, yr, mons, days in [
 ```
 
 Deep-layer steering = mass-weighted mean of the 850/500/250 winds; shear
-magnitude = `|V(200) − V(850)|`. Event files feed v1.1 counterfactual `env.bin`
-timesteps (one field, `nt` = hourly steps, `tFrac` interpolates). Known caveat:
-event fields contain the real storm's own vortex — smooth/large-scale-filter the
-steering before baking, or document the contamination (design Open Question).
+magnitude = `|V(200) − V(850)|`. Event files feed the v1.1 counterfactual env
+bins (below).
+
+### Event bake (v1.1 counterfactual scenarios) — `bake/era5_event.py`
+
+Opt-in, NOT part of the default bake (it must never touch env.bin/terrain.bin/
+flowacc.bin/genesis.json):
+
+```bash
+bake/.venv/bin/python bake/bake.py events
+```
+
+emits `public/data/env_gonu.bin`, `public/data/env_shaheen.bin`, and
+`public/data/scenarios.json`. The env bins are the **same WIWB format** as
+env.bin (version 1, identical 88-byte records) — only the `nt` semantics differ:
+`u/v/shr` carry a **time axis** (`nt` = 3-hourly steps, `tFrac` interpolates)
+instead of the climatology's synoptic samples. Layers keep the month-suffix
+convention so the existing sampler resolves them unchanged: gonu → `sst_05,
+u_05, v_05, shr_05`; shaheen → `..._08`. Gonu = `era5_gonu_2007.nc` (192 h → 64
+planes, windowH 189). Shaheen = `era5_shaheen_2021_09.nc` + `_10.nc` stitched by
+`valid_time` into one continuous 504 h series (→ 168 planes, windowH 501).
+
+**Vortex filter (why, and the diagnostic).** Event winds contain the real
+storm's own vortex; baked verbatim they would replay the historical track rather
+than provide a clean counterfactual steering environment. We wash the vortex out
+with `scipy.ndimage.gaussian_filter`, **sigma = 3 native cells (1.5°)** on the
+0.5° grid, applied to `u/v/shr` per time plane before regridding to 40×24. The
+bake reports mean `|raw − smoothed|` steering speed at the real storm's track
+positions vs the far-field: **gonu near 9.0 vs far 0.8 m/s**, **shaheen near 2.4
+vs far 0.7 m/s** — the filter removes the tight vortex (near ≫ far, and far
+matches the ~0.7 m/s residual of the preserved large-scale monsoon flow). Gonu's
+larger near value reflects its far stronger (127 kt) vortex. Fallback if a filter
+ever visibly wrecks the monsoon flow: drop sigma to 2; never ship unfiltered
+without this diagnostic.
+
+**SST provenance.** The event fetch was **winds-only**, so `sst_MM` is *not* from
+the event: it is copied verbatim (`nt=1`) from the committed `env.bin`'s
+climatological `sst_05` / `sst_08` layer (OISST 1991–2020 long-term mean).
+
+`scenarios.json` (`{version, scenarios:[{id,label,bin,monthIndex,stepH,windowH,
+startIso,spawn,ghostId}]}`) pins each scenario's sim window: `windowH =
+(planes−1)·stepH` is **computed**, and `spawn` = the storm's first IBTrACS fix
+inside the playable DOMAIN (same first-in-domain rule as genesis).
+
+### Ghost tracks — `public/data/tracks.json`
+
+`sources.load_event_tracks()` extracts the **full** IBTrACS polyline (every fix,
+with time + intensity) for the two named systems, distinct from the genesis dots.
+Storms are matched by **SEASON + a NAME token** (never NAME alone): GONU is one
+SID (`2007151N14072`, 63 fixes); the Gulab→Shaheen system is the single SID
+`2021267N18094` named `GULAB:SHAHEEN-GU` (85 fixes) — the loader still merges +
+de-dupes across SIDs by ISO_TIME so a future split archive stitches transparently.
+`windKt`/`presMb` are `null` where the CSV cell is blank; all fixes are kept
+(including off-domain Bay-of-Bengal segments — canvas clipping handles them).
 
 ### Track-diversity spike (design D10 / eng task T7) — `bake/spike_tracks.py`
 

@@ -191,3 +191,29 @@ These drive the faint historic-genesis-zone glow (eng task T8) that nudges spawn
 toward interesting outcomes without biasing the physics. The committed values are
 **approximate placeholders**; weekend two replaces them with points extracted
 from IBTrACS for storms that actually reached Oman.
+
+---
+
+## Event scenarios (v1.1) — `env_gonu.bin`, `env_shaheen.bin`, `scenarios.json`, `tracks.json`
+
+The counterfactual mode (`bake/bake.py events`) adds four files:
+
+- **`env_gonu.bin` / `env_shaheen.bin`** — the SAME WIWB format as `env.bin`
+  (version 1, identical 88-byte records, 40×24, int16 quant scale 0.01, north
+  row 0). The ONLY difference is the `nt` mode-2 **time axis**: `u/v/shr` planes
+  are consecutive 3-hourly steps (gonu `nt=64`, shaheen `nt=168`), consumed by
+  clearing the synoptic index (−1) and interpolating along `tFrac`. Layers keep
+  the month-suffix names (`sst_05,u_05,v_05,shr_05` for gonu; `..._08` for
+  shaheen) so the existing sampler resolves them unchanged. `sst_MM` stays
+  `nt=1`, copied verbatim from `env.bin` (the event fetch was winds-only). The
+  real-storm vortex is washed out at bake time (gaussian_filter σ=3 cells); see
+  `bake/README.md`.
+- **`scenarios.json`** — JSON (tiny). `{"version":1,"scenarios":[{id,label,bin,
+  monthIndex,stepH,windowH,startIso,spawn:{lat,lon,seed},ghostId}]}`. `windowH =
+  (planes−1)·stepH`, computed. `spawn` = the storm's first IBTrACS fix inside the
+  playable DOMAIN.
+- **`tracks.json`** — JSON. `{"version":1,"storms":[{id,name,year,points:[{iso,
+  lat,lon,windKt,presMb}]}]}`; the historic ghost-track polylines. `lat/lon`
+  rounded to 3 dp; `windKt/presMb` are integers or `null` when the CSV cell is
+  blank; all fixes kept in time order (off-domain segments included — the canvas
+  clips them).

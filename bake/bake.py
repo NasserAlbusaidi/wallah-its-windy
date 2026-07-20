@@ -2,14 +2,21 @@
 """
 bake.py — build the baked map data for "Wallah It's Windy".
 
-Produces four files the browser loads (BINARY-FORMATS.md is the contract):
+Produces five files the browser loads by default (BINARY-FORMATS.md is the contract):
   public/data/terrain.bin   elevation (int16 m) + land mask, ~2 km grid
   public/data/env.bin       SST (REAL) + steering u/v + shear (SYNTHETIC), 0.5 deg,
                             per-(field,month) layers for May..Nov
   public/data/flowacc.bin   log flow accumulation + basin-ID on the terrain grid
   public/data/genesis.json  IBTrACS first-fix points of storms that reached Oman
+  public/data/tracks.json   IBTrACS full polylines for the ghost-track overlay
 
-Run:  bake/.venv/bin/python bake/bake.py
+And, opt-in via `bake/.venv/bin/python bake/bake.py events`, the v1.1
+counterfactual artifacts (event steering with a real TIME axis, vortex washed
+out — see era5_event.py):
+  public/data/env_gonu.bin  public/data/env_shaheen.bin  public/data/scenarios.json
+
+Run:  bake/.venv/bin/python bake/bake.py           (default 5-file bake)
+      bake/.venv/bin/python bake/bake.py events     (event bins + scenarios)
 Reproduction, sources, licenses, and the ERA5 / HydroSHEDS drop-in TODOs are in
 bake/README.md. Zero-auth sources; raw downloads cache under data/raw/.
 
@@ -24,15 +31,30 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 
 import numpy as np
 
 import binfmt
 import era5
+import era5_event
 import hydro
 import sources
 import synth
 from binfmt import Layer
+
+# Event scenarios (v1.1 counterfactual mode). Each references the storm's ghost
+# track (C1), its event env bin (C2), and the sim time window (C3, windowH is
+# COMPUTED from the baked plane count, never hardcoded). nc files are the
+# committed data/raw/era5_{tag}*.nc; Shaheen spans two months (_09 + _10).
+EVENT_SCENARIOS = (
+    {"id": "gonu", "label": "gonu 2007", "tag": "gonu", "monthIndex": 5,
+     "seed": 2007, "ghostId": "gonu2007",
+     "nc": ("era5_gonu_2007.nc",)},
+    {"id": "shaheen", "label": "shaheen 2021", "tag": "shaheen", "monthIndex": 8,
+     "seed": 2021, "ghostId": "shaheen2021",
+     "nc": ("era5_shaheen_2021_09.nc", "era5_shaheen_2021_10.nc")},
+)
 
 # Steering/shear source: real ERA5 climatology when its download exists, else the
 # labeled synthetic fallback. Both expose steering_shear/banner/TAG/IS_SYNTHETIC.
@@ -47,7 +69,7 @@ def _mb(path: str) -> str:
 
 
 def build_terrain() -> str:
-    print("[1/4] terrain.bin  (GMRT bathymetry+topo -> 2 km grid)")
+    print("[1/5] terrain.bin  (GMRT bathymetry+topo -> 2 km grid)")
     elev, landmask = sources.load_terrain()
     ny, nx = elev.shape
     layers = [
@@ -64,7 +86,7 @@ def build_terrain() -> str:
 
 
 def build_env() -> str:
-    print(f"[2/4] env.bin  (OISST SST [REAL] + steering/shear [{ENV_SRC.TAG}], 0.5 deg)")
+    print(f"[2/5] env.bin  (OISST SST [REAL] + steering/shear [{ENV_SRC.TAG}], 0.5 deg)")
     sst_by_month = sources.load_sst_by_month()
     elat = sources.lat_centers(sources.ENV_NY)
     elon = sources.lon_centers(sources.ENV_NX)
@@ -114,7 +136,7 @@ def build_env() -> str:
 
 
 def build_flowacc(terrain_path: str) -> tuple[str, str]:
-    print("[3/4] flowacc.bin  (D8 flow accumulation + basins from real DEM)")
+    print("[3/5] flowacc.bin  (D8 flow accumulation + basins from real DEM)")
     parsed = binfmt.parse_bin(open(terrain_path, "rb").read())
     ny, nx = parsed["elev"].ny, parsed["elev"].nx
     elev = parsed["elev"].data.reshape(ny, nx)
@@ -143,7 +165,7 @@ def build_flowacc(terrain_path: str) -> tuple[str, str]:
 
 
 def build_genesis() -> tuple[str, int, int]:
-    print("[4/4] genesis.json  (IBTrACS North Indian first-fix, Oman-affecting)")
+    print("[4/5] genesis.json  (IBTrACS North Indian first-fix, Oman-affecting)")
     points, n_qual, n_total = sources.load_genesis_points()
     path = os.path.join(OUT_DIR, "genesis.json")
     with open(path, "w") as fh:
@@ -157,8 +179,93 @@ def build_genesis() -> tuple[str, int, int]:
     return path, n_qual, n_total
 
 
+def build_tracks() -> tuple[str, list[dict]]:
+    print("[5/5] tracks.json  (IBTrACS full polylines for the ghost-track overlay)")
+    storms = sources.load_event_tracks()
+    doc = {"version": 1, "storms": storms}
+    path = os.path.join(OUT_DIR, "tracks.json")
+    with open(path, "w") as fh:
+        json.dump(doc, fh, separators=(",", ":"))
+        fh.write("\n")
+    for s in storms:
+        w = [p["windKt"] for p in s["points"] if p["windKt"] is not None]
+        peak = max(w) if w else None
+        print(f"      {s['id']}: {len(s['points'])} fixes | peak {peak} kt | {_mb(path)}")
+    return path, storms
+
+
+def _first_in_domain(points: list[dict]) -> dict | None:
+    """First time-ordered fix inside the playable DOMAIN (spawn = genesis rule)."""
+    lo_min, lo_max, la_min, la_max = sources.DOMAIN
+    for p in points:
+        if lo_min <= p["lon"] <= lo_max and la_min <= p["lat"] <= la_max:
+            return p
+    return None
+
+
+def build_events() -> tuple[list[str], list[dict]]:
+    """Event env bins (C2) + scenarios.json (C3). Opt-in: NOT in the default
+    bake. Reuses the committed env.bin for climatological SST and reads the
+    per-event ERA5 winds from data/raw. windowH is derived from the baked plane
+    count. Prints the vortex-filter diagnostic per storm."""
+    print("[events] event env bins + scenarios.json (v1.1 counterfactual mode)")
+    print("[assert] " + binfmt.assert_golden_vector())
+    storms = {s["id"]: s for s in sources.load_event_tracks()}
+    env_bin = os.path.join(OUT_DIR, "env.bin")
+
+    scenarios: list[dict] = []
+    out_paths: list[str] = []
+    diags: list[dict] = []
+    for spec in EVENT_SCENARIOS:
+        nc_paths = [os.path.join(sources.RAW_DIR, n) for n in spec["nc"]]
+        ghost = storms[spec["ghostId"]]
+        d = era5_event.build_event_env(
+            spec["tag"], spec["monthIndex"], nc_paths, OUT_DIR, env_bin,
+            track_points=ghost["points"],
+        )
+        diags.append(d)
+        out_paths.append(d["path"])
+        spawn = _first_in_domain(ghost["points"])
+        if spawn is None:
+            raise ValueError(f"{spec['ghostId']}: no in-domain fix for spawn")
+        nf = d["vortex_near_far"]
+        nf_s = f"near {nf[0]:.2f} vs far {nf[1]:.2f} m/s" if nf else "n/a"
+        print(f"      env_{spec['tag']}.bin: {d['planes']} planes | windowH {d['windowH']} h "
+              f"| layers {d['layers']} | u {d['u_range'][0]:.1f}..{d['u_range'][1]:.1f} "
+              f"shr {d['shr_range'][0]:.1f}..{d['shr_range'][1]:.1f} m/s | {_mb(d['path'])}")
+        print(f"      vortex wash-out |raw-smoothed| steering: {nf_s} (sigma={era5_event.VORTEX_SIGMA})")
+        scenarios.append({
+            "id": spec["id"], "label": spec["label"], "bin": f"data/env_{spec['tag']}.bin",
+            "monthIndex": spec["monthIndex"], "stepH": era5_event.DECIMATE, "windowH": d["windowH"],
+            "startIso": d["start_iso"],
+            "spawn": {"lat": spawn["lat"], "lon": spawn["lon"], "seed": spec["seed"]},
+            "ghostId": spec["ghostId"],
+        })
+
+    spath = os.path.join(OUT_DIR, "scenarios.json")
+    with open(spath, "w") as fh:
+        json.dump({"version": 1, "scenarios": scenarios}, fh, separators=(",", ":"))
+        fh.write("\n")
+    out_paths.append(spath)
+    print(f"      scenarios.json: {len(scenarios)} scenarios | {_mb(spath)}")
+    for sc in scenarios:
+        print(f"        {sc['id']}: spawn ({sc['spawn']['lat']},{sc['spawn']['lon']}) "
+              f"monthIndex {sc['monthIndex']} windowH {sc['windowH']} startIso {sc['startIso']}")
+    return out_paths, diags
+
+
 def main() -> int:
     os.makedirs(OUT_DIR, exist_ok=True)
+
+    # Opt-in event bake: `python bake/bake.py events` builds the counterfactual
+    # env bins + scenarios ONLY (reuses the committed env.bin for SST). Kept out
+    # of the default path so the fast/offline 5-file bake never touches events.
+    if "events" in sys.argv[1:]:
+        paths, _ = build_events()
+        total = sum(os.path.getsize(p) for p in paths)
+        print(f"\n[done] event payload = {total/1e6:.2f} MB")
+        return 0
+
     print(ENV_SRC.banner())
 
     # Bake-time assert #1 (eng task T6): header write->parse roundtrip vs golden.
@@ -169,8 +276,9 @@ def main() -> int:
     epath = build_env()
     fpath, conn_msg = build_flowacc(tpath)
     gpath, n_qual, n_total = build_genesis()
+    kpath, _storms = build_tracks()
 
-    total = sum(os.path.getsize(p) for p in (tpath, epath, fpath, gpath))
+    total = sum(os.path.getsize(p) for p in (tpath, epath, fpath, gpath, kpath))
     print()
     print(f"[done] public/data payload = {total/1e6:.2f} MB raw (budget <= ~7 MB)")
     print(ENV_SRC.banner())

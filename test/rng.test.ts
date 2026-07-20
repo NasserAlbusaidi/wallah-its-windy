@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mulberry32, makeRng, readHash, encodeHash } from '../src/rng';
+import { mulberry32, makeRng, readHash, encodeHash, isEnvHashKey } from '../src/rng';
 import type { HashState } from '../src/rng';
 
 describe('rng: mulberry32 is deterministic (sim = f(spawn,month,seed))', () => {
@@ -55,5 +55,51 @@ describe('rng: URL hash round-trips a shareable storm', () => {
     expect(readHash('')).toBeNull();
     expect(readHash('#')).toBeNull();
     expect(readHash('#lat=1&lon=2')).toBeNull(); // missing month + seed
+  });
+});
+
+describe('rng: optional scenario env key (C8) is backward compatible', () => {
+  const LEGACY = 'lat=18.234&lon=63.512&month=5&seed=4242';
+
+  it('a climatology storm serialises to the EXACT legacy string (byte-identical)', () => {
+    const state: HashState = { lat: 18.234, lon: 63.512, monthIndex: 5, seed: 4242 };
+    expect(encodeHash(state)).toBe(LEGACY);
+    expect(encodeHash(state)).not.toContain('env');
+  });
+
+  it('a legacy URL (no env) reads back as climatology (env undefined)', () => {
+    const back = readHash('#' + LEGACY);
+    expect(back).not.toBeNull();
+    expect(back!.env).toBeUndefined();
+  });
+
+  it('appends env ONLY for a known key, always last', () => {
+    const enc = encodeHash({ lat: 16.2, lon: 63.4, monthIndex: 5, seed: 2007, env: 'gonu' });
+    expect(enc).toBe('lat=16.200&lon=63.400&month=5&seed=2007&env=gonu');
+  });
+
+  it('round-trips a scenario env key', () => {
+    const state: HashState = { lat: 16.2, lon: 63.4, monthIndex: 5, seed: 2007, env: 'shaheen' };
+    const back = readHash('#' + encodeHash(state));
+    expect(back).not.toBeNull();
+    expect(back!.env).toBe('shaheen');
+    expect(back!.seed).toBe(2007);
+  });
+
+  it('ignores an unknown/garbage env value (validated against the known set)', () => {
+    expect(readHash('#' + LEGACY + '&env=bogus')!.env).toBeUndefined();
+    expect(readHash('#' + LEGACY + '&env=')!.env).toBeUndefined();
+    // A garbage env in state is dropped on encode, keeping the string legacy-shaped.
+    const enc = encodeHash({ lat: 18.234, lon: 63.512, monthIndex: 5, seed: 4242, env: 'nope' as never });
+    expect(enc).toBe(LEGACY);
+  });
+
+  it('isEnvHashKey validates the known set', () => {
+    expect(isEnvHashKey('gonu')).toBe(true);
+    expect(isEnvHashKey('shaheen')).toBe(true);
+    expect(isEnvHashKey('climatology')).toBe(false);
+    expect(isEnvHashKey('')).toBe(false);
+    expect(isEnvHashKey(null)).toBe(false);
+    expect(isEnvHashKey(undefined)).toBe(false);
   });
 });

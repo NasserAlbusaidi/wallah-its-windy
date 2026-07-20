@@ -51,6 +51,23 @@ export function randomSeed(): number {
 // URL hash: shareable storms
 // ---------------------------------------------------------------------------
 
+/**
+ * The scenario env keys the URL hash recognises (C8). This is the ONE coupling
+ * point between the hash and the scenario catalogue: a shared URL carrying
+ * `env=<key>` replays that historic event's env; any other value (or absence) is
+ * climatology. Kept as a fixed known set here so readHash can validate without
+ * importing the (async-loaded) scenario list. Must stay in sync with the scenario
+ * ids in data/scenarios.json.
+ */
+export const ENV_HASH_KEYS = ['gonu', 'shaheen'] as const;
+export type EnvHashKey = (typeof ENV_HASH_KEYS)[number];
+const ENV_HASH_SET: ReadonlySet<string> = new Set(ENV_HASH_KEYS);
+
+/** True when `v` is a recognised scenario env key (validated, tolerant of garbage). */
+export function isEnvHashKey(v: string | null | undefined): v is EnvHashKey {
+  return v != null && ENV_HASH_SET.has(v);
+}
+
 /** The reproducible identity of a storm, round-tripped through the URL hash. */
 export interface HashState {
   lat: number;
@@ -58,6 +75,11 @@ export interface HashState {
   /** 0=Jan..11=Dec. */
   monthIndex: number;
   seed: number;
+  /**
+   * Optional scenario env key (one of {@link ENV_HASH_KEYS}); absent = climatology.
+   * Legacy shared URLs lack it entirely and must keep replaying as climatology.
+   */
+  env?: EnvHashKey;
 }
 
 /**
@@ -73,6 +95,7 @@ export function readHash(hash: string = location.hash): HashState | null {
   const lonS = p.get('lon');
   const monthS = p.get('month');
   const seedS = p.get('seed');
+  const envS = p.get('env');
   // Every field must be present — Number(null) is 0, so absent keys would
   // otherwise slip through as a bogus (0,0,Jan,0) storm.
   if (latS === null || lonS === null || monthS === null || seedS === null) return null;
@@ -88,7 +111,13 @@ export function readHash(hash: string = location.hash): HashState | null {
   ) {
     return null;
   }
-  return { lat, lon, monthIndex, seed: seed >>> 0 };
+  // OPTIONAL scenario key: never part of the required-presence check above, so a
+  // legacy `#lat=..&lon=..&month=..&seed=..` URL still parses as climatology. An
+  // unknown/garbage value is ignored (validated against the known set).
+  const env = isEnvHashKey(envS) ? envS : undefined;
+  const state: HashState = { lat, lon, monthIndex, seed: seed >>> 0 };
+  if (env) state.env = env;
+  return state;
 }
 
 /** Serialize a HashState into the URL fragment (without leading '#'). */
@@ -99,6 +128,10 @@ export function encodeHash(state: HashState): string {
     month: String(state.monthIndex),
     seed: String(state.seed >>> 0),
   });
+  // The scenario key is appended LAST and ONLY for a recognised non-climatology
+  // value, so a plain storm serialises to the exact legacy string — existing
+  // shared URLs stay byte-identical and no climatology storm churns its hash.
+  if (isEnvHashKey(state.env)) p.set('env', state.env);
   return p.toString();
 }
 

@@ -57,6 +57,9 @@ import { EnvLayer } from './env';
 import { ParticleLayer } from './particles';
 import { RainLayer } from './rain';
 import { TrackLayer } from './track';
+import { GhostLayer } from './ghosts';
+import { parseTracks, toGhostPolylines } from '../tracks';
+import type { GhostPolyline } from '../tracks';
 
 /** Baked data handed to the renderer (mode A); any field may arrive progressively. */
 export interface RenderResources {
@@ -66,6 +69,8 @@ export interface RenderResources {
   env: ParsedBin | null;
   /** genesis.json points (historic genesis zones). */
   genesis: LatLon[];
+  /** tracks.json historic-storm polylines (ghost tracks, C7). Empty when absent. */
+  tracks: GhostPolyline[];
 }
 
 const ELEV_NAMES = ['elev', 'elevation', 'dem', 'z'];
@@ -119,7 +124,7 @@ export class RenderPipeline implements RenderLayer {
   private gl: WebGL2RenderingContext | null = null;
   private overlay: CanvasRenderingContext2D | null = null;
   private caps: GlCaps = { colorBufferFloat: false, floatLinear: false };
-  private res: RenderResources = { terrain: null, env: null, genesis: [] };
+  private res: RenderResources = { terrain: null, env: null, genesis: [], tracks: [] };
   private gpu: GpuTextures = emptyGpu();
   private monthIndex = 5;
   private injected = false;
@@ -133,6 +138,7 @@ export class RenderPipeline implements RenderLayer {
   private env = new EnvLayer();
   private particles = new ParticleLayer();
   private rain = new RainLayer();
+  private ghosts = new GhostLayer();
   private track = new TrackLayer();
 
   private width = 1;
@@ -174,6 +180,7 @@ export class RenderPipeline implements RenderLayer {
     this.env.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
+    this.ghosts.resize(this.width, this.height);
     this.track.resize(this.width, this.height);
   }
 
@@ -202,6 +209,8 @@ export class RenderPipeline implements RenderLayer {
 
     if (this.overlay) {
       this.overlay.clearRect(0, 0, this.width, this.height);
+      // Ghosts sit BELOW the live track in luminance: dimmer, drawn first (C7).
+      this.ghosts.draw();
       this.track.draw(ctx); // ripples land on top when ui.drawOverlay runs after
     }
   }
@@ -219,6 +228,7 @@ export class RenderPipeline implements RenderLayer {
     this.env.dispose();
     this.particles.dispose();
     this.rain.dispose();
+    this.ghosts.dispose();
     this.track.dispose();
     this.gl = null;
     this.overlay = null;
@@ -230,11 +240,23 @@ export class RenderPipeline implements RenderLayer {
     this.injected = true;
     this.res = resources;
     this.rebuildAllTextures();
+    this.applyTracks(); // ghost polylines are CPU-side, not GL textures
+  }
+
+  /** Ghost tracks are Canvas2D data (no GL state) — apply straight to the layer. */
+  private applyTracks(): void {
+    this.ghosts.setTracks(this.res.tracks ?? []);
   }
 
   setMonth(monthIndex: number): void {
     this.monthIndex = monthIndex;
     this.applyEnv(); // only the SST tint depends on month
+  }
+
+  /** Highlight one ghost polyline (~2x alpha) as the active scenario; null clears
+   *  it. The matching DOM label is highlighted separately via ui.highlightGhost. */
+  setActiveGhost(id: string | null): void {
+    this.ghosts.setActiveGhostId(id);
   }
 
   // --- self-source (mode B) --------------------------------------------------
@@ -293,7 +315,23 @@ export class RenderPipeline implements RenderLayer {
         this.res.genesis = pts;
         this.applyGenesis();
       }),
+      this.loadTracks().then((polys) => {
+        this.res.tracks = polys;
+        this.applyTracks();
+      }),
     ]);
+  }
+
+  /** Mode B: self-fetch tracks.json for ghost parity. Missing/bad -> no ghosts. */
+  private async loadTracks(): Promise<GhostPolyline[]> {
+    try {
+      const res = await fetch(this.assetUrl('data/tracks.json'));
+      if (!res.ok) return [];
+      const parsed = parseTracks((await res.json()) as unknown);
+      return parsed ? toGhostPolylines(parsed) : [];
+    } catch {
+      return [];
+    }
   }
 
   private mergeAndApplyTerrain(): void {
@@ -328,12 +366,17 @@ export class RenderPipeline implements RenderLayer {
     this.env.init(gl);
     this.particles.init(gl);
     this.rain.init(gl, this.caps);
-    if (this.overlay) this.track.init(this.overlay);
+    if (this.overlay) {
+      this.ghosts.init(this.overlay);
+      this.track.init(this.overlay);
+    }
     this.env.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
+    this.ghosts.resize(this.width, this.height);
     this.track.resize(this.width, this.height);
     this.rebuildAllTextures();
+    this.applyTracks(); // re-seed ghost polylines after (re)init (e.g. context loss)
   }
 
   private onLost = (e: Event): void => {

@@ -16,7 +16,8 @@
  * when the catalogue is empty.
  */
 
-import type { EnvSamplingMode } from './types';
+import { envMonthSuffix } from './env-sampler';
+import type { EnvSamplingMode, ParsedBin } from './types';
 
 /** The picker value + hash sentinel for the default (non-event) regime. */
 export const CLIMATOLOGY_ID = 'climatology';
@@ -117,6 +118,42 @@ export function parseScenarios(json: unknown): Scenario[] | null {
 export function findScenario(scenarios: readonly Scenario[], id: string | null | undefined): Scenario | null {
   if (id == null || id === CLIMATOLOGY_ID) return null;
   return scenarios.find((s) => s.id === id) ?? null;
+}
+
+/** Return a human-readable incompatibility, or null when the bin matches. */
+export function validateEventBinForScenario(
+  bin: ParsedBin,
+  scenario: Scenario,
+): string | null {
+  const mm = envMonthSuffix(scenario.monthIndex);
+  const expectedNt = scenario.windowH / scenario.stepH + 1;
+  if (!Number.isInteger(expectedNt)) {
+    return `scenario windowH=${scenario.windowH} and stepH=${scenario.stepH} imply non-integer nt=${expectedNt}`;
+  }
+  for (const field of ['u', 'v', 'shr']) {
+    const name = `${field}_${mm}`;
+    const layer = bin.layers.get(name);
+    if (!layer) return `missing ${name}`;
+    if (layer.nt !== expectedNt) {
+      return `${name} nt=${layer.nt}, expected ${expectedNt}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Gate a parsed event bin before the scenario runtime caches or activates it.
+ * Incompatible physics is a visible failure path, never a silent fallback.
+ */
+export function acceptEventBinForScenario(
+  bin: ParsedBin,
+  scenario: Scenario,
+  warn: (message: string) => void = (message) => console.warn(message),
+): ParsedBin | null {
+  const mismatch = validateEventBinForScenario(bin, scenario);
+  if (!mismatch) return bin;
+  warn(`${scenario.label} bin mismatch: ${mismatch}`);
+  return null;
 }
 
 // ---------------------------------------------------------------------------

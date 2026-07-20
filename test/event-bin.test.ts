@@ -15,9 +15,14 @@ import { describe, it, expect } from 'vitest';
 import { buildWiwbBin, constantPlanes } from './helpers/wiwb';
 import { parseBin } from '../src/loader';
 import { makeEnvSampler, synopticCount, envMonthSuffix } from '../src/env-sampler';
+import {
+  acceptEventBinForScenario,
+  validateEventBinForScenario,
+} from '../src/scenarios';
 import { createSimEngine } from '../src/sim';
 import { DOMAIN } from '../src/grid';
 import type { ParsedBin, SimEvent } from '../src/types';
+import type { Scenario } from '../src/scenarios';
 
 // A June (monthIndex 5) event bin: sst_05 is a single climatological plane; u/v/shr
 // carry 3 time planes. u_05 ramps 0 -> 10 -> 20 across the timesteps so tFrac reads
@@ -37,6 +42,56 @@ function buildEventBin(): ParsedBin {
   ]);
   return parseBin(buf);
 }
+
+const SCENARIO: Scenario = {
+  id: 'test',
+  label: 'test event',
+  bin: 'data/env_test.bin',
+  monthIndex: 5,
+  stepH: 3,
+  windowH: 6,
+  startIso: '2000-01-01T00:00:00Z',
+  spawn: { lat: 18, lon: 62, seed: 1 },
+  ghostId: 'test2000',
+};
+
+describe('event-bin scenario compatibility', () => {
+  it('accepts a bin whose fields and timeline match the scenario', () => {
+    expect(validateEventBinForScenario(buildEventBin(), SCENARIO)).toBeNull();
+  });
+
+  it('rejects a structurally valid bin with the wrong month suffix', () => {
+    const wrongMonth = { ...SCENARIO, monthIndex: 6 };
+
+    expect(validateEventBinForScenario(buildEventBin(), wrongMonth)).toMatch(
+      /missing u_06/,
+    );
+  });
+
+  it('rejects a bin whose timeline length disagrees with scenario metadata', () => {
+    const wrongWindow = { ...SCENARIO, windowH: 9 };
+
+    expect(validateEventBinForScenario(buildEventBin(), wrongWindow)).toMatch(
+      /u_05 nt=3, expected 4/,
+    );
+  });
+
+  it('warns and returns null instead of accepting incompatible physics', () => {
+    const warnings: string[] = [];
+    const wrongWindow = { ...SCENARIO, windowH: 9 };
+
+    const accepted = acceptEventBinForScenario(
+      buildEventBin(),
+      wrongWindow,
+      (message) => warnings.push(message),
+    );
+
+    expect(accepted).toBeNull();
+    expect(warnings).toEqual([
+      'test event bin mismatch: u_05 nt=3, expected 4',
+    ]);
+  });
+});
 
 describe('event bin: nt semantics are explicit', () => {
   it('synopticCount reports the steering layer nt', () => {

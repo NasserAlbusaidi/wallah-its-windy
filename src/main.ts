@@ -48,6 +48,7 @@ import {
   eventSpawn,
   samplingModeForSpawn,
   eventTimeFraction,
+  acceptEventBinForScenario,
   restoredMonth,
   CLIMATOLOGY_ID,
 } from './scenarios';
@@ -494,7 +495,13 @@ async function loadEventBin(scenario: Scenario): Promise<ParsedBin | null> {
   progressEl.setAttribute('data-done', 'true');
   if (!buf) return null;
   try {
-    const bin = parseBin(buf);
+    const parsed = parseBin(buf);
+    const bin = acceptEventBinForScenario(
+      parsed,
+      scenario,
+      (message) => console.warn(`[scenario] ${message}`),
+    );
+    if (!bin) return null;
     eventBinCache.set(scenario.id, bin);
     return bin;
   } catch (err) {

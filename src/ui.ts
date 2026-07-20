@@ -60,10 +60,10 @@ function trackRgba(a: number): string {
  * Sharqiya coast ~309 km from Muscat. The integration test pins this outcome so
  * a re-bake that reshuffles sample years cannot silently kill the demo.
  */
-const DEMO_SEED = 71;
-const DEMO_GENESIS: LatLon = { lat: 17.5, lon: 61.0 };
+export const DEMO_SEED = 71;
+export const DEMO_GENESIS: LatLon = { lat: 17.5, lon: 61.0 };
 /** Demo month (May, 0-indexed 4): the real pre-monsoon cyclone window. */
-const DEMO_MONTH = 4;
+export const DEMO_MONTH = 4;
 
 /** Storm center this close to a coast → drop to landfall-climax slow-mo. */
 const SLOWMO_COAST_KM = 150;
@@ -178,10 +178,16 @@ export class UiController {
     return params;
   }
 
-  /** The fixed-seed, dimmed ambient demo (design task T1 / D3). */
+  /**
+   * The fixed-seed, dimmed ambient demo (design task T1 / D3). The month is
+   * FORCED to DEMO_MONTH, not read from the picker: browsers that restore form
+   * state across reloads (Firefox notably) would otherwise hand the curated
+   * seed a different month's fields and turn the first-load storm into a dud.
+   * The picker is written back so what the user sees matches what runs.
+   */
   demoSpawnParams(): SpawnParams {
-    const monthIndex = this.readMonth(DEMO_MONTH);
-    return { ...DEMO_GENESIS, monthIndex, seed: DEMO_SEED, isDemo: true };
+    this.host.monthSelect.value = String(DEMO_MONTH);
+    return { ...DEMO_GENESIS, monthIndex: DEMO_MONTH, seed: DEMO_SEED, isDemo: true };
   }
 
   // -------------------------------------------------------------------------

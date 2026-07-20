@@ -145,6 +145,28 @@ export function windToDegPerHour(
 // distance
 // ---------------------------------------------------------------------------
 
+/**
+ * Offset a lat/lon point by `km` along a unit (east,north) bearing vector, with
+ * the cos-lat correction on the eastward component (a km east spans more degrees
+ * of longitude toward the poles). `east`/`north` need not be normalized — they
+ * scale the km. The sole owner of "step a point by a ground distance", used by
+ * sim.ts's dry-air upwind ray probe so that file never does inline lat/lon math.
+ */
+export function offsetKm(
+  lat: number,
+  lon: number,
+  east: number,
+  north: number,
+  km: number,
+): LatLon {
+  const degLat = (km * 1000) / METERS_PER_DEG_LAT;
+  const cosLat = Math.max(0.2, Math.cos(lat * DEG2RAD));
+  return {
+    lat: lat + north * degLat,
+    lon: lon + (east * degLat) / cosLat,
+  };
+}
+
 /** Great-circle distance between two lat/lon points, km (haversine). */
 export function greatCircleKm(a: LatLon, b: LatLon): number {
   const dLat = (b.lat - a.lat) * DEG2RAD;

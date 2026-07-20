@@ -61,16 +61,27 @@ export const SIM = {
   INTENSIFY_K_PER_H: 0.012,
   /**
    * Deep-layer shear below this (m/s) does no harm. The classic instantaneous
-   * onset is ~10 m/s, but env.bin feeds MONTHLY-MEAN-OF-MAGNITUDES ERA5 shear,
-   * which is biased high vs the synoptic windows storms actually use (a calm
-   * fortnight and a jet fortnight average to "hostile"). Recalibrated against
-   * the real fields so the seasonal shape matches climatology: May regimes
-   * (median 4-11) intensify freely, June/Oct split by sampled year (14-16
-   * marginal vs ~29 lethal), Jul-Aug (18-26) shred everything.
+   * onset is ~10 m/s, but env.bin's per-year planes carry |V200 - V850| of
+   * MONTHLY-MEAN winds — smoother than any instantaneous shear (a vector mean
+   * under-counts variability), yet persistently high wherever the flow is
+   * steady (the monsoon). The constants are therefore calibrated EMPIRICALLY
+   * against the shipped field's distribution (genesis-belt cores, by plane):
+   * May ~3-9 m/s -> majors possible; June splits by sampled year (~10 free vs
+   * ~23 lethal); Jul-Aug ~27-32 -> everything shredded. Recalibrate from
+   * scratch if the env source ever moves to daily/hourly fields.
    */
   SHEAR_THRESHOLD_MS: 14,
   /** Weakening per m/s of shear above threshold, kt/h (same recalibration). */
   SHEAR_K_KT_PER_H_PER_MS: 0.45,
+  /**
+   * Shear penalty ramps in linearly over a young storm's first hours (full
+   * strength at this age). Physical fig leaf: a fresh depression takes ~half a
+   * day to be torn apart. Real reason (D11 legibility): in a hostile plane a
+   * 30 kt spawn otherwise dies in ~2 sim-hours — under ONE real second at
+   * 3 h/s, an epitaph before the downshear smear cue can even render its cause.
+   * The verdict is unchanged; it just becomes watchable (~15-20 sim-h).
+   */
+  SHEAR_GRACE_H: 12,
   /** Fractional intensity lost per hour over land (rapid decay, ~9 h e-fold). */
   LAND_DECAY_PER_H: 0.1,
 
@@ -202,6 +213,8 @@ interface IntensityArgs {
   lat: number;
   lon: number;
   monthIndex: number;
+  /** Storm age in hours; omitted = mature (full shear penalty, no grace). */
+  ageH?: number;
 }
 
 /** The four ODE terms plus their net dV/dt (kt/h). Internal — drives attribution. */
@@ -216,7 +229,8 @@ function intensityTerms(a: IntensityArgs): {
   // whatever SST the sampler returns there — the relaxation term then decays V.
   const mpi = a.overLand ? 0 : mpiKt(a.sstC);
   const relax = SIM.INTENSIFY_K_PER_H * (mpi - a.vKt);
-  const shearPen = shearPenaltyKtPerH(a.shearMs);
+  const graceRamp = a.ageH === undefined ? 1 : Math.min(1, a.ageH / SIM.SHEAR_GRACE_H);
+  const shearPen = graceRamp * shearPenaltyKtPerH(a.shearMs);
   const landPen = a.overLand ? landDecayKtPerH(a.vKt) : 0;
   const dryPen = dryAirPenaltyKtPerH(a.lat, a.lon, a.monthIndex);
   const net = relax - shearPen - landPen - dryPen;
@@ -387,6 +401,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       lat,
       lon,
       monthIndex,
+      ageH,
     });
     vKt = guardFinite(Math.max(0, vKt + terms.net * dtH), 'vKt');
 

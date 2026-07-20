@@ -145,8 +145,12 @@ export function makeEnvSampler(getBin: () => ParsedBin | null): SelectableEnvSam
       // Steering: gentle NW push toward the Omani coast, seasonally modulated.
       const steerU = -3 + 2 * Math.sin(phase) - 0.05 * (la - 20); // eastward (mostly westward)
       const steerV = 3 + 1.5 * Math.cos(phase) + 0.1 * (65 - lo); // northward
-      // Shear: monsoon peak (~Aug) + higher at latitude → northern/late storms weaken.
-      const shear = clamp(7 + 3 * Math.max(0, Math.cos((monthIndex - 7) * (Math.PI / 6))) + 0.3 * (la - 18), 4, 20);
+      // Shear: monsoon peak (~Aug) + higher at latitude → northern/late storms
+      // weaken. Scaled so the monsoon peak clearly exceeds sim.ts's
+      // SHEAR_THRESHOLD_MS (14, calibrated for monthly-mean fields) — otherwise
+      // the fallback could never kill a storm by shear and DeathReason.Shear
+      // would be unreachable in degraded (env.bin-missing) mode.
+      const shear = clamp(9 + 9 * Math.max(0, Math.cos((monthIndex - 7) * (Math.PI / 6))) + 0.5 * (la - 18), 5, 26);
       return { sstC, steerU, steerV, shear };
     },
   };

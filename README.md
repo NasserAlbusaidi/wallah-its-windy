@@ -11,7 +11,8 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > on real baked climate data, rendered as a dark nautical instrument. A fixed-seed
 > demo storm opens mid-life on first load. Compare June vs October at one click;
 > share any storm by its URL. User storms carry a live flight recorder that
-> explains each intensity change, then becomes a debrief and replay timeline.
+> explains each intensity change in numbers and plain language, then becomes a
+> debrief, controlled-comparison lab, export station, and replay timeline.
 
 ## Stack
 
@@ -41,6 +42,19 @@ npm test          # vitest run (physics, grid, loader golden vector, rng, bake<-
 - After the storm ends, scrub its recorded track or jump to its peak, first
   landfall, and final frame. Replay reads immutable recorded frames; it never
   rewinds the simulation engine.
+- Choose a second month or event environment under the debrief to run the exact
+  same genesis and seed again. The first track remains amber beneath the cyan
+  candidate, and the paired debrief reports intensity, lifetime, approach, and
+  landfall differences.
+- Save a 1600×900 PNG debrief card or a 10-second WebM replay. Both render from
+  the immutable flight tape with no runtime dependency or server upload.
+- Open **model notes** for the observed inputs, deliberate simplifications, and
+  the counterfactual-event contract.
+
+On touch screens, a short stable tap spawns; drag, long-press, and multi-touch
+gestures do not. Narrow layouts keep the causal sentence visible and place exact
+physics behind a **details** disclosure. Decorative resolution and particle
+count adapt to the device; physics and recorded results never do.
 
 Deploys to GitHub Pages from `main` via `.github/workflows/deploy.yml`. The Vite
 `base` is `./` so it works from a project subpath.
@@ -93,6 +107,13 @@ keep this distinction instead of tuning one physics model to reproduce two
 storms. See `bake/README.md` for the intensity sensitivity measurements and the
 requirements for a future hindcast mode.
 
+That contract is also visible in the interface: event options are labelled as
+environments, the picker displays “not a historical reconstruction,” and every
+event flight tape carries a counterfactual marker. Scientific limitations are
+not hidden in documentation: the in-app model notes identify the point-vortex
+core, empirical intensity equation, geometric dry-air proxy, and the current
+rain-accumulation-versus-routed-flood distinction.
+
 `env.bin` encodes the month in the layer **name** (`sst_MM/u_MM/v_MM/shr_MM`,
 `MM` = 0-indexed `monthIndex`, `04`=May … `10`=Nov). Consumers resolve it with
 `clamp(monthIndex, 4, 10)`; `src/env-sampler.ts` (sim) and `src/render/index.ts`
@@ -128,6 +149,13 @@ src/
   loader.ts           .bin parser + validation + dequantize
   env-sampler.ts      EnvSampler over env.bin (real SST) + analytic fallback
   sim.ts              point-vortex physics: steering+beta+wander, DeMaria-Kaplan
+  storm-session.ts    recording, pause/seek/replay transport, comparison baseline
+  flight-recorder.ts  immutable per-tick tape + debrief/snapshot construction
+  comparison.ts       same-identity paired-run validation and result deltas
+  narrative.ts        exact intensity budget -> plain-language dominant cause
+  export.ts           dependency-free PNG card + WebM replay renderer
+  performance.ts      device-aware DPR/particle budgets (render only)
+  tap-gesture.ts      tap-vs-drag/pinch input recognizer
   ui.ts               loading/demo/aftermath state machine, ripple, epitaph, slow-mo
   render/             WebGL2 dark-instrument layers behind one facade
   style.css           instrument chrome styling

@@ -30,11 +30,31 @@ function state(ageH: number, vKt: number, alive = true): StormState {
   };
 }
 
+function meta(
+  label: string,
+  monthIndex = 5,
+  seed = 42,
+  extra: { historicalPeakKt?: number; counterfactual?: boolean } = {},
+) {
+  return {
+    spawn: { lat: 18, lon: 62, monthIndex, seed, isDemo: false },
+    environmentId: extra.counterfactual ? 'gonu' : 'climatology',
+    monthIndex,
+    seed,
+    isDemo: false,
+    label,
+    counterfactual: extra.counterfactual ?? false,
+    ...(extra.historicalPeakKt === undefined
+      ? {}
+      : { historicalPeakKt: extra.historicalPeakKt }),
+  };
+}
+
 describe('FlightRecorder replay snapshots', () => {
   it('rebuilds a scrubbed storm with only the track recorded up to that frame', () => {
     const recorder = new FlightRecorder();
     recorder.start(
-      { monthIndex: 5, seed: 42, isDemo: false, label: 'june climatology' },
+      meta('june climatology'),
       state(0, 30),
     );
     recorder.record(state(1, 40), []);
@@ -53,7 +73,7 @@ describe('FlightRecorder replay snapshots', () => {
   it('ignores repeated no-op snapshots after the engine has stopped', () => {
     const recorder = new FlightRecorder();
     recorder.start(
-      { monthIndex: 5, seed: 42, isDemo: false, label: 'june climatology' },
+      meta('june climatology'),
       state(0, 30),
     );
     const dead = state(1, 19, false);
@@ -69,13 +89,10 @@ describe('FlightRecorder debrief', () => {
   it('reports landfall, death, and the active historical comparison', () => {
     const recorder = new FlightRecorder();
     recorder.start(
-      {
-        monthIndex: 5,
-        seed: 2007,
-        isDemo: false,
-        label: 'gonu 2007 counterfactual',
+      meta('gonu 2007 counterfactual', 5, 2007, {
         historicalPeakKt: 127,
-      },
+        counterfactual: true,
+      }),
       state(0, 30),
     );
     recorder.record(state(24, 60), [
@@ -114,7 +131,7 @@ describe('FlightRecorder replay milestones', () => {
   it('finds the peak, first landfall, and final recorded frame', () => {
     const recorder = new FlightRecorder();
     recorder.start(
-      { monthIndex: 4, seed: 7, isDemo: false, label: 'may climatology' },
+      meta('may climatology', 4, 7),
       state(0, 30),
     );
     recorder.record(state(12, 70), []);

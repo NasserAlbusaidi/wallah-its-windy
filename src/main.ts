@@ -53,7 +53,15 @@ import {
   CLIMATOLOGY_ID,
 } from './scenarios';
 import type { Scenario } from './scenarios';
-import { FlightRecorder } from './flight-recorder';
+import { StormSession } from './storm-session';
+import {
+  downloadBlob,
+  exportFileStem,
+  makeDebriefCard,
+  makeReplayVideo,
+} from './export';
+import { chooseRenderProfile } from './performance';
+import { TapGesture } from './tap-gesture';
 
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
@@ -93,6 +101,11 @@ const flightStart = must(document.getElementById('flight-start') as HTMLButtonEl
 const flightPeak = must(document.getElementById('flight-peak') as HTMLButtonElement | null, '#flight-peak');
 const flightLandfall = must(document.getElementById('flight-landfall') as HTMLButtonElement | null, '#flight-landfall');
 const flightEnd = must(document.getElementById('flight-end') as HTMLButtonElement | null, '#flight-end');
+const compareTarget = must(document.getElementById('compare-target') as HTMLSelectElement | null, '#compare-target');
+const compareRun = must(document.getElementById('compare-run') as HTMLButtonElement | null, '#compare-run');
+const compareClear = must(document.getElementById('compare-clear') as HTMLButtonElement | null, '#compare-clear');
+const exportCard = must(document.getElementById('export-card') as HTMLButtonElement | null, '#export-card');
+const exportReplay = must(document.getElementById('export-replay') as HTMLButtonElement | null, '#export-replay');
 
 const gl = glCanvas.getContext('webgl2', { antialias: true, alpha: false });
 if (!gl) {
@@ -113,7 +126,7 @@ const ui = new UiController({
   monthSelect,
   reducedMotion: prefersReducedMotion,
 });
-const flightRecorder = new FlightRecorder();
+const session = new StormSession();
 
 // --- Environment sampler (sim dependency) -----------------------------------
 // The sim requires an EnvSampler. It closes over a live holder: once env.bin
@@ -181,9 +194,17 @@ try {
 
 // --- Canvas sizing ----------------------------------------------------------
 function resize(): void {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const profile = chooseRenderProfile({
+    width: glCanvas.clientWidth,
+    dpr: window.devicePixelRatio || 1,
+    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+    hardwareConcurrency: navigator.hardwareConcurrency || 8,
+  });
+  const dpr = Math.min(window.devicePixelRatio || 1, profile.dprCap);
   const w = Math.floor(glCanvas.clientWidth * dpr);
   const h = Math.floor(glCanvas.clientHeight * dpr);
+  document.documentElement.dataset.compact = String(profile.compact);
+  renderCtrl?.setParticleBudget?.(profile.particleBudget);
   for (const c of [glCanvas, overlayCanvas]) {
     if (c.width !== w || c.height !== h) {
       c.width = w;
@@ -373,6 +394,7 @@ async function loadAll(): Promise<void> {
   // climatology is reachable — we have no event bin paths to fetch).
   scenarios = parsedScenarios ?? [];
   scenarioSelect.disabled = scenarios.length === 0;
+  ui.setComparisonScenarios(scenarios);
 
   // Inject the single parsed copy into the render facade (mode A): the exact
   // bytes main just loaded feed BOTH the sim sampler and the GPU textures, so no
@@ -423,22 +445,35 @@ interface Head {
 let prevHead: Head | null = null;
 let currHead: Head | null = null;
 let accumulatorMin = 0;
-let paused = false;
-let replayIndex: number | null = null;
-let replayPlaying = false;
-let replayCursor = 0;
 let currentRunLabel = '';
-const REPLAY_DURATION_MS = 12_000;
+const pendingMapCaptures: Array<(canvas: HTMLCanvasElement) => void> = [];
 
 function headOf(s: StormState): Head {
   return { lat: s.lat, lon: s.lon, vKt: s.vKt };
 }
 
-function resetReplayTransport(): void {
-  paused = false;
-  replayIndex = null;
-  replayPlaying = false;
-  replayCursor = 0;
+/**
+ * Resolve on the next freshly composited GL frame. WebGL does not preserve its
+ * drawing buffer after presentation, so copying from a later click task may
+ * produce a black export. This captures once, in-frame, without imposing the
+ * permanent cost of `preserveDrawingBuffer: true`.
+ */
+function captureMapFrame(): Promise<HTMLCanvasElement> {
+  return new Promise((resolve) => pendingMapCaptures.push(resolve));
+}
+
+function flushMapCaptures(): void {
+  if (pendingMapCaptures.length === 0) return;
+  const snapshot = document.createElement('canvas');
+  snapshot.width = glCanvas.width;
+  snapshot.height = glCanvas.height;
+  const ctx = snapshot.getContext('2d');
+  if (!ctx) {
+    pendingMapCaptures.splice(0).forEach((resolve) => resolve(snapshot));
+    return;
+  }
+  ctx.drawImage(glCanvas, 0, 0);
+  pendingMapCaptures.splice(0).forEach((resolve) => resolve(snapshot));
 }
 
 function labelForRun(params: SpawnParams): string {
@@ -460,7 +495,10 @@ function activeHistoricalPeakKt(): number | undefined {
 }
 
 /** Spawn (replacing any active storm), reset interpolation, and share via the hash. */
-function doSpawn(params: SpawnParams): void {
+function doSpawn(
+  params: SpawnParams,
+  options: { preserveComparison?: boolean } = {},
+): void {
   if (!engine) return;
   // Select the environment-axis meaning BEFORE spawn. Climatology freezes one
   // seed-picked real-year regime; event mode treats nt as chronological time.
@@ -486,18 +524,22 @@ function doSpawn(params: SpawnParams): void {
     return;
   }
   const s = engine.getState();
-  resetReplayTransport();
   currentRunLabel = labelForRun(spawn);
+  ui.rememberSpawn(spawn);
   if (s) {
-    flightRecorder.start(
+    session.start(
       {
+        spawn: { ...spawn },
+        environmentId: activeScenario?.id ?? CLIMATOLOGY_ID,
         monthIndex: spawn.monthIndex,
         seed: spawn.seed,
         isDemo: spawn.isDemo,
         label: currentRunLabel,
+        counterfactual: activeScenario !== null,
         historicalPeakKt: activeHistoricalPeakKt(),
       },
       s,
+      options.preserveComparison ?? false,
     );
   }
   currHead = s ? headOf(s) : null;
@@ -520,7 +562,7 @@ function warmUp(hours: number): void {
     try {
       const events = engine.tick(SIM_DT_MIN);
       const state = engine.getState();
-      if (state) flightRecorder.record(state, events);
+      if (state) session.record(state, events);
       dead = events.some((e) => e.type === 'died');
     } catch (err) {
       console.warn('[warmup] tick threw:', err);
@@ -587,6 +629,7 @@ function applyEventEnv(scenario: Scenario, bin: ParsedBin): void {
   renderCtrl?.setMonth?.(scenario.monthIndex);
   renderCtrl?.setActiveGhost?.(scenario.ghostId);
   ui.highlightGhost(scenario.ghostId);
+  ui.setScenarioContext(scenario.label);
 }
 
 /** Enter an event interactively (from the picker): apply its env, then spawn the
@@ -603,20 +646,31 @@ function enterScenario(scenario: Scenario, bin: ParsedBin): void {
  * at the restored month (so it becomes an ordinary storm again), or the ambient
  * demo when none was active.
  */
-function returnToClimatology(): void {
-  if (!activeScenario) return; // already climatology
+function applyClimatologyEnv(month: number): void {
   activeScenario = null;
   envBin = climatologyBin;
   monthSelect.disabled = false;
+  monthSelect.value = String(month);
+  scenarioSelect.value = CLIMATOLOGY_ID;
   renderCtrl?.setActiveGhost?.(null);
   ui.highlightGhost(null);
+  ui.setScenarioContext(null);
+  renderCtrl?.setResources?.({
+    terrain: mergedTerrainBin,
+    env: climatologyBin,
+    genesis: genesisPoints,
+    tracks: ghostTracks,
+  });
+  renderCtrl?.setMonth?.(month);
+}
+
+function returnToClimatology(): void {
+  if (!activeScenario) return; // already climatology
   const user = ui.activeUserSpawn();
   const month = restoredMonth(preEventMonth, user ? user.monthIndex : null, DEMO_MONTH);
   preEventMonth = null;
-  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: climatologyBin, genesis: genesisPoints, tracks: ghostTracks });
+  applyClimatologyEnv(month);
   if (user) {
-    monthSelect.value = String(month);
-    renderCtrl?.setMonth?.(month);
     doSpawn({ lat: user.lat, lon: user.lon, monthIndex: month, seed: user.seed, isDemo: false });
     ui.climatologyRestored();
   } else {
@@ -670,9 +724,22 @@ function readPickerMonth(): number {
 }
 
 // --- Input ------------------------------------------------------------------
-// Click to spawn. Screen -> clip -> lat/lon through grid.ts (the only coordinate
-// owner). Ocean -> despawn + fresh spawn; land -> ripple, no storm (design T2).
-glCanvas.addEventListener('pointerdown', (e) => {
+// Tap to spawn. A small recognizer rejects drag, long-press, and pinch contacts
+// before screen -> clip -> lat/lon conversion. Ocean -> fresh deterministic
+// storm; land -> ripple, no storm.
+const mapTap = new TapGesture();
+glCanvas.addEventListener('pointerdown', (event) => {
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
+  mapTap.start(event.pointerId, event.clientX, event.clientY, event.timeStamp);
+});
+glCanvas.addEventListener('pointermove', (event) => {
+  mapTap.move(event.pointerId, event.clientX, event.clientY);
+});
+glCanvas.addEventListener('pointercancel', (event) => {
+  mapTap.cancel(event.pointerId);
+});
+glCanvas.addEventListener('pointerup', (e) => {
+  if (!mapTap.end(e.pointerId, e.clientX, e.clientY, e.timeStamp)) return;
   const rect = glCanvas.getBoundingClientRect();
   const clipX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   const clipY = -(((e.clientY - rect.top) / rect.height) * 2 - 1); // screen y is flipped
@@ -685,35 +752,13 @@ glCanvas.addEventListener('pointerdown', (e) => {
 // Space toggles pause — but never when a form control is focused, so the native
 // month picker stays keyboard-operable (a11y floor, design task T6).
 function setReplayFrame(index: number): void {
-  if (flightRecorder.frameCount === 0) return;
-  replayIndex = Math.max(
-    0,
-    Math.min(flightRecorder.frameCount - 1, Math.round(index)),
-  );
-  replayCursor = replayIndex;
-  replayPlaying = false;
-  paused = true;
+  session.seek(index);
   accumulatorMin = 0;
 }
 
 function toggleTransport(): void {
-  const complete = flightRecorder.debrief() !== null;
-  if (!complete) {
-    paused = !paused;
-    return;
-  }
-  const end = flightRecorder.frameCount - 1;
-  if (replayIndex === null || replayIndex >= end) {
-    replayIndex = 0;
-    replayCursor = 0;
-    replayPlaying = true;
-    paused = true;
-    accumulatorMin = 0;
-    return;
-  }
-  replayPlaying = !replayPlaying;
-  replayCursor = replayIndex;
-  paused = true;
+  session.toggle();
+  accumulatorMin = 0;
 }
 
 window.addEventListener('keydown', (e) => {
@@ -729,20 +774,145 @@ flightScrubber.addEventListener('input', () => {
   setReplayFrame(Number(flightScrubber.value));
 });
 flightStart.addEventListener('click', () => {
-  const milestone = flightRecorder.milestones();
+  const milestone = session.recorder.milestones();
   if (milestone) setReplayFrame(milestone.start);
 });
 flightPeak.addEventListener('click', () => {
-  const milestone = flightRecorder.milestones();
+  const milestone = session.recorder.milestones();
   if (milestone) setReplayFrame(milestone.peak);
 });
 flightLandfall.addEventListener('click', () => {
-  const milestone = flightRecorder.milestones();
+  const milestone = session.recorder.milestones();
   if (milestone?.landfall != null) setReplayFrame(milestone.landfall);
 });
 flightEnd.addEventListener('click', () => {
-  const milestone = flightRecorder.milestones();
+  const milestone = session.recorder.milestones();
   if (milestone) setReplayFrame(milestone.end);
+});
+
+async function runControlledComparison(): Promise<void> {
+  const completed = session.recorder.snapshot();
+  if (!completed || completed.meta.isDemo) return;
+  const [kind, id] = compareTarget.value.split(':', 2);
+
+  if (
+    (kind === 'month' &&
+      completed.meta.environmentId === CLIMATOLOGY_ID &&
+      completed.meta.monthIndex === Number(id)) ||
+    (kind === 'scenario' && completed.meta.environmentId === id)
+  ) {
+    ui.comparisonMessage('choose a different environment for a useful comparison.');
+    return;
+  }
+
+  const baseline = session.beginComparison();
+  if (!baseline) return;
+  const identity = baseline.meta.spawn;
+  compareRun.disabled = true;
+
+  if (kind === 'month') {
+    const monthIndex = Number(id);
+    if (!Number.isInteger(monthIndex) || monthIndex < 4 || monthIndex > 10) {
+      session.clearComparison();
+      compareRun.disabled = false;
+      return;
+    }
+    preEventMonth = null;
+    applyClimatologyEnv(monthIndex);
+    doSpawn(
+      {
+        lat: identity.lat,
+        lon: identity.lon,
+        seed: identity.seed,
+        monthIndex,
+        isDemo: false,
+      },
+      { preserveComparison: true },
+    );
+    ui.comparisonMessage(
+      `comparison running · same genesis and seed in ${labelForRun({
+        ...identity,
+        monthIndex,
+      })}.`,
+    );
+    compareRun.disabled = false;
+    return;
+  }
+
+  if (kind === 'scenario') {
+    const scenario = findScenario(scenarios, id);
+    if (!scenario) {
+      session.clearComparison();
+      compareRun.disabled = false;
+      return;
+    }
+    ui.scenarioLoading(scenario.label);
+    const bin = await loadEventBin(scenario);
+    if (!bin) {
+      session.clearComparison();
+      ui.scenarioError(scenario.label);
+      compareRun.disabled = false;
+      return;
+    }
+    applyEventEnv(scenario, bin);
+    doSpawn(eventSpawn(scenario, identity), { preserveComparison: true });
+    ui.comparisonMessage(
+      `comparison running · same genesis and seed in the ${scenario.label} environment.`,
+    );
+  }
+  compareRun.disabled = false;
+}
+
+compareRun.addEventListener('click', () => {
+  void runControlledComparison();
+});
+compareClear.addEventListener('click', () => {
+  session.clearComparison();
+  ui.comparisonMessage('comparison cleared. the current storm remains on tape.');
+});
+
+exportCard.addEventListener('click', () => {
+  const run = session.recorder.snapshot();
+  if (!run) return;
+  ui.setExportStatus('drawing debrief card…', true);
+  void captureMapFrame()
+    .then((mapCanvas) =>
+      makeDebriefCard({
+        run,
+        comparison: session.comparison(),
+        mapCanvas,
+      }),
+    )
+    .then((blob) => {
+      downloadBlob(blob, `${exportFileStem(run)}.png`);
+      ui.setExportStatus('PNG saved.', false);
+    })
+    .catch((error: unknown) => {
+      console.warn('[export] debrief card failed:', error);
+      ui.setExportStatus('card export failed.', false);
+    });
+});
+
+exportReplay.addEventListener('click', () => {
+  const run = session.recorder.snapshot();
+  if (!run) return;
+  ui.setExportStatus('recording 10 s replay…', true);
+  void captureMapFrame()
+    .then((mapCanvas) =>
+      makeReplayVideo({
+        run,
+        comparison: session.comparison(),
+        mapCanvas,
+      }),
+    )
+    .then((blob) => {
+      downloadBlob(blob, `${exportFileStem(run)}.webm`);
+      ui.setExportStatus('WebM replay saved.', false);
+    })
+    .catch((error: unknown) => {
+      console.warn('[export] replay failed:', error);
+      ui.setExportStatus('replay unsupported here; the PNG card still works.', false);
+    });
 });
 
 // Month picker → re-spawn the active storm at the same point + seed in the new
@@ -785,20 +955,16 @@ function tickSim(nowMs: number): void {
     return;
   }
   const s = engine.getState();
-  if (s) flightRecorder.record(s, events);
+  if (s) session.record(s, events);
   currHead = s ? headOf(s) : null;
   for (const ev of events) ui.onSimEvent(ev, nowMs);
 }
 
 /** Build the interpolated storm view for this frame from the fixed-step heads. */
 function buildStorm(): { storm: StormState | null; prev: StormState | null } {
-  if (replayIndex !== null) {
-    return {
-      storm: flightRecorder.stormAt(replayIndex),
-      prev: flightRecorder.stormAt(Math.max(0, replayIndex - 1)),
-    };
-  }
   const live = engine ? engine.getState() : null;
+  const recorded = session.stormView(live);
+  if (session.replayMode) return recorded;
   if (!live) return { storm: null, prev: null };
   const prev: StormState =
     prevHead && currHead
@@ -817,8 +983,9 @@ function render(alpha: number, nowMs: number): void {
     reducedMotion: prefersReducedMotion,
     isDemo: storm?.isDemo ?? false,
     nowMs,
-    paused: paused || replayIndex !== null,
-    replayMode: replayIndex !== null,
+    paused: session.paused || session.replayMode,
+    replayMode: session.replayMode,
+    comparisonTrack: session.comparisonTrack,
     envSamplingMode: envSampler.getSamplingMode(),
     envTFrac:
       activeScenario && storm
@@ -838,6 +1005,7 @@ function render(alpha: number, nowMs: number): void {
       console.warn('[render] layer draw threw (skipping this frame):', err);
     }
   }
+  flushMapCaptures();
   prevFrameStorm = storm;
 
   ui.drawOverlay(nowMs); // genesis glow + ripples, on top of the track
@@ -845,14 +1013,16 @@ function render(alpha: number, nowMs: number): void {
   ui.updateFlightRecorder({
     storm,
     label: currentRunLabel,
-    frameIndex:
-      replayIndex ?? Math.max(0, flightRecorder.frameCount - 1),
-    frameCount: flightRecorder.frameCount,
-    debrief: flightRecorder.debrief(),
-    milestones: flightRecorder.milestones(),
-    paused,
-    replayMode: replayIndex !== null,
-    replayPlaying,
+    frameIndex: session.frameIndex,
+    frameCount: session.recorder.frameCount,
+    debrief: session.recorder.debrief(),
+    milestones: session.recorder.milestones(),
+    paused: session.paused,
+    replayMode: session.replayMode,
+    replayPlaying: session.replayPlaying,
+    counterfactual: activeScenario !== null,
+    comparisonActive: session.comparisonBaseline !== null,
+    comparison: session.comparison(),
   });
 }
 
@@ -862,16 +1032,9 @@ function frame(nowMs: number): void {
   dbgFrames++;
   dbgLastDt = dtRealMs;
 
-  if (replayPlaying && replayIndex !== null) {
-    const end = flightRecorder.frameCount - 1;
-    replayCursor += (dtRealMs / REPLAY_DURATION_MS) * end;
-    replayIndex = Math.min(end, Math.floor(replayCursor));
-    if (replayIndex >= end) {
-      replayIndex = end;
-      replayCursor = end;
-      replayPlaying = false;
-    }
-  } else if (!paused && replayIndex === null) {
+  if (session.replayPlaying) {
+    session.advanceReplay(dtRealMs);
+  } else if (!session.paused && !session.replayMode) {
     const live = engine ? engine.getState() : null;
     const hoursPerSec = ui.timescaleHoursPerSec(live);
     const simMinutesPerMs = (hoursPerSec * 60) / 1000;
@@ -918,6 +1081,7 @@ type RenderController = RenderLayer & {
   init(gl: WebGL2RenderingContext, overlay?: CanvasRenderingContext2D, resources?: RenderResourcesLike): void;
   setResources?(resources: RenderResourcesLike): void;
   setMonth?(monthIndex: number): void;
+  setParticleBudget?(count: number): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;
 };
@@ -960,7 +1124,7 @@ Object.defineProperty(window, '__cyc', {
   get: () => {
     const storm = engine ? engine.getState() : null;
     return {
-      paused,
+      paused: session.paused,
       accumulatorMin,
       lastMs,
       dbgFrames,
@@ -968,10 +1132,10 @@ Object.defineProperty(window, '__cyc', {
       dbgLastDt,
       hasEngine: engine !== null,
       layerCount: layers.length,
-      replayIndex,
-      replayPlaying,
-      flightFrameCount: flightRecorder.frameCount,
-      debrief: flightRecorder.debrief(),
+      replayIndex: session.replayIndex,
+      replayPlaying: session.replayPlaying,
+      flightFrameCount: session.recorder.frameCount,
+      debrief: session.recorder.debrief(),
       hoursPerSec: ui.timescaleHoursPerSec(storm),
       activeScenario: activeScenario?.id ?? null,
       envSamplingMode: envSampler.getSamplingMode(),

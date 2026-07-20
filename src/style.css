@@ -63,6 +63,9 @@ body {
 #overlay-canvas {
   pointer-events: none; /* clicks fall through to the app for spawning */
 }
+#gl-canvas {
+  touch-action: manipulation;
+}
 
 /* Thin cyan progress line at the very top during loading. Width driven by
    --progress (0..1) set from JS; hidden once loading completes. */
@@ -104,6 +107,29 @@ body {
 }
 #title .accent {
   color: var(--accent, #ffb74d);
+}
+
+.quiet-button {
+  top: 42px;
+  left: calc(var(--space, 8px) * 2);
+  padding: 0;
+  color: var(--text, #7fd4e8);
+  font: 400 10px/1.4 var(--mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  opacity: 0.52;
+}
+.quiet-button:hover,
+.quiet-button:focus-visible {
+  color: var(--storm-core, #e8f4ff);
+  opacity: 1;
+}
+.quiet-button:focus-visible {
+  outline: 1px solid var(--accent, #ffb74d);
+  outline-offset: 3px;
 }
 
 #month-picker {
@@ -148,6 +174,17 @@ body {
   outline: 1px solid var(--accent, #ffb74d);
   outline-offset: 2px;
 }
+#scenario-contract {
+  width: 27ch;
+  margin: 7px 0 0 auto;
+  color: var(--accent, #ffb74d);
+  font-size: 9px;
+  line-height: 1.4;
+  opacity: 0.82;
+}
+#scenario-contract[hidden] {
+  display: none;
+}
 
 /* Caption / epitaph slot, bottom-left. Reserves height so the epitaph does not
    shift the layout when it appears. */
@@ -169,7 +206,7 @@ body {
 #flight-recorder {
   right: calc(var(--space, 8px) * 2);
   bottom: calc(var(--space, 8px) * 2);
-  width: min(640px, calc(100vw - 32px));
+  width: min(720px, calc(100vw - 32px));
   padding: 10px 12px 11px;
   color: var(--text, #7fd4e8);
   background:
@@ -194,7 +231,7 @@ body {
 
 .flight-head {
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto auto 1fr auto;
   gap: 10px;
   align-items: baseline;
   padding-bottom: 7px;
@@ -202,6 +239,9 @@ body {
   font-size: 10px;
   letter-spacing: 0.11em;
   text-transform: uppercase;
+}
+.flight-details-toggle {
+  display: none;
 }
 #flight-status {
   color: var(--accent, #ffb74d);
@@ -218,6 +258,44 @@ body {
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+#flight-explanation {
+  display: grid;
+  grid-template-columns: minmax(190px, auto) 1fr;
+  gap: 12px;
+  align-items: baseline;
+  margin: 8px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+}
+#flight-explanation strong {
+  color: var(--storm-core, #e8f4ff);
+  font-weight: 500;
+}
+#flight-explanation[data-tone='strengthening'] strong {
+  color: var(--accent, #ffb74d);
+}
+#flight-explanation[data-tone='weakening'] strong {
+  color: var(--track, #78dcff);
+}
+#flight-explanation span {
+  overflow: hidden;
+  opacity: 0.58;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#flight-contract {
+  margin: 7px 0 0;
+  color: var(--accent, #ffb74d);
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+#flight-contract[hidden] {
+  display: none;
 }
 
 .flight-readouts {
@@ -268,7 +346,9 @@ body {
 }
 #flight-debrief[hidden],
 #flight-jumps[hidden],
-#debrief-compare-row[hidden] {
+#debrief-compare-row[hidden],
+#run-comparison[hidden],
+#compare-clear[hidden] {
   display: none;
 }
 #flight-verdict {
@@ -287,6 +367,85 @@ body {
   grid-template-columns: 0.7fr 0.7fr 0.85fr 1.25fr;
 }
 
+#run-comparison {
+  margin-top: 9px;
+  padding: 9px;
+  background: linear-gradient(90deg, rgba(255, 183, 77, 0.08), transparent);
+  border-left: 2px solid color-mix(in srgb, var(--accent, #ffb74d) 68%, transparent);
+}
+#run-comparison h2 {
+  margin: 0;
+  color: var(--accent, #ffb74d);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+#comparison-labels {
+  margin: 3px 0 7px;
+  color: var(--storm-core, #e8f4ff);
+  font-size: 10px;
+}
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+  margin: 0;
+}
+.comparison-grid dt {
+  color: var(--text, #7fd4e8);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.48;
+}
+.comparison-grid dd {
+  margin: 2px 0 0;
+  color: var(--text, #7fd4e8);
+  font-size: 9px;
+}
+
+#flight-actions {
+  display: grid;
+  grid-template-columns: 1.45fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid color-mix(in srgb, var(--ridge-hi, #2c343c) 72%, transparent);
+}
+.compare-action > label,
+.export-actions > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text, #7fd4e8);
+  font-size: 8px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.48;
+}
+.compare-action > div,
+.export-actions > div {
+  display: flex;
+  gap: 5px;
+}
+#compare-target {
+  min-width: 0;
+  flex: 1;
+  padding: 3px 6px;
+  color: var(--text, #7fd4e8);
+  font: 500 9px/1.2 var(--mono);
+  background: rgba(10, 21, 34, 0.82);
+  border: 1px solid var(--ridge-hi, #2c343c);
+  border-radius: var(--radius, 4px);
+}
+#export-status {
+  display: block;
+  min-height: 1.4em;
+  margin-top: 4px;
+  color: var(--accent, #ffb74d);
+  font-size: 8px;
+}
+
 .flight-transport {
   display: grid;
   grid-template-columns: auto minmax(90px, 1fr) auto;
@@ -294,7 +453,8 @@ body {
   align-items: center;
   margin-top: 9px;
 }
-.flight-transport button {
+.flight-transport button,
+#flight-actions button {
   min-height: 25px;
   padding: 3px 7px;
   color: var(--text, #7fd4e8);
@@ -310,20 +470,25 @@ body {
     color 140ms ease,
     background-color 140ms ease;
 }
-.flight-transport button:hover:not(:disabled) {
+.flight-transport button:hover:not(:disabled),
+#flight-actions button:hover:not(:disabled) {
   color: var(--storm-core, #e8f4ff);
   border-color: var(--track, #78dcff);
   background: rgba(10, 21, 34, 0.98);
 }
-.flight-transport button:active:not(:disabled) {
+.flight-transport button:active:not(:disabled),
+#flight-actions button:active:not(:disabled) {
   transform: translateY(1px);
 }
 .flight-transport button:focus-visible,
+#flight-actions button:focus-visible,
+#compare-target:focus-visible,
 #flight-scrubber:focus-visible {
   outline: 1px solid var(--accent, #ffb74d);
   outline-offset: 2px;
 }
-.flight-transport button:disabled {
+.flight-transport button:disabled,
+#flight-actions button:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
@@ -345,7 +510,7 @@ body {
 
 /* Keep the existing caption clear of the recorder on desktop. */
 #app:has(#flight-recorder:not([hidden])) #caption {
-  max-width: min(36ch, calc(100vw - 690px));
+  max-width: min(36ch, calc(100vw - 770px));
 }
 
 /* Historic ghost-track labels (C7). DOM type, not canvas — lowercase, faint,
@@ -371,6 +536,81 @@ body {
 .ghost-label.active {
   opacity: 0.72;
 }
+html[data-compact='true'] .ghost-label:not(.active) {
+  display: none;
+}
+
+/* Native model notes stay typographic and diagram-like, never a generic card. */
+#model-dialog {
+  width: min(620px, calc(100vw - 32px));
+  padding: 0;
+  color: var(--text, #7fd4e8);
+  font-family: var(--mono);
+  background:
+    linear-gradient(135deg, rgba(77, 216, 255, 0.07), transparent 40%),
+    var(--ocean-deep, #050a12);
+  border: 1px solid var(--ridge-hi, #2c343c);
+  border-top-color: var(--track, #78dcff);
+  border-radius: var(--radius, 4px);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.62);
+}
+#model-dialog::backdrop {
+  background: rgba(1, 5, 10, 0.76);
+  backdrop-filter: blur(5px);
+}
+#model-dialog form {
+  padding: 18px 20px 22px;
+}
+#model-dialog header {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--ridge-hi, #2c343c);
+}
+#model-dialog header p {
+  margin: 0;
+  color: var(--accent, #ffb74d);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+#model-dialog button {
+  padding: 0;
+  color: var(--text, #7fd4e8);
+  font: 400 9px/1 var(--mono);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  opacity: 0.62;
+}
+#model-dialog h2 {
+  margin: 22px 0 18px;
+  color: var(--storm-core, #e8f4ff);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+#model-dialog section {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 18px;
+  padding: 12px 0;
+  border-top: 1px solid color-mix(in srgb, var(--ridge-hi, #2c343c) 68%, transparent);
+}
+#model-dialog h3 {
+  margin: 0;
+  color: var(--accent, #ffb74d);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+#model-dialog section p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.65;
+  opacity: 0.76;
+}
 
 @media (max-width: 820px) {
   #flight-recorder {
@@ -378,6 +618,10 @@ body {
     bottom: 72px;
     left: calc(var(--space, 8px) * 2);
     width: auto;
+    max-height: calc(100dvh - 170px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .flight-readouts {
     grid-template-columns: repeat(3, 1fr);
@@ -387,6 +631,131 @@ body {
   }
   #app:has(#flight-recorder:not([hidden])) #caption {
     max-width: calc(100vw - 32px);
+  }
+  #flight-actions {
+    grid-template-columns: 1fr;
+  }
+  .flight-details-toggle {
+    display: inline;
+    padding: 0;
+    color: var(--text, #7fd4e8);
+    font: 400 9px/1 var(--mono);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    opacity: 0.62;
+  }
+}
+
+@media (max-width: 600px) {
+  #title {
+    top: max(8px, env(safe-area-inset-top));
+    left: 10px;
+    max-width: 48vw;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .quiet-button {
+    top: calc(max(8px, env(safe-area-inset-top)) + 37px);
+    left: 10px;
+    min-height: 36px;
+  }
+  #month-picker {
+    top: max(8px, env(safe-area-inset-top));
+    right: 10px;
+  }
+  #month-picker label {
+    display: inline;
+    margin: 0 4px 0 0;
+    font-size: 8px;
+  }
+  #month-picker label[for='scenario'] {
+    display: block;
+    margin-top: 5px;
+  }
+  #month,
+  #scenario {
+    max-width: 47vw;
+    min-height: 36px;
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  #scenario-contract {
+    width: 25ch;
+    font-size: 8px;
+  }
+  #flight-recorder {
+    right: 8px;
+    bottom: max(54px, calc(env(safe-area-inset-bottom) + 48px));
+    left: 8px;
+    max-height: min(62dvh, calc(100dvh - 142px));
+    padding: 9px 10px 10px;
+  }
+  .flight-head {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    gap: 7px;
+  }
+  #flight-explanation {
+    display: block;
+  }
+  #flight-explanation span {
+    display: block;
+    margin-top: 2px;
+    text-align: left;
+    white-space: normal;
+  }
+  .flight-readouts {
+    display: none;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  #flight-recorder[data-expanded='true'] .flight-readouts {
+    display: grid;
+  }
+  .debrief-grid,
+  .debrief-grid:has(#debrief-compare-row[hidden]) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .comparison-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .flight-transport {
+    grid-template-columns: auto 1fr;
+  }
+  .flight-transport button,
+  #flight-actions button,
+  #compare-target {
+    min-height: 36px;
+  }
+  .flight-details-toggle {
+    min-width: 42px;
+    min-height: 30px;
+  }
+  #flight-jumps {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+  .compare-action > div {
+    flex-wrap: wrap;
+  }
+  #compare-target {
+    flex-basis: 100%;
+  }
+  #caption {
+    right: 10px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: 10px;
+    max-width: none;
+    min-height: 2.6em;
+    font-size: 10px;
+  }
+  #model-dialog form {
+    padding: 15px;
+  }
+  #model-dialog section {
+    display: block;
+  }
+  #model-dialog h3 {
+    margin-bottom: 5px;
   }
 }
 

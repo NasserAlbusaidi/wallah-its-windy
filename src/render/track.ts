@@ -25,12 +25,19 @@ const s = TOKENS.stormCore.rgba01;
 const SR = Math.round(s[0] * 255);
 const SG = Math.round(s[1] * 255);
 const SB = Math.round(s[2] * 255);
+const accent = TOKENS.accent.rgba01;
+const AR = Math.round(accent[0] * 255);
+const AG = Math.round(accent[1] * 255);
+const AB = Math.round(accent[2] * 255);
 
 function trackRgba(a: number): string {
   return `rgba(${TR},${TG},${TB},${a})`;
 }
 function coreRgba(a: number): string {
   return `rgba(${SR},${SG},${SB},${a})`;
+}
+function accentRgba(a: number): string {
+  return `rgba(${AR},${AG},${AB},${a})`;
 }
 
 export class TrackLayer {
@@ -61,6 +68,26 @@ export class TrackLayer {
 
     g.save();
     g.globalCompositeOperation = 'lighter';
+
+    // A controlled comparison keeps run one as a complete amber reference while
+    // the cyan candidate grows over it. Same genesis + seed; only environment
+    // changed, so divergence is readable directly on the map.
+    const comparison = ctx.comparisonTrack;
+    if (comparison && comparison.length > 1) {
+      g.lineWidth = Math.max(1, unit * 0.00135);
+      g.setLineDash([unit * 0.002, unit * 0.006]);
+      g.lineCap = 'round';
+      g.strokeStyle = accentRgba(0.42);
+      g.beginPath();
+      for (let i = 0; i < comparison.length; i++) {
+        const point = latLonToClip(comparison[i].lat, comparison[i].lon);
+        const [x, y] = this.px(point.x, point.y);
+        if (i === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.stroke();
+      g.setLineDash([]);
+    }
 
     // Dotted, age-faded track polyline.
     const track = ctx.track;

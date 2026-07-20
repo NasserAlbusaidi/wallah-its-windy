@@ -253,6 +253,11 @@ export class RenderPipeline implements RenderLayer {
     this.applyEnv(); // only the SST tint depends on month
   }
 
+  /** Decorative workload only; deterministic physics and flight tapes are untouched. */
+  setParticleBudget(count: number): void {
+    this.particles.setBudget(count);
+  }
+
   /** Highlight one ghost polyline (~2x alpha) as the active scenario; null clears
    *  it. The matching DOM label is highlighted separately via ui.highlightGhost. */
   setActiveGhost(id: string | null): void {
@@ -566,6 +571,7 @@ export class RenderPipeline implements RenderLayer {
       reduced: frame.reducedMotion,
       aftermath,
       track,
+      comparisonTrack: frame.comparisonTrack,
       env,
     };
   }

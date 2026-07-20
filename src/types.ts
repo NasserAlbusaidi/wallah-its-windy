@@ -268,6 +268,8 @@ export interface FrameState {
   paused: boolean;
   /** A recorded frame is being inspected instead of the live engine state. */
   replayMode: boolean;
+  /** Completed baseline track retained while a same-storm comparison runs. */
+  comparisonTrack: TrackPoint[] | null;
   /**
    * Explicit interpretation of the active environment's `nt` axis. Render cues
    * must use the same mode as physics or event timelines freeze visually.

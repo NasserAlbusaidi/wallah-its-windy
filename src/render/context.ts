@@ -64,6 +64,8 @@ export interface DrawCtx {
   aftermath: number;
   /** Current storm track, or the lingering track during aftermath, or null. */
   track: TrackPoint[] | null;
+  /** Completed baseline shown beneath a controlled comparison run. */
+  comparisonTrack: TrackPoint[] | null;
   /** Env sampled at the storm centre, or null when unavailable. */
   env: EnvAtStorm | null;
 }

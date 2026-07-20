@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
       content="Wallah It's Windy — spawn a tropical cyclone in the Arabian Sea and let the environment decide its fate."
@@ -22,6 +22,9 @@
 
       <!-- chrome: all type, no icons -->
       <h1 id="title" class="chrome">Wallah It's <span class="accent">Windy</span></h1>
+      <button id="model-toggle" class="chrome quiet-button" type="button">
+        model notes
+      </button>
 
       <div id="month-picker" class="chrome">
         <label for="month">Month</label>
@@ -45,9 +48,12 @@
         <label for="scenario">Scenario</label>
         <select id="scenario" aria-label="Scenario">
           <option value="climatology" selected>climatology</option>
-          <option value="gonu">gonu 2007</option>
-          <option value="shaheen">shaheen 2021</option>
+          <option value="gonu">gonu 2007 environment</option>
+          <option value="shaheen">shaheen 2021 environment</option>
         </select>
+        <p id="scenario-contract" role="status" hidden>
+          counterfactual environment — not a historical reconstruction
+        </p>
       </div>
 
       <!-- Flight recorder: live physics explanation, then an immutable
@@ -58,7 +64,24 @@
           <span id="flight-status">live tape</span>
           <output id="flight-clock">0 h</output>
           <span id="flight-label"></span>
+          <button
+            id="flight-details-toggle"
+            class="flight-details-toggle"
+            type="button"
+            aria-expanded="false"
+          >
+            details
+          </button>
         </header>
+
+        <p id="flight-explanation" data-tone="steady">
+          <strong>The storm is holding nearly steady.</strong>
+          <span>Waiting for the first physics step.</span>
+        </p>
+
+        <p id="flight-contract" hidden>
+          counterfactual tape · the observed storm is the faint ghost track
+        </p>
 
         <dl class="flight-readouts" aria-label="Current storm physics">
           <div class="flight-readout primary">
@@ -96,6 +119,45 @@
             <div><dt>landfall</dt><dd id="debrief-landfall">—</dd></div>
             <div id="debrief-compare-row"><dt>history</dt><dd id="debrief-compare">—</dd></div>
           </dl>
+
+          <section id="run-comparison" aria-label="Controlled comparison" hidden>
+            <h2 id="comparison-heading">same storm · two environments</h2>
+            <p id="comparison-labels">—</p>
+            <dl class="comparison-grid">
+              <div><dt>peak change</dt><dd id="comparison-peak">—</dd></div>
+              <div><dt>life change</dt><dd id="comparison-life">—</dd></div>
+              <div><dt>muscat change</dt><dd id="comparison-muscat">—</dd></div>
+              <div><dt>landfall</dt><dd id="comparison-landfall">—</dd></div>
+            </dl>
+          </section>
+
+          <div id="flight-actions">
+            <div class="compare-action">
+              <label for="compare-target">same genesis + seed, new environment</label>
+              <div>
+                <select id="compare-target" aria-label="Comparison environment">
+                  <option value="month:4">may climatology</option>
+                  <option value="month:5">june climatology</option>
+                  <option value="month:6">july climatology</option>
+                  <option value="month:7">august climatology</option>
+                  <option value="month:8">september climatology</option>
+                  <option value="month:9" selected>october climatology</option>
+                  <option value="month:10">november climatology</option>
+                </select>
+                <button id="compare-run" type="button">run comparison</button>
+                <button id="compare-clear" type="button" hidden>clear</button>
+              </div>
+            </div>
+
+            <div class="export-actions">
+              <span>take this storm with you</span>
+              <div>
+                <button id="export-card" type="button">save card</button>
+                <button id="export-replay" type="button">save replay</button>
+              </div>
+              <output id="export-status" aria-live="polite"></output>
+            </div>
+          </div>
         </div>
 
         <div class="flight-transport">
@@ -122,6 +184,39 @@
       <!-- caption / epitaph slot -->
       <p id="caption" class="chrome hint">click the sea to spawn your own</p>
     </div>
+
+    <dialog id="model-dialog" aria-labelledby="model-title">
+      <form method="dialog">
+        <header>
+          <p>instrument 04</p>
+          <button value="close" aria-label="Close model notes">close</button>
+        </header>
+        <h2 id="model-title">What this model knows</h2>
+        <section>
+          <h3>Observed inputs</h3>
+          <p>
+            OISST sea-surface temperatures, ERA5 steering winds and shear,
+            IBTrACS tracks, and GMRT terrain shape the sandbox.
+          </p>
+        </section>
+        <section>
+          <h3>Deliberate simplifications</h3>
+          <p>
+            The storm is a point vortex with an empirical intensity equation.
+            Dry air is a geometric coastal proxy. Wadi light currently shows
+            rainfall accumulation, not routed downstream flooding.
+          </p>
+        </section>
+        <section>
+          <h3>Historic environments</h3>
+          <p>
+            Gonu and Shaheen modes replay their environmental timelines around
+            your simulated vortex. The faint line is the observed track. These
+            are counterfactual experiments, not historical reconstructions.
+          </p>
+        </section>
+      </form>
+    </dialog>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

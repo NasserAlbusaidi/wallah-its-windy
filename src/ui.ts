@@ -30,11 +30,13 @@ import { randomSeed, type HashState } from './rng';
 import { latLonToCell, latLonToClip } from './grid';
 import { TOKENS } from './tokens';
 import type { GhostLabelAnchor } from './tracks';
+import type { RunComparison } from './comparison';
 import {
   compassDirection,
   type ReplayMilestones,
   type StormDebrief,
 } from './flight-recorder';
+import { explainIntensity } from './narrative';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -121,6 +123,9 @@ export interface FlightRecorderView {
   paused: boolean;
   replayMode: boolean;
   replayPlaying: boolean;
+  counterfactual: boolean;
+  comparisonActive: boolean;
+  comparison: RunComparison | null;
 }
 
 interface Ripple {
@@ -140,6 +145,10 @@ export class UiController {
     status: HTMLElement;
     clock: HTMLOutputElement;
     label: HTMLElement;
+    explanation: HTMLElement;
+    explanationHeadline: HTMLElement;
+    explanationDetail: HTMLElement;
+    contract: HTMLElement;
     trend: HTMLOutputElement;
     ocean: HTMLOutputElement;
     sst: HTMLOutputElement;
@@ -154,6 +163,13 @@ export class UiController {
     landfall: HTMLElement;
     compareRow: HTMLElement;
     compare: HTMLElement;
+    comparisonRoot: HTMLElement;
+    comparisonLabels: HTMLElement;
+    comparisonPeak: HTMLElement;
+    comparisonLife: HTMLElement;
+    comparisonMuscat: HTMLElement;
+    comparisonLandfall: HTMLElement;
+    compareClear: HTMLButtonElement;
     toggle: HTMLButtonElement;
     scrubber: HTMLInputElement;
     jumps: HTMLElement;
@@ -186,6 +202,12 @@ export class UiController {
       status: dom('flight-status'),
       clock: dom('flight-clock'),
       label: dom('flight-label'),
+      explanation: dom('flight-explanation'),
+      explanationHeadline:
+        dom('flight-explanation').querySelector<HTMLElement>('strong')!,
+      explanationDetail:
+        dom('flight-explanation').querySelector<HTMLElement>('span')!,
+      contract: dom('flight-contract'),
       trend: dom('flight-trend'),
       ocean: dom('flight-ocean'),
       sst: dom('flight-sst'),
@@ -200,11 +222,30 @@ export class UiController {
       landfall: dom('debrief-landfall'),
       compareRow: dom('debrief-compare-row'),
       compare: dom('debrief-compare'),
+      comparisonRoot: dom('run-comparison'),
+      comparisonLabels: dom('comparison-labels'),
+      comparisonPeak: dom('comparison-peak'),
+      comparisonLife: dom('comparison-life'),
+      comparisonMuscat: dom('comparison-muscat'),
+      comparisonLandfall: dom('comparison-landfall'),
+      compareClear: dom('compare-clear'),
       toggle: dom('flight-toggle'),
       scrubber: dom('flight-scrubber'),
       jumps: dom('flight-jumps'),
       landfallJump: dom('flight-landfall'),
     };
+
+    const details = dom<HTMLButtonElement>('flight-details-toggle');
+    details.addEventListener('click', () => {
+      const expanded = this.flight.root.dataset.expanded !== 'true';
+      this.flight.root.dataset.expanded = String(expanded);
+      details.setAttribute('aria-expanded', String(expanded));
+      details.textContent = expanded ? 'less' : 'details';
+    });
+
+    const modelToggle = dom<HTMLButtonElement>('model-toggle');
+    const modelDialog = dom<HTMLDialogElement>('model-dialog');
+    modelToggle.addEventListener('click', () => modelDialog.showModal());
   }
 
   // -------------------------------------------------------------------------
@@ -328,6 +369,48 @@ export class UiController {
     return this.lastSpawn && !this.lastSpawn.isDemo ? { ...this.lastSpawn } : null;
   }
 
+  /** Keep deterministic identity aligned when main starts a comparison directly. */
+  rememberSpawn(params: SpawnParams): void {
+    this.lastSpawn = { ...params };
+    if (!params.isDemo) this.state = { kind: 'user-storm' };
+  }
+
+  /** Visible event-mode contract; documentation alone is not sufficient. */
+  setScenarioContext(label: string | null): void {
+    const contract = dom('scenario-contract');
+    contract.hidden = label === null;
+    contract.textContent = label
+      ? `${label} environment · counterfactual, not a historical reconstruction`
+      : '';
+  }
+
+  /** Add validated event environments to the controlled-comparison chooser. */
+  setComparisonScenarios(
+    scenarios: readonly { id: string; label: string }[],
+  ): void {
+    const select = dom<HTMLSelectElement>('compare-target');
+    for (const old of Array.from(select.querySelectorAll('option[data-scenario]'))) {
+      old.remove();
+    }
+    for (const scenario of scenarios) {
+      const option = document.createElement('option');
+      option.value = `scenario:${scenario.id}`;
+      option.textContent = `${scenario.label} counterfactual`;
+      option.dataset.scenario = 'true';
+      select.appendChild(option);
+    }
+  }
+
+  comparisonMessage(message: string): void {
+    this.setCaption(message, true);
+  }
+
+  setExportStatus(message: string, busy = false): void {
+    dom<HTMLOutputElement>('export-status').textContent = message;
+    dom<HTMLButtonElement>('export-card').disabled = busy;
+    dom<HTMLButtonElement>('export-replay').disabled = busy;
+  }
+
   /** Transient status while an event bin is fetched, e.g. "loading gonu 2007…". */
   scenarioLoading(label: string): void {
     this.setCaption(`loading ${label}…`, true);
@@ -426,6 +509,11 @@ export class UiController {
     f.label.textContent = view.label;
 
     const d = storm.diagnostics;
+    const explanation = explainIntensity(d);
+    f.explanation.dataset.tone = explanation.tone;
+    f.explanationHeadline.textContent = explanation.headline;
+    f.explanationDetail.textContent = explanation.detail;
+    f.contract.hidden = !view.counterfactual;
     f.trend.textContent = `${signed(d.netKtPerH)} kt/h`;
     f.trend.dataset.sign = d.netKtPerH > 0.05 ? 'up' : d.netKtPerH < -0.05 ? 'down' : 'flat';
     f.ocean.textContent = signed(d.oceanKtPerH);
@@ -468,6 +556,34 @@ export class UiController {
         summary.historicalDeltaKt ?? 0,
         summary.historicalPeakKt,
       );
+    }
+
+    f.comparisonRoot.hidden = view.comparison === null;
+    f.compareClear.hidden = !view.comparisonActive;
+    if (view.comparison) {
+      const comparison = view.comparison;
+      f.comparisonLabels.textContent =
+        `${comparison.baseline.meta.label} → ${comparison.candidate.meta.label}`;
+      f.comparisonPeak.textContent = delta(
+        comparison.peakDeltaKt,
+        'kt',
+        'stronger',
+        'weaker',
+      );
+      f.comparisonLife.textContent = delta(
+        comparison.lifeDeltaH,
+        'h',
+        'longer',
+        'shorter',
+      );
+      f.comparisonMuscat.textContent = distanceDelta(comparison.muscatDeltaKm);
+      f.comparisonLandfall.textContent = comparison.landfallChanged
+        ? comparison.candidate.debrief.landfall
+          ? 'candidate made landfall'
+          : 'candidate stayed offshore'
+        : comparison.candidate.debrief.landfall
+          ? 'both made landfall'
+          : 'both stayed offshore';
     }
   }
 
@@ -787,6 +903,23 @@ function historicalComparison(deltaKt: number, historicalPeakKt: number): string
   const reference = `${Math.round(historicalPeakKt)} kt ghost`;
   if (difference === 0) return `matched ${reference}`;
   return `${deltaKt > 0 ? '+' : '−'}${difference} kt vs ${reference}`;
+}
+
+function delta(
+  value: number,
+  unit: string,
+  positive: string,
+  negative: string,
+): string {
+  const rounded = Math.round(Math.abs(value));
+  if (rounded === 0) return `no change`;
+  return `${value > 0 ? '+' : '−'}${rounded} ${unit} · ${value > 0 ? positive : negative}`;
+}
+
+function distanceDelta(valueKm: number): string {
+  const rounded = Math.round(Math.abs(valueKm));
+  if (rounded === 0) return 'same approach';
+  return `${rounded} km ${valueKm < 0 ? 'closer' : 'farther'}`;
 }
 
 function approachPhrase(km: number): string {

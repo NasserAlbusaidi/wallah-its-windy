@@ -9,6 +9,7 @@
 import type {
   LatLon,
   SimEvent,
+  SpawnParams,
   StormDeath,
   StormDiagnostics,
   StormState,
@@ -16,14 +17,20 @@ import type {
 } from './types';
 
 export interface FlightRunMeta {
+  /** Exact genesis identity used to reproduce and compare this run. */
+  spawn: SpawnParams;
+  /** Stable environment key: `climatology` or a historic scenario id. */
+  environmentId: string;
   monthIndex: number;
   seed: number;
   isDemo: boolean;
   label: string;
+  /** Event environments are counterfactual experiments, never hindcasts. */
+  counterfactual: boolean;
   historicalPeakKt?: number;
 }
 
-interface FlightFrame extends TrackPoint {
+export interface FlightFrame extends TrackPoint {
   alive: boolean;
   diagnostics: StormDiagnostics;
 }
@@ -47,6 +54,14 @@ export interface ReplayMilestones {
   peak: number;
   landfall: number | null;
   end: number;
+}
+
+/** A detached, immutable-by-convention result suitable for comparison/export. */
+export interface FlightRunSnapshot {
+  meta: FlightRunMeta;
+  debrief: StormDebrief;
+  frames: FlightFrame[];
+  track: TrackPoint[];
 }
 
 function clampIndex(index: number, length: number): number {
@@ -91,7 +106,7 @@ export class FlightRecorder {
   private death: StormDeath | null = null;
 
   start(meta: FlightRunMeta, initial: StormState): void {
-    this.meta = { ...meta };
+    this.meta = { ...meta, spawn: { ...meta.spawn } };
     this.frames = [frameOf(initial)];
     this.landfall = null;
     this.death = null;
@@ -159,6 +174,25 @@ export class FlightRecorder {
             historicalPeakKt,
             historicalDeltaKt: this.death.peakKt - historicalPeakKt,
           }),
+    };
+  }
+
+  snapshot(): FlightRunSnapshot | null {
+    const debrief = this.debrief();
+    if (!this.meta || !debrief) return null;
+    const frames = this.frames.map((frame) => ({
+      ...frame,
+      diagnostics: { ...frame.diagnostics },
+    }));
+    return {
+      meta: { ...this.meta, spawn: { ...this.meta.spawn } },
+      debrief: {
+        ...debrief,
+        death: { ...debrief.death },
+        landfall: debrief.landfall ? { ...debrief.landfall } : null,
+      },
+      frames,
+      track: frames.map(({ lat, lon, vKt, ageH }) => ({ lat, lon, vKt, ageH })),
     };
   }
 

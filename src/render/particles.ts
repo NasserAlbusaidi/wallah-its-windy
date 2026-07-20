@@ -26,7 +26,7 @@ import { makeProgram } from './gl-utils';
 import type { Rng } from '../rng';
 import type { DrawCtx, RenderModule } from './context';
 
-const N = 8000;
+const DEFAULT_COUNT = 8000;
 const RMAX_BASE = 0.11; // radius of max wind, iso units (fraction of half-height)
 const VMAX_BASE = 0.32; // peak tangential speed, iso units / sec
 const SPAWN_R = 0.34; // outer seed radius, iso units
@@ -64,14 +64,32 @@ export class ParticleLayer implements RenderModule {
   private prog: WebGLProgram | null = null;
   private vao: WebGLVertexArrayObject | null = null;
   private buf: WebGLBuffer | null = null;
-  private data = new Float32Array(N * 3); // x, y, alpha interleaved
-  private life = new Float32Array(N);
+  private count = DEFAULT_COUNT;
+  private data = new Float32Array(this.count * 3); // x, y, alpha interleaved
+  private life = new Float32Array(this.count);
   private rng: Rng = makeRng(0x51ee9);
   private seeded = false;
   private uSize: WebGLUniformLocation | null = null;
   private uCore: WebGLUniformLocation | null = null;
   private uAlpha: WebGLUniformLocation | null = null;
   private height = 1;
+
+  setBudget(count: number): void {
+    const next = Math.max(256, Math.round(count));
+    if (next === this.count) return;
+    this.count = next;
+    this.data = new Float32Array(next * 3);
+    this.life = new Float32Array(next);
+    this.seeded = false;
+    if (this.buf && this.gl) {
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buf);
+      this.gl.bufferData(
+        this.gl.ARRAY_BUFFER,
+        this.data.byteLength,
+        this.gl.DYNAMIC_DRAW,
+      );
+    }
+  }
 
   init(gl: WebGL2RenderingContext): void {
     this.gl = gl;
@@ -113,7 +131,9 @@ export class ParticleLayer implements RenderModule {
   }
 
   private seedAll(cx: number, cy: number, aspect: number, intensity: number): void {
-    for (let i = 0; i < N; i++) this.spawn(i, cx, cy, aspect, intensity);
+    for (let i = 0; i < this.count; i++) {
+      this.spawn(i, cx, cy, aspect, intensity);
+    }
     this.seeded = true;
   }
 
@@ -147,7 +167,7 @@ export class ParticleLayer implements RenderModule {
 
     const data = this.data;
     const life = this.life;
-    for (let i = 0; i < N; i++) {
+    for (let i = 0; i < this.count; i++) {
       const o = i * 3;
       // Relative position in the round iso frame.
       let fx = (data[o] - c.x) * aspect;
@@ -184,7 +204,7 @@ export class ParticleLayer implements RenderModule {
     // Soft per-point alpha; demo storm and aftermath both render dimmer.
     const baseAlpha = 0.10 * (ctx.demo ? 0.45 : 1) * ctx.aftermath;
     gl.uniform1f(this.uAlpha, baseAlpha);
-    gl.drawArrays(gl.POINTS, 0, N);
+    gl.drawArrays(gl.POINTS, 0, this.count);
     gl.bindVertexArray(null);
   }
 

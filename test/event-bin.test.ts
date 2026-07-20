@@ -59,6 +59,7 @@ const SCENARIO: Scenario = {
   spawn: { lat: 18, lon: 62, seed: 1 },
   ghostId: 'test2000',
   hindcast: null,
+  benchmarkPartition: null,
 };
 
 describe('event-bin scenario compatibility', () => {

@@ -24,7 +24,7 @@
 import './style.css';
 import { injectCssVars, TOKENS } from './tokens';
 import { readHash, writeHash, clearHash, isEnvHashKey } from './rng';
-import { DOMAIN, clipToLatLon, inBBox } from './grid';
+import { DOMAIN, clipToLatLon, inBBox, latLonToClip } from './grid';
 import { parseBin } from './loader';
 import type {
   BinLayer,
@@ -65,6 +65,20 @@ import { chooseRenderProfile } from './performance';
 import { TapGesture } from './tap-gesture';
 import { cloneStormStructure } from './structure';
 import { scoreHindcast, type HindcastScore } from './hindcast';
+import {
+  isWeatherLayerId,
+  weatherLayerDefinition,
+  WEATHER_LAYERS,
+  type WeatherLayerId,
+} from './weather-layers';
+import {
+  requestEnsemble,
+  requestSensitivity,
+} from './ensemble-client';
+import type {
+  EnsembleResult,
+  EnvironmentPerturbation,
+} from './ensemble';
 
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
@@ -117,6 +131,97 @@ const compareRun = must(document.getElementById('compare-run') as HTMLButtonElem
 const compareClear = must(document.getElementById('compare-clear') as HTMLButtonElement | null, '#compare-clear');
 const exportCard = must(document.getElementById('export-card') as HTMLButtonElement | null, '#export-card');
 const exportReplay = must(document.getElementById('export-replay') as HTMLButtonElement | null, '#export-replay');
+const weatherLayerSelect = must(
+  document.getElementById('weather-layer') as HTMLSelectElement | null,
+  '#weather-layer',
+);
+const weatherLegend = must(document.getElementById('weather-legend'), '#weather-legend');
+const weatherLegendName = must(
+  document.getElementById('weather-legend-name'),
+  '#weather-legend-name',
+);
+const weatherLegendUnit = must(
+  document.getElementById('weather-legend-unit'),
+  '#weather-legend-unit',
+);
+const weatherLegendScale = must(
+  document.getElementById('weather-legend-scale'),
+  '#weather-legend-scale',
+);
+const ensembleSize = must(
+  document.getElementById('ensemble-size') as HTMLSelectElement | null,
+  '#ensemble-size',
+);
+const ensembleRun = must(
+  document.getElementById('ensemble-run') as HTMLButtonElement | null,
+  '#ensemble-run',
+);
+const ensembleStatus = must(
+  document.getElementById('ensemble-status') as HTMLOutputElement | null,
+  '#ensemble-status',
+);
+const ensembleResults = must(
+  document.getElementById('ensemble-results'),
+  '#ensemble-results',
+);
+const ensemblePeak = must(document.getElementById('ensemble-peak'), '#ensemble-peak');
+const ensembleHurricane = must(
+  document.getElementById('ensemble-hurricane'),
+  '#ensemble-hurricane',
+);
+const ensembleMajor = must(document.getElementById('ensemble-major'), '#ensemble-major');
+const ensembleLandfall = must(
+  document.getElementById('ensemble-landfall'),
+  '#ensemble-landfall',
+);
+const sensitivityRun = must(
+  document.getElementById('sensitivity-run') as HTMLButtonElement | null,
+  '#sensitivity-run',
+);
+const sensitivityStatus = must(
+  document.getElementById('sensitivity-status') as HTMLOutputElement | null,
+  '#sensitivity-status',
+);
+const sensitivitySst = must(
+  document.getElementById('sensitivity-sst') as HTMLInputElement | null,
+  '#sensitivity-sst',
+);
+const sensitivityRh = must(
+  document.getElementById('sensitivity-rh') as HTMLInputElement | null,
+  '#sensitivity-rh',
+);
+const sensitivityShear = must(
+  document.getElementById('sensitivity-shear') as HTMLInputElement | null,
+  '#sensitivity-shear',
+);
+const sensitivityOhc = must(
+  document.getElementById('sensitivity-ohc') as HTMLInputElement | null,
+  '#sensitivity-ohc',
+);
+const sensitivityOrg = must(
+  document.getElementById('sensitivity-org') as HTMLInputElement | null,
+  '#sensitivity-org',
+);
+const sensitivitySstValue = must(
+  document.getElementById('sensitivity-sst-value'),
+  '#sensitivity-sst-value',
+);
+const sensitivityRhValue = must(
+  document.getElementById('sensitivity-rh-value'),
+  '#sensitivity-rh-value',
+);
+const sensitivityShearValue = must(
+  document.getElementById('sensitivity-shear-value'),
+  '#sensitivity-shear-value',
+);
+const sensitivityOhcValue = must(
+  document.getElementById('sensitivity-ohc-value'),
+  '#sensitivity-ohc-value',
+);
+const sensitivityOrgValue = must(
+  document.getElementById('sensitivity-org-value'),
+  '#sensitivity-org-value',
+);
 
 const gl = glCanvas.getContext('webgl2', { antialias: true, alpha: false });
 if (!gl) {
@@ -167,6 +272,10 @@ let activeRunMode: EventRunMode = 'counterfactual';
 let preEventMonth: number | null = null;
 /** Monotonic guard so a slow event fetch can't clobber a newer switch. */
 let scenarioReqSeq = 0;
+let currentSpawn: SpawnParams | null = null;
+let activeWeatherLayer: WeatherLayerId = 'terrain';
+let activeEnsemble: EnsembleResult | null = null;
+let analysisRequestSeq = 0;
 
 // --- Sim + render construction (defensive against half-done siblings) --------
 let engine: SimEngine | null = null;
@@ -374,6 +483,20 @@ function findLandMask(terrain: ParsedBin | null): BinLayer | null {
   return terrain.layers.get('landmask') ?? terrain.layers.get('land') ?? null;
 }
 
+function populateScenarioPicker(items: readonly Scenario[]): void {
+  scenarioSelect.replaceChildren();
+  const climatology = document.createElement('option');
+  climatology.value = CLIMATOLOGY_ID;
+  climatology.textContent = CLIMATOLOGY_ID;
+  scenarioSelect.append(climatology);
+  for (const scenario of items) {
+    const option = document.createElement('option');
+    option.value = scenario.id;
+    option.textContent = `${scenario.label} environment`;
+    scenarioSelect.append(option);
+  }
+}
+
 async function loadAll(): Promise<void> {
   const bins = new Map<string, ParsedBin>();
   await Promise.all(
@@ -405,6 +528,7 @@ async function loadAll(): Promise<void> {
   // Scenario catalogue (C8): an absent/empty catalogue disables the picker (only
   // climatology is reachable — we have no event bin paths to fetch).
   scenarios = parsedScenarios ?? [];
+  populateScenarioPicker(scenarios);
   scenarioSelect.disabled = scenarios.length === 0;
   ui.setComparisonScenarios(scenarios);
 
@@ -575,6 +699,13 @@ function doSpawn(
     console.warn('[spawn] engine.spawn threw:', err);
     return;
   }
+  currentSpawn = { ...spawn };
+  activeEnsemble = null;
+  analysisRequestSeq++;
+  ensembleResults.hidden = true;
+  ensembleStatus.value = spawn.isDemo
+    ? 'spawn or select a storm'
+    : 'ready · worker cache will reuse this environment';
   const s = engine.getState();
   currentRunLabel = labelForRun(spawn);
   if (s) {
@@ -610,7 +741,7 @@ function doSpawn(
   prevHead = currHead;
   accumulatorMin = 0;
   if (!spawn.isDemo) {
-    // The scenario id doubles as the hash env key (gonu/shaheen); validate it so a
+    // The scenario id doubles as the hash env key; validate it so a
     // catalogue that ever adds an id outside the known set can't emit a bad hash.
     const env = activeScenario && isEnvHashKey(activeScenario.id) ? activeScenario.id : undefined;
     writeHash({ lat: spawn.lat, lon: spawn.lon, monthIndex: spawn.monthIndex, seed: spawn.seed, env });
@@ -808,6 +939,165 @@ function readPickerMonth(): number {
 // before screen -> clip -> lat/lon conversion. Ocean -> fresh deterministic
 // storm; land -> ripple, no storm.
 const mapTap = new TapGesture();
+
+function setWeatherLayer(layer: WeatherLayerId): void {
+  activeWeatherLayer = layer;
+  weatherLayerSelect.value = layer;
+  renderCtrl?.setWeatherLayer?.(layer);
+  const definition = weatherLayerDefinition(layer);
+  weatherLegend.dataset.layer = layer;
+  weatherLegendName.textContent = definition.shortLabel;
+  weatherLegendUnit.textContent = definition.unit;
+  weatherLegendScale.textContent = definition.legend;
+}
+
+weatherLayerSelect.replaceChildren(
+  ...WEATHER_LAYERS.map((definition) => {
+    const option = document.createElement('option');
+    option.value = definition.id;
+    option.textContent = definition.label;
+    option.selected = definition.id === 'terrain';
+    return option;
+  }),
+);
+weatherLayerSelect.addEventListener('change', () => {
+  if (isWeatherLayerId(weatherLayerSelect.value)) {
+    setWeatherLayer(weatherLayerSelect.value);
+  }
+});
+setWeatherLayer('terrain');
+
+function currentAnalysisUrls(): { envUrl: string; terrainUrl: string } {
+  const envPath = activeScenario?.bin ?? 'data/env.bin';
+  return {
+    envUrl: new URL(asset(envPath), window.location.href).href,
+    terrainUrl: new URL(asset('data/terrain.bin'), window.location.href).href,
+  };
+}
+
+function percentage(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+ensembleRun.addEventListener('click', () => {
+  const spawn = currentSpawn;
+  if (!spawn || spawn.isDemo) {
+    ensembleStatus.value = 'spawn or select a non-demo storm first';
+    return;
+  }
+  const count = Number(ensembleSize.value);
+  const requestSeq = ++analysisRequestSeq;
+  const startedAt = performance.now();
+  ensembleRun.disabled = true;
+  ensembleResults.hidden = true;
+  ensembleStatus.value = `starting ${count}-member worker ensemble…`;
+  const urls = currentAnalysisUrls();
+  void requestEnsemble(
+    {
+      type: 'ensemble',
+      ...urls,
+      spawn,
+      samplingMode: envSampler.getSamplingMode(),
+      count,
+    },
+    (completed, total) => {
+      if (requestSeq === analysisRequestSeq) {
+        ensembleStatus.value = `running members ${completed}/${total}`;
+      }
+    },
+  )
+    .then((result) => {
+      if (requestSeq !== analysisRequestSeq) return;
+      activeEnsemble = result;
+      ensemblePeak.textContent =
+        `${result.peakKt.p10.toFixed(0)}–${result.peakKt.p90.toFixed(0)} kt ` +
+        `(median ${result.peakKt.median.toFixed(0)})`;
+      ensembleHurricane.textContent = percentage(result.hurricaneProbability);
+      ensembleMajor.textContent = percentage(result.majorProbability);
+      ensembleLandfall.textContent = percentage(result.landfallProbability);
+      ensembleResults.hidden = false;
+      ensembleStatus.value =
+        `${result.members.length} deterministic members · ` +
+        `${((performance.now() - startedAt) / 1000).toFixed(1)} s · probability field on map`;
+    })
+    .catch((error: unknown) => {
+      if (requestSeq !== analysisRequestSeq) return;
+      activeEnsemble = null;
+      ensembleStatus.value =
+        error instanceof Error ? `ensemble failed · ${error.message}` : 'ensemble failed';
+    })
+    .finally(() => {
+      ensembleRun.disabled = false;
+    });
+});
+
+function signed(value: number, digits: number): string {
+  const text = Math.abs(value).toFixed(digits);
+  return `${value >= 0 ? '+' : '−'}${text}`;
+}
+
+function updateSensitivityLabels(): void {
+  sensitivitySstValue.textContent = `${signed(Number(sensitivitySst.value), 1)} °C`;
+  sensitivityRhValue.textContent = `${signed(Number(sensitivityRh.value), 0)}%`;
+  sensitivityShearValue.textContent =
+    `${signed(Number(sensitivityShear.value), 0)} m/s`;
+  sensitivityOhcValue.textContent = `×${Number(sensitivityOhc.value).toFixed(1)}`;
+  sensitivityOrgValue.textContent = signed(Number(sensitivityOrg.value), 2);
+}
+for (const control of [
+  sensitivitySst,
+  sensitivityRh,
+  sensitivityShear,
+  sensitivityOhc,
+  sensitivityOrg,
+]) {
+  control.addEventListener('input', updateSensitivityLabels);
+}
+updateSensitivityLabels();
+
+sensitivityRun.addEventListener('click', () => {
+  const spawn = currentSpawn;
+  if (!spawn || spawn.isDemo) {
+    sensitivityStatus.value = 'spawn or select a non-demo storm first';
+    return;
+  }
+  const perturbation: EnvironmentPerturbation = {
+    sstDeltaC: Number(sensitivitySst.value),
+    rhDeltaPct: Number(sensitivityRh.value),
+    shearDeltaMs: Number(sensitivityShear.value),
+    ohcScale: Number(sensitivityOhc.value),
+  };
+  const requestSeq = ++analysisRequestSeq;
+  const startedAt = performance.now();
+  sensitivityRun.disabled = true;
+  sensitivityStatus.value = 'running baseline + perturbed storm in worker…';
+  void requestSensitivity({
+    type: 'sensitivity',
+    ...currentAnalysisUrls(),
+    spawn,
+    samplingMode: envSampler.getSamplingMode(),
+    perturbation,
+    organizationDelta: Number(sensitivityOrg.value),
+  })
+    .then(({ baseline, perturbed }) => {
+      if (requestSeq !== analysisRequestSeq) return;
+      const peakDelta = perturbed.peakKt - baseline.peakKt;
+      const lifeDelta = perturbed.durationH - baseline.durationH;
+      sensitivityStatus.value =
+        `peak ${signed(peakDelta, 1)} kt · life ${signed(lifeDelta, 0)} h · ` +
+        `${perturbed.landfall === baseline.landfall ? 'landfall unchanged' : perturbed.landfall ? 'landfall gained' : 'landfall lost'} · ` +
+        `${((performance.now() - startedAt) / 1000).toFixed(1)} s`;
+    })
+    .catch((error: unknown) => {
+      if (requestSeq !== analysisRequestSeq) return;
+      sensitivityStatus.value =
+        error instanceof Error ? `experiment failed · ${error.message}` : 'experiment failed';
+    })
+    .finally(() => {
+      sensitivityRun.disabled = false;
+    });
+});
+
 glCanvas.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'mouse' && event.button !== 0) return;
   mapTap.start(event.pointerId, event.clientX, event.clientY, event.timeStamp);
@@ -849,9 +1139,24 @@ function toggleTransport(): void {
 }
 
 window.addEventListener('keydown', (e) => {
-  if (e.code !== 'Space') return;
   const t = e.target as HTMLElement | null;
-  if (t instanceof HTMLSelectElement || t instanceof HTMLInputElement || t instanceof HTMLButtonElement) return;
+  if (
+    t instanceof HTMLSelectElement ||
+    t instanceof HTMLInputElement ||
+    t instanceof HTMLButtonElement
+  ) {
+    return;
+  }
+  if (/^Digit[1-7]$/.test(e.code)) {
+    const index = Number(e.code.slice(-1)) - 1;
+    const definition = WEATHER_LAYERS[index];
+    if (definition) {
+      e.preventDefault();
+      setWeatherLayer(definition.id);
+    }
+    return;
+  }
+  if (e.code !== 'Space') return;
   e.preventDefault();
   toggleTransport();
 });
@@ -1082,6 +1387,50 @@ function buildStorm(): { storm: StormState | null; prev: StormState | null } {
   return { storm: live, prev };
 }
 
+function drawEnsembleOverlay(result: EnsembleResult | null): void {
+  if (!result) return;
+  const { nx, ny, probability } = result.grid;
+  const cellWidth = overlayCanvas.width / nx;
+  const cellHeight = overlayCanvas.height / ny;
+  overlay.save();
+  overlay.globalCompositeOperation = 'screen';
+  const accent = TOKENS.accent.rgba01;
+  for (let index = 0; index < probability.length; index++) {
+    const chance = probability[index];
+    if (chance < 0.025) continue;
+    const col = index % nx;
+    const row = Math.floor(index / nx);
+    overlay.fillStyle =
+      `rgba(${Math.round(accent[0] * 255)},${Math.round(accent[1] * 255)},` +
+      `${Math.round(accent[2] * 255)},${Math.min(0.28, 0.025 + chance * 0.32)})`;
+    overlay.fillRect(
+      col * cellWidth,
+      row * cellHeight,
+      cellWidth + 1,
+      cellHeight + 1,
+    );
+  }
+  const trackColor = TOKENS.track.rgba01;
+  overlay.strokeStyle =
+    `rgba(${Math.round(trackColor[0] * 255)},${Math.round(trackColor[1] * 255)},` +
+    `${Math.round(trackColor[2] * 255)},0.13)`;
+  overlay.lineWidth = Math.max(0.6, window.devicePixelRatio * 0.45);
+  for (const member of result.members) {
+    if (member.track.length < 2) continue;
+    overlay.beginPath();
+    for (let index = 0; index < member.track.length; index++) {
+      const point = member.track[index];
+      const clip = latLonToClip(point.lat, point.lon, DOMAIN);
+      const x = ((clip.x + 1) * overlayCanvas.width) / 2;
+      const y = ((1 - clip.y) * overlayCanvas.height) / 2;
+      if (index === 0) overlay.moveTo(x, y);
+      else overlay.lineTo(x, y);
+    }
+    overlay.stroke();
+  }
+  overlay.restore();
+}
+
 function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
   const { storm, prev } = buildStorm();
   const frame: FrameState = {
@@ -1115,6 +1464,7 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
       console.warn('[render] layer draw threw (skipping this frame):', err);
     }
   }
+  drawEnsembleOverlay(activeEnsemble);
   flushMapCaptures();
   prevFrameStorm = storm;
 
@@ -1196,6 +1546,7 @@ type RenderController = RenderLayer & {
   init(gl: WebGL2RenderingContext, overlay?: CanvasRenderingContext2D, resources?: RenderResourcesLike): void;
   setResources?(resources: RenderResourcesLike): void;
   setMonth?(monthIndex: number): void;
+  setWeatherLayer?(layer: WeatherLayerId): void;
   setParticleBudget?(count: number): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;
@@ -1253,6 +1604,7 @@ Object.defineProperty(window, '__cyc', {
       debrief: session.recorder.debrief(),
       hoursPerSec: ui.timescaleHoursPerSec(storm),
       activeScenario: activeScenario?.id ?? null,
+      weatherLayer: activeWeatherLayer,
       envSamplingMode: envSampler.getSamplingMode(),
       envTFrac:
         activeScenario && storm

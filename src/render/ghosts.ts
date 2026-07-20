@@ -3,7 +3,7 @@
  *
  * A dim, static counterpart to {@link TrackLayer}: instead of the single live
  * storm's dotted, age-faded, aftermath-gated path, this draws the fixed IBTrACS
- * polylines (Gonu 2007, Shaheen 2021) as faint long-dashed lines that are ALWAYS
+ * catalogue polylines as faint long-dashed lines that are ALWAYS
  * present — they are the historical backdrop the user's storm is measured against.
  *
  * It mirrors TrackLayer deliberately: a Canvas2D layer on the overlay context
@@ -81,12 +81,16 @@ export class GhostLayer {
     ctx.lineJoin = 'round';
     // Long dashes distinguish the historic ghost from the live dotted track.
     ctx.setLineDash([unit * 0.02, unit * 0.014]);
+    const inactiveAlpha =
+      this.tracks.length > 4 ? GHOST_ALPHA * 0.38 : GHOST_ALPHA;
 
     for (const t of this.tracks) {
       const pts = t.points;
       if (pts.length < 2) continue;
       const active = this.activeId !== null && t.id === this.activeId;
-      ctx.strokeStyle = ghostRgba(active ? GHOST_ALPHA * 2 : GHOST_ALPHA);
+      ctx.strokeStyle = ghostRgba(
+        active ? GHOST_ALPHA * 2 : inactiveAlpha,
+      );
       ctx.beginPath();
       for (let i = 0; i < pts.length; i++) {
         const c = latLonToClip(pts[i].lat, pts[i].lon);

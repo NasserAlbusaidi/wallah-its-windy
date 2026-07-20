@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  environmentPlaneInterpolation,
   hasTimedFlowRouting,
   normalizeLoggedFlowAccumulation,
 } from '../src/render/textures';
@@ -38,5 +39,26 @@ describe('flow-accumulation texture contract', () => {
     expect(hasTimedFlowRouting(emptyDirections, emptyTravel)).toBe(false);
     expect(hasTimedFlowRouting(directions, emptyTravel)).toBe(false);
     expect(hasTimedFlowRouting(null, travel)).toBe(false);
+  });
+});
+
+describe('environment texture time contract', () => {
+  it('brackets and blends event planes exactly like the physics sampler', () => {
+    expect(
+      environmentPlaneInterpolation(5, { kind: 'event-timeline' }, 0.375),
+    ).toEqual({ current: 1, next: 2, blend: 0.5 });
+    expect(
+      environmentPlaneInterpolation(5, { kind: 'event-timeline' }, 1),
+    ).toEqual({ current: 4, next: 4, blend: 0 });
+  });
+
+  it('freezes a selected synoptic plane', () => {
+    expect(
+      environmentPlaneInterpolation(
+        4,
+        { kind: 'synoptic-plane', plane: 2 },
+        0.9,
+      ),
+    ).toEqual({ current: 2, next: 2, blend: 0 });
   });
 });

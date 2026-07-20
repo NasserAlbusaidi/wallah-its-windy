@@ -28,7 +28,7 @@ its progress, selected real years, thermodynamic ranges, and bake-time asserts.
 | `env.bin` | `sst_MM`,`u_MM`,`v_MM`,`shr_MM`,`shu_MM`,`shv_MM`,`rh_MM`,`ohc_MM` × 7 months | 40×24 (0.5°) | OISST + ERA5 + WOA23 |
 | `flowacc.bin` | `flowacc` (uint16 log), `flowdir` (uint8 D8), `travmin` (uint8 minutes), `basin` (uint16 compatibility) | 1040×668 | HydroSHEDS v1.1 ACC+DIR |
 | `genesis.json` | `[{lat,lon}]` | — | IBTrACS North Indian |
-| `tracks.json` | two observed ghost-track polylines | — | IBTrACS North Indian |
+| `tracks.json` | ten observed ghost-track polylines | — | IBTrACS North Indian |
 
 The physical-structure calibration subset is a separate offline artifact under
 `calibration/data/`; it never ships in `public/` or the browser bundle. Rebuild
@@ -144,10 +144,12 @@ are selected jointly from real years with genesis-belt shear below 17 m/s,
 ranked by RH; this avoids mistaking a calm but exceptionally dry year for a
 productive post-monsoon regime.
 
-`bake/fetch_era5.py` is the executable CDS request specification. It downloads
-monthly winds and RH plus hourly Gonu/Shaheen wind, RH, and SST files. It requires
-a configured CDS API token and accepted Copernicus licence. WOA23 needs no
-credentials and is fetched lazily by `bake/woa23.py`.
+`bake/fetch_era5.py` is the executable climatology request specification.
+`bake/fetch_event_benchmark.py` shares the frozen catalogue with the bake and
+downloads hourly wind, RH, and SST parts for all ten events. Both cache completed
+files, require a configured CDS API token and accepted Copernicus licence, and
+are safe to resume. WOA23 needs no credentials and is fetched lazily by
+`bake/woa23.py`.
 
 ### Event bake — `bake/era5_event.py`
 
@@ -158,13 +160,12 @@ flowacc.bin/genesis.json):
 bake/.venv/bin/python bake/bake.py events
 ```
 
-emits `public/data/env_gonu.bin`, `public/data/env_shaheen.bin`, and
+emits ten `public/data/env_<event>.bin` files and
 `public/data/scenarios.json`. The env bins are the **same WIWB format** as
 env.bin (version 1, identical 88-byte records) — only the `nt` semantics differ.
 All eight fields (`sst/u/v/shr/shu/shv/rh/ohc`) share a 3-hourly chronological
-axis and are interpolated by `tFrac`. Gonu has 64 planes (`windowH=189`);
-Shaheen's September/October inputs are stitched by `valid_time` into 168 planes
-(`windowH=501`).
+axis and are interpolated by `tFrac`. Cross-month inputs are stitched by
+`valid_time`; every `windowH` is derived from the resulting aligned axis.
 
 **Vortex filter (why, and the diagnostic).** Event winds contain the real
 storm's own vortex; baked verbatim they would feed the observed circulation back
@@ -198,16 +199,18 @@ event environment?” workflow.
 
 `scenarios.json` stores both the sandbox spawn and a `hindcast` block with
 `startIso`, position, observed wind, derived initial organization, and
-`envOffsetH`. `windowH = (planes−1)·stepH` is computed from the bin.
+`envOffsetH`. `windowH = (planes−1)·stepH` is computed from the bin. It also
+stores a frozen complete-storm benchmark split:
+
+- calibration: Gonu, Phet, Nilofar, Ashobaa, Mekunu, Hikaa, Vayu;
+- validation holdout: Kyarr, Shaheen, Biparjoy.
 
 ### Ghost tracks — `public/data/tracks.json`
 
 `sources.load_event_tracks()` extracts the **full** IBTrACS polyline (every fix,
-with time + intensity) for the two named systems, distinct from the genesis dots.
-Storms are matched by **SEASON + a NAME token** (never NAME alone): GONU is one
-SID (`2007151N14072`, 63 fixes); the Gulab→Shaheen system is the single SID
-`2021267N18094` named `GULAB:SHAHEEN-GU` (85 fixes) — the loader still merges +
-de-dupes across SIDs by ISO_TIME so a future split archive stitches transparently.
+with time + intensity) for all ten systems, distinct from the genesis dots.
+Storms match exact frozen SIDs, avoiding reused-name ambiguity, and fixes
+de-duplicate by ISO time.
 `windKt`/`presMb` are `null` where the CSV cell is blank; all fixes are kept
 (including off-domain Bay-of-Bengal segments — canvas clipping handles them).
 

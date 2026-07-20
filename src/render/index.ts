@@ -53,6 +53,7 @@ import {
   buildBasinRG8Tex,
   buildElevationTex,
   buildR8Tex,
+  environmentPlaneInterpolation,
   hasTimedFlowRouting,
   pickLayer,
   planeMax,
@@ -66,6 +67,7 @@ import { TerrainLayer } from './terrain';
 import { EnvLayer } from './env';
 import { ParticleLayer } from './particles';
 import { RainLayer } from './rain';
+import { RadarLayer } from './radar';
 import { TrackLayer } from './track';
 import { GhostLayer } from './ghosts';
 import { parseTracks, toGhostPolylines } from '../tracks';
@@ -74,6 +76,7 @@ import {
   cloneStormStructure,
   interpolateStormStructure,
 } from '../structure';
+import type { WeatherLayerId } from '../weather-layers';
 
 /** Baked data handed to the renderer (mode A); any field may arrive progressively. */
 export interface RenderResources {
@@ -109,7 +112,14 @@ function clamp01(x: number): number {
  * months clamp to the nearest season month. Mirror of env-sampler.envMonthSuffix.
  */
 function envMonthNames(monthIndex: number): {
-  sst: string; u: string; v: string; shr: string; shu: string; shv: string;
+  sst: string;
+  u: string;
+  v: string;
+  shr: string;
+  shu: string;
+  shv: string;
+  rh: string;
+  ohc: string;
 } {
   const mm = String(Math.min(10, Math.max(4, monthIndex))).padStart(2, '0');
   return {
@@ -119,6 +129,8 @@ function envMonthNames(monthIndex: number): {
     shr: `shr_${mm}`,
     shu: `shu_${mm}`,
     shv: `shv_${mm}`,
+    rh: `rh_${mm}`,
+    ohc: `ohc_${mm}`,
   };
 }
 
@@ -135,6 +147,14 @@ function emptyGpu(): GpuTextures {
     hasFlowRouting: false,
     envGrid: null,
     sst: null,
+    sstNext: null,
+    humidity: null,
+    humidityNext: null,
+    ohc: null,
+    ohcNext: null,
+    shear: null,
+    shearNext: null,
+    envBlend: 0,
     genesisClip: null,
   };
 }
@@ -155,6 +175,10 @@ export class RenderPipeline implements RenderLayer {
   private res: RenderResources = { terrain: null, env: null, genesis: [], tracks: [] };
   private gpu: GpuTextures = emptyGpu();
   private monthIndex = 5;
+  private weatherLayer: WeatherLayerId = 'terrain';
+  private envPlane = -1;
+  private envNextPlane = -1;
+  private envPlaneMode = '';
   private injected = false;
 
   // Self-source (mode B) holders.
@@ -166,6 +190,7 @@ export class RenderPipeline implements RenderLayer {
   private env = new EnvLayer();
   private particles = new ParticleLayer();
   private rain = new RainLayer();
+  private radar = new RadarLayer();
   private ghosts = new GhostLayer();
   private track = new TrackLayer();
 
@@ -209,6 +234,7 @@ export class RenderPipeline implements RenderLayer {
     this.env.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
+    this.radar.resize(this.width, this.height);
     this.ghosts.resize(this.width, this.height);
     this.track.resize(this.width, this.height);
   }
@@ -216,6 +242,7 @@ export class RenderPipeline implements RenderLayer {
   draw(frame: FrameState): void {
     const gl = this.gl;
     if (!gl || this.contextLost) return;
+    this.syncEnvPlane(frame);
     const ctx = this.buildCtx(frame);
     const terrainFade = this.fadeSince(this.terrainReadyMs, ctx.nowMs);
     const glowFade = this.fadeSince(this.glowReadyMs, ctx.nowMs);
@@ -232,6 +259,7 @@ export class RenderPipeline implements RenderLayer {
     // Luminance order (back to front). Rain updates offscreen, then composites.
     this.terrain.draw(ctx, this.gpu, terrainFade);
     this.env.draw(ctx, this.gpu, glowFade);
+    this.radar.draw(ctx);
     this.rain.update(ctx, this.gpu);
     this.rain.composite(ctx, this.gpu, terrainFade);
     if (!ctx.reduced) this.particles.draw(ctx);
@@ -257,6 +285,7 @@ export class RenderPipeline implements RenderLayer {
     this.env.dispose();
     this.particles.dispose();
     this.rain.dispose();
+    this.radar.dispose();
     this.ghosts.dispose();
     this.track.dispose();
     this.gl = null;
@@ -279,7 +308,13 @@ export class RenderPipeline implements RenderLayer {
 
   setMonth(monthIndex: number): void {
     this.monthIndex = monthIndex;
-    this.applyEnv(); // only the SST tint depends on month
+    this.envPlane = -1;
+    this.envNextPlane = -1;
+    this.applyEnv(0, 0);
+  }
+
+  setWeatherLayer(layer: WeatherLayerId): void {
+    this.weatherLayer = layer;
   }
 
   /** Decorative workload only; deterministic physics and flight tapes are untouched. */
@@ -311,7 +346,9 @@ export class RenderPipeline implements RenderLayer {
 
   private onMonthChange = (): void => {
     if (this.monthSelect) this.monthIndex = Number(this.monthSelect.value) || 5;
-    this.applyEnv();
+    this.envPlane = -1;
+    this.envNextPlane = -1;
+    this.applyEnv(0, 0);
   };
 
   private assetUrl(path: string): string {
@@ -342,7 +379,9 @@ export class RenderPipeline implements RenderLayer {
       this.fetchBin('data/env.bin').then((b) => {
         if (b) {
           this.res.env = b;
-          this.applyEnv();
+          this.envPlane = -1;
+          this.envNextPlane = -1;
+          this.applyEnv(0, 0);
         }
       }),
       this.loadGenesis().then((pts) => {
@@ -400,6 +439,7 @@ export class RenderPipeline implements RenderLayer {
     this.env.init(gl);
     this.particles.init(gl);
     this.rain.init(gl, this.caps);
+    this.radar.init(gl);
     if (this.overlay) {
       this.ghosts.init(this.overlay);
       this.track.init(this.overlay);
@@ -407,6 +447,7 @@ export class RenderPipeline implements RenderLayer {
     this.env.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
+    this.radar.resize(this.width, this.height);
     this.ghosts.resize(this.width, this.height);
     this.track.resize(this.width, this.height);
     this.rebuildAllTextures();
@@ -428,7 +469,9 @@ export class RenderPipeline implements RenderLayer {
     this.disposeTextures();
     this.gpu = emptyGpu();
     this.applyTerrain();
-    this.applyEnv();
+    this.envPlane = -1;
+    this.envNextPlane = -1;
+    this.applyEnv(0, 0);
     this.applyGenesis();
   }
 
@@ -503,18 +546,130 @@ export class RenderPipeline implements RenderLayer {
     if ((this.gpu.elev || this.gpu.land) && this.terrainReadyMs < 0) this.terrainReadyMs = performance.now();
   }
 
-  private applyEnv(): void {
+  private applyEnv(plane: number, nextPlane: number): void {
     const gl = this.gl;
     const bin = this.res.env;
     if (!gl || !bin) return;
     const n = envMonthNames(this.monthIndex);
     const sstL = pickLayer(bin, [n.sst, 'sst']);
-    if (this.gpu.sst) gl.deleteTexture(this.gpu.sst);
+    const rhL = pickLayer(bin, [n.rh, 'rh']);
+    const ohcL = pickLayer(bin, [n.ohc, 'ohc']);
+    const shearL = pickLayer(bin, [n.shr, 'shear', 'shr']);
+    for (const texture of [
+      this.gpu.sst,
+      this.gpu.sstNext,
+      this.gpu.humidity,
+      this.gpu.humidityNext,
+      this.gpu.ohc,
+      this.gpu.ohcNext,
+      this.gpu.shear,
+      this.gpu.shearNext,
+    ]) {
+      if (texture) gl.deleteTexture(texture);
+    }
     this.gpu.sst = null;
+    this.gpu.sstNext = null;
+    this.gpu.humidity = null;
+    this.gpu.humidityNext = null;
+    this.gpu.ohc = null;
+    this.gpu.ohcNext = null;
+    this.gpu.shear = null;
+    this.gpu.shearNext = null;
     if (sstL) {
       this.gpu.envGrid = { nx: sstL.nx, ny: sstL.ny, bbox: sstL.bbox };
-      this.gpu.sst = buildR8Tex(gl, sstL, 0, (v) => (v - SST_MIN_C) / (SST_MAX_C - SST_MIN_C), gl.LINEAR);
+      this.gpu.sst = buildR8Tex(
+        gl,
+        sstL,
+        Math.min(plane, sstL.nt - 1),
+        (v) => (v - SST_MIN_C) / (SST_MAX_C - SST_MIN_C),
+        gl.LINEAR,
+      );
+      this.gpu.sstNext = buildR8Tex(
+        gl,
+        sstL,
+        Math.min(nextPlane, sstL.nt - 1),
+        (v) => (v - SST_MIN_C) / (SST_MAX_C - SST_MIN_C),
+        gl.LINEAR,
+      );
       if (this.glowReadyMs < 0) this.glowReadyMs = performance.now();
+    }
+    if (rhL) {
+      this.gpu.humidity = buildR8Tex(
+        gl,
+        rhL,
+        Math.min(plane, rhL.nt - 1),
+        (value) => value / 100,
+        gl.LINEAR,
+      );
+      this.gpu.humidityNext = buildR8Tex(
+        gl,
+        rhL,
+        Math.min(nextPlane, rhL.nt - 1),
+        (value) => value / 100,
+        gl.LINEAR,
+      );
+    }
+    if (ohcL) {
+      this.gpu.ohc = buildR8Tex(
+        gl,
+        ohcL,
+        Math.min(plane, ohcL.nt - 1),
+        (value) => value / 140,
+        gl.LINEAR,
+      );
+      this.gpu.ohcNext = buildR8Tex(
+        gl,
+        ohcL,
+        Math.min(nextPlane, ohcL.nt - 1),
+        (value) => value / 140,
+        gl.LINEAR,
+      );
+    }
+    if (shearL) {
+      this.gpu.shear = buildR8Tex(
+        gl,
+        shearL,
+        Math.min(plane, shearL.nt - 1),
+        (value) => value / 40,
+        gl.LINEAR,
+      );
+      this.gpu.shearNext = buildR8Tex(
+        gl,
+        shearL,
+        Math.min(nextPlane, shearL.nt - 1),
+        (value) => value / 40,
+        gl.LINEAR,
+      );
+    }
+    this.envPlane = plane;
+    this.envNextPlane = nextPlane;
+  }
+
+  private syncEnvPlane(frame: FrameState): void {
+    const bin = this.res.env;
+    if (!bin) return;
+    const names = envMonthNames(this.monthIndex);
+    const reference = pickLayer(bin, [names.u, names.rh, names.sst]);
+    if (!reference) return;
+    const interpolation = environmentPlaneInterpolation(
+      reference.nt,
+      frame.envSamplingMode,
+      frame.envTFrac,
+    );
+    const plane = interpolation.current;
+    const nextPlane = interpolation.next;
+    this.gpu.envBlend = interpolation.blend;
+    const modeKey =
+      frame.envSamplingMode.kind === 'event-timeline'
+        ? 'event'
+        : `synoptic:${frame.envSamplingMode.plane}`;
+    if (
+      plane !== this.envPlane ||
+      nextPlane !== this.envNextPlane ||
+      modeKey !== this.envPlaneMode
+    ) {
+      this.envPlaneMode = modeKey;
+      this.applyEnv(plane, nextPlane);
     }
   }
 
@@ -546,6 +701,13 @@ export class RenderPipeline implements RenderLayer {
       g.flowDir,
       g.travelMin,
       g.sst,
+      g.sstNext,
+      g.humidity,
+      g.humidityNext,
+      g.ohc,
+      g.ohcNext,
+      g.shear,
+      g.shearNext,
     ]) {
       if (t) gl.deleteTexture(t);
     }
@@ -656,6 +818,7 @@ export class RenderPipeline implements RenderLayer {
       track,
       comparisonTrack: frame.comparisonTrack,
       env,
+      weatherLayer: this.weatherLayer,
     };
   }
 

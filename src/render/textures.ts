@@ -9,11 +9,39 @@
  * parallel — see the name lists in index.ts and the deviation note in the report.
  */
 
-import type { BinLayer, ParsedBin } from '../types';
+import type { BinLayer, EnvSamplingMode, ParsedBin } from '../types';
 
 /** SST normalisation window, °C. Shader reverses: sstC = v*(MAX-MIN)+MIN. */
 export const SST_MIN_C = 10;
 export const SST_MAX_C = 35;
+
+export interface PlaneInterpolation {
+  current: number;
+  next: number;
+  blend: number;
+}
+
+/** Match physics' event-time interpolation; synoptic mode stays frozen. */
+export function environmentPlaneInterpolation(
+  nt: number,
+  mode: EnvSamplingMode,
+  tFrac: number,
+): PlaneInterpolation {
+  const last = Math.max(0, Math.floor(nt) - 1);
+  const position =
+    mode.kind === 'event-timeline'
+      ? Math.max(0, Math.min(1, tFrac)) * last
+      : Math.max(0, Math.min(last, mode.plane));
+  const current = Math.floor(position);
+  return {
+    current,
+    next:
+      mode.kind === 'event-timeline'
+        ? Math.min(last, current + 1)
+        : current,
+    blend: mode.kind === 'event-timeline' ? position - current : 0,
+  };
+}
 
 /**
  * flowacc.bin already stores log10(1 + upstream-cell-count). Normalize that

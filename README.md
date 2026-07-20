@@ -17,8 +17,12 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > share any storm by its URL. User storms carry a live flight recorder that
 > explains each intensity change in numbers and plain language, then becomes a
 > debrief, controlled-comparison lab, export station, and replay timeline.
-> Gonu and Shaheen also have deterministic, observed-initialization hindcasts
-> with honest track/intensity/pressure scoring and a separate counterfactual mode.
+> Ten historical environments also have deterministic, observed-initialization
+> hindcasts with honest track/intensity/pressure scoring and a separate
+> counterfactual mode. The map can switch among terrain, simulated infrared,
+> SST, humidity, ocean heat, shear, and simulated rain-radar views. A worker-run
+> forecast laboratory adds deterministic ensembles, track-probability fields,
+> and same-storm sensitivity experiments without blocking the map.
 
 ## Stack
 
@@ -39,11 +43,22 @@ npm run dev       # local dev server
 npm run build     # typecheck (tsc --noEmit) + vite build -> dist/
 npm run preview   # serve the production build
 npm test          # vitest run (physics, grid, loader golden vector, rng, bake<->runtime)
+npm run profile:ensemble # 20/40/80-member steady-state benchmark
 ```
 
 ## Controls
 
 - Click open water to spawn a storm.
+- Change **Map layer** or press 1–7 for terrain, simulated infrared, SST,
+  humidity, OHC, shear, and simulated rain-radar views. SST/RH/OHC/shear render
+  the exact active baked plane; IR and radar are explicitly simulated proxies.
+- Open **forecast laboratory** to run a 20/40/80-member deterministic ensemble.
+  The map shows every member plus the fraction of members entering each grid
+  cell. Peak-intensity quantiles and landfall/hurricane/major probabilities are
+  reported beside it. These are explicit perturbation frequencies, not
+  operationally calibrated forecast probabilities.
+- Use the same laboratory to re-run one seed with controlled SST, RH, shear,
+  OHC, or initial-core changes.
 - Press Space or use the flight recorder's button to pause and resume.
 - After the storm ends, scrub its recorded track or jump to its peak, first
   landfall, and final frame. Replay reads immutable recorded frames; it never
@@ -61,6 +76,20 @@ The live map shows three structure contours: amber is the radius of maximum
 wind, faint cyan is the 34-kt footprint, and bright white-cyan is the 64-kt
 footprint. The flight tape records central pressure, RMW, Holland B, outer wind
 radii, translation, and right-of-motion bias with every fixed physics step.
+
+### Weather-product contract
+
+The four environmental products are data views, not decoration: their GPU
+textures use the same temporally interpolated SST/RH/OHC/shear fields sampled by
+physics. The enhanced-IR view follows the visual language of
+[NOAA cloud-top-temperature products](https://www.goes-r.gov/products/baseline-cloud-top-temp.html),
+but derives a bounded brightness-temperature proxy from the simulated vortex,
+organization, and intensity. The rain view maps the separated simulated rain
+rates through a Marshall–Palmer-style `Z = 200 R^1.6` transform and a
+reflectivity palette; it follows the
+[NWS reflectivity concept](https://training.weather.gov/nwstc/NEXRAD/RADAR/3-1.htm)
+but is not a radar observation. The interface labels both proxy products
+“simulated” at all times.
 
 On touch screens, a short stable tap spawns; drag, long-press, and multi-touch
 gestures do not. Narrow layouts keep the causal sentence visible and place exact
@@ -81,6 +110,8 @@ dimension, bbox, and quantization scale comes from the file header.
 python3 -m venv bake/.venv
 bake/.venv/bin/python -m pip install -r bake/requirements.txt
 bake/.venv/bin/python bake/bake.py          # ~15s; writes public/data/*
+bake/.venv/bin/python bake/fetch_event_benchmark.py # CDS-cached 10-storm inputs
+bake/.venv/bin/python bake/bake.py events   # event bins + frozen catalogue
 ```
 
 - Binary format + golden test vector: **`BINARY-FORMATS.md`**.
@@ -115,14 +146,24 @@ WOA23 OHC stay `nt = 1`. November replaces the old wind-only “calm” selectio
 with two real years selected jointly for survivable shear and mid-level
 moisture.
 
-**Event contracts:** every event bin carries aligned 3-hourly ERA5 SST,
+**Event contracts:** each of ten event bins carries aligned 3-hourly ERA5 SST,
 600/700-hPa RH, steering, and shear plus midpoint-interpolated WOA23 OHC. “Observed
-hindcast” starts at the first in-domain observed ≥34-kt fix, uses the matching
+hindcast” starts at the first observed ≥34-kt fix at least 1.2° inside the map,
+uses the matching
 event-time offset, disables stochastic wander, then runs freely with no track or
 intensity nudging. The debrief scores track MAE/RMSE, intensity MAE/bias,
 pressure MAE, and peak bias against IBTrACS fixes. “Counterfactual sandbox”
 keeps the original what-if workflow for a user-authored storm. The observed
 ghost remains visible in both modes.
+
+**Historical benchmark:** the catalogue is frozen at ten named storms with a
+storm-level 7/3 split. Gonu, Phet, Nilofar, Ashobaa, Mekunu, Hikaa, and Vayu are
+available to the bounded joint intensity search. Kyarr, Shaheen, and Biparjoy
+stay untouched until acceptance. The generated
+[hindcast report](docs/hindcast-benchmark.md) reports each storm and rejects a
+candidate unless it improves the equal-storm held-out objective without breaking
+per-storm wind, mean pressure, or track gates. CI re-runs the same runtime model
+against the committed bins; it downloads nothing.
 
 Scientific limitations are not hidden: this is still a deterministic point-vortex
 track/intensity model, not an operational atmospheric model. Its convection,
@@ -184,8 +225,19 @@ unchanged. See the generated [calibration report](docs/structure-calibration.md)
 ```bash
 npm run data:structure       # re-extract from the pinned raw IBTrACS snapshot
 npm run calibrate:structure  # regenerate machine + human reports
+npm run calibrate:intensity  # ten-storm search + untouched holdout decision
 npm run calibrate:check      # CI regression gate; no network required
 ```
+
+**Ensemble performance:** simulation runs in a dedicated worker and caches
+decoded environment/terrain bins by URL. Non-rendered members evolve the exact
+same coupled intensity, organization, cold-wake, RMW, and outer-size dynamics
+but skip twelve quadrant-radius inversions per tick; a regression test proves
+those coupled states remain byte-for-byte identical to full structure mode.
+`npm run profile:ensemble` records the 20 / 40 / 80-member scaling curve with a
+synthetic environment (browser fetch and worker startup excluded); the committed
+implementation remains below 250 ms even at 80 members on the current
+development machine. Interactive analyses use a declared 240-hour horizon.
 
 **Moisture and rainfall:** dry-air weakening now uses the actual ERA5 600/700-hPa
 RH, with shear providing a ventilation pathway into a weakly organized core.
@@ -212,13 +264,17 @@ src/
   storm-session.ts    recording, pause/seek/replay transport, comparison baseline
   flight-recorder.ts  immutable per-tick tape + debrief/snapshot construction
   hindcast.ts         observed-fix interpolation + track/intensity/pressure scores
+  hindcast-benchmark.ts exact multi-storm runner + equal-storm aggregation
+  ensemble.ts         deterministic perturbations, probability grid, summaries
+  ensemble.worker.ts  off-main-thread runs + decoded-bin URL cache
+  weather-layers.ts   seven map-product labels, provenance, and legends
   comparison.ts       same-identity paired-run validation and result deltas
   narrative.ts        exact intensity budget -> plain-language dominant cause
   export.ts           dependency-free PNG card + WebM replay renderer
   performance.ts      device-aware DPR/particle budgets (render only)
   tap-gesture.ts      tap-vs-drag/pinch input recognizer
   ui.ts               loading/demo/aftermath state machine, ripple, epitaph, slow-mo
-  render/             WebGL2 dark-instrument layers behind one facade
+  render/             WebGL2 terrain, scalar, IR-proxy, radar, storm layers
   style.css           instrument chrome styling
   fonts/              self-hosted IBM Plex Mono woff2 (400, 500)
 test/                 vitest: grid, loader (golden vector), rng, physics, integration

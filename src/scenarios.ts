@@ -22,7 +22,7 @@ import type { EnvSamplingMode, ParsedBin } from './types';
 /** The picker value + hash sentinel for the default (non-event) regime. */
 export const CLIMATOLOGY_ID = 'climatology';
 
-/** The canonical spawn point/seed for a historic event (first in-domain fix, C3). */
+/** Canonical counterfactual spawn, inset from the domain edge for a watchable run. */
 export interface ScenarioSpawn {
   lat: number;
   lon: number;
@@ -30,6 +30,7 @@ export interface ScenarioSpawn {
 }
 
 export type EventRunMode = 'hindcast' | 'counterfactual';
+export type BenchmarkPartition = 'calibration' | 'validation';
 
 /** Observed tropical-storm fix used to initialize a scored hindcast. */
 export interface HindcastInitialization {
@@ -64,6 +65,8 @@ export interface Scenario {
   ghostId: string;
   /** Null only for legacy catalogues; production events carry this. */
   hindcast: HindcastInitialization | null;
+  /** Frozen storm-level split used by constrained intensity calibration. */
+  benchmarkPartition: BenchmarkPartition | null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -138,6 +141,11 @@ function parseScenario(v: unknown): Scenario | null {
     spawn,
     ghostId: v.ghostId,
     hindcast: parseHindcast(v.hindcast),
+    benchmarkPartition:
+      v.benchmarkPartition === 'calibration' ||
+      v.benchmarkPartition === 'validation'
+        ? v.benchmarkPartition
+        : null,
   };
 }
 

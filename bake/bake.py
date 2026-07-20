@@ -10,9 +10,9 @@ Produces five files the browser loads by default (BINARY-FORMATS.md is the contr
   public/data/genesis.json  IBTrACS first-fix points of storms that reached Oman
   public/data/tracks.json   IBTrACS full polylines for the ghost-track overlay
 
-And, opt-in via `bake/.venv/bin/python bake/bake.py events`, aligned event
-forcing for observed-initialization hindcasts and counterfactuals:
-  public/data/env_gonu.bin  public/data/env_shaheen.bin  public/data/scenarios.json
+And, opt-in via `bake/.venv/bin/python bake/bake.py events`, aligned forcing
+for the frozen ten-storm hindcast benchmark and counterfactual catalogue:
+  public/data/env_<event>.bin  public/data/scenarios.json
 
 Run:  bake/.venv/bin/python bake/bake.py           (default 5-file bake)
       bake/.venv/bin/python bake/bake.py events     (event bins + scenarios)
@@ -40,6 +40,7 @@ import binfmt
 import era5
 import era5_event
 import era5_humidity
+import event_catalog
 import hydro
 import hydrosheds
 import sources
@@ -47,36 +48,7 @@ import synth
 import woa23
 from binfmt import Layer
 
-# Event scenarios. Each references the storm's ghost
-# track (C1), its event env bin (C2), and the sim time window (C3, windowH is
-# COMPUTED from the baked plane count, never hardcoded). nc files are the
-# committed data/raw/era5_{tag}*.nc; Shaheen spans two months (_09 + _10).
-#
-# `spawn` is an explicit (lat, lon) override for the canonical replay point (C3).
-# The bare "first IBTrACS fix inside DOMAIN" rule (_first_in_domain) puts the
-# spawn ON the boundary the track entered through — Gonu's is lat 15.000, exactly
-# DOMAIN.latMin — where the vortex-filtered plane-0 steering runs southward /
-# onshore, so the storm crosses the edge (or the coast) on its first 15-min tick
-# and dies at ageH~0 ("drifted off the map" / instant landfall). Both shipped
-# events were dead-on-arrival that way. These overrides are points a few tenths
-# of a degree up-track, VERIFIED by a live replay through createSimEngine (see
-# test/integration-events.test.ts "each canonical spawn replays into a real
-# storm"): gonu (20.5,64.5) -> ~110 sim-h life, peak ~89 kt, closest ~314 km to
-# Muscat before an Oman/Makran landfall; shaheen (24.0,61.5) -> ~130 sim-h, peak
-# ~82 kt, closest ~183 km. Both reproduce the storm's recognizable NW approach
-# instead of an instant epitaph.
-EVENT_SCENARIOS = (
-    {"id": "gonu", "label": "gonu 2007", "tag": "gonu", "monthIndex": 5,
-     "seed": 2007, "ghostId": "gonu2007", "spawn": (20.5, 64.5),
-     "nc": ("era5_gonu_2007.nc",),
-     "rh_nc": ("era5_rh_gonu_2007.nc",),
-     "sst_nc": ("era5_sst_gonu_2007.nc",)},
-    {"id": "shaheen", "label": "shaheen 2021", "tag": "shaheen", "monthIndex": 8,
-     "seed": 2021, "ghostId": "shaheen2021", "spawn": (24.0, 61.5),
-     "nc": ("era5_shaheen_2021_09.nc", "era5_shaheen_2021_10.nc"),
-     "rh_nc": ("era5_rh_shaheen_2021_09.nc", "era5_rh_shaheen_2021_10.nc"),
-     "sst_nc": ("era5_sst_shaheen_2021_09.nc", "era5_sst_shaheen_2021_10.nc")},
-)
+EVENT_SCENARIOS = event_catalog.EVENTS
 
 # Steering/shear source: real ERA5 climatology when its download exists, else the
 # labeled synthetic fallback. Both expose steering_shear/banner/TAG/IS_SYNTHETIC.
@@ -249,14 +221,21 @@ def build_tracks() -> tuple[str, list[dict]]:
 
 
 def _first_in_domain(points: list[dict]) -> dict | None:
-    """First time-ordered fix inside the playable DOMAIN (spawn = genesis rule).
+    """First time-ordered fix safely inside the playable DOMAIN.
 
-    Fallback only: the shipped scenarios use the explicit `spawn` override in
-    EVENT_SCENARIOS because this bare rule lands ON the entry edge, where the
-    event steering kills the storm on tick 0 (see EVENT_SCENARIOS). A future
-    storm added without an override should verify its spawn via a live replay.
+    Historical tracks often enter exactly on a bbox edge; spawning there makes
+    the counterfactual leave the map on tick one. Keep a 1.2-degree instrument
+    margin, then fall back to the literal first in-domain fix only if a future
+    track never clears it.
     """
     lo_min, lo_max, la_min, la_max = sources.DOMAIN
+    margin = 1.2
+    for p in points:
+        if (
+            lo_min + margin <= p["lon"] <= lo_max - margin
+            and la_min + margin <= p["lat"] <= la_max - margin
+        ):
+            return p
     for p in points:
         if lo_min <= p["lon"] <= lo_max and la_min <= p["lat"] <= la_max:
             return p
@@ -264,8 +243,9 @@ def _first_in_domain(points: list[dict]) -> dict | None:
 
 
 def _hindcast_initialization(points: list[dict], event_start_iso: str) -> dict:
-    """First in-domain observed tropical-storm fix, aligned to the event axis."""
+    """First safely interior observed tropical-storm fix, aligned to the axis."""
     lo_min, lo_max, la_min, la_max = sources.DOMAIN
+    margin = 1.2
     event_start = dt.datetime.strptime(
         event_start_iso, "%Y-%m-%dT%H:%M:%SZ"
     ).replace(tzinfo=dt.timezone.utc)
@@ -274,8 +254,8 @@ def _hindcast_initialization(points: list[dict], event_start_iso: str) -> dict:
         if wind is None or wind < 34:
             continue
         if not (
-            lo_min <= point["lon"] <= lo_max
-            and la_min <= point["lat"] <= la_max
+            lo_min + margin <= point["lon"] <= lo_max - margin
+            and la_min + margin <= point["lat"] <= la_max - margin
         ):
             continue
         start = dt.datetime.strptime(
@@ -317,7 +297,9 @@ def _hindcast_initialization(points: list[dict], event_start_iso: str) -> dict:
             ),
             "envOffsetH": offset_h,
         }
-    raise ValueError("no in-domain >=34 kt observed fix for hindcast initialization")
+    raise ValueError(
+        "no safely interior >=34 kt observed fix for hindcast initialization"
+    )
 
 
 def build_events() -> tuple[list[str], list[dict]]:
@@ -331,23 +313,32 @@ def build_events() -> tuple[list[str], list[dict]]:
     out_paths: list[str] = []
     diags: list[dict] = []
     for spec in EVENT_SCENARIOS:
-        nc_paths = [os.path.join(sources.RAW_DIR, n) for n in spec["nc"]]
-        rh_paths = [os.path.join(sources.RAW_DIR, n) for n in spec["rh_nc"]]
-        sst_paths = [os.path.join(sources.RAW_DIR, n) for n in spec["sst_nc"]]
-        ghost = storms[spec["ghostId"]]
+        nc_paths = [
+            os.path.join(sources.RAW_DIR, name)
+            for name in event_catalog.event_files(spec, "wind")
+        ]
+        rh_paths = [
+            os.path.join(sources.RAW_DIR, name)
+            for name in event_catalog.event_files(spec, "rh")
+        ]
+        sst_paths = [
+            os.path.join(sources.RAW_DIR, name)
+            for name in event_catalog.event_files(spec, "sst")
+        ]
+        ghost = storms[spec["trackId"]]
         d = era5_event.build_event_env(
             spec["tag"], spec["monthIndex"], nc_paths, rh_paths, sst_paths, OUT_DIR,
             track_points=ghost["points"],
         )
         diags.append(d)
         out_paths.append(d["path"])
-        override = spec.get("spawn")
+        override = spec.get("sandboxSpawn")
         if override is not None:
             spawn = {"lat": float(override[0]), "lon": float(override[1])}
         else:
             spawn = _first_in_domain(ghost["points"])
             if spawn is None:
-                raise ValueError(f"{spec['ghostId']}: no in-domain fix for spawn")
+                raise ValueError(f"{spec['trackId']}: no in-domain fix for spawn")
         nf = d["vortex_near_far"]
         nf_s = f"near {nf[0]:.2f} vs far {nf[1]:.2f} m/s" if nf else "n/a"
         print(f"      env_{spec['tag']}.bin: {d['planes']} planes | windowH {d['windowH']} h "
@@ -359,7 +350,8 @@ def build_events() -> tuple[list[str], list[dict]]:
             "monthIndex": spec["monthIndex"], "stepH": era5_event.DECIMATE, "windowH": d["windowH"],
             "startIso": d["start_iso"],
             "spawn": {"lat": spawn["lat"], "lon": spawn["lon"], "seed": spec["seed"]},
-            "ghostId": spec["ghostId"],
+            "ghostId": spec["trackId"],
+            "benchmarkPartition": spec["partition"],
             "hindcast": _hindcast_initialization(
                 ghost["points"], d["start_iso"]
             ),

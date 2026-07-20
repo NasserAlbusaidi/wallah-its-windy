@@ -744,7 +744,7 @@ export class UiController {
   // -------------------------------------------------------------------------
 
   /**
-   * Wire the historic-storm labels ("gonu 2007", "shaheen 2021"). ui owns these
+   * Wire the historic-storm labels from the current catalogue. ui owns these
    * DOM elements (the facade owns the ghost polyline pixels — the owners don't
    * overlap). Each anchor pins one lowercase, low-opacity `.chrome` label at the
    * storm's peak-wind in-domain point. Called once after tracks.json parses;

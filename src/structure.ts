@@ -611,10 +611,18 @@ export interface StructureInput {
   deltaHours?: number;
 }
 
+/**
+ * `dynamics` advances the RMW/outer-size state used by ocean coupling while
+ * skipping the twelve expensive quadrant-radius inversions. It is for
+ * non-rendered ensemble members only; displayed and scored storms stay `full`.
+ */
+export type StructureDetail = 'full' | 'dynamics';
+
 /** Derive one immutable-by-convention physical-structure snapshot. */
 export function deriveStormStructure(
   input: StructureInput,
   parameters: Readonly<StructureParameters> = DEFAULT_STRUCTURE_PARAMETERS,
+  detail: StructureDetail = 'full',
 ): StormStructure {
   const maximumWindKt = Math.max(0, finite(input.vKt));
   const shearMs = Math.max(0, finite(input.shearMs));
@@ -684,21 +692,24 @@ export function deriveStormStructure(
     0,
     maximumWindKt - translationAsymmetryKt,
   );
-  const referenceOuterSize = referenceOuterRadiusKm(
-    34,
-    rmwKm,
-    hollandB,
-    symmetricPeakKt,
-  );
-  const calibratedOuterScale = clamp(
-    outerSizeKm / Math.max(rmwKm * 1.1, referenceOuterSize),
-    0.5,
-    2.3,
-  );
-  const outerWindScale =
-    1 +
-    (calibratedOuterScale - 1) *
-      clamp(parameters.outerSizeWeight, 0, 1);
+  let outerWindScale = 1;
+  if (detail === 'full') {
+    const referenceOuterSize = referenceOuterRadiusKm(
+      34,
+      rmwKm,
+      hollandB,
+      symmetricPeakKt,
+    );
+    const calibratedOuterScale = clamp(
+      outerSizeKm / Math.max(rmwKm * 1.1, referenceOuterSize),
+      0.5,
+      2.3,
+    );
+    outerWindScale =
+      1 +
+      (calibratedOuterScale - 1) *
+        clamp(parameters.outerSizeWeight, 0, 1);
+  }
   const vectorMagnitude = Math.hypot(shearUms, shearVms);
   const shearAsymmetryFraction =
     vectorMagnitude < 1e-6
@@ -762,8 +773,10 @@ export function deriveStormStructure(
     r50Km: emptyRadii(),
     r64Km: emptyRadii(),
   };
-  structure.r34Km = quadrantRadii(34, structure);
-  structure.r50Km = quadrantRadii(50, structure);
-  structure.r64Km = quadrantRadii(64, structure);
+  if (detail === 'full') {
+    structure.r34Km = quadrantRadii(34, structure);
+    structure.r50Km = quadrantRadii(50, structure);
+    structure.r64Km = quadrantRadii(64, structure);
+  }
   return structure;
 }

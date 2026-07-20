@@ -211,6 +211,19 @@ export class FlightRecorder {
     };
   }
 
+  /**
+   * Detached frames for offline verification while a fixed-duration hindcast
+   * is still alive. Unlike snapshot(), this deliberately does not require a
+   * death event and therefore cannot be mistaken for a completed debrief.
+   */
+  framesSnapshot(): FlightFrame[] {
+    return this.frames.map((frame) => ({
+      ...frame,
+      diagnostics: { ...frame.diagnostics },
+      structure: cloneStormStructure(frame.structure),
+    }));
+  }
+
   milestones(): ReplayMilestones | null {
     if (this.frames.length === 0) return null;
     let peak = 0;

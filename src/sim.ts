@@ -39,6 +39,7 @@ import { makeRng } from './rng';
 import type { Rng } from './rng';
 import { DOMAIN, inBBox, greatCircleKm, offsetKm, windToDegPerHour } from './grid';
 import { cloneStormStructure, deriveStormStructure } from './structure';
+import type { StructureDetail } from './structure';
 
 // ---------------------------------------------------------------------------
 // Tunable constants — the ONE place to tune the model by eye (design: "tunable
@@ -181,6 +182,32 @@ export const SIM = {
   EVENT_TFRAC_HORIZON_H: 240,
 } as const;
 
+/** Constrained intensity coefficients that offline calibration and ensembles vary. */
+export interface IntensityParameters {
+  intensifyKPerH: number;
+  shearThresholdMs: number;
+  shearKtPerHPerMs: number;
+  dryAirK: number;
+  organizationRecoveryH: number;
+  organizationDisruptionH: number;
+  /** Fraction of potential intensity controlled by upper-ocean support. */
+  ohcMpiWeight: number;
+  /** Strength of the organized-core multiplier during intensification. */
+  organizationIntensification: number;
+}
+
+/** Deployed coefficients. Calibration compares candidates against this contract. */
+export const DEFAULT_INTENSITY_PARAMETERS: Readonly<IntensityParameters> = {
+  intensifyKPerH: SIM.INTENSIFY_K_PER_H,
+  shearThresholdMs: SIM.SHEAR_THRESHOLD_MS,
+  shearKtPerHPerMs: SIM.SHEAR_K_KT_PER_H_PER_MS,
+  dryAirK: SIM.DRYAIR_K,
+  organizationRecoveryH: SIM.ORGANIZATION_RECOVERY_H,
+  organizationDisruptionH: SIM.ORGANIZATION_DISRUPTION_H,
+  ohcMpiWeight: 0.28,
+  organizationIntensification: 0.5,
+};
+
 // ---------------------------------------------------------------------------
 // Small pure helpers
 // ---------------------------------------------------------------------------
@@ -219,9 +246,12 @@ export function mpiKt(sstC: number): number {
 }
 
 /** Intensity loss rate from vertical wind shear (m/s) — kt/h, ≥ 0. */
-export function shearPenaltyKtPerH(shearMs: number): number {
-  const excess = shearMs - SIM.SHEAR_THRESHOLD_MS;
-  return excess <= 0 ? 0 : excess * SIM.SHEAR_K_KT_PER_H_PER_MS;
+export function shearPenaltyKtPerH(
+  shearMs: number,
+  parameters: Readonly<IntensityParameters> = DEFAULT_INTENSITY_PARAMETERS,
+): number {
+  const excess = shearMs - parameters.shearThresholdMs;
+  return excess <= 0 ? 0 : excess * parameters.shearKtPerHPerMs;
 }
 
 /** Intensity loss rate over land — kt/h, proportional to current intensity. */
@@ -289,7 +319,7 @@ export function betaDriftMs(): { u: number; v: number } {
   return { u: -speed * SQRT1_2, v: speed * SQRT1_2 };
 }
 
-interface IntensityArgs {
+export interface IntensityArgs {
   vKt: number;
   sstC: number;
   shearMs: number;
@@ -305,6 +335,8 @@ interface IntensityArgs {
   ohcKjCm2?: number;
   /** Persistent convective organization in [0,1]. */
   organization?: number;
+  /** Optional candidate coefficients for calibration/sensitivity work. */
+  parameters?: Readonly<IntensityParameters>;
 }
 
 /** The four ODE terms plus their net dV/dt (kt/h). Internal — drives attribution. */
@@ -318,29 +350,34 @@ interface IntensityTerms {
 }
 
 function intensityTerms(a: IntensityArgs): IntensityTerms {
+  const parameters = a.parameters ?? DEFAULT_INTENSITY_PARAMETERS;
   // Over land there is no ocean heat source, so MPI collapses to 0 regardless of
   // whatever SST the sampler returns there — the relaxation term then decays V.
   const organization = clamp01(a.organization ?? 1);
   const ohcSupport = clamp01(((a.ohcKjCm2 ?? 70) - 10) / 70);
   const mpi = a.overLand
     ? 0
-    : mpiKt(a.sstC) * (0.72 + 0.28 * ohcSupport);
+    : mpiKt(a.sstC) *
+      (1 - parameters.ohcMpiWeight + parameters.ohcMpiWeight * ohcSupport);
   const potentialGap = mpi - a.vKt;
   const organizedExcess = clamp01((organization - 0.45) / 0.1);
   const organizationCoupling =
     potentialGap >= 0
-      ? 0.08 + 0.5 * organizedExcess * organizedExcess
+      ? 0.08 +
+        parameters.organizationIntensification *
+          organizedExcess *
+          organizedExcess
       : 1;
   const oceanDepthCoupling =
     potentialGap >= 0
       ? 0.8 + 0.55 * clamp01(((a.ohcKjCm2 ?? 70) - 40) / 35)
       : 1;
   const coreCoupling = organizationCoupling * oceanDepthCoupling;
-  const relax = SIM.INTENSIFY_K_PER_H * potentialGap * coreCoupling;
+  const relax = parameters.intensifyKPerH * potentialGap * coreCoupling;
   const graceRamp = a.ageH === undefined ? 1 : Math.min(1, a.ageH / SIM.SHEAR_GRACE_H);
   const shearPen =
     graceRamp *
-    shearPenaltyKtPerH(a.shearMs) *
+    shearPenaltyKtPerH(a.shearMs, parameters) *
     (1.15 - 0.3 * organization);
   const landPen = a.overLand ? landDecayKtPerH(a.vKt) : 0;
   const dryFraction = clamp01(
@@ -356,7 +393,7 @@ function intensityTerms(a: IntensityArgs): IntensityTerms {
   const dryPen =
     a.overLand
       ? 0
-      : SIM.DRYAIR_K *
+      : parameters.dryAirK *
         dryFraction *
         (0.25 + 1.5 * coreExposure) *
         shearExposure;
@@ -386,11 +423,12 @@ export function advanceOrganization(
   current: number,
   target: number,
   dtH: number,
+  parameters: Readonly<IntensityParameters> = DEFAULT_INTENSITY_PARAMETERS,
 ): number {
   const tau =
     target < current
-      ? SIM.ORGANIZATION_DISRUPTION_H
-      : SIM.ORGANIZATION_RECOVERY_H;
+      ? parameters.organizationDisruptionH
+      : parameters.organizationRecoveryH;
   const weight = 1 - Math.exp(-Math.max(0, dtH) / tau);
   return clamp01(current + (target - current) * weight);
 }
@@ -445,10 +483,19 @@ export interface SimDeps {
   env: EnvSampler;
   /** Land mask predicate, from terrain.bin — true where (lat,lon) is land. */
   isLand: (lat: number, lon: number) => boolean;
+  /** Optional deterministic coefficient override for calibration/ensembles. */
+  intensityParameters?: Partial<IntensityParameters>;
+  /** Skip non-coupled wind-radius inversions for non-rendered ensemble members. */
+  structureDetail?: StructureDetail;
 }
 
 export function createSimEngine(deps: SimDeps): SimEngine {
   const { env, isLand } = deps;
+  const intensityParameters: IntensityParameters = {
+    ...DEFAULT_INTENSITY_PARAMETERS,
+    ...deps.intensityParameters,
+  };
+  const structureDetail = deps.structureDetail ?? 'full';
   const beta = betaDriftMs();
 
   // --- Mutable run state (all reset by spawn) ------------------------------
@@ -787,6 +834,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       midlevelRhPct: initialEnv.midlevelRhPct,
       ohcKjCm2: initialEnv.ohcKjCm2,
       organization,
+      parameters: intensityParameters,
       overLand: prevOverLand,
       lat,
       lon,
@@ -795,17 +843,21 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     });
     updateDiagnostics(initialEnv, initialEnv.sstC, prevOverLand, initialTerms);
     const initialMotion = motionAt(lat, lon, initialTFrac);
-    structure = deriveStormStructure({
-      vKt,
-      lat,
-      lon,
-      shearMs: initialEnv.shear,
-      shearUms: initialEnv.shearU,
-      shearVms: initialEnv.shearV,
-      overLand: prevOverLand,
-      motionUms: initialMotion.u,
-      motionVms: initialMotion.v,
-    });
+    structure = deriveStormStructure(
+      {
+        vKt,
+        lat,
+        lon,
+        shearMs: initialEnv.shear,
+        shearUms: initialEnv.shearU,
+        shearVms: initialEnv.shearV,
+        overLand: prevOverLand,
+        motionUms: initialMotion.u,
+        motionVms: initialMotion.v,
+      },
+      undefined,
+      structureDetail,
+    );
     closestKm = greatCircleKm(MUSCAT, { lat, lon });
 
     track = [];
@@ -862,6 +914,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       organization,
       organizationTargetValue,
       dtH,
+      intensityParameters,
     );
     const terms = intensityTerms({
       vKt,
@@ -870,6 +923,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       midlevelRhPct: e.midlevelRhPct,
       ohcKjCm2: e.ohcKjCm2,
       organization,
+      parameters: intensityParameters,
       overLand,
       lat,
       lon,
@@ -877,20 +931,24 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       ageH,
     });
     vKt = guardFinite(Math.max(0, vKt + terms.net * dtH), 'vKt');
-    structure = deriveStormStructure({
-      vKt,
-      lat,
-      lon,
-      shearMs: e.shear,
-      shearUms: e.shearU,
-      shearVms: e.shearV,
-      overLand,
-      motionUms: k2.u,
-      motionVms: k2.v,
-      previousRmwKm: structure.rmwKm,
-      previousOuterSizeKm: structure.outerSizeKm,
-      deltaHours: dtH,
-    });
+    structure = deriveStormStructure(
+      {
+        vKt,
+        lat,
+        lon,
+        shearMs: e.shear,
+        shearUms: e.shearU,
+        shearVms: e.shearV,
+        overLand,
+        motionUms: k2.u,
+        motionVms: k2.v,
+        previousRmwKm: structure.rmwKm,
+        previousOuterSizeKm: structure.outerSizeKm,
+        deltaHours: dtH,
+      },
+      undefined,
+      structureDetail,
+    );
     depositWake(
       lat,
       lon,

@@ -10,7 +10,7 @@ Run:  bake/.venv/bin/python bake/test_events.py
 
 Both tests are fully offline and self-contained:
   * track extraction runs against a synthetic IBTrACS CSV fixture (header + units
-    row + a handful of GONU/GULAB:SHAHEEN/decoy rows) — no 28 MB download needed;
+    row + a handful of GONU/SHAHEEN/decoy rows) — no 28 MB download needed;
   * the event-env WIWB round-trip builds a tiny event bin from synthetic fields
     and parses it back — no .nc read needed.
 """
@@ -51,7 +51,7 @@ def test_load_event_tracks_synthetic() -> None:
         os.unlink(path)
 
     ids = [s["id"] for s in storms]
-    assert ids == ["gonu2007", "shaheen2021"], ids
+    assert ids == [s["id"] for s in sources.EVENT_STORMS], ids
     by_id = {s["id"]: s for s in storms}
 
     gonu = by_id["gonu2007"]
@@ -74,9 +74,14 @@ def test_load_event_tracks_synthetic() -> None:
 
     shaheen = by_id["shaheen2021"]
     assert shaheen["name"] == "shaheen" and shaheen["year"] == 2021, shaheen
-    # matched by GULAB/SHAHEEN token inside "GULAB:SHAHEEN-GU", single SID.
+    # Exact SID match; archive display-name punctuation is irrelevant.
     assert len(shaheen["points"]) == 2, len(shaheen["points"])
     assert shaheen["points"][0]["iso"] == "2021-09-23T18:00:00Z", shaheen["points"][0]
+    assert all(
+        len(storm["points"]) == 0
+        for storm in storms
+        if storm["id"] not in {"gonu2007", "shaheen2021"}
+    )
     print("PASS test_load_event_tracks_synthetic")
 
 
@@ -92,10 +97,13 @@ def test_event_bin_roundtrip() -> None:
     shr = rng.uniform(0, 25, size=(nt, ny, nx))
     shu = rng.uniform(-20, 20, size=(nt, ny, nx))
     shv = rng.uniform(-20, 20, size=(nt, ny, nx))
-    sst_raw = np.clip(np.round((28.0 - 20.0) / 0.01), -32768, 32767).astype(np.int16)
-    sst_raw = np.full(ny * nx, int(sst_raw), dtype=np.int16)
+    sst = np.full((nt, ny, nx), 28.0)
+    rh = rng.uniform(20, 95, size=(nt, ny, nx))
+    ohc = rng.uniform(0, 140, size=(nt, ny, nx))
 
-    layers = era5_event.assemble_event_layers("05", sst_raw, u, v, shr, shu, shv)
+    layers = era5_event.assemble_event_layers(
+        "05", sst, u, v, shr, shu, shv, rh, ohc
+    )
     with tempfile.NamedTemporaryFile("wb", suffix=".bin", delete=False) as fh:
         binfmt.write_bin(fh.name, layers)
         path = fh.name
@@ -105,10 +113,13 @@ def test_event_bin_roundtrip() -> None:
         os.unlink(path)
 
     assert set(parsed) == {
-        "sst_05", "u_05", "v_05", "shr_05", "shu_05", "shv_05"
+        "sst_05", "u_05", "v_05", "shr_05", "shu_05", "shv_05",
+        "rh_05", "ohc_05",
     }, set(parsed)
-    assert parsed["sst_05"].nt == 1, parsed["sst_05"].nt
-    for nm in ("u_05", "v_05", "shr_05", "shu_05", "shv_05"):
+    for nm in (
+        "sst_05", "u_05", "v_05", "shr_05", "shu_05", "shv_05",
+        "rh_05", "ohc_05",
+    ):
         L = parsed[nm]
         assert L.nt == nt, (nm, L.nt)
         assert L.quantized is True, nm
@@ -116,7 +127,7 @@ def test_event_bin_roundtrip() -> None:
     # dequant round-trips within the 0.01 quant step.
     got_u = parsed["u_05"].data.reshape(nt, ny, nx)
     assert np.max(np.abs(got_u - u)) <= 0.01 + 1e-6, float(np.max(np.abs(got_u - u)))
-    assert parsed["sst_05"].data.reshape(ny, nx).mean() == 28.0, parsed["sst_05"].data.mean()
+    assert parsed["sst_05"].data.reshape(nt, ny, nx).mean() == 28.0, parsed["sst_05"].data.mean()
     print("PASS test_event_bin_roundtrip")
 
 

@@ -59,7 +59,18 @@ export function randomSeed(): number {
  * importing the (async-loaded) scenario list. Must stay in sync with the scenario
  * ids in data/scenarios.json.
  */
-export const ENV_HASH_KEYS = ['gonu', 'shaheen'] as const;
+export const ENV_HASH_KEYS = [
+  'gonu',
+  'phet',
+  'nilofar',
+  'ashobaa',
+  'mekunu',
+  'hikaa',
+  'vayu',
+  'kyarr',
+  'shaheen',
+  'biparjoy',
+] as const;
 export type EnvHashKey = (typeof ENV_HASH_KEYS)[number];
 const ENV_HASH_SET: ReadonlySet<string> = new Set(ENV_HASH_KEYS);
 

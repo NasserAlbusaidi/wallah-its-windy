@@ -41,15 +41,11 @@
           <option value="10">November</option>
         </select>
 
-        <!-- Scenario picker (C8): climatology sandbox, or replay a historic event
-             (Gonu 2007 / Shaheen 2021) as a counterfactual. main.ts owns the change
-             listener + lazy env-bin fetch; the picker disables itself when the
-             scenario catalogue (data/scenarios.json) is absent. -->
+        <!-- Scenario picker (C8): main.ts fills the frozen historical catalogue
+             after loading scenarios.json, then lazy-loads only the selected bin. -->
         <label for="scenario">Scenario</label>
         <select id="scenario" aria-label="Scenario">
           <option value="climatology" selected>climatology</option>
-          <option value="gonu">gonu 2007 environment</option>
-          <option value="shaheen">shaheen 2021 environment</option>
         </select>
         <label id="scenario-mode-label" for="scenario-mode" hidden>Run</label>
         <select id="scenario-mode" aria-label="Event run mode" hidden>
@@ -60,6 +56,21 @@
           observed initialization · freely simulated · scored against IBTrACS
         </p>
       </div>
+
+      <section id="weather-view" class="chrome" aria-label="Weather map layer">
+        <label for="weather-layer">Map layer</label>
+        <select id="weather-layer" aria-label="Weather map layer">
+          <option value="terrain" selected>terrain instrument</option>
+        </select>
+        <div id="weather-legend" data-layer="terrain">
+          <span id="weather-legend-name">terrain</span>
+          <span id="weather-legend-unit">bathymetry · topography</span>
+          <span class="weather-scale" aria-hidden="true"></span>
+          <span id="weather-legend-scale">
+            bathymetry · topography · storm structure
+          </span>
+        </div>
+      </section>
 
       <!-- Flight recorder: live physics explanation, then an immutable
            post-storm debrief + scrub transport. All controls observe recorded
@@ -235,6 +246,76 @@
         </div>
       </section>
 
+      <details id="analysis-dock" class="chrome">
+        <summary>forecast laboratory</summary>
+        <div class="analysis-body">
+          <section aria-labelledby="ensemble-title">
+            <h2 id="ensemble-title">uncertainty ensemble</h2>
+            <p>
+              Perturbs initialization, ERA5/OHC forcing, and constrained model
+              coefficients. The baseline member is unchanged. Spread is
+              experimental, not an operationally calibrated probability.
+            </p>
+            <div class="analysis-action">
+              <label for="ensemble-size">members</label>
+              <select id="ensemble-size">
+                <option value="20">20</option>
+                <option value="40" selected>40</option>
+                <option value="80">80</option>
+              </select>
+              <button id="ensemble-run" type="button">run ensemble</button>
+            </div>
+            <output id="ensemble-status" aria-live="polite">
+              spawn or select a storm
+            </output>
+            <dl id="ensemble-results" class="analysis-results" hidden>
+              <div><dt>peak p10–p90</dt><dd id="ensemble-peak">—</dd></div>
+              <div><dt>hurricane</dt><dd id="ensemble-hurricane">—</dd></div>
+              <div><dt>major</dt><dd id="ensemble-major">—</dd></div>
+              <div><dt>landfall</dt><dd id="ensemble-landfall">—</dd></div>
+            </dl>
+          </section>
+
+          <section aria-labelledby="sensitivity-title">
+            <h2 id="sensitivity-title">controlled sensitivity</h2>
+            <p>
+              Re-runs the same seed with explicit environmental changes.
+            </p>
+            <div class="sensitivity-grid">
+              <label>
+                sst Δ
+                <input id="sensitivity-sst" type="range" min="-2" max="2" step="0.5" value="0" />
+                <output id="sensitivity-sst-value">+0.0 °C</output>
+              </label>
+              <label>
+                humidity Δ
+                <input id="sensitivity-rh" type="range" min="-20" max="20" step="5" value="0" />
+                <output id="sensitivity-rh-value">+0%</output>
+              </label>
+              <label>
+                shear Δ
+                <input id="sensitivity-shear" type="range" min="-8" max="8" step="2" value="0" />
+                <output id="sensitivity-shear-value">+0 m/s</output>
+              </label>
+              <label>
+                ocean heat
+                <input id="sensitivity-ohc" type="range" min="0.5" max="1.5" step="0.1" value="1" />
+                <output id="sensitivity-ohc-value">×1.0</output>
+              </label>
+              <label>
+                core Δ
+                <input id="sensitivity-org" type="range" min="-0.3" max="0.3" step="0.05" value="0" />
+                <output id="sensitivity-org-value">+0.00</output>
+              </label>
+            </div>
+            <button id="sensitivity-run" type="button">run same-storm test</button>
+            <output id="sensitivity-status" aria-live="polite">
+              no experiment yet
+            </output>
+          </section>
+        </div>
+      </details>
+
       <!-- caption / epitaph slot -->
       <p id="caption" class="chrome hint">click the sea to spawn your own</p>
     </div>
@@ -281,11 +362,22 @@
         <section>
           <h3>Historic environments</h3>
           <p>
-            Observed hindcasts start from the first in-domain tropical-storm fix,
-            simulate freely with no track nudging, and score the result against
-            the faint observed track. Counterfactual sandbox mode instead places
-            your storm into the same event environment. Neither is an operational
-            forecast or full atmospheric reconstruction.
+            Ten observed hindcasts start from the first tropical-storm fix safely
+            inside the map, simulate freely with no track nudging, and score the result
+            against the faint observed track. Seven storms calibrate the bounded
+            intensity search; three complete storms remain an untouched holdout.
+            Counterfactual mode instead places your storm into the same event
+            environment. Neither mode is an operational forecast.
+          </p>
+        </section>
+        <section>
+          <h3>Weather views</h3>
+          <p>
+            SST, humidity, ocean heat, and shear show the exact baked field being
+            sampled by the model. Infrared and rain-radar views are explicitly
+            simulated structural proxies derived from the live vortex—not
+            satellite brightness temperatures or observed radar reflectivity.
+            Keys 1–7 switch layers.
           </p>
         </section>
       </form>

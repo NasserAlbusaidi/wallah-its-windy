@@ -21,6 +21,7 @@ import urllib.request
 import numpy as np
 from scipy.io import netcdf_file
 from scipy import ndimage
+from event_catalog import EVENTS
 
 # --- Domain + target grids (mirror src/grid.ts DOMAIN) ----------------------
 DOMAIN = (50.0, 70.0, 15.0, 27.0)  # lonMin, lonMax, latMin, latMax
@@ -237,20 +238,22 @@ def load_genesis_points() -> tuple[list[dict[str, float]], int, int]:
 
 
 # ---------------------------------------------------------------------------
-# Event tracks: full IBTrACS polylines for the two named counterfactual storms.
+# Event tracks: full IBTrACS polylines for the frozen benchmark catalogue.
 # Distinct from genesis dots (load_genesis_points): this keeps EVERY fix with its
 # time + intensity, for the ghost-track overlay (C7) and sim tuning (C5).
 # ---------------------------------------------------------------------------
 
-# Each storm is disambiguated by SEASON + a NAME token set (never NAME alone —
-# multiple seasons can reuse a name). Empirically ibtracs.NI.csv gives ONE SID
-# per system: GONU is 2007151N14072; the Gulab->Shaheen system is the single SID
-# 2021267N18094 named "GULAB:SHAHEEN-GU" (one row group, no stitch needed). The
-# loader still merges + de-dupes across multiple SIDs defensively, so a future
-# archive that splits the system into two SIDs stitches transparently.
-EVENT_STORMS = (
-    {"id": "gonu2007", "name": "gonu", "year": 2007, "tokens": ("GONU",)},
-    {"id": "shaheen2021", "name": "shaheen", "year": 2021, "tokens": ("SHAHEEN", "GULAB")},
+# Exact IBTrACS SIDs keep the frozen split stable even if names are reused or
+# agency labels change in a later archive.
+EVENT_STORMS = tuple(
+    {
+        "id": event["trackId"],
+        "name": event["name"],
+        "year": event["year"],
+        "sid": event["sid"],
+        "partition": event["partition"],
+    }
+    for event in EVENTS
 )
 
 
@@ -279,7 +282,7 @@ def load_event_tracks(csv_path: str | None = None) -> list[dict]:
     Points keep ALL fixes (including off-domain Bay-of-Bengal segments — canvas
     clipping handles them), time-ordered, lat/lon rounded to 3 dp, windKt/presMb
     integers or None when the CSV cell is blank. Rows are matched by SEASON + a
-    NAME token; multiple SIDs for one system are merged and de-duped by ISO_TIME.
+    exact SID and de-duplicate by ISO_TIME.
     """
     path = csv_path or ensure_download(URL_IBTRACS_NI, "ibtracs.NI.csv")
 
@@ -291,14 +294,12 @@ def load_event_tracks(csv_path: str | None = None) -> list[dict]:
         reader = csv.reader(fh)
         header = next(reader)
         i_sid = header.index("SID")
-        i_season = header.index("SEASON")
-        i_name = header.index("NAME")
         i_iso = header.index("ISO_TIME")
         i_lat = header.index("LAT")
         i_lon = header.index("LON")
         i_wind = header.index("WMO_WIND")
         i_pres = header.index("WMO_PRES")
-        need = max(i_sid, i_season, i_name, i_iso, i_lat, i_lon, i_wind, i_pres)
+        need = max(i_sid, i_iso, i_lat, i_lon, i_wind, i_pres)
         for rowv in reader:
             if len(rowv) <= need:
                 continue
@@ -312,12 +313,8 @@ def load_event_tracks(csv_path: str | None = None) -> list[dict]:
                 continue
             if lo > 180.0:  # IBTrACS uses -180..180; guard anyway
                 lo -= 360.0
-            season = rowv[i_season].strip()
-            name_u = rowv[i_name].strip().upper()
             for spec in EVENT_STORMS:
-                if season != str(spec["year"]):
-                    continue
-                if not any(tok in name_u for tok in spec["tokens"]):
+                if sid != spec["sid"]:
                     continue
                 iso = _iso_z(rowv[i_iso])
                 collected[spec["id"]][iso] = (
@@ -334,7 +331,13 @@ def load_event_tracks(csv_path: str | None = None) -> list[dict]:
             for iso, (la, lo, w, p) in sorted(fixes.items())  # ISO strings sort chronologically
         ]
         storms.append(
-            {"id": spec["id"], "name": spec["name"], "year": spec["year"], "points": points}
+            {
+                "id": spec["id"],
+                "name": spec["name"],
+                "year": spec["year"],
+                "partition": spec["partition"],
+                "points": points,
+            }
         )
     return storms
 

@@ -13,6 +13,12 @@ separate from the browser runtime.
 - `results.json` — machine-readable metrics, slices, parameters, decision, and
   source manifest.
 - `../docs/structure-calibration.md` — generated human-readable report.
+- `hindcast.mjs` — exact ten-event free-replay runner, bounded joint intensity
+  search, and frozen 7/3 complete-storm acceptance split.
+- `hindcast-results.json` — per-storm/aggregate baseline, proposal, deployed
+  decision, and live-parameter consistency.
+- `../docs/hindcast-benchmark.md` — generated historical-replay report.
+- `ensemble.bench.ts` — steady-state 20/40/80-member performance profile.
 
 The committed subset contains six-hour main-track tropical fixes only. All
 position and structure values come from USA/JTWC columns. R34 is scored from
@@ -27,6 +33,8 @@ npm run data:structure
 
 # Re-run search and regenerate both reports.
 npm run calibrate:structure
+npm run calibrate:intensity
+npm run profile:ensemble
 
 # Fail if data, metrics, reports, gates, or live parameters drift.
 npm run calibrate:check

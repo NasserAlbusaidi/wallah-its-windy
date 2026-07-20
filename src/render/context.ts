@@ -17,6 +17,7 @@ import type {
   StormStructure,
   TrackPoint,
 } from '../types';
+import type { WeatherLayerId } from '../weather-layers';
 
 /** Environment sampled at the storm centre (render's own CPU read of env.bin). */
 export interface EnvAtStorm {
@@ -46,6 +47,15 @@ export interface GpuTextures {
   /** Env (0.5°) grid for the SST tint. */
   envGrid: GridSpec | null;
   sst: WebGLTexture | null;
+  sstNext: WebGLTexture | null;
+  humidity: WebGLTexture | null;
+  humidityNext: WebGLTexture | null;
+  ohc: WebGLTexture | null;
+  ohcNext: WebGLTexture | null;
+  shear: WebGLTexture | null;
+  shearNext: WebGLTexture | null;
+  /** Fractional interpolation from each current texture to its next texture. */
+  envBlend: number;
   /** Genesis-zone points in clip space (x,y interleaved), or null when absent. */
   genesisClip: Float32Array | null;
 }
@@ -82,6 +92,7 @@ export interface DrawCtx {
   comparisonTrack: TrackPoint[] | null;
   /** Env sampled at the storm centre, or null when unavailable. */
   env: EnvAtStorm | null;
+  weatherLayer: WeatherLayerId;
 }
 
 /** Lifecycle shared by every internal layer module. Draw signatures vary. */

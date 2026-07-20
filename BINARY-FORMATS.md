@@ -214,26 +214,29 @@ from IBTrACS for storms that actually reached Oman.
 
 ---
 
-## Event scenarios — `env_gonu.bin`, `env_shaheen.bin`, `scenarios.json`, `tracks.json`
+## Event scenarios — `env_<event>.bin`, `scenarios.json`, `tracks.json`
 
-The event bake (`bake/bake.py events`) adds four files:
+The event bake (`bake/bake.py events`) adds one bin per frozen catalogue event
+plus two JSON catalogues:
 
-- **`env_gonu.bin` / `env_shaheen.bin`** — the SAME WIWB format as `env.bin`
+- **`env_<event>.bin`** — the SAME WIWB format as `env.bin`
   (version 1, identical 88-byte records, 40×24, int16 quant scale 0.01, north
   row 0). The ONLY difference is the `nt` mode-2 **time axis**:
   `sst/u/v/shr/shu/shv/rh/ohc` planes
-  are consecutive 3-hourly steps (gonu `nt=64`, shaheen `nt=168`), consumed by
+  are consecutive 3-hourly steps, consumed by
   selecting `event-timeline` mode and interpolating along `tFrac`. Layers keep
-  the month-suffix names (`sst_05,u_05,v_05,shr_05,rh_05,ohc_05` for gonu;
-  `..._08` for shaheen) so the existing sampler resolves them unchanged.
+  the scenario's fixed month-suffix names so the existing sampler resolves them
+  unchanged.
   SST/RH are event-time ERA5 fields; OHC linearly interpolates adjacent WOA23
   monthly means. The real-storm wind vortex is washed out at bake time
   (gaussian_filter σ=3 cells); see `bake/README.md`.
 - **`scenarios.json`** — JSON (tiny). `{"version":1,"scenarios":[{id,label,bin,
-  monthIndex,stepH,windowH,startIso,spawn:{lat,lon,seed},ghostId,hindcast:{
-  startIso,lat,lon,initialWindKt,initialOrganization,envOffsetH}}]}`. `windowH =
-  (planes−1)·stepH`, computed. `hindcast` is derived from the first in-domain
-  observed ≥34-kt fix and aligns it to the bin's time axis.
+  monthIndex,stepH,windowH,startIso,spawn:{lat,lon,seed},ghostId,
+  benchmarkPartition,hindcast:{startIso,lat,lon,initialWindKt,
+  initialOrganization,envOffsetH}}]}`. `benchmarkPartition` is the frozen
+  storm-level `calibration` or `validation` split. `windowH =
+  (planes−1)·stepH`, computed. `hindcast` is derived from the first observed
+  ≥34-kt fix at least 1.2° inside the domain and aligns it to the bin's time axis.
 - **`tracks.json`** — JSON. `{"version":1,"storms":[{id,name,year,points:[{iso,
   lat,lon,windKt,presMb}]}]}`; the historic ghost-track polylines. `lat/lon`
   rounded to 3 dp; `windKt/presMb` are integers or `null` when the CSV cell is

@@ -23,7 +23,7 @@
 
 import './style.css';
 import { injectCssVars, TOKENS } from './tokens';
-import { readHash, writeHash, isEnvHashKey } from './rng';
+import { readHash, writeHash, clearHash, isEnvHashKey } from './rng';
 import { DOMAIN, clipToLatLon, inBBox } from './grid';
 import { parseBin } from './loader';
 import type {
@@ -559,6 +559,11 @@ function returnToClimatology(): void {
     renderCtrl?.setMonth?.(demo.monthIndex);
     doSpawn(demo);
     warmUp(DEMO_WARMUP_H);
+    // Entering the event wrote '#...&env=gonu' (canonical spawn, isDemo:false); the
+    // demo is hash-free, so strip that stale fragment and reset the caption off the
+    // event copy, or a reload/share would replay the event the user just left.
+    clearHash();
+    ui.climatologyRestored();
   }
 }
 

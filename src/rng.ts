@@ -143,3 +143,13 @@ export function writeHash(state: HashState): void {
   const next = `#${encodeHash(state)}`;
   history.replaceState(null, '', next);
 }
+
+/**
+ * Strip the storm fragment from the address bar, returning to the legacy no-hash
+ * state, without adding a history entry. The ambient demo runs hash-free (doSpawn
+ * skips writeHash for demos), so a return-to-climatology that respawns the demo
+ * must clear any leftover event fragment so a reload/share matches the screen.
+ */
+export function clearHash(): void {
+  history.replaceState(null, '', location.pathname + location.search);
+}

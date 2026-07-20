@@ -386,10 +386,17 @@ async function loadAll(): Promise<void> {
       doSpawn({ ...first, monthIndex: sharedScenario.monthIndex, tFracHorizonH: sharedScenario.windowH });
       return;
     }
-    // Event bin unbaked/404: visible caption, then replay in climatology so the
-    // storm still forms (the caption makes the wrong-env replay non-silent).
-    ui.scenarioError(sharedScenario.label);
+    // Event bin unbaked/404: replay in climatology so the storm still forms, then
+    // pin the error caption. scenarioError must fire AFTER finishLoading — the
+    // latter unconditionally writes SHARED_HINT in the same tick and would bury a
+    // caption set beforehand, which C8 forbids (never a silent wrong-physics
+    // replay: the recipient must SEE that the requested event physics is missing).
     scenarioSelect.value = CLIMATOLOGY_ID;
+    const climFirst = ui.finishLoading(shared);
+    renderCtrl?.setMonth?.(climFirst.monthIndex);
+    doSpawn(climFirst);
+    ui.scenarioError(sharedScenario.label);
+    return;
   }
   const first = ui.finishLoading(shared);
   renderCtrl?.setMonth?.(first.monthIndex); // SST tint follows the spawned month
@@ -502,6 +509,12 @@ function applyEventEnv(scenario: Scenario, bin: ParsedBin): void {
   if (!activeScenario) preEventMonth = readPickerMonth();
   activeScenario = scenario;
   envBin = bin; // sampler live-swap — the sim reads the event env on its next tick
+  // Sync the scenario picker to the active event (C8 fidelity). On the shared-URL
+  // boot path nothing else sets it, so without this the picker keeps its DOM
+  // default 'climatology' while the event runs — and, because selecting the
+  // already-shown 'climatology' fires no 'change', the user can't leave the event.
+  // On interactive switches the value already matches, so this stays idempotent.
+  scenarioSelect.value = scenario.id;
   monthSelect.value = String(scenario.monthIndex);
   monthSelect.disabled = true; // a historic event is pinned to its real month
   renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: bin, genesis: genesisPoints, tracks: ghostTracks });

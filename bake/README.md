@@ -86,18 +86,28 @@ Months outside May–Nov are not baked (no Arabian-Sea cyclone season) — clamp
 
 ---
 
-## TODO: real ERA5 steering + shear (currently SYNTHETIC_V0)
+## Real ERA5 steering + shear — ACTIVE (2026-07-20)
 
-ERA5 is **blocked** on the build machine (no CDS credentials). `env.bin`'s SST is
-**real**; its steering `u/v` and `shear` are a documented synthetic Arabian-Sea
-climatology (`bake/synth.py`, loud banner). To swap in real data, replace the one
-function `synth.steering_shear(elat, elon, month)` with an ERA5 reader returning
-the deep-layer-mean `(u,v)` and 850–200 hPa shear magnitude on the env grid.
-Nothing else changes — quantization, layout, and the timestep axis are already
-real-data-shaped.
+`bake/era5.py` reads `data/raw/era5_climatology.nc` (fetched by
+`bake/fetch_era5.py`) and replaces `synth` automatically when the file exists
+(`bake.py`/`spike_tracks.py` pick `era5 if era5.available() else synth`).
+Definitions: deep-layer steering = pressure-weighted mean of 850/500/250 hPa
+winds (0.531/0.313/0.156); shear = |V200 − V850| per year-month, then averaged
+(mean-of-magnitudes — opposing years must not cancel to calm).
 
-Register a free CDS account, then submit (queue delays can eat hours — submit
-before the build weekend):
+**Synoptic samples (D10):** monthly means alone FAILed the spike (June
+keep-ratio 16 % < 30 %), so `steering_shear_samples()` ships 4 real YEARS per
+month as `nt=4` planes (deterministic farthest-point pick: one typical + three
+diverse; years print at bake). The runtime seed selects the plane. With
+samples the spike PASSes at 50–65 %. NOTE: `src/sim.ts`'s shear penalty is
+calibrated for monthly-mean-of-magnitudes input (threshold 14 m/s, not the
+instantaneous ~10) — see the README physics note.
+
+Gonu (Jun 2007) + Shaheen (Sep 20 – Oct 10 2021) hourly event fields are
+already under `data/raw/` for the v1.1 counterfactual bake (`nt` = TIME there).
+
+The original request, for reproducing from scratch (`bake/fetch_era5.py`
+automates exactly this):
 
 ```python
 import cdsapi
@@ -144,16 +154,13 @@ pure-steering tracks from varied spawns and reports whether nearby spawns collap
 onto rails (too-smooth monthly means). It is the reference implementation the TS
 steering integrator is checked against.
 
-**Status / honest gap:** it currently runs against `synth.steering_shear`
-(SYNTHETIC_V0), because ERA5 is blocked here — so it measures the *synthetic*
-field's diversity, not ERA5's. Against the shipped synthetic steering it reports a
-keep-ratio of ~21–26 % (below its 30 % rail threshold), i.e. the monthly-mean
-synthetic steering is moderately rail-prone — precisely the D10 signal. **RE-RUN it
-against the real ERA5 fields the moment they land, BEFORE the tuning pass.**
-Mitigation already in place: switching a field to 3–5 synoptic samples/month uses
-the `nt` timestep axis, so acting on a FAIL is a re-bake, not a format change. The
-spike is a standalone diagnostic; it is deliberately NOT wired into `bake.py`'s
-gate (no WebGL, no bake format — design D10).
+**Status (2026-07-20): the D10 loop is CLOSED.** Run against real ERA5 monthly
+means the spike FAILed (June keep-ratio 16 %, worse than the synthetic's
+21–26 %) — the exact rails D10 predicted. The remedy was applied: 4 real-year
+synoptic samples per month (`nt=4` planes, seed-selected at runtime). Re-run
+with runtime-like per-sample assignment, the spike PASSes: May 50 %, Sep 65 %
+(gate ≥ 30 %). The spike stays a standalone diagnostic, deliberately NOT wired
+into `bake.py`'s gate (no WebGL, no bake format — design D10).
 
 ## TODO: real HydroSHEDS flow accumulation (currently D8-from-DEM)
 

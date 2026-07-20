@@ -31,6 +31,7 @@ import numpy as np
 
 IS_SYNTHETIC = True
 SYNTHETIC_TAG = "SYNTHETIC_V0"
+TAG = SYNTHETIC_TAG  # common source-tag name shared with era5.py
 
 # Monsoon strength index by 0-indexed month. Peaks Jul-Aug; low in the two
 # cyclone-season shoulders. Tunable, but the SHAPE is the point.

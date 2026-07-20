@@ -28,10 +28,15 @@ import os
 import numpy as np
 
 import binfmt
+import era5
 import hydro
 import sources
 import synth
 from binfmt import Layer
+
+# Steering/shear source: real ERA5 climatology when its download exists, else the
+# labeled synthetic fallback. Both expose steering_shear/banner/TAG/IS_SYNTHETIC.
+ENV_SRC = era5 if era5.available() else synth
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "public", "data")
 DOMAIN = sources.DOMAIN  # (lonMin, lonMax, latMin, latMax)
@@ -59,7 +64,7 @@ def build_terrain() -> str:
 
 
 def build_env() -> str:
-    print("[2/4] env.bin  (OISST SST [REAL] + steering/shear [SYNTHETIC_V0], 0.5 deg)")
+    print(f"[2/4] env.bin  (OISST SST [REAL] + steering/shear [{ENV_SRC.TAG}], 0.5 deg)")
     sst_by_month = sources.load_sst_by_month()
     elat = sources.lat_centers(sources.ENV_NY)
     elon = sources.lon_centers(sources.ENV_NX)
@@ -70,27 +75,41 @@ def build_env() -> str:
         raw = np.round((a - offset) / scale)
         return np.clip(raw, -32768, 32767).astype(np.int16).ravel(order="C")
 
+    # Synoptic samples (D10): when the source can provide K distinct real years
+    # per month, u/v/shr ship as nt=K planes (plane 0 = most typical year) and
+    # the runtime picks a plane per spawn from the seed. SST stays nt=1 (OISST
+    # long-term-mean; its year-to-year spread is second-order for this toy).
+    has_samples = hasattr(ENV_SRC, "steering_shear_samples")
+
     layers: list[Layer] = []
     sst_lo, sst_hi = 99.0, -99.0
+    sample_years: dict[int, list[int]] = {}
     for m in sources.SEASON_MONTHS:
         sst = sst_by_month[m]
-        u, v, shr = synth.steering_shear(ELAT, ELON, m)
         sst_lo, sst_hi = min(sst_lo, float(sst.min())), max(sst_hi, float(sst.max()))
+        if has_samples:
+            u, v, shr, years = ENV_SRC.steering_shear_samples(ELAT, ELON, m)
+            sample_years[m] = years
+        else:
+            u1, v1, shr1 = ENV_SRC.steering_shear(ELAT, ELON, m)
+            u, v, shr = u1[None], v1[None], shr1[None]
+        nt = u.shape[0]
         mm = f"{m:02d}"
         layers.append(Layer(f"sst_{mm}", "int16", True, nx, ny, 1, DOMAIN, 0.01, 20.0, q_i16(sst, 0.01, 20.0)))
-        layers.append(Layer(f"u_{mm}", "int16", True, nx, ny, 1, DOMAIN, 0.01, 0.0, q_i16(u, 0.01, 0.0)))
-        layers.append(Layer(f"v_{mm}", "int16", True, nx, ny, 1, DOMAIN, 0.01, 0.0, q_i16(v, 0.01, 0.0)))
-        layers.append(Layer(f"shr_{mm}", "int16", True, nx, ny, 1, DOMAIN, 0.01, 0.0, q_i16(shr, 0.01, 0.0)))
+        layers.append(Layer(f"u_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(u, 0.01, 0.0)))
+        layers.append(Layer(f"v_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(v, 0.01, 0.0)))
+        layers.append(Layer(f"shr_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(shr, 0.01, 0.0)))
 
     path = os.path.join(OUT_DIR, "env.bin")
     binfmt.write_bin(path, layers)
     # Report the seasonal signal so the synthetic field is inspectable.
     print(f"      grid {nx}x{ny} | {len(layers)} layers ({len(sources.SEASON_MONTHS)} months x 4 fields) | {_mb(path)}")
-    print(f"      SST [REAL] {sst_lo:.1f}..{sst_hi:.1f} degC | steering+shear [{synth.SYNTHETIC_TAG}]:")
+    print(f"      SST [REAL] {sst_lo:.1f}..{sst_hi:.1f} degC | steering+shear [{ENV_SRC.TAG}]:")
     for m in sources.SEASON_MONTHS:
-        u, v, shr = synth.steering_shear(ELAT, ELON, m)
+        u, v, shr = ENV_SRC.steering_shear(ELAT, ELON, m)
         spd = float(np.hypot(u, v).mean())
-        print(f"        month {m:02d}: |steer|~{spd:4.1f} m/s  shear~{float(shr.mean()):4.1f} m/s")
+        yrs = f"  samples={sample_years[m]}" if m in sample_years else ""
+        print(f"        month {m:02d}: |steer|~{spd:4.1f} m/s  shear~{float(shr.mean()):4.1f} m/s{yrs}")
     return path
 
 
@@ -140,7 +159,7 @@ def build_genesis() -> tuple[str, int, int]:
 
 def main() -> int:
     os.makedirs(OUT_DIR, exist_ok=True)
-    print(synth.banner())
+    print(ENV_SRC.banner())
 
     # Bake-time assert #1 (eng task T6): header write->parse roundtrip vs golden.
     print("[assert] " + binfmt.assert_golden_vector())
@@ -154,7 +173,7 @@ def main() -> int:
     total = sum(os.path.getsize(p) for p in (tpath, epath, fpath, gpath))
     print()
     print(f"[done] public/data payload = {total/1e6:.2f} MB raw (budget <= ~7 MB)")
-    print(synth.banner())
+    print(ENV_SRC.banner())
 
     ok = "PASS" in conn_msg
     print(f"[asserts] golden-vector PASS | ACC-connectivity {'PASS' if ok else 'FAIL'}")

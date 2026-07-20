@@ -27,8 +27,11 @@ import math
 
 import numpy as np
 
+import era5
 import sources
 import synth
+
+ENV_SRC = era5 if era5.available() else synth
 
 LON_MIN, LON_MAX, LAT_MIN, LAT_MAX = sources.DOMAIN
 # grid.ts METERS_PER_DEG_LAT — the ONE m/s -> deg conversion constant.
@@ -90,16 +93,31 @@ def run() -> int:
     spawns = np.array([(la, lo) for la in SPAWN_LATS for lo in SPAWN_LONS], dtype=float)
     spawn_spread = nearest_neighbour_mean(spawns[:, ::-1])  # (lon,lat) for spread
 
-    print(synth.banner())
+    print(ENV_SRC.banner())
     print(f"[spike] {len(spawns)} spawns x {len(MONTHS)} months, dt={DT_H} h, {STEPS} steps")
-    print(f"[spike] steering source: {synth.SYNTHETIC_TAG} (re-run against ERA5 when it lands)\n")
+    note = "(re-run against ERA5 when it lands)" if ENV_SRC.IS_SYNTHETIC else "(REAL fields — this is the D10 gate)"
+    print(f"[spike] steering source: {ENV_SRC.TAG} {note}\n")
+
+    # Runtime-like synoptic sampling (D10 remedy): when the source ships K real
+    # year-samples per month, spawn i rides sample i % K — mirroring the runtime's
+    # seed-picks-a-plane behavior — so the measured spread is the spread a
+    # population of user storms actually experiences.
+    has_samples = hasattr(ENV_SRC, "steering_shear_samples")
 
     worst_ratio = 1.0
     all_pass = True
     for m in MONTHS:
-        u, v, _shr = synth.steering_shear(ELAT, ELON, m)
-        ends = np.array([integrate(la, lo, u, v)[:2] for la, lo in spawns])  # (lat,lon)
-        alive = np.array([integrate(la, lo, u, v)[2] for la, lo in spawns])
+        if has_samples:
+            u3, v3, _s3, years = ENV_SRC.steering_shear_samples(ELAT, ELON, m)
+            k = u3.shape[0]
+            fields = [(u3[i], v3[i]) for i in range(k)]
+            print(f"  month {m:02d}: {k} synoptic samples (years {years})")
+        else:
+            u1, v1, _shr = ENV_SRC.steering_shear(ELAT, ELON, m)
+            fields = [(u1, v1)]
+        pick = lambda i: fields[i % len(fields)]  # noqa: E731
+        ends = np.array([integrate(la, lo, *pick(i))[:2] for i, (la, lo) in enumerate(spawns)])
+        alive = np.array([integrate(la, lo, *pick(i))[2] for i, (la, lo) in enumerate(spawns)])
         end_pts = ends[:, ::-1]  # (lon,lat) for planar spread
         end_spread = nearest_neighbour_mean(end_pts)
         # Rail-collapse ratio: endpoints keep this fraction of initial spacing.

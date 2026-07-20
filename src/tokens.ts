@@ -36,6 +36,10 @@ const RAW: readonly RawToken[] = [
   { key: 'genesis', cssVar: '--genesis', rgb: [255, 190, 80], a: 0.12 },
   { key: 'stormCore', cssVar: '--storm-core', rgb: [232, 244, 255], a: 1 },
   { key: 'track', cssVar: '--track', rgb: [120, 220, 255], a: 0.5 },
+  // Historic ghost tracks (C7): a cool, desaturated cyan distinct from the live
+  // track (120,220,255), at genesis-glow luminance (a 0.12) — clearly below the
+  // live track's 0.12–0.62 alpha range so ghosts never compete with the storm.
+  { key: 'ghostTrack', cssVar: '--ghost-track', rgb: [96, 168, 200], a: 0.12 },
   { key: 'text', cssVar: '--text', rgb: [127, 212, 232], a: 1 },
   { key: 'accent', cssVar: '--accent', rgb: [255, 183, 77], a: 1 },
 ] as const;

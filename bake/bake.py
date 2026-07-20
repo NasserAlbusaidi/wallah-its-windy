@@ -47,12 +47,26 @@ from binfmt import Layer
 # track (C1), its event env bin (C2), and the sim time window (C3, windowH is
 # COMPUTED from the baked plane count, never hardcoded). nc files are the
 # committed data/raw/era5_{tag}*.nc; Shaheen spans two months (_09 + _10).
+#
+# `spawn` is an explicit (lat, lon) override for the canonical replay point (C3).
+# The bare "first IBTrACS fix inside DOMAIN" rule (_first_in_domain) puts the
+# spawn ON the boundary the track entered through — Gonu's is lat 15.000, exactly
+# DOMAIN.latMin — where the vortex-filtered plane-0 steering runs southward /
+# onshore, so the storm crosses the edge (or the coast) on its first 15-min tick
+# and dies at ageH~0 ("drifted off the map" / instant landfall). Both shipped
+# events were dead-on-arrival that way. These overrides are points a few tenths
+# of a degree up-track, VERIFIED by a live replay through createSimEngine (see
+# test/integration-events.test.ts "each canonical spawn replays into a real
+# storm"): gonu (20.5,64.5) -> ~110 sim-h life, peak ~89 kt, closest ~314 km to
+# Muscat before an Oman/Makran landfall; shaheen (24.0,61.5) -> ~130 sim-h, peak
+# ~82 kt, closest ~183 km. Both reproduce the storm's recognizable NW approach
+# instead of an instant epitaph.
 EVENT_SCENARIOS = (
     {"id": "gonu", "label": "gonu 2007", "tag": "gonu", "monthIndex": 5,
-     "seed": 2007, "ghostId": "gonu2007",
+     "seed": 2007, "ghostId": "gonu2007", "spawn": (20.5, 64.5),
      "nc": ("era5_gonu_2007.nc",)},
     {"id": "shaheen", "label": "shaheen 2021", "tag": "shaheen", "monthIndex": 8,
-     "seed": 2021, "ghostId": "shaheen2021",
+     "seed": 2021, "ghostId": "shaheen2021", "spawn": (24.0, 61.5),
      "nc": ("era5_shaheen_2021_09.nc", "era5_shaheen_2021_10.nc")},
 )
 
@@ -195,7 +209,13 @@ def build_tracks() -> tuple[str, list[dict]]:
 
 
 def _first_in_domain(points: list[dict]) -> dict | None:
-    """First time-ordered fix inside the playable DOMAIN (spawn = genesis rule)."""
+    """First time-ordered fix inside the playable DOMAIN (spawn = genesis rule).
+
+    Fallback only: the shipped scenarios use the explicit `spawn` override in
+    EVENT_SCENARIOS because this bare rule lands ON the entry edge, where the
+    event steering kills the storm on tick 0 (see EVENT_SCENARIOS). A future
+    storm added without an override should verify its spawn via a live replay.
+    """
     lo_min, lo_max, la_min, la_max = sources.DOMAIN
     for p in points:
         if lo_min <= p["lon"] <= lo_max and la_min <= p["lat"] <= la_max:
@@ -225,9 +245,13 @@ def build_events() -> tuple[list[str], list[dict]]:
         )
         diags.append(d)
         out_paths.append(d["path"])
-        spawn = _first_in_domain(ghost["points"])
-        if spawn is None:
-            raise ValueError(f"{spec['ghostId']}: no in-domain fix for spawn")
+        override = spec.get("spawn")
+        if override is not None:
+            spawn = {"lat": float(override[0]), "lon": float(override[1])}
+        else:
+            spawn = _first_in_domain(ghost["points"])
+            if spawn is None:
+                raise ValueError(f"{spec['ghostId']}: no in-domain fix for spawn")
         nf = d["vortex_near_far"]
         nf_s = f"near {nf[0]:.2f} vs far {nf[1]:.2f} m/s" if nf else "n/a"
         print(f"      env_{spec['tag']}.bin: {d['planes']} planes | windowH {d['windowH']} h "

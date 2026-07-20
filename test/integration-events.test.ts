@@ -17,9 +17,10 @@ import { readFileSync } from 'node:fs';
 import { parseBin } from '../src/loader';
 import { parseTracks } from '../src/tracks';
 import { parseScenarios } from '../src/scenarios';
-import { envMonthSuffix } from '../src/env-sampler';
-import { DOMAIN } from '../src/grid';
-import type { BinLayer, ParsedBin } from '../src/types';
+import { makeEnvSampler, envMonthSuffix } from '../src/env-sampler';
+import { createSimEngine } from '../src/sim';
+import { DOMAIN, latLonToCell } from '../src/grid';
+import type { BinLayer, ParsedBin, SimEvent } from '../src/types';
 
 const DATA_DIR = 'public/data';
 
@@ -128,6 +129,55 @@ describe('scenarios.json', () => {
       expect(s.spawn.lat).toBeLessThanOrEqual(DOMAIN.latMax);
       expect(s.spawn.lon).toBeGreaterThanOrEqual(DOMAIN.lonMin);
       expect(s.spawn.lon).toBeLessThanOrEqual(DOMAIN.lonMax);
+    }
+  });
+
+  // The canonical spawn is the default replay on the picker's flagship path (no
+  // user storm active). A spawn ON the domain-entry edge or hard against the coast
+  // dies at ageH~0 ("drifted off the map" / instant landfall) — the exact DOA the
+  // v1.1 review caught. Replay each scenario end-to-end through the SAME wiring
+  // main.ts uses in event mode (setSynopticIndex(-1) so the bin's nt is a time
+  // axis, tFracHorizonH=windowH, the real terrain landmask) and assert a
+  // non-trivial life: the headline storm must survive and intensify, not epitaph.
+  it('each canonical spawn replays into a real storm (survives + intensifies)', () => {
+    const terrain = loadBin('terrain.bin');
+    const land = terrain.layers.get('landmask')!;
+    const isLand = (lat: number, lon: number): boolean => {
+      const { col, row } = latLonToCell({ nx: land.nx, ny: land.ny, bbox: land.bbox }, lat, lon);
+      const c = Math.max(0, Math.min(land.nx - 1, Math.round(col)));
+      const r = Math.max(0, Math.min(land.ny - 1, Math.round(row)));
+      return land.data[r * land.nx + c] > 0.5;
+    };
+    for (const s of scenarios!) {
+      const bin = loadBin(s.bin.replace(/^data\//, ''));
+      const sampler = makeEnvSampler(() => bin);
+      sampler.setSynopticIndex(-1); // event mode: nt is a time axis (C4/C8)
+      const engine = createSimEngine({ env: sampler, isLand });
+      engine.spawn({
+        lat: s.spawn.lat,
+        lon: s.spawn.lon,
+        monthIndex: s.monthIndex,
+        seed: s.spawn.seed,
+        isDemo: false,
+        tFracHorizonH: s.windowH,
+      });
+      let died = false;
+      let peakKt = 0;
+      let ticks = 0;
+      const MAX_TICKS = 4000; // ~41 sim-days; any real storm dies well before this
+      for (; ticks < MAX_TICKS && !died; ticks++) {
+        const events: SimEvent[] = engine.tick(15);
+        const st = engine.getState()!;
+        peakKt = Math.max(peakKt, st.vKt);
+        for (const e of events) if (e.type === 'died') died = true;
+      }
+      sampler.setSynopticIndex(-1);
+      const ageH = (ticks * 15) / 60;
+      // A DOA spawn dies at ageH<=4 h with peak ~30 kt (spawn intensity, no
+      // spin-up). Require a clearly non-trivial life instead: > 24 sim-hours and a
+      // storm that actually strengthened past a strong tropical storm.
+      expect(ageH, `${s.id} canonical replay lifetime`).toBeGreaterThan(24);
+      expect(peakKt, `${s.id} canonical replay peak`).toBeGreaterThanOrEqual(60);
     }
   });
 });

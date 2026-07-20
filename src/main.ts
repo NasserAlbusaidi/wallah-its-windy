@@ -52,16 +52,6 @@ import {
 } from './scenarios';
 import type { Scenario } from './scenarios';
 
-/**
- * SpawnParams plus the OPTIONAL event-window horizon (C4). B2 adds `tFracHorizonH`
- * to types.ts SpawnParams on his branch; this worktree (B3's) predates that merge,
- * so B4 threads it via this local extension. sim.tick() on B2's branch reads it as
- * `spawn.tFracHorizonH ?? SIM.EVENT_TFRAC_HORIZON_H`; until integration merges B2
- * the field is inert here (sim uses the fixed 240 h horizon), so the counterfactual
- * time-axis mapping is only 1:1 post-merge — see contract_deviations.
- * TODO(integration): drop this alias once SpawnParams carries tFracHorizonH.
- */
-type SpawnParamsX = SpawnParams & { tFracHorizonH?: number };
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
 // main resolves the module by a namespace probe (acquireRender) and PREFERS mode A
@@ -422,7 +412,7 @@ function headOf(s: StormState): Head {
 }
 
 /** Spawn (replacing any active storm), reset interpolation, and share via the hash. */
-function doSpawn(params: SpawnParamsX): void {
+function doSpawn(params: SpawnParams): void {
   if (!engine) return;
   // Synoptic-plane selection BEFORE spawn so the whole life rides one coherent env
   // and sim = f(spawn, month, seed[, env]) holds. Climatology: seed % K picks a
@@ -434,7 +424,7 @@ function doSpawn(params: SpawnParamsX): void {
   // In event mode, thread the scenario window as the tFrac horizon so sim-hours map
   // onto event-hours (C4). Ambient clicks in event mode inherit it too, so they
   // read the same time axis as the canonical replay.
-  const spawn: SpawnParamsX =
+  const spawn: SpawnParams =
     inEvent && params.tFracHorizonH === undefined
       ? { ...params, tFracHorizonH: activeScenario!.windowH }
       : params;

@@ -27,6 +27,7 @@ import type {
   SimEngine,
   SimEvent,
   SpawnParams,
+  StormDiagnostics,
   StormState,
   TrackPoint,
 } from './types';
@@ -302,13 +303,16 @@ interface IntensityArgs {
 }
 
 /** The four ODE terms plus their net dV/dt (kt/h). Internal — drives attribution. */
-function intensityTerms(a: IntensityArgs): {
+interface IntensityTerms {
+  mpi: number;
   relax: number;
   shearPen: number;
   landPen: number;
   dryPen: number;
   net: number;
-} {
+}
+
+function intensityTerms(a: IntensityArgs): IntensityTerms {
   // Over land there is no ocean heat source, so MPI collapses to 0 regardless of
   // whatever SST the sampler returns there — the relaxation term then decays V.
   const mpi = a.overLand ? 0 : mpiKt(a.sstC);
@@ -320,7 +324,7 @@ function intensityTerms(a: IntensityArgs): {
   // the term is off, matching the pre-v1.1 open-ocean behaviour.
   const dryPen = a.isLand ? dryAirPenaltyKtPerH(a.lat, a.lon, a.monthIndex, a.isLand) : 0;
   const net = relax - shearPen - landPen - dryPen;
-  return { relax, shearPen, landPen, dryPen, net };
+  return { mpi, relax, shearPen, landPen, dryPen, net };
 }
 
 /** Net intensity change rate, kt/h (dV/dt). Positive = intensifying. */
@@ -358,6 +362,19 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   let vKt = 0;
   let ageH = 0;
   let alive = false;
+  let diagnostics: StormDiagnostics = {
+    sstC: 0,
+    mpiKt: 0,
+    steerU: 0,
+    steerV: 0,
+    shearMs: 0,
+    overLand: false,
+    oceanKtPerH: 0,
+    shearKtPerH: 0,
+    landKtPerH: 0,
+    dryAirKtPerH: 0,
+    netKtPerH: 0,
+  };
 
   // wander (steering-velocity perturbation, m/s)
   let pu = 0;
@@ -396,7 +413,36 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   }
 
   function snapshot(): StormState {
-    return { lat, lon, vKt, ageH, trackPoints: track, alive, isDemo: demo };
+    return {
+      lat,
+      lon,
+      vKt,
+      ageH,
+      trackPoints: track,
+      alive,
+      isDemo: demo,
+      diagnostics: { ...diagnostics },
+    };
+  }
+
+  function updateDiagnostics(
+    sample: EnvSample,
+    overLand: boolean,
+    terms: IntensityTerms,
+  ): void {
+    diagnostics = {
+      sstC: sample.sstC,
+      mpiKt: terms.mpi,
+      steerU: sample.steerU,
+      steerV: sample.steerV,
+      shearMs: sample.shear,
+      overLand,
+      oceanKtPerH: terms.relax,
+      shearKtPerH: terms.shearPen,
+      landKtPerH: terms.landPen,
+      dryAirKtPerH: terms.dryPen,
+      netKtPerH: terms.net,
+    };
   }
 
   function recordTrackPoint(): void {
@@ -457,6 +503,19 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     prevVKtForPeak = vKt;
     rising = false;
     prevOverLand = isLand(lat, lon);
+    const initialEnv = sampleEnv(lat, lon, 0);
+    const initialTerms = intensityTerms({
+      vKt,
+      sstC: initialEnv.sstC,
+      shearMs: initialEnv.shear,
+      overLand: prevOverLand,
+      lat,
+      lon,
+      monthIndex,
+      ageH,
+      isLand,
+    });
+    updateDiagnostics(initialEnv, prevOverLand, initialTerms);
     closestKm = greatCircleKm(MUSCAT, { lat, lon });
 
     track = [];
@@ -502,6 +561,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       ageH,
       isLand,
     });
+    updateDiagnostics(e, overLand, terms);
     vKt = guardFinite(Math.max(0, vKt + terms.net * dtH), 'vKt');
 
     // 4) Attribute this tick's weakening to a channel (recent-weighted EMA).

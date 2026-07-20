@@ -50,6 +50,75 @@
         </select>
       </div>
 
+      <!-- Flight recorder: live physics explanation, then an immutable
+           post-storm debrief + scrub transport. All controls observe recorded
+           frames; they never rewind the deterministic simulation engine. -->
+      <section id="flight-recorder" class="chrome" aria-label="Storm flight recorder" hidden>
+        <header class="flight-head">
+          <span id="flight-status">live tape</span>
+          <output id="flight-clock">0 h</output>
+          <span id="flight-label"></span>
+        </header>
+
+        <dl class="flight-readouts" aria-label="Current storm physics">
+          <div class="flight-readout primary">
+            <dt>trend</dt>
+            <dd><output id="flight-trend">+0.0 kt/h</output></dd>
+          </div>
+          <div class="flight-readout">
+            <dt>ocean</dt>
+            <dd><output id="flight-ocean">+0.0</output></dd>
+          </div>
+          <div class="flight-readout">
+            <dt>sst / mpi</dt>
+            <dd><output id="flight-sst">—</output></dd>
+          </div>
+          <div class="flight-readout">
+            <dt>shear</dt>
+            <dd><output id="flight-shear">—</output></dd>
+          </div>
+          <div class="flight-readout">
+            <dt>land / dry</dt>
+            <dd><output id="flight-land-dry">—</output></dd>
+          </div>
+          <div class="flight-readout">
+            <dt>steering</dt>
+            <dd><output id="flight-steering">—</output></dd>
+          </div>
+        </dl>
+
+        <div id="flight-debrief" aria-live="polite" hidden>
+          <p id="flight-verdict"></p>
+          <dl class="debrief-grid">
+            <div><dt>peak</dt><dd id="debrief-peak">—</dd></div>
+            <div><dt>life</dt><dd id="debrief-life">—</dd></div>
+            <div><dt>muscat</dt><dd id="debrief-muscat">—</dd></div>
+            <div><dt>landfall</dt><dd id="debrief-landfall">—</dd></div>
+            <div id="debrief-compare-row"><dt>history</dt><dd id="debrief-compare">—</dd></div>
+          </dl>
+        </div>
+
+        <div class="flight-transport">
+          <button id="flight-toggle" type="button">pause</button>
+          <input
+            id="flight-scrubber"
+            type="range"
+            min="0"
+            max="0"
+            value="0"
+            step="1"
+            aria-label="Storm replay timeline"
+            disabled
+          />
+          <nav id="flight-jumps" aria-label="Replay milestones" hidden>
+            <button id="flight-start" type="button">start</button>
+            <button id="flight-peak" type="button">peak</button>
+            <button id="flight-landfall" type="button">landfall</button>
+            <button id="flight-end" type="button">end</button>
+          </nav>
+        </div>
+      </section>
+
       <!-- caption / epitaph slot -->
       <p id="caption" class="chrome hint">click the sea to spawn your own</p>
     </div>

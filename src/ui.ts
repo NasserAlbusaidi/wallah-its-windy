@@ -30,6 +30,11 @@ import { randomSeed, type HashState } from './rng';
 import { latLonToCell, latLonToClip } from './grid';
 import { TOKENS } from './tokens';
 import type { GhostLabelAnchor } from './tracks';
+import {
+  compassDirection,
+  type ReplayMilestones,
+  type StormDebrief,
+} from './flight-recorder';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -47,6 +52,12 @@ function genesisRgba(a: number): string {
 /** `rgba(...)` from the track token's channels at alpha `a`. */
 function trackRgba(a: number): string {
   return `rgba(${TRACK_RGB},${a})`;
+}
+
+function dom<T extends HTMLElement = HTMLElement>(id: string): T {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`ui: missing #${id}`);
+  return element as T;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,6 +110,19 @@ export interface UiHost {
   reducedMotion: boolean;
 }
 
+/** Per-frame presentation state for the live tape and post-storm transport. */
+export interface FlightRecorderView {
+  storm: StormState | null;
+  label: string;
+  frameIndex: number;
+  frameCount: number;
+  debrief: StormDebrief | null;
+  milestones: ReplayMilestones | null;
+  paused: boolean;
+  replayMode: boolean;
+  replayPlaying: boolean;
+}
+
 interface Ripple {
   lat: number;
   lon: number;
@@ -111,6 +135,30 @@ interface Ripple {
  */
 export class UiController {
   private readonly host: UiHost;
+  private readonly flight: {
+    root: HTMLElement;
+    status: HTMLElement;
+    clock: HTMLOutputElement;
+    label: HTMLElement;
+    trend: HTMLOutputElement;
+    ocean: HTMLOutputElement;
+    sst: HTMLOutputElement;
+    shear: HTMLOutputElement;
+    landDry: HTMLOutputElement;
+    steering: HTMLOutputElement;
+    debrief: HTMLElement;
+    verdict: HTMLElement;
+    peak: HTMLElement;
+    life: HTMLElement;
+    muscat: HTMLElement;
+    landfall: HTMLElement;
+    compareRow: HTMLElement;
+    compare: HTMLElement;
+    toggle: HTMLButtonElement;
+    scrubber: HTMLInputElement;
+    jumps: HTMLElement;
+    landfallJump: HTMLButtonElement;
+  };
   private state: UiState = { kind: 'loading', progress: 0 };
   private ripples: Ripple[] = [];
   /** Identity of the currently active storm, for month re-spawn + share hash. */
@@ -133,6 +181,30 @@ export class UiController {
 
   constructor(host: UiHost) {
     this.host = host;
+    this.flight = {
+      root: dom('flight-recorder'),
+      status: dom('flight-status'),
+      clock: dom('flight-clock'),
+      label: dom('flight-label'),
+      trend: dom('flight-trend'),
+      ocean: dom('flight-ocean'),
+      sst: dom('flight-sst'),
+      shear: dom('flight-shear'),
+      landDry: dom('flight-land-dry'),
+      steering: dom('flight-steering'),
+      debrief: dom('flight-debrief'),
+      verdict: dom('flight-verdict'),
+      peak: dom('debrief-peak'),
+      life: dom('debrief-life'),
+      muscat: dom('debrief-muscat'),
+      landfall: dom('debrief-landfall'),
+      compareRow: dom('debrief-compare-row'),
+      compare: dom('debrief-compare'),
+      toggle: dom('flight-toggle'),
+      scrubber: dom('flight-scrubber'),
+      jumps: dom('flight-jumps'),
+      landfallJump: dom('flight-landfall'),
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -319,13 +391,97 @@ export class UiController {
     }
   }
 
+  /** Render the live intensity budget or a recorded post-storm frame. */
+  updateFlightRecorder(view: FlightRecorderView): void {
+    const { storm } = view;
+    const f = this.flight;
+    if (!storm || storm.isDemo) {
+      f.root.hidden = true;
+      return;
+    }
+
+    f.root.hidden = false;
+    const complete = view.debrief !== null;
+    const mode = view.replayMode
+      ? view.replayPlaying
+        ? 'replaying'
+        : 'replay-held'
+      : complete
+        ? 'complete'
+        : view.paused
+          ? 'held'
+          : 'live';
+    f.root.dataset.mode = mode;
+    f.status.textContent =
+      mode === 'replaying'
+        ? 'replay'
+        : mode === 'replay-held'
+          ? 'replay held'
+          : mode === 'complete'
+            ? 'tape complete'
+            : mode === 'held'
+              ? 'live held'
+              : 'live tape';
+    f.clock.textContent = flightClock(storm.ageH);
+    f.label.textContent = view.label;
+
+    const d = storm.diagnostics;
+    f.trend.textContent = `${signed(d.netKtPerH)} kt/h`;
+    f.trend.dataset.sign = d.netKtPerH > 0.05 ? 'up' : d.netKtPerH < -0.05 ? 'down' : 'flat';
+    f.ocean.textContent = signed(d.oceanKtPerH);
+    f.sst.textContent = `${d.sstC.toFixed(1)}°c · ${Math.round(d.mpiKt)} kt`;
+    f.shear.textContent = `${loss(d.shearKtPerH)} · ${d.shearMs.toFixed(1)} m/s`;
+    f.landDry.textContent = `${loss(d.landKtPerH)} / ${loss(d.dryAirKtPerH)}`;
+    const steerSpeed = Math.hypot(d.steerU, d.steerV);
+    f.steering.textContent = `${compactDirection(d.steerU, d.steerV)} · ${steerSpeed.toFixed(1)} m/s`;
+
+    f.scrubber.max = String(Math.max(0, view.frameCount - 1));
+    f.scrubber.value = String(Math.max(0, view.frameIndex));
+    f.scrubber.disabled = !complete || view.frameCount < 2;
+    f.jumps.hidden = !complete;
+    f.landfallJump.disabled = view.milestones?.landfall == null;
+    f.toggle.textContent = complete
+      ? view.replayMode
+        ? view.replayPlaying
+          ? 'pause replay'
+          : view.frameIndex >= view.frameCount - 1
+            ? 'replay'
+            : 'resume replay'
+        : 'replay'
+      : view.paused
+        ? 'resume'
+        : 'pause';
+
+    f.debrief.hidden = !complete;
+    if (!view.debrief) return;
+    const summary = view.debrief;
+    f.verdict.textContent = deathReasonPhrase(summary.death.reason);
+    f.peak.textContent = `${Math.round(summary.death.peakKt)} kt`;
+    f.life.textContent = durationPhrase(summary.death.durationH);
+    f.muscat.textContent = approachDistance(summary.death.closestApproachKm);
+    f.landfall.textContent = summary.landfall
+      ? formatLatLon(summary.landfall.lat, summary.landfall.lon)
+      : 'none';
+    f.compareRow.hidden = summary.historicalPeakKt === undefined;
+    if (summary.historicalPeakKt !== undefined) {
+      f.compare.textContent = historicalComparison(
+        summary.historicalDeltaKt ?? 0,
+        summary.historicalPeakKt,
+      );
+    }
+  }
+
   /**
    * Per-frame housekeeping: expire the aftermath fade (~10s) back to a quiet idle
    * that shows the landfall-rarity copy (eng task T8). The track + flood glow
    * linger over this window; render reads FrameState during aftermath to fade them.
    */
   update(nowMs: number): void {
-    if (this.state.kind === 'aftermath' && nowMs - this.state.fadeStartMs > AFTERMATH_FADE_MS) {
+    if (
+      this.state.kind === 'aftermath' &&
+      this.lastSpawn?.isDemo !== false &&
+      nowMs - this.state.fadeStartMs > AFTERMATH_FADE_MS
+    ) {
       this.state = { kind: 'idle-demo' };
       this.lastSpawn = null;
       this.setCaption(RARITY_COPY, true);
@@ -572,14 +728,65 @@ const REASON_PHRASE: Record<DeathReason, string> = {
   [DeathReason.ExitedDomain]: 'drifted off the map',
 };
 
+export function deathReasonPhrase(reason: DeathReason): string {
+  return REASON_PHRASE[reason] ?? 'dissipated';
+}
+
 /**
  * One-line epitaph: cause · closest approach to Muscat · duration · peak, e.g.
  * "torn apart by wind shear · 340 km short of Muscat · 6 days · peak 85 kt".
  */
 export function epitaph(d: StormDeath): string {
-  const cause = REASON_PHRASE[d.reason] ?? 'dissipated';
+  const cause = deathReasonPhrase(d.reason);
   const parts = [cause, approachPhrase(d.closestApproachKm), durationPhrase(d.durationH), `peak ${Math.round(d.peakKt)} kt`];
   return parts.join(' · ');
+}
+
+function signed(value: number): string {
+  if (Math.abs(value) < 0.05) return '0.0';
+  return `${value > 0 ? '+' : '−'}${Math.abs(value).toFixed(1)}`;
+}
+
+function loss(value: number): string {
+  return value < 0.05 ? '0.0' : `−${value.toFixed(1)}`;
+}
+
+function flightClock(ageH: number): string {
+  const totalMinutes = Math.max(0, Math.round(ageH * 60));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days} d ${String(hours).padStart(2, '0')} h`;
+  return `${hours} h ${String(minutes).padStart(2, '0')} m`;
+}
+
+function formatLatLon(lat: number, lon: number): string {
+  const ns = lat < 0 ? 's' : 'n';
+  const ew = lon < 0 ? 'w' : 'e';
+  return `${Math.abs(lat).toFixed(1)}°${ns} ${Math.abs(lon).toFixed(1)}°${ew}`;
+}
+
+function compactDirection(steerU: number, steerV: number): string {
+  const direction = compassDirection(steerU, steerV);
+  if (direction === 'calm') return direction;
+  return direction
+    .replace('north', 'n')
+    .replace('south', 's')
+    .replace('east', 'e')
+    .replace('west', 'w');
+}
+
+function approachDistance(km: number): string {
+  if (!Number.isFinite(km)) return '—';
+  if (km <= 25) return 'direct hit';
+  return `${Math.round(km)} km`;
+}
+
+function historicalComparison(deltaKt: number, historicalPeakKt: number): string {
+  const difference = Math.round(Math.abs(deltaKt));
+  const reference = `${Math.round(historicalPeakKt)} kt ghost`;
+  if (difference === 0) return `matched ${reference}`;
+  return `${deltaKt > 0 ? '+' : '−'}${difference} kt vs ${reference}`;
 }
 
 function approachPhrase(km: number): string {

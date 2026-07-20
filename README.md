@@ -10,8 +10,8 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > Status: **playable**. A point-vortex storm forms, drifts, intensifies and dies
 > on real baked climate data, rendered as a dark nautical instrument. A fixed-seed
 > demo storm opens mid-life on first load. Compare June vs October at one click;
-> share any storm by its URL. See the design doc for what lands next (v1.1 dry-air
-> and per-storm ERA5 event files are wired seams).
+> share any storm by its URL. User storms carry a live flight recorder that
+> explains each intensity change, then becomes a debrief and replay timeline.
 
 ## Stack
 
@@ -33,6 +33,14 @@ npm run build     # typecheck (tsc --noEmit) + vite build -> dist/
 npm run preview   # serve the production build
 npm test          # vitest run (physics, grid, loader golden vector, rng, bake<->runtime)
 ```
+
+## Controls
+
+- Click open water to spawn a storm.
+- Press Space or use the flight recorder's button to pause and resume.
+- After the storm ends, scrub its recorded track or jump to its peak, first
+  landfall, and final frame. Replay reads immutable recorded frames; it never
+  rewinds the simulation engine.
 
 Deploys to GitHub Pages from `main` via `.github/workflows/deploy.yml`. The Vite
 `base` is `./` so it works from a project subpath.

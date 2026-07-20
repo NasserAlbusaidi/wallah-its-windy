@@ -147,6 +147,36 @@ describe('penalty helpers', () => {
   });
 });
 
+describe('live storm diagnostics', () => {
+  it('exposes the exact environment and intensity terms used by the latest tick', () => {
+    const engine = createSimEngine({
+      env: env({ sstC: 30, steerU: 3, steerV: 4, shear: 20 }),
+      isLand: NO_LAND,
+    });
+    engine.spawn(spawnParams());
+    engine.tick(DT);
+
+    const diagnostics = engine.getState()!.diagnostics;
+    expect(diagnostics.sstC).toBe(30);
+    expect(diagnostics.steerU).toBe(3);
+    expect(diagnostics.steerV).toBe(4);
+    expect(diagnostics.shearMs).toBe(20);
+    expect(diagnostics.overLand).toBe(false);
+    expect(diagnostics.mpiKt).toBeCloseTo(mpiKt(30), 8);
+    expect(diagnostics.oceanKtPerH).toBeGreaterThan(0);
+    expect(diagnostics.shearKtPerH).toBeGreaterThan(0);
+    expect(diagnostics.landKtPerH).toBe(0);
+    expect(diagnostics.dryAirKtPerH).toBe(0);
+    expect(diagnostics.netKtPerH).toBeCloseTo(
+      diagnostics.oceanKtPerH -
+        diagnostics.shearKtPerH -
+        diagnostics.landKtPerH -
+        diagnostics.dryAirKtPerH,
+      10,
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Dry-air term (v1.1, design D12): geometric upwind-land proxy
 // ---------------------------------------------------------------------------

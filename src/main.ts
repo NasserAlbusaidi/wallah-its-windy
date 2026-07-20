@@ -53,6 +53,7 @@ import {
   CLIMATOLOGY_ID,
 } from './scenarios';
 import type { Scenario } from './scenarios';
+import { FlightRecorder } from './flight-recorder';
 
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
@@ -86,6 +87,12 @@ const progressEl = must(document.getElementById('progress'), '#progress');
 const captionEl = must(document.getElementById('caption'), '#caption');
 const monthSelect = must(document.getElementById('month') as HTMLSelectElement | null, '#month');
 const scenarioSelect = must(document.getElementById('scenario') as HTMLSelectElement | null, '#scenario');
+const flightToggle = must(document.getElementById('flight-toggle') as HTMLButtonElement | null, '#flight-toggle');
+const flightScrubber = must(document.getElementById('flight-scrubber') as HTMLInputElement | null, '#flight-scrubber');
+const flightStart = must(document.getElementById('flight-start') as HTMLButtonElement | null, '#flight-start');
+const flightPeak = must(document.getElementById('flight-peak') as HTMLButtonElement | null, '#flight-peak');
+const flightLandfall = must(document.getElementById('flight-landfall') as HTMLButtonElement | null, '#flight-landfall');
+const flightEnd = must(document.getElementById('flight-end') as HTMLButtonElement | null, '#flight-end');
 
 const gl = glCanvas.getContext('webgl2', { antialias: true, alpha: false });
 if (!gl) {
@@ -106,6 +113,7 @@ const ui = new UiController({
   monthSelect,
   reducedMotion: prefersReducedMotion,
 });
+const flightRecorder = new FlightRecorder();
 
 // --- Environment sampler (sim dependency) -----------------------------------
 // The sim requires an EnvSampler. It closes over a live holder: once env.bin
@@ -415,9 +423,40 @@ interface Head {
 let prevHead: Head | null = null;
 let currHead: Head | null = null;
 let accumulatorMin = 0;
+let paused = false;
+let replayIndex: number | null = null;
+let replayPlaying = false;
+let replayCursor = 0;
+let currentRunLabel = '';
+const REPLAY_DURATION_MS = 12_000;
 
 function headOf(s: StormState): Head {
   return { lat: s.lat, lon: s.lon, vKt: s.vKt };
+}
+
+function resetReplayTransport(): void {
+  paused = false;
+  replayIndex = null;
+  replayPlaying = false;
+  replayCursor = 0;
+}
+
+function labelForRun(params: SpawnParams): string {
+  if (activeScenario) return `${activeScenario.label} counterfactual`;
+  const option = Array.from(monthSelect.options).find(
+    (candidate) => Number(candidate.value) === params.monthIndex,
+  );
+  return `${(option?.textContent ?? 'season').toLowerCase()} climatology`;
+}
+
+function activeHistoricalPeakKt(): number | undefined {
+  if (!activeScenario || !parsedTracks) return undefined;
+  const track = parsedTracks.find((candidate) => candidate.id === activeScenario!.ghostId);
+  if (!track) return undefined;
+  const winds = track.points
+    .map((point) => point.windKt)
+    .filter((wind): wind is number => wind !== null);
+  return winds.length > 0 ? Math.max(...winds) : undefined;
 }
 
 /** Spawn (replacing any active storm), reset interpolation, and share via the hash. */
@@ -447,6 +486,20 @@ function doSpawn(params: SpawnParams): void {
     return;
   }
   const s = engine.getState();
+  resetReplayTransport();
+  currentRunLabel = labelForRun(spawn);
+  if (s) {
+    flightRecorder.start(
+      {
+        monthIndex: spawn.monthIndex,
+        seed: spawn.seed,
+        isDemo: spawn.isDemo,
+        label: currentRunLabel,
+        historicalPeakKt: activeHistoricalPeakKt(),
+      },
+      s,
+    );
+  }
   currHead = s ? headOf(s) : null;
   prevHead = currHead;
   accumulatorMin = 0;
@@ -466,6 +519,8 @@ function warmUp(hours: number): void {
     let dead = false;
     try {
       const events = engine.tick(SIM_DT_MIN);
+      const state = engine.getState();
+      if (state) flightRecorder.record(state, events);
       dead = events.some((e) => e.type === 'died');
     } catch (err) {
       console.warn('[warmup] tick threw:', err);
@@ -629,13 +684,65 @@ glCanvas.addEventListener('pointerdown', (e) => {
 
 // Space toggles pause — but never when a form control is focused, so the native
 // month picker stays keyboard-operable (a11y floor, design task T6).
-let paused = false;
+function setReplayFrame(index: number): void {
+  if (flightRecorder.frameCount === 0) return;
+  replayIndex = Math.max(
+    0,
+    Math.min(flightRecorder.frameCount - 1, Math.round(index)),
+  );
+  replayCursor = replayIndex;
+  replayPlaying = false;
+  paused = true;
+  accumulatorMin = 0;
+}
+
+function toggleTransport(): void {
+  const complete = flightRecorder.debrief() !== null;
+  if (!complete) {
+    paused = !paused;
+    return;
+  }
+  const end = flightRecorder.frameCount - 1;
+  if (replayIndex === null || replayIndex >= end) {
+    replayIndex = 0;
+    replayCursor = 0;
+    replayPlaying = true;
+    paused = true;
+    accumulatorMin = 0;
+    return;
+  }
+  replayPlaying = !replayPlaying;
+  replayCursor = replayIndex;
+  paused = true;
+}
+
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Space') return;
   const t = e.target as HTMLElement | null;
   if (t instanceof HTMLSelectElement || t instanceof HTMLInputElement || t instanceof HTMLButtonElement) return;
   e.preventDefault();
-  paused = !paused;
+  toggleTransport();
+});
+
+flightToggle.addEventListener('click', toggleTransport);
+flightScrubber.addEventListener('input', () => {
+  setReplayFrame(Number(flightScrubber.value));
+});
+flightStart.addEventListener('click', () => {
+  const milestone = flightRecorder.milestones();
+  if (milestone) setReplayFrame(milestone.start);
+});
+flightPeak.addEventListener('click', () => {
+  const milestone = flightRecorder.milestones();
+  if (milestone) setReplayFrame(milestone.peak);
+});
+flightLandfall.addEventListener('click', () => {
+  const milestone = flightRecorder.milestones();
+  if (milestone?.landfall != null) setReplayFrame(milestone.landfall);
+});
+flightEnd.addEventListener('click', () => {
+  const milestone = flightRecorder.milestones();
+  if (milestone) setReplayFrame(milestone.end);
 });
 
 // Month picker → re-spawn the active storm at the same point + seed in the new
@@ -678,12 +785,19 @@ function tickSim(nowMs: number): void {
     return;
   }
   const s = engine.getState();
+  if (s) flightRecorder.record(s, events);
   currHead = s ? headOf(s) : null;
   for (const ev of events) ui.onSimEvent(ev, nowMs);
 }
 
 /** Build the interpolated storm view for this frame from the fixed-step heads. */
 function buildStorm(): { storm: StormState | null; prev: StormState | null } {
+  if (replayIndex !== null) {
+    return {
+      storm: flightRecorder.stormAt(replayIndex),
+      prev: flightRecorder.stormAt(Math.max(0, replayIndex - 1)),
+    };
+  }
   const live = engine ? engine.getState() : null;
   if (!live) return { storm: null, prev: null };
   const prev: StormState =
@@ -703,7 +817,8 @@ function render(alpha: number, nowMs: number): void {
     reducedMotion: prefersReducedMotion,
     isDemo: storm?.isDemo ?? false,
     nowMs,
-    paused,
+    paused: paused || replayIndex !== null,
+    replayMode: replayIndex !== null,
     envSamplingMode: envSampler.getSamplingMode(),
     envTFrac:
       activeScenario && storm
@@ -727,6 +842,18 @@ function render(alpha: number, nowMs: number): void {
 
   ui.drawOverlay(nowMs); // genesis glow + ripples, on top of the track
   ui.update(nowMs); // expire the aftermath fade back to the rarity copy
+  ui.updateFlightRecorder({
+    storm,
+    label: currentRunLabel,
+    frameIndex:
+      replayIndex ?? Math.max(0, flightRecorder.frameCount - 1),
+    frameCount: flightRecorder.frameCount,
+    debrief: flightRecorder.debrief(),
+    milestones: flightRecorder.milestones(),
+    paused,
+    replayMode: replayIndex !== null,
+    replayPlaying,
+  });
 }
 
 function frame(nowMs: number): void {
@@ -735,7 +862,16 @@ function frame(nowMs: number): void {
   dbgFrames++;
   dbgLastDt = dtRealMs;
 
-  if (!paused) {
+  if (replayPlaying && replayIndex !== null) {
+    const end = flightRecorder.frameCount - 1;
+    replayCursor += (dtRealMs / REPLAY_DURATION_MS) * end;
+    replayIndex = Math.min(end, Math.floor(replayCursor));
+    if (replayIndex >= end) {
+      replayIndex = end;
+      replayCursor = end;
+      replayPlaying = false;
+    }
+  } else if (!paused && replayIndex === null) {
     const live = engine ? engine.getState() : null;
     const hoursPerSec = ui.timescaleHoursPerSec(live);
     const simMinutesPerMs = (hoursPerSec * 60) / 1000;
@@ -832,6 +968,10 @@ Object.defineProperty(window, '__cyc', {
       dbgLastDt,
       hasEngine: engine !== null,
       layerCount: layers.length,
+      replayIndex,
+      replayPlaying,
+      flightFrameCount: flightRecorder.frameCount,
+      debrief: flightRecorder.debrief(),
       hoursPerSec: ui.timescaleHoursPerSec(storm),
       activeScenario: activeScenario?.id ?? null,
       envSamplingMode: envSampler.getSamplingMode(),

@@ -518,7 +518,12 @@ export class RenderPipeline implements RenderLayer {
       intensity = clamp01((vKt - 20) / 100);
       demo = s.isDemo;
       env = this.sampleEnv(lat, lon, frame);
-      if (s.alive) {
+      if (frame.replayMode) {
+        // Recorded frames are an immutable flight tape, not a fresh aftermath:
+        // keep the selected track/centre fully legible even at the final frame.
+        aftermath = 1;
+        this.deathMs = null;
+      } else if (s.alive) {
         aftermath = 1;
         this.deathMs = null;
       } else {

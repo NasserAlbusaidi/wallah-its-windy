@@ -137,6 +137,25 @@ export interface TrackPoint {
   ageH: number;
 }
 
+/**
+ * The exact environmental sample and intensity-budget terms used by the latest
+ * physics tick. Positive ocean values strengthen the storm; the three penalty
+ * values are non-negative losses, all in knots per simulated hour.
+ */
+export interface StormDiagnostics {
+  sstC: number;
+  mpiKt: number;
+  steerU: number;
+  steerV: number;
+  shearMs: number;
+  overLand: boolean;
+  oceanKtPerH: number;
+  shearKtPerH: number;
+  landKtPerH: number;
+  dryAirKtPerH: number;
+  netKtPerH: number;
+}
+
 /** The live state of the single active storm. Pure data — no methods. */
 export interface StormState {
   lat: number;
@@ -150,6 +169,8 @@ export interface StormState {
   alive: boolean;
   /** The ambient first-load demo storm renders dimmed; user storms full. */
   isDemo: boolean;
+  /** Why the storm is strengthening or weakening at this instant. */
+  diagnostics: StormDiagnostics;
 }
 
 /** Everything needed to reproduce a storm exactly: sim = f(spawn, month, seed). */
@@ -245,6 +266,8 @@ export interface FrameState {
   nowMs: number;
   /** Space-bar pause: the sim is frozen, so sim-coupled output (rain) must freeze too. */
   paused: boolean;
+  /** A recorded frame is being inspected instead of the live engine state. */
+  replayMode: boolean;
   /**
    * Explicit interpretation of the active environment's `nt` axis. Render cues
    * must use the same mode as physics or event timelines freeze visually.

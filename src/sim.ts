@@ -134,8 +134,12 @@ export const SIM = {
 
   // -- v1.1 dry-air term (design D12) ----------------------------------------
   /**
-   * Peak dry-air weakening rate, kt/h, approached as the Arabian landmass nears
-   * the storm along a dry (N/NW/W) bearing (proximity → 1). A GEOMETRIC proxy for
+   * Nominal dry-air weakening coefficient, kt/h, scaling the geometric proximity
+   * as the Arabian landmass nears the storm along a dry (N/NW/W) bearing. Because
+   * the upwind probe starts one DRYAIR_STEP_KM out, proximity tops out near ~0.82
+   * (see dryLandProximity), so the EFFECTIVE peak weakening is ~0.74 kt/h, not the
+   * full 0.9 — a tuning pass shifts the real ceiling by only ~82% of any change to
+   * this constant. A GEOMETRIC proxy for
    * desert-air entrainment: EnvSample carries no humidity, so "how close is the
    * upwind coast" stands in for it. Tuned against IBTrACS Gonu (2007), which fell
    * 127→77 kt over its final ~330 km NW approach to Oman: on the real env.bin the
@@ -233,8 +237,10 @@ const DRY_BEARINGS: ReadonlyArray<readonly [number, number]> = [
  * is. Walks isLand outward along each dry bearing in DRYAIR_STEP_KM increments up
  * to DRYAIR_RANGE_KM (via grid.offsetKm — no inline lat/lon math here); the min
  * hit distance across bearings sets proximity = (RANGE − dist)/RANGE. 0 when no
- * land within range (open sea), 1 when land is at the storm. Deterministic: a
- * fixed step grid, no RNG, no wall-clock — safe in the tick path.
+ * land within range (open sea); the probe starts one DRYAIR_STEP_KM out, so the
+ * nearest resolvable land sits that step away and proximity tops out near
+ * (RANGE − STEP)/RANGE ≈ 0.82 — never a full 1. Deterministic: a fixed step
+ * grid, no RNG, no wall-clock — safe in the tick path.
  */
 function dryLandProximity(
   lat: number,

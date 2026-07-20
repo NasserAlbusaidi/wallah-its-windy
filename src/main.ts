@@ -39,7 +39,7 @@ import type {
 } from './types';
 import { UiController } from './ui';
 import { createSimEngine } from './sim';
-import { makeEnvSampler } from './env-sampler';
+import { makeEnvSampler, synopticCount } from './env-sampler';
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
 // main resolves the module by a namespace probe (acquireRender) and PREFERS mode A
@@ -337,6 +337,10 @@ function headOf(s: StormState): Head {
 /** Spawn (replacing any active storm), reset interpolation, and share via the hash. */
 function doSpawn(params: SpawnParams): void {
   if (!engine) return;
+  // Seed picks the synoptic regime (D10): env.bin u/v/shr carry nt=K real-year
+  // planes; select BEFORE spawn so the whole life (incl. warmup ticks) rides one
+  // coherent regime and sim = f(spawn, month, seed) holds. K=1 -> always plane 0.
+  envSampler.setSynopticIndex(params.seed % synopticCount(envBin, params.monthIndex));
   try {
     engine.spawn(params);
   } catch (err) {
@@ -455,6 +459,7 @@ function render(alpha: number, nowMs: number): void {
     isDemo: storm?.isDemo ?? false,
     nowMs,
     paused,
+    synopticIndex: Math.max(0, envSampler.getSynopticIndex()),
   };
 
   // main owns the base clear of both canvases (guards against any render layer

@@ -427,7 +427,10 @@ export class RenderPipeline implements RenderLayer {
 
   // --- per-frame context -----------------------------------------------------
 
-  private sampleEnv(lat: number, lon: number): EnvAtStorm | null {
+  /** Env at the storm centre. `plane` = the storm's seed-picked synoptic sample
+   *  (FrameState.synopticIndex) so the shear-smear cue reads the SAME regime the
+   *  physics rides; sampleLayerBilinear clamps it for nt=1 layers (SST). */
+  private sampleEnv(lat: number, lon: number, plane: number): EnvAtStorm | null {
     const bin = this.res.env;
     if (!bin) return null;
     const n = envMonthNames(this.monthIndex);
@@ -436,10 +439,10 @@ export class RenderPipeline implements RenderLayer {
     const uL = pickLayer(bin, [n.u, 'u']);
     const vL = pickLayer(bin, [n.v, 'v']);
     return {
-      sstC: sstL ? sampleLayerBilinear(sstL, 0, lat, lon) : 0,
-      shear: shearL ? sampleLayerBilinear(shearL, 0, lat, lon) : 0,
-      steerU: uL ? sampleLayerBilinear(uL, 0, lat, lon) : 0,
-      steerV: vL ? sampleLayerBilinear(vL, 0, lat, lon) : 0,
+      sstC: sstL ? sampleLayerBilinear(sstL, plane, lat, lon) : 0,
+      shear: shearL ? sampleLayerBilinear(shearL, plane, lat, lon) : 0,
+      steerU: uL ? sampleLayerBilinear(uL, plane, lat, lon) : 0,
+      steerV: vL ? sampleLayerBilinear(vL, plane, lat, lon) : 0,
     };
   }
 
@@ -467,7 +470,7 @@ export class RenderPipeline implements RenderLayer {
       track = s.trackPoints;
       intensity = clamp01((vKt - 20) / 100);
       demo = s.isDemo;
-      env = this.sampleEnv(lat, lon);
+      env = this.sampleEnv(lat, lon, frame.synopticIndex ?? 0);
       if (s.alive) {
         aftermath = 1;
         this.deathMs = null;

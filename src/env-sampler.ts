@@ -16,6 +16,13 @@
  * clamp to the nearest season month; the Arabian-Sea cyclone season is all that
  * is baked. tFrac interpolates along a layer's timestep axis (a no-op at the
  * v1.0 nt=1 climatology; live for v1.1 per-storm event files).
+ *
+ * SYNOPTIC SAMPLES (D10): a v1.0 climatology bake may instead carry nt=K
+ * distinct real-year planes per u/v/shr layer (bake/era5.py). Those planes are
+ * ALTERNATIVE regimes to pick per spawn (seed % K, set via setSynopticIndex),
+ * NOT a time axis — so while an index is set, nearestCell reads that one plane
+ * and ignores tFrac. Clearing the index (setSynopticIndex(-1)) restores tFrac
+ * interpolation for v1.1 event files, whose nt IS time.
  */
 
 import { DOMAIN, latLonToCell } from './grid';
@@ -40,15 +47,21 @@ function pickLayer(bin: ParsedBin, names: readonly string[]): BinLayer | null {
 }
 
 /**
- * Nearest-cell read of a layer with linear timestep interpolation. The latlon->
- * cell conversion is grid.latLonToCell (eng D1: ONE owner of coordinate math);
- * row order is north->south per BINARY-FORMATS.md and grid.ts.
+ * Nearest-cell read of a layer. The latlon->cell conversion is grid.latLonToCell
+ * (eng D1: ONE owner of coordinate math); row order is north->south per
+ * BINARY-FORMATS.md and grid.ts. Plane semantics: a non-negative sampleIndex
+ * selects one synoptic plane (D10 regime pick, tFrac ignored); a negative index
+ * means nt is a TIME axis and tFrac linearly interpolates along it.
  */
-function nearestCell(layer: BinLayer, lat: number, lon: number, tFrac: number): number {
+function nearestCell(layer: BinLayer, lat: number, lon: number, tFrac: number, sampleIndex: number): number {
   const { nx, ny, nt, bbox, data } = layer;
   const cell = latLonToCell({ nx, ny, bbox }, lat, lon);
   const col = clamp(Math.round(cell.col), 0, nx - 1);
   const row = clamp(Math.round(cell.row), 0, ny - 1);
+  if (sampleIndex >= 0) {
+    const t = clamp(Math.floor(sampleIndex), 0, nt - 1);
+    return data[(t * ny + row) * nx + col];
+  }
   const tf = clamp(tFrac * (nt - 1), 0, nt - 1);
   const t0 = Math.floor(tf);
   const t1 = Math.min(nt - 1, t0 + 1);
@@ -69,6 +82,7 @@ export function sampleEnvBin(
   lon: number,
   monthIndex: number,
   tFrac: number,
+  sampleIndex = -1,
 ): EnvSample | null {
   const mm = envMonthSuffix(monthIndex);
   const sst = pickLayer(bin, [`sst_${mm}`, 'sst']);
@@ -77,11 +91,27 @@ export function sampleEnvBin(
   const sh = pickLayer(bin, [`shr_${mm}`, 'shear', 'shr']);
   if (!sst || !su || !sv || !sh) return null;
   return {
-    sstC: nearestCell(sst, lat, lon, tFrac),
-    steerU: nearestCell(su, lat, lon, tFrac),
-    steerV: nearestCell(sv, lat, lon, tFrac),
-    shear: nearestCell(sh, lat, lon, tFrac),
+    // SST bakes nt=1, so the synoptic index degenerates to plane 0 there.
+    sstC: nearestCell(sst, lat, lon, tFrac, sampleIndex),
+    steerU: nearestCell(su, lat, lon, tFrac, sampleIndex),
+    steerV: nearestCell(sv, lat, lon, tFrac, sampleIndex),
+    shear: nearestCell(sh, lat, lon, tFrac, sampleIndex),
   };
+}
+
+/** How many synoptic sample planes the bake shipped (nt of a steering layer). */
+export function synopticCount(bin: ParsedBin | null, monthIndex: number): number {
+  if (!bin) return 1;
+  const su = pickLayer(bin, [`u_${envMonthSuffix(monthIndex)}`, 'u']);
+  return su ? Math.max(1, su.nt) : 1;
+}
+
+/** An EnvSampler whose synoptic plane can be re-pointed per spawn (seed % K). */
+export interface SelectableEnvSampler extends EnvSampler {
+  /** Select the plane storms read (>= 0), or -1 to restore tFrac time-interp. */
+  setSynopticIndex(index: number): void;
+  /** The currently selected plane (-1 = time-interp mode). */
+  getSynopticIndex(): number;
 }
 
 /**
@@ -89,15 +119,24 @@ export function sampleEnvBin(
  * holder so it starts working the instant the file lands) and falls back to a
  * coarse analytic Arabian-Sea climatology when it is absent. The fallback is a
  * deterministic function of (lat, lon, month) and every output is finite.
+ * The synoptic index is spawn state: main sets it from the seed BEFORE
+ * engine.spawn, so sim = f(spawn, month, seed) still holds exactly.
  */
-export function makeEnvSampler(getBin: () => ParsedBin | null): EnvSampler {
+export function makeEnvSampler(getBin: () => ParsedBin | null): SelectableEnvSampler {
+  let synopticIndex = -1;
   return {
+    setSynopticIndex(index: number): void {
+      synopticIndex = Math.floor(index);
+    },
+    getSynopticIndex(): number {
+      return synopticIndex;
+    },
     sample(lat: number, lon: number, monthIndex: number, tFrac: number): EnvSample {
       const la = clamp(lat, DOMAIN.latMin, DOMAIN.latMax);
       const lo = clamp(lon, DOMAIN.lonMin, DOMAIN.lonMax);
       const bin = getBin();
       if (bin) {
-        const sampled = sampleEnvBin(bin, la, lo, monthIndex, tFrac);
+        const sampled = sampleEnvBin(bin, la, lo, monthIndex, tFrac, synopticIndex);
         if (sampled) return sampled;
       }
       const phase = (monthIndex / 12) * Math.PI * 2;

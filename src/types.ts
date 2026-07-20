@@ -226,6 +226,13 @@ export interface FrameState {
   nowMs: number;
   /** Space-bar pause: the sim is frozen, so sim-coupled output (rain) must freeze too. */
   paused: boolean;
+  /**
+   * Synoptic-sample plane the active storm rides (seed-picked, D10): env.bin
+   * u/v/shr layers carry nt=K real-year planes and the sim samples plane
+   * seed % K. Render cues that read env at the storm (shear smear) must read
+   * the SAME plane or cue and physics disagree. Absent/0 for nt=1 bakes.
+   */
+  synopticIndex?: number;
 }
 
 /**

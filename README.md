@@ -77,6 +77,14 @@ Gonu (Jun 2007) and Shaheen (Sep–Oct 2021) event fields are already downloaded
 under `data/raw/` for the v1.1 counterfactual bake, where `nt` is a TIME axis
 (`tFrac` interpolation — the sampler's other mode).
 
+**Event replay contract:** event mode is a counterfactual, not a hindcast. The
+historical ghost shows the observed storm; the live point vortex answers how a
+spawn evolves in vortex-filtered ERA5 steering and shear with climatological
+OISST. Its track and peak intensity need not match the ghost. We deliberately
+keep this distinction instead of tuning one physics model to reproduce two
+storms. See `bake/README.md` for the intensity sensitivity measurements and the
+requirements for a future hindcast mode.
+
 `env.bin` encodes the month in the layer **name** (`sst_MM/u_MM/v_MM/shr_MM`,
 `MM` = 0-indexed `monthIndex`, `04`=May … `10`=Nov). Consumers resolve it with
 `clamp(monthIndex, 4, 10)`; `src/env-sampler.ts` (sim) and `src/render/index.ts`

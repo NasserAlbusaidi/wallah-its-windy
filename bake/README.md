@@ -184,6 +184,27 @@ without this diagnostic.
 the event: it is copied verbatim (`nt=1`) from the committed `env.bin`'s
 climatological `sst_05` / `sst_08` layer (OISST 1991–2020 long-term mean).
 
+**Intensity fidelity decision (2026-07-20).** Event mode remains a
+counterfactual, not a historical-intensity hindcast. A canonical replay with the
+shipped fields peaks at 88.6 kt for Gonu and 81.5 kt for Shaheen. A sensitivity
+run produced:
+
+| Forcing experiment | Gonu peak | Shaheen peak |
+| --- | ---: | ---: |
+| Shipped fields | 88.6 kt | 81.5 kt |
+| SST +1.0 °C everywhere | 98.1 kt | 94.3 kt |
+| Shear reduced 20% everywhere | 103.6 kt | 81.5 kt |
+| Both changes | 116.7 kt | 94.3 kt |
+
+These broad adjustments still fail to reproduce both historical peaks and would
+silently tune the sandbox to two storms. The shipped replay therefore keeps
+climatological SST and the existing vortex filter. `tracks.json` supplies the
+observed reference; the simulated storm is expected only to survive and
+intensify plausibly. A future hindcast mode must fetch time-resolved event SST,
+define how it removes the observed vortex without erasing environmental shear,
+and validate against a larger storm set. It should be a separate named mode,
+not a retune of this counterfactual.
+
 `scenarios.json` (`{version, scenarios:[{id,label,bin,monthIndex,stepH,windowH,
 startIso,spawn,ghostId}]}`) pins each scenario's sim window: `windowH =
 (planes−1)·stepH` is **computed**, and `spawn` = the storm's first IBTrACS fix

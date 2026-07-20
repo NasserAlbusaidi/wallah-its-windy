@@ -139,7 +139,7 @@ describe('scenarios.json', () => {
   // main.ts uses in event mode (explicit event-timeline sampling,
   // tFracHorizonH=windowH, the real terrain landmask) and assert a
   // non-trivial life: the headline storm must survive and intensify, not epitaph.
-  it('each canonical spawn replays into a real storm (survives + intensifies)', () => {
+  it('each canonical counterfactual survives and intensifies without a hindcast peak target', () => {
     const terrain = loadBin('terrain.bin');
     const land = terrain.layers.get('landmask')!;
     const isLand = (lat: number, lon: number): boolean => {
@@ -174,8 +174,9 @@ describe('scenarios.json', () => {
       sampler.setSamplingMode({ kind: 'event-timeline' });
       const ageH = (ticks * 15) / 60;
       // A DOA spawn dies at ageH<=4 h with peak ~30 kt (spawn intensity, no
-      // spin-up). Require a clearly non-trivial life instead: > 24 sim-hours and a
-      // storm that actually strengthened past a strong tropical storm.
+      // spin-up). Require a clearly non-trivial life instead: > 24 sim-hours and
+      // a storm that strengthened past a strong tropical storm. The ghost track
+      // owns historical intensity; this vortex-filtered replay is not a hindcast.
       expect(ageH, `${s.id} canonical replay lifetime`).toBeGreaterThan(24);
       expect(peakKt, `${s.id} canonical replay peak`).toBeGreaterThanOrEqual(60);
     }

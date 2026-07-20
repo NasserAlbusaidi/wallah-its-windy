@@ -35,7 +35,15 @@
  */
 
 import { AFTERMATH_FADE_MS } from '../types';
-import type { BinLayer, FrameState, LatLon, ParsedBin, RenderLayer, TrackPoint } from '../types';
+import type {
+  BinLayer,
+  FrameState,
+  LatLon,
+  ParsedBin,
+  RenderLayer,
+  StormStructure,
+  TrackPoint,
+} from '../types';
 import { TOKENS } from '../tokens';
 import { DOMAIN, latLonToClip } from '../grid';
 import { parseBin } from '../loader';
@@ -62,6 +70,10 @@ import { TrackLayer } from './track';
 import { GhostLayer } from './ghosts';
 import { parseTracks, toGhostPolylines } from '../tracks';
 import type { GhostPolyline } from '../tracks';
+import {
+  cloneStormStructure,
+  interpolateStormStructure,
+} from '../structure';
 
 /** Baked data handed to the renderer (mode A); any field may arrive progressively. */
 export interface RenderResources {
@@ -160,6 +172,7 @@ export class RenderPipeline implements RenderLayer {
   private memVkt = 0;
   private memIntensity = 0;
   private memDemo = false;
+  private memStructure: StormStructure | null = null;
 
   // --- public RenderLayer contract (init/resize/draw/dispose) ----------------
 
@@ -556,6 +569,7 @@ export class RenderPipeline implements RenderLayer {
     let center: { x: number; y: number } | null = null;
     let track: TrackPoint[] | null = null;
     let vKt = 0;
+    let structure: StormStructure | null = null;
     let intensity = 0;
     let aftermath = 0;
     let demo = frame.isDemo;
@@ -568,6 +582,9 @@ export class RenderPipeline implements RenderLayer {
       const lat = pv ? pv.lat + (s.lat - pv.lat) * a : s.lat;
       const lon = pv ? pv.lon + (s.lon - pv.lon) * a : s.lon;
       vKt = pv ? pv.vKt + (s.vKt - pv.vKt) * a : s.vKt;
+      structure = pv
+        ? interpolateStormStructure(pv.structure, s.structure, a)
+        : cloneStormStructure(s.structure);
       center = latLonToClip(lat, lon, DOMAIN);
       track = s.trackPoints;
       intensity = clamp01((vKt - 20) / 100);
@@ -590,6 +607,7 @@ export class RenderPipeline implements RenderLayer {
       this.memVkt = vKt;
       this.memIntensity = intensity;
       this.memDemo = demo;
+      this.memStructure = cloneStormStructure(s.structure);
     } else if (this.memCenter) {
       if (this.deathMs == null) this.deathMs = nowMs;
       aftermath = 1 - clamp01((nowMs - this.deathMs) / AFTERMATH_FADE_MS);
@@ -597,12 +615,16 @@ export class RenderPipeline implements RenderLayer {
         this.deathMs = null;
         this.memCenter = null;
         this.memTrack = null;
+        this.memStructure = null;
       } else {
         center = this.memCenter;
         track = this.memTrack;
         vKt = this.memVkt;
         intensity = this.memIntensity;
         demo = this.memDemo;
+        structure = this.memStructure
+          ? cloneStormStructure(this.memStructure)
+          : null;
       }
     }
 
@@ -616,6 +638,7 @@ export class RenderPipeline implements RenderLayer {
       dtSec,
       centerClip: center,
       vKt,
+      structure,
       intensity01: intensity,
       demo,
       reduced: frame.reducedMotion,

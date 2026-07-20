@@ -12,7 +12,12 @@ import type {
   FlightFrame,
   FlightRunSnapshot,
 } from './flight-recorder';
-import { DOMAIN } from './grid';
+import { DOMAIN, offsetKm } from './grid';
+import {
+  maxWindRadiusKm,
+  windRadiusFromQuadrantsKm,
+} from './structure';
+import type { WindRadiiKm } from './types';
 
 const WIDTH = 1600;
 const HEIGHT = 900;
@@ -76,6 +81,41 @@ function drawTrack(
   ctx.restore();
 }
 
+function drawWindRing(
+  ctx: CanvasRenderingContext2D,
+  frame: FlightFrame,
+  radii: WindRadiiKm,
+  color: string,
+  width: number,
+  dash: number[],
+): void {
+  if (maxWindRadiusKm(radii) <= 0) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.setLineDash(dash);
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let step = 0; step <= 72; step++) {
+    const bearing = step * 5;
+    const angle = (bearing * Math.PI) / 180;
+    const radiusKm = windRadiusFromQuadrantsKm(radii, bearing);
+    const location = offsetKm(
+      frame.lat,
+      frame.lon,
+      Math.sin(angle),
+      Math.cos(angle),
+      radiusKm,
+    );
+    const [x, y] = point(location);
+    if (step === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
 function duration(h: number): string {
   return h < 24 ? `${Math.round(h)} h` : `${(h / 24).toFixed(1)} days`;
 }
@@ -111,21 +151,28 @@ function drawType(
 
   ctx.fillStyle = CYAN;
   ctx.font = '400 23px "IBM Plex Mono", monospace';
-  const metrics = [
+  const structureMetrics = [
     `FRAME ${Math.round(frame.ageH)} H`,
     `WIND ${Math.round(frame.vKt)} KT`,
+    `MSLP ${Math.round(frame.structure.centralPressureHpa)} HPA`,
+    `RMW ${Math.round(frame.structure.rmwKm)} KM`,
+    `R34 ${Math.round(maxWindRadiusKm(frame.structure.r34Km))} KM`,
+  ];
+  ctx.fillText(structureMetrics.join('   ·   '), 70, 798);
+
+  const outcomeMetrics = [
     `PEAK ${Math.round(death.peakKt)} KT`,
     `LIFE ${duration(death.durationH)}`,
     `MUSCAT ${Math.round(death.closestApproachKm)} KM`,
   ];
-  ctx.fillText(metrics.join('   ·   '), 70, 806);
+  ctx.fillText(outcomeMetrics.join('   ·   '), 70, 832);
 
   ctx.fillStyle = 'rgba(127, 212, 232, 0.62)';
   ctx.font = '400 18px "IBM Plex Mono", monospace';
   const contract = run.meta.counterfactual
     ? 'COUNTERFACTUAL ENVIRONMENT · OBSERVED TRACK IS REFERENCE, NOT A HINDCAST'
     : `GENESIS ${run.meta.spawn.lat.toFixed(2)}°N ${run.meta.spawn.lon.toFixed(2)}°E · SEED ${run.meta.seed}`;
-  ctx.fillText(contract, 70, 850);
+  ctx.fillText(contract, 70, 870);
 
   if (comparison) {
     ctx.textAlign = 'right';
@@ -157,6 +204,29 @@ function drawStorm(
     drawTrack(ctx, comparison.baseline.frames, 'rgba(255, 183, 77, 0.56)', 3);
   }
   drawTrack(ctx, run.frames.slice(0, index + 1), 'rgba(120, 220, 255, 0.78)', 4);
+  drawWindRing(
+    ctx,
+    frame,
+    frame.structure.r34Km,
+    'rgba(120, 220, 255, 0.22)',
+    2,
+    [5, 10],
+  );
+  drawWindRing(
+    ctx,
+    frame,
+    frame.structure.r64Km,
+    'rgba(232, 244, 255, 0.34)',
+    2,
+    [3, 6],
+  );
+  const rmw = {
+    ne: frame.structure.rmwKm,
+    se: frame.structure.rmwKm,
+    sw: frame.structure.rmwKm,
+    nw: frame.structure.rmwKm,
+  };
+  drawWindRing(ctx, frame, rmw, 'rgba(255, 183, 77, 0.5)', 2, []);
 
   const [x, y] = point(frame);
   const radius = 24 + Math.max(0, frame.vKt - 20) * 0.32;
@@ -272,4 +342,3 @@ export async function makeReplayVideo(
   recorder.stop();
   return stopped;
 }
-

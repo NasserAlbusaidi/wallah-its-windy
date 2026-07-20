@@ -37,6 +37,7 @@ import {
   type StormDebrief,
 } from './flight-recorder';
 import { explainIntensity } from './narrative';
+import { maxWindRadiusKm } from './structure';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -155,6 +156,10 @@ export class UiController {
     shear: HTMLOutputElement;
     landDry: HTMLOutputElement;
     steering: HTMLOutputElement;
+    pressure: HTMLOutputElement;
+    rmw: HTMLOutputElement;
+    windRadii: HTMLOutputElement;
+    motion: HTMLOutputElement;
     debrief: HTMLElement;
     verdict: HTMLElement;
     peak: HTMLElement;
@@ -214,6 +219,10 @@ export class UiController {
       shear: dom('flight-shear'),
       landDry: dom('flight-land-dry'),
       steering: dom('flight-steering'),
+      pressure: dom('flight-pressure'),
+      rmw: dom('flight-rmw'),
+      windRadii: dom('flight-wind-radii'),
+      motion: dom('flight-motion'),
       debrief: dom('flight-debrief'),
       verdict: dom('flight-verdict'),
       peak: dom('debrief-peak'),
@@ -509,7 +518,7 @@ export class UiController {
     f.label.textContent = view.label;
 
     const d = storm.diagnostics;
-    const explanation = explainIntensity(d);
+    const explanation = explainIntensity(d, storm.structure);
     f.explanation.dataset.tone = explanation.tone;
     f.explanationHeadline.textContent = explanation.headline;
     f.explanationDetail.textContent = explanation.detail;
@@ -522,6 +531,20 @@ export class UiController {
     f.landDry.textContent = `${loss(d.landKtPerH)} / ${loss(d.dryAirKtPerH)}`;
     const steerSpeed = Math.hypot(d.steerU, d.steerV);
     f.steering.textContent = `${compactDirection(d.steerU, d.steerV)} · ${steerSpeed.toFixed(1)} m/s`;
+    const structure = storm.structure;
+    const motionSpeed = Math.hypot(
+      structure.motionUms,
+      structure.motionVms,
+    );
+    f.pressure.textContent = `${Math.round(structure.centralPressureHpa)} hPa`;
+    f.rmw.textContent =
+      `${Math.round(structure.rmwKm)} km · b ${structure.hollandB.toFixed(2)}`;
+    f.windRadii.textContent =
+      `${Math.round(maxWindRadiusKm(structure.r34Km))} / ` +
+      `${Math.round(maxWindRadiusKm(structure.r64Km))} km`;
+    f.motion.textContent =
+      `${compactDirection(structure.motionUms, structure.motionVms)} ` +
+      `${motionSpeed.toFixed(1)} · ${structure.translationAsymmetryKt.toFixed(1)} kt`;
 
     f.scrubber.max = String(Math.max(0, view.frameCount - 1));
     f.scrubber.value = String(Math.max(0, view.frameIndex));

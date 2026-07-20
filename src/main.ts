@@ -36,6 +36,7 @@ import type {
   SimEngine,
   SpawnParams,
   StormState,
+  StormStructure,
 } from './types';
 import { UiController, DEMO_MONTH } from './ui';
 import { createSimEngine } from './sim';
@@ -62,6 +63,7 @@ import {
 } from './export';
 import { chooseRenderProfile } from './performance';
 import { TapGesture } from './tap-gesture';
+import { cloneStormStructure } from './structure';
 
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
@@ -441,6 +443,7 @@ interface Head {
   lat: number;
   lon: number;
   vKt: number;
+  structure: StormStructure;
 }
 let prevHead: Head | null = null;
 let currHead: Head | null = null;
@@ -449,7 +452,12 @@ let currentRunLabel = '';
 const pendingMapCaptures: Array<(canvas: HTMLCanvasElement) => void> = [];
 
 function headOf(s: StormState): Head {
-  return { lat: s.lat, lon: s.lon, vKt: s.vKt };
+  return {
+    lat: s.lat,
+    lon: s.lon,
+    vKt: s.vKt,
+    structure: cloneStormStructure(s.structure),
+  };
 }
 
 /**
@@ -968,7 +976,13 @@ function buildStorm(): { storm: StormState | null; prev: StormState | null } {
   if (!live) return { storm: null, prev: null };
   const prev: StormState =
     prevHead && currHead
-      ? { ...live, lat: prevHead.lat, lon: prevHead.lon, vKt: prevHead.vKt }
+      ? {
+          ...live,
+          lat: prevHead.lat,
+          lon: prevHead.lon,
+          vKt: prevHead.vKt,
+          structure: cloneStormStructure(prevHead.structure),
+        }
       : live;
   return { storm: live, prev };
 }

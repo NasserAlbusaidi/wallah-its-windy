@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { compassDirection, FlightRecorder } from '../src/flight-recorder';
 import type { StormDiagnostics, StormState } from '../src/types';
 import { DeathReason } from '../src/types';
+import { deriveStormStructure } from '../src/structure';
 
 const DIAGNOSTICS: StormDiagnostics = {
   sstC: 29,
@@ -27,6 +28,14 @@ function state(ageH: number, vKt: number, alive = true): StormState {
     alive,
     isDemo: false,
     diagnostics: { ...DIAGNOSTICS },
+    structure: deriveStormStructure({
+      vKt,
+      lat: 18 + ageH / 10,
+      shearMs: DIAGNOSTICS.shearMs,
+      overLand: false,
+      motionUms: DIAGNOSTICS.steerU,
+      motionVms: DIAGNOSTICS.steerV,
+    }),
   };
 }
 
@@ -66,7 +75,9 @@ describe('FlightRecorder replay snapshots', () => {
     expect(scrubbed.trackPoints.map((point) => point.ageH)).toEqual([0, 1]);
 
     scrubbed.trackPoints[0].vKt = 999;
+    scrubbed.structure.r34Km.ne = 999;
     expect(recorder.stormAt(0)!.vKt).toBe(30);
+    expect(recorder.stormAt(1)!.structure.r34Km.ne).not.toBe(999);
     expect(recorder.stormAt(99)!.ageH).toBe(2);
   });
 

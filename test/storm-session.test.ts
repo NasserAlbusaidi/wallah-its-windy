@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { StormSession } from '../src/storm-session';
 import { DeathReason, type StormDiagnostics, type StormState } from '../src/types';
+import { deriveStormStructure } from '../src/structure';
 
 const diagnostics: StormDiagnostics = {
   sstC: 29,
@@ -25,6 +26,14 @@ function state(ageH: number, alive = true): StormState {
     alive,
     isDemo: false,
     diagnostics,
+    structure: deriveStormStructure({
+      vKt: alive ? 40 + ageH : 19,
+      lat: 17,
+      shearMs: diagnostics.shearMs,
+      overLand: false,
+      motionUms: diagnostics.steerU,
+      motionVms: diagnostics.steerV,
+    }),
     trackPoints: [{ lat: 17, lon: 62, vKt: 40, ageH: 0 }],
   };
 }

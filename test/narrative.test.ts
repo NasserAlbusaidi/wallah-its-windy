@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { explainIntensity } from '../src/narrative';
+import { deriveStormStructure } from '../src/structure';
 import type { StormDiagnostics } from '../src/types';
 
 function diagnostics(
@@ -46,5 +47,26 @@ describe('explainIntensity', () => {
       tone: 'steady',
       headline: 'The storm is holding nearly steady.',
     });
+  });
+
+  it('adds pressure and RMW when physical structure is available', () => {
+    const structure = deriveStormStructure({
+      vKt: 100,
+      lat: 20,
+      shearMs: 5,
+      overLand: false,
+      motionUms: 2,
+      motionVms: 4,
+    });
+    const narrative = explainIntensity(
+      diagnostics({ netKtPerH: 1 }),
+      structure,
+    );
+    expect(narrative.detail).toContain(
+      `${Math.round(structure.centralPressureHpa)} hPa`,
+    );
+    expect(narrative.detail).toContain(
+      `${Math.round(structure.rmwKm)} km RMW`,
+    );
   });
 });

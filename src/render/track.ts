@@ -14,7 +14,12 @@
  */
 
 import { TOKENS } from '../tokens';
-import { latLonToClip } from '../grid';
+import { clipToLatLon, latLonToClip, offsetKm } from '../grid';
+import {
+  maxWindRadiusKm,
+  windRadiusFromQuadrantsKm,
+} from '../structure';
+import type { WindRadiiKm } from '../types';
 import type { DrawCtx } from './context';
 
 const t = TOKENS.track.rgba01;
@@ -58,6 +63,44 @@ export class TrackLayer {
     return [(clipX * 0.5 + 0.5) * this.w, (0.5 - clipY * 0.5) * this.h];
   }
 
+  private drawWindRing(
+    g: CanvasRenderingContext2D,
+    ctx: DrawCtx,
+    radii: WindRadiiKm,
+    stroke: string,
+    lineWidth: number,
+    dash: number[],
+  ): void {
+    const centre = ctx.centerClip;
+    if (!centre || maxWindRadiusKm(radii) <= 0) return;
+    const origin = clipToLatLon(centre.x, centre.y);
+    g.save();
+    g.strokeStyle = stroke;
+    g.lineWidth = lineWidth;
+    g.setLineDash(dash);
+    g.lineJoin = 'round';
+    g.beginPath();
+    for (let step = 0; step <= 72; step++) {
+      const bearing = step * 5;
+      const angle = (bearing * Math.PI) / 180;
+      const radiusKm = windRadiusFromQuadrantsKm(radii, bearing);
+      const point = offsetKm(
+        origin.lat,
+        origin.lon,
+        Math.sin(angle),
+        Math.cos(angle),
+        radiusKm,
+      );
+      const clip = latLonToClip(point.lat, point.lon);
+      const [x, y] = this.px(clip.x, clip.y);
+      if (step === 0) g.moveTo(x, y);
+      else g.lineTo(x, y);
+    }
+    g.closePath();
+    g.stroke();
+    g.restore();
+  }
+
   draw(ctx: DrawCtx): void {
     const g = this.ov;
     if (!g) return;
@@ -87,6 +130,43 @@ export class TrackLayer {
       }
       g.stroke();
       g.setLineDash([]);
+    }
+
+    // Physical wind footprint: faint 34-kt extent, brighter hurricane-force
+    // extent, and the compact RMW/eyewall ring. These are parametric quadrants
+    // from the recorded structure—not a forecast cone or observed wind analysis.
+    const structure = ctx.structure;
+    if (structure && ctx.centerClip) {
+      this.drawWindRing(
+        g,
+        ctx,
+        structure.r34Km,
+        trackRgba(0.16 * fade),
+        Math.max(1, unit * 0.0008),
+        [unit * 0.003, unit * 0.008],
+      );
+      this.drawWindRing(
+        g,
+        ctx,
+        structure.r64Km,
+        coreRgba(0.3 * fade),
+        Math.max(1, unit * 0.001),
+        [unit * 0.002, unit * 0.004],
+      );
+      const rmw = {
+        ne: structure.rmwKm,
+        se: structure.rmwKm,
+        sw: structure.rmwKm,
+        nw: structure.rmwKm,
+      };
+      this.drawWindRing(
+        g,
+        ctx,
+        rmw,
+        accentRgba(0.34 * fade),
+        Math.max(1, unit * 0.0012),
+        [],
+      );
     }
 
     // Dotted, age-faded track polyline.

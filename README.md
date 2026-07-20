@@ -7,8 +7,10 @@ the Omani coast, the Hajar mountains wring out the rain and the wadis light up.
 
 No joystick, no dragging the storm: you author it, physics finishes it.
 
-> Status: **playable**. A point-vortex storm forms, drifts, intensifies and dies
-> on real baked climate data, rendered as a dark nautical instrument. A fixed-seed
+> Status: **playable**. A deterministic storm forms, drifts, intensifies and dies
+> on real baked climate data. Its Holland-style structure carries parametric
+> central pressure, radius of maximum wind, motion asymmetry, and quadrant
+> 34/50/64-kt wind radii, rendered as a dark nautical instrument. A fixed-seed
 > demo storm opens mid-life on first load. Compare June vs October at one click;
 > share any storm by its URL. User storms carry a live flight recorder that
 > explains each intensity change in numbers and plain language, then becomes a
@@ -50,6 +52,11 @@ npm test          # vitest run (physics, grid, loader golden vector, rng, bake<-
   the immutable flight tape with no runtime dependency or server upload.
 - Open **model notes** for the observed inputs, deliberate simplifications, and
   the counterfactual-event contract.
+
+The live map shows three structure contours: amber is the radius of maximum
+wind, faint cyan is the 34-kt footprint, and bright white-cyan is the 64-kt
+footprint. The flight tape records central pressure, RMW, Holland B, outer wind
+radii, translation, and right-of-motion bias with every fixed physics step.
 
 On touch screens, a short stable tap spawns; drag, long-press, and multi-touch
 gestures do not. Narrow layouts keep the causal sentence visible and place exact
@@ -101,7 +108,7 @@ under `data/raw/` for the v1.1 counterfactual bake, where `nt` is a TIME axis
 (`tFrac` interpolation — the sampler's other mode).
 
 **Event replay contract:** event mode is a counterfactual, not a hindcast. The
-historical ghost shows the observed storm; the live point vortex answers how a
+historical ghost shows the observed storm; the live parametric storm answers how a
 spawn evolves in vortex-filtered ERA5 steering and shear with climatological
 OISST. Its track and peak intensity need not match the ghost. We deliberately
 keep this distinction instead of tuning one physics model to reproduce two
@@ -111,8 +118,9 @@ requirements for a future hindcast mode.
 That contract is also visible in the interface: event options are labelled as
 environments, the picker displays “not a historical reconstruction,” and every
 event flight tape carries a counterfactual marker. Scientific limitations are
-not hidden in documentation: the in-app model notes identify the point-vortex
-core, empirical intensity equation, geometric dry-air proxy, and the fact that
+not hidden in documentation: the in-app model notes identify the point-storm
+track/intensity core, empirical intensity equation, parametric Holland wind
+structure, Atlantic-derived RMW proxy, geometric dry-air proxy, and the fact that
 downstream flood light is timed D8 routing—not a discharge, infiltration, or
 inundation model.
 
@@ -129,6 +137,20 @@ smoother than instantaneous shear yet runs persistently high wherever the flow
 is steady (the monsoon). Recalibrate from scratch if the env source ever moves
 to daily/hourly fields. A young storm gets a 12 h shear-grace ramp so hostile
 regimes kill it watchably (~15–20 sim-h), not before the cause can render.
+
+**Physical structure:** `src/structure.ts` converts each simulated intensity
+state into a coherent [Holland-style radial wind
+profile](https://doi.org/10.1175/1520-0493(1980)108%3C1212:AAMOTW%3E2.0.CO;2).
+The radius of maximum wind begins from the
+[NOAA/NHC-documented Willoughby–Rahn climatological
+relationship](https://www.nhc.noaa.gov/jht/17-19reports/Chirokova_midyear1.pdf),
+then relaxes over 12 simulated hours toward an intensity-, latitude-, shear-,
+and land-dependent target. Holland B controls profile compactness; the inverted
+Holland maximum-wind relation supplies a parametric central pressure. The
+actual simulated translation vector introduces a bounded right-of-motion
+asymmetry, from which quadrant 34/50/64-kt radii are solved. This is a
+deterministic visualization/hazard proxy. The RMW relationship was developed
+from Atlantic storms and is not a North Indian aircraft analysis.
 
 **Dry air (v1.1):** a fourth decay term models desert-air entrainment as a pure
 geometric proxy — no humidity field exists, so the penalty grows as the Arabian
@@ -150,7 +172,8 @@ src/
   rng.ts              seeded RNG + shareable-storm URL hash
   loader.ts           .bin parser + validation + dequantize
   env-sampler.ts      EnvSampler over env.bin (real SST) + analytic fallback
-  sim.ts              point-vortex physics: steering+beta+wander, DeMaria-Kaplan
+  sim.ts              track/intensity physics: steering+beta+wander, DeMaria-Kaplan
+  structure.ts        Holland pressure/wind profile, RMW evolution, quadrant radii
   storm-session.ts    recording, pause/seek/replay transport, comparison baseline
   flight-recorder.ts  immutable per-tick tape + debrief/snapshot construction
   comparison.ts       same-identity paired-run validation and result deltas

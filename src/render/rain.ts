@@ -9,7 +9,7 @@
  * "Additive blending" is realised as this in-shader add so decay and transport —
  * which hardware ONE,ONE blending cannot express — become possible.
  *
- * Rain source = intensity · max(0, w⃗·∇h): w⃗ is the SAME analytic Rankine vortex
+ * Rain source = intensity · max(0, w⃗·∇h): w⃗ is the SAME analytic Holland vortex
  * inflow the particles ride (vortex.ts, in clip east/north), ∇h from the R16F
  * elevation texture. max(0,·) clamps lee slopes to zero — orographic-only by
  * design.
@@ -29,6 +29,7 @@
 
 import { TOKENS } from '../tokens';
 import { flowOffsetGlsl, HYDRO_ROUTE_CFL } from '../hydro-routing';
+import { DOMAIN } from '../grid';
 import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
 import { bindTex, makeProgram, makeQuadVao, makeRenderTarget, disposeRenderTarget } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
@@ -39,6 +40,8 @@ const RAIN_DECAY_PER_H = 0.72;
 const RAIN_GAIN = 45.0; // folds in the metres→slope scale of ∇h
 const FALLBACK_TRANSPORT_PER_H = 0.44;
 const RMAX_BASE = 0.11; // mirror of particles' base radius (clip units here)
+const HALF_DOMAIN_HEIGHT_KM =
+  ((DOMAIN.latMax - DOMAIN.latMin) * 111) / 2;
 // Channel window on the normalized baked log10(1+acc) values. These preserve the
 // old visual cutoffs after removing the renderer's accidental second logarithm:
 // old 0.62/0.92 in log1p-space map to ~0.41/0.84 in the honest linear space.
@@ -75,6 +78,9 @@ uniform float u_fallbackTransportPerH;
 uniform float u_dtH;
 uniform vec2 u_center;      // storm centre, clip
 uniform float u_rMax;
+uniform float u_hollandB;
+uniform vec2 u_motion;
+uniform float u_asymmetry;
 uniform float u_inflow;
 uniform float u_rainAmount; // storm intensity, 0 when no storm (decay-only)
 
@@ -99,7 +105,16 @@ void main() {
 
   // Orographic source: vortex inflow wind dotted with the terrain gradient.
   vec2 cell = vec2(uv.x * 2.0 - 1.0, 1.0 - 2.0 * uv.y); // clip, east=x north=y
-  vec2 w = vortexWind(cell, u_center, u_rMax, 1.0, u_inflow);
+  vec2 w = vortexWind(
+    cell,
+    u_center,
+    u_rMax,
+    1.0,
+    u_hollandB,
+    u_motion,
+    u_asymmetry,
+    u_inflow
+  );
   float eE = elev(uv + vec2(u_elevTexel.x, 0.0));
   float eW = elev(uv - vec2(u_elevTexel.x, 0.0));
   float eN = elev(uv + vec2(0.0, -u_elevTexel.y));
@@ -251,7 +266,25 @@ export class RainLayer {
     gl.uniform1f(u('u_dtH'), ctx.frame.hydroDeltaH);
     const c = ctx.centerClip;
     gl.uniform2f(u('u_center'), c ? c.x : 0, c ? c.y : 0);
-    gl.uniform1f(u('u_rMax'), RMAX_BASE * (0.7 + 0.6 * ctx.intensity01));
+    const structure = ctx.structure;
+    const rMax = structure
+      ? Math.max(
+          0.015,
+          Math.min(0.16, structure.rmwKm / HALF_DOMAIN_HEIGHT_KM),
+        )
+      : RMAX_BASE * (0.7 + 0.6 * ctx.intensity01);
+    const maximumWind = Math.max(1, structure?.maximumWindKt ?? ctx.vKt);
+    gl.uniform1f(u('u_rMax'), rMax);
+    gl.uniform1f(u('u_hollandB'), structure?.hollandB ?? 1.35);
+    gl.uniform2f(
+      u('u_motion'),
+      structure?.motionUms ?? 0,
+      structure?.motionVms ?? 0,
+    );
+    gl.uniform1f(
+      u('u_asymmetry'),
+      (structure?.translationAsymmetryKt ?? 0) / maximumWind,
+    );
     gl.uniform1f(u('u_inflow'), INFLOW_RAD);
     // Only a live storm over the map produces rain; after death the last state
     // remains renderable, but must drive decay + downstream transport only.

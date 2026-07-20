@@ -1,8 +1,9 @@
 /**
  * sim.ts — the physics core (eng tasks T2, T6; design steps 4 + D12 seam).
  *
- * A point-vortex storm advected by climatological steering + beta drift + a
- * gentle seeded wander, with a DeMaria–Kaplan intensity ODE. The whole thing is
+ * A storm centre advected by climatological steering + beta drift + a gentle
+ * seeded wander, with a DeMaria–Kaplan intensity ODE and a deterministic
+ * Holland-style pressure/wind structure. The whole thing is
  * a PURE function of (spawn, month, seed): given the same SpawnParams and the
  * same fixed-dt tick sequence it always produces the identical track. All
  * randomness flows through the seeded RNG in rng.ts — there is NO Math.random in
@@ -29,12 +30,14 @@ import type {
   SpawnParams,
   StormDiagnostics,
   StormState,
+  StormStructure,
   TrackPoint,
 } from './types';
 import { DeathReason, MUSCAT } from './types';
 import { makeRng } from './rng';
 import type { Rng } from './rng';
 import { DOMAIN, inBBox, greatCircleKm, offsetKm, windToDegPerHour } from './grid';
+import { cloneStormStructure, deriveStormStructure } from './structure';
 
 // ---------------------------------------------------------------------------
 // Tunable constants — the ONE place to tune the model by eye (design: "tunable
@@ -375,6 +378,14 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     dryAirKtPerH: 0,
     netKtPerH: 0,
   };
+  let structure: StormStructure = deriveStormStructure({
+    vKt: 0,
+    lat: 20,
+    shearMs: 0,
+    overLand: false,
+    motionUms: 0,
+    motionVms: 0,
+  });
 
   // wander (steering-velocity perturbation, m/s)
   let pu = 0;
@@ -404,12 +415,16 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     return e;
   }
 
-  /** Instantaneous storm velocity in deg/h at a point (steering+beta+wander). */
-  function velDegPerH(atLat: number, atLon: number, tFrac: number): { dLat: number; dLon: number } {
+  /** Instantaneous storm motion at a point (steering + beta + seeded wander). */
+  function motionAt(
+    atLat: number,
+    atLon: number,
+    tFrac: number,
+  ): { u: number; v: number; dLat: number; dLon: number } {
     const e = sampleEnv(atLat, atLon, tFrac);
     const u = e.steerU + beta.u + pu; // m/s eastward
     const v = e.steerV + beta.v + pv; // m/s northward
-    return windToDegPerHour(u, v, atLat); // grid.ts owns the cos-lat correction
+    return { u, v, ...windToDegPerHour(u, v, atLat) };
   }
 
   function snapshot(): StormState {
@@ -422,6 +437,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       alive,
       isDemo: demo,
       diagnostics: { ...diagnostics },
+      structure: cloneStormStructure(structure),
     };
   }
 
@@ -516,6 +532,15 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       isLand,
     });
     updateDiagnostics(initialEnv, prevOverLand, initialTerms);
+    const initialMotion = motionAt(lat, lon, 0);
+    structure = deriveStormStructure({
+      vKt,
+      lat,
+      shearMs: initialEnv.shear,
+      overLand: prevOverLand,
+      motionUms: initialMotion.u,
+      motionVms: initialMotion.v,
+    });
     closestKm = greatCircleKm(MUSCAT, { lat, lon });
 
     track = [];
@@ -541,8 +566,12 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     pv += (rng.next() * 2 - 1) * SIM.WANDER_STEP_MS - pv * SIM.WANDER_REVERT;
 
     // 2) RK2 (midpoint) position integration, in lat/lon degrees.
-    const k1 = velDegPerH(lat, lon, tFrac);
-    const k2 = velDegPerH(lat + (k1.dLat * dtH) / 2, lon + (k1.dLon * dtH) / 2, tFrac);
+    const k1 = motionAt(lat, lon, tFrac);
+    const k2 = motionAt(
+      lat + (k1.dLat * dtH) / 2,
+      lon + (k1.dLon * dtH) / 2,
+      tFrac,
+    );
     lat = guardFinite(lat + k2.dLat * dtH, 'lat');
     lon = guardFinite(lon + k2.dLon * dtH, 'lon');
     ageH = guardFinite(ageH + dtH, 'ageH');
@@ -563,6 +592,16 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     });
     updateDiagnostics(e, overLand, terms);
     vKt = guardFinite(Math.max(0, vKt + terms.net * dtH), 'vKt');
+    structure = deriveStormStructure({
+      vKt,
+      lat,
+      shearMs: e.shear,
+      overLand,
+      motionUms: k2.u,
+      motionVms: k2.v,
+      previousRmwKm: structure.rmwKm,
+      deltaHours: dtH,
+    });
 
     // 4) Attribute this tick's weakening to a channel (recent-weighted EMA).
     const coldHere = overLand ? 0 : Math.max(0, -terms.relax);

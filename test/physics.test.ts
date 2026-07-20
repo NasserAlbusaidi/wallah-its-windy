@@ -156,7 +156,8 @@ describe('live storm diagnostics', () => {
     engine.spawn(spawnParams());
     engine.tick(DT);
 
-    const diagnostics = engine.getState()!.diagnostics;
+    const state = engine.getState()!;
+    const diagnostics = state.diagnostics;
     expect(diagnostics.sstC).toBe(30);
     expect(diagnostics.steerU).toBe(3);
     expect(diagnostics.steerV).toBe(4);
@@ -174,6 +175,12 @@ describe('live storm diagnostics', () => {
         diagnostics.dryAirKtPerH,
       10,
     );
+    expect(state.structure.maximumWindKt).toBeCloseTo(state.vKt, 10);
+    expect(state.structure.centralPressureHpa).toBeLessThan(1010);
+    expect(state.structure.rmwKm).toBeGreaterThan(0);
+    expect(state.structure.hollandB).toBeGreaterThan(0);
+    expect(Number.isFinite(state.structure.motionUms)).toBe(true);
+    expect(Number.isFinite(state.structure.motionVms)).toBe(true);
   });
 });
 

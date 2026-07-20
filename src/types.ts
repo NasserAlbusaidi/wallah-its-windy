@@ -156,6 +156,42 @@ export interface StormDiagnostics {
   netKtPerH: number;
 }
 
+/** Maximum radial extent of a wind threshold in each geographic quadrant. */
+export interface WindRadiiKm {
+  ne: number;
+  se: number;
+  sw: number;
+  nw: number;
+}
+
+/**
+ * Parametric inner-core structure derived from the simulated intensity,
+ * latitude, environment, and translation vector.
+ *
+ * These values make the renderer and recorder physically coherent; they are
+ * not aircraft observations or an operational wind-field analysis.
+ */
+export interface StormStructure {
+  /** The reported maximum sustained surface wind carried by StormState. */
+  maximumWindKt: number;
+  /** Parametric minimum sea-level pressure at the storm centre. */
+  centralPressureHpa: number;
+  /** Fixed surrounding pressure used by the Holland pressure deficit. */
+  environmentalPressureHpa: number;
+  /** Radius of maximum surface wind—the eyewall scale. */
+  rmwKm: number;
+  /** Holland radial-profile shape parameter. */
+  hollandB: number;
+  /** Actual simulated translation vector, east/north, m/s. */
+  motionUms: number;
+  motionVms: number;
+  /** Motion-induced maximum-wind asymmetry applied to the symmetric vortex. */
+  translationAsymmetryKt: number;
+  r34Km: WindRadiiKm;
+  r50Km: WindRadiiKm;
+  r64Km: WindRadiiKm;
+}
+
 /** The live state of the single active storm. Pure data — no methods. */
 export interface StormState {
   lat: number;
@@ -171,6 +207,8 @@ export interface StormState {
   isDemo: boolean;
   /** Why the storm is strengthening or weakening at this instant. */
   diagnostics: StormDiagnostics;
+  /** Pressure, eyewall scale, motion asymmetry, and threshold wind radii. */
+  structure: StormStructure;
 }
 
 /** Everything needed to reproduce a storm exactly: sim = f(spawn, month, seed). */

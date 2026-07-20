@@ -11,7 +11,12 @@
  * facade's book-keeping.
  */
 
-import type { FrameState, GridSpec, TrackPoint } from '../types';
+import type {
+  FrameState,
+  GridSpec,
+  StormStructure,
+  TrackPoint,
+} from '../types';
 
 /** Environment sampled at the storm centre (render's own CPU read of env.bin). */
 export interface EnvAtStorm {
@@ -57,6 +62,8 @@ export interface DrawCtx {
   /** Interpolated storm centre in clip space, or null when no storm/aftermath track only. */
   centerClip: { x: number; y: number } | null;
   vKt: number;
+  /** Interpolated parametric pressure/wind structure for the current frame. */
+  structure: StormStructure | null;
   /** vKt mapped to [0,1] across the storm's plausible range. */
   intensity01: number;
   demo: boolean;

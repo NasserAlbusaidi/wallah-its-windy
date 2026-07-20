@@ -13,8 +13,10 @@ import type {
   StormDeath,
   StormDiagnostics,
   StormState,
+  StormStructure,
   TrackPoint,
 } from './types';
+import { cloneStormStructure } from './structure';
 
 export interface FlightRunMeta {
   /** Exact genesis identity used to reproduce and compare this run. */
@@ -33,6 +35,7 @@ export interface FlightRunMeta {
 export interface FlightFrame extends TrackPoint {
   alive: boolean;
   diagnostics: StormDiagnostics;
+  structure: StormStructure;
 }
 
 export interface FlightLandfall extends LatLon {
@@ -96,6 +99,7 @@ function frameOf(state: StormState): FlightFrame {
     ageH: state.ageH,
     alive: state.alive,
     diagnostics: { ...state.diagnostics },
+    structure: cloneStormStructure(state.structure),
   };
 }
 
@@ -156,6 +160,7 @@ export class FlightRecorder {
       alive: frame.alive,
       isDemo: this.meta.isDemo,
       diagnostics: { ...frame.diagnostics },
+      structure: cloneStormStructure(frame.structure),
     };
   }
 
@@ -183,6 +188,7 @@ export class FlightRecorder {
     const frames = this.frames.map((frame) => ({
       ...frame,
       diagnostics: { ...frame.diagnostics },
+      structure: cloneStormStructure(frame.structure),
     }));
     return {
       meta: { ...this.meta, spawn: { ...this.meta.spawn } },

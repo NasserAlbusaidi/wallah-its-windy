@@ -304,6 +304,12 @@ body {
   gap: 9px;
   margin: 8px 0 0;
 }
+.structure-readouts {
+  grid-template-columns: 1fr 1.15fr 1fr 1.3fr;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--ridge-hi, #2c343c) 42%, transparent);
+}
 .flight-readout,
 .debrief-grid > div {
   min-width: 0;

@@ -2,7 +2,7 @@
  * particles.ts — the storm as a satellite spiral (design "whoa" moment).
  *
  * 8k particles held in a preallocated interleaved typed array (x, y, alpha) and
- * advected on the CPU each frame through the SHARED analytic Rankine vortex
+ * advected on the CPU each frame through the SHARED analytic Holland vortex
  * (vortex.ts) around the interpolated storm centre — the same wind field the
  * rain source samples, so spiral and rain never disagree. Particles are seeded
  * along two logarithmic spiral arms and recycled as the ~20° inflow pulls them
@@ -21,6 +21,8 @@
 
 import { TOKENS } from '../tokens';
 import { makeRng } from '../rng';
+import { DOMAIN } from '../grid';
+import { maxWindRadiusKm } from '../structure';
 import { INFLOW_RAD, vortexWind } from './vortex';
 import { makeProgram } from './gl-utils';
 import type { Rng } from '../rng';
@@ -35,6 +37,50 @@ const SHEAR_THRESHOLD = 9; // m/s; above this the swarm smears downshear
 const SHEAR_K = 0.010; // clip units / sec per (m/s) above threshold
 const LIFE_MIN = 2.2;
 const LIFE_MAX = 5.5;
+const HALF_DOMAIN_HEIGHT_KM =
+  ((DOMAIN.latMax - DOMAIN.latMin) * 111) / 2;
+
+interface ParticleGeometry {
+  rMax: number;
+  spawnR: number;
+  hollandB: number;
+  motionX: number;
+  motionY: number;
+  asymmetryFraction: number;
+}
+
+function geometry(ctx: DrawCtx): ParticleGeometry {
+  const structure = ctx.structure;
+  if (!structure) {
+    return {
+      rMax: RMAX_BASE * (0.7 + 0.6 * ctx.intensity01),
+      spawnR: SPAWN_R,
+      hollandB: 1.35,
+      motionX: 0,
+      motionY: 0,
+      asymmetryFraction: 0,
+    };
+  }
+  const rMax = Math.max(
+    0.015,
+    Math.min(0.16, structure.rmwKm / HALF_DOMAIN_HEIGHT_KM),
+  );
+  const r34 = maxWindRadiusKm(structure.r34Km);
+  const outerKm = Math.max(structure.rmwKm * 4, r34 * 1.08);
+  const spawnR = Math.max(
+    rMax * 2.5,
+    Math.min(0.46, outerKm / HALF_DOMAIN_HEIGHT_KM),
+  );
+  const maximum = Math.max(1, structure.maximumWindKt);
+  return {
+    rMax,
+    spawnR,
+    hollandB: structure.hollandB,
+    motionX: structure.motionUms,
+    motionY: structure.motionVms,
+    asymmetryFraction: structure.translationAsymmetryKt / maximum,
+  };
+}
 
 const VS = /* glsl */ `#version 300 es
 in vec2 a_pos;
@@ -116,9 +162,15 @@ export class ParticleLayer implements RenderModule {
   }
 
   /** Seed particle i onto one of two spiral arms around the centre (iso frame). */
-  private spawn(i: number, cx: number, cy: number, aspect: number, intensity: number): void {
-    const rMax = RMAX_BASE * (0.7 + 0.6 * intensity);
-    const rr = rMax * 0.3 + this.rng.next() * (SPAWN_R - rMax * 0.3);
+  private spawn(
+    i: number,
+    cx: number,
+    cy: number,
+    aspect: number,
+    geometryValue: ParticleGeometry,
+  ): void {
+    const { rMax, spawnR } = geometryValue;
+    const rr = rMax * 0.3 + this.rng.next() * (spawnR - rMax * 0.3);
     const arm = this.rng.next() < 0.5 ? 0 : Math.PI;
     const theta = arm + SPIRAL_TIGHTNESS * Math.log(rr / rMax + 0.001) + (this.rng.next() - 0.5) * 0.5;
     const fx = rr * Math.cos(theta);
@@ -130,9 +182,14 @@ export class ParticleLayer implements RenderModule {
     this.life[i] = LIFE_MIN + this.rng.next() * (LIFE_MAX - LIFE_MIN);
   }
 
-  private seedAll(cx: number, cy: number, aspect: number, intensity: number): void {
+  private seedAll(
+    cx: number,
+    cy: number,
+    aspect: number,
+    geometryValue: ParticleGeometry,
+  ): void {
     for (let i = 0; i < this.count; i++) {
-      this.spawn(i, cx, cy, aspect, intensity);
+      this.spawn(i, cx, cy, aspect, geometryValue);
     }
     this.seeded = true;
   }
@@ -147,10 +204,11 @@ export class ParticleLayer implements RenderModule {
     }
     const aspect = ctx.aspect;
     const intensity = ctx.intensity01;
-    if (!this.seeded) this.seedAll(c.x, c.y, aspect, intensity);
+    const geometryValue = geometry(ctx);
+    if (!this.seeded) this.seedAll(c.x, c.y, aspect, geometryValue);
 
     const dt = ctx.dtSec;
-    const rMax = RMAX_BASE * (0.7 + 0.6 * intensity);
+    const { rMax, spawnR } = geometryValue;
     const vMax = VMAX_BASE * (0.5 + 0.5 * intensity);
 
     // Downshear drift (clip units/sec) from env shear + steering-direction proxy.
@@ -172,15 +230,25 @@ export class ParticleLayer implements RenderModule {
       // Relative position in the round iso frame.
       let fx = (data[o] - c.x) * aspect;
       let fy = data[o + 1] - c.y;
-      const w = vortexWind(fx, fy, { cx: 0, cy: 0, rMax, vMax, inflow: INFLOW_RAD });
+      const w = vortexWind(fx, fy, {
+        cx: 0,
+        cy: 0,
+        rMax,
+        vMax,
+        hollandB: geometryValue.hollandB,
+        motionX: geometryValue.motionX,
+        motionY: geometryValue.motionY,
+        asymmetryFraction: geometryValue.asymmetryFraction,
+        inflow: INFLOW_RAD,
+      });
       fx += w.wx * dt;
       fy += w.wy * dt;
       let x = c.x + fx / aspect + driftX * dt;
       let y = c.y + fy + driftY * dt;
       life[i] -= dt;
       const r = Math.hypot(fx, fy);
-      if (life[i] <= 0 || r > SPAWN_R * 1.4 || r < 0.006) {
-        this.spawn(i, c.x, c.y, aspect, intensity);
+      if (life[i] <= 0 || r > spawnR * 1.4 || r < 0.006) {
+        this.spawn(i, c.x, c.y, aspect, geometryValue);
         continue;
       }
       // Fade in over the first ~0.4s of life, fade out over the last ~0.6s.

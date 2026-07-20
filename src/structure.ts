@@ -15,13 +15,79 @@
 import type { StormStructure, WindRadiiKm } from './types';
 
 const KT_TO_MS = 0.514444;
-const ENVIRONMENTAL_PRESSURE_HPA = 1010;
-const AIR_DENSITY_KG_M3 = 1.15;
-const SURFACE_WIND_REDUCTION = 0.9;
-const RMW_MIN_KM = 12;
-const RMW_MAX_KM = 95;
-const RMW_RELAXATION_H = 12;
 const MAX_RADIUS_KM = 800;
+
+/**
+ * Tunable physical-structure parameters. Values that are not exposed to the
+ * calibration search remain here so the scientific contract is inspectable
+ * and versionable instead of being scattered through the equations.
+ */
+export interface StructureParameters {
+  environmentalPressureHpa: number;
+  airDensityKgM3: number;
+  surfaceWindReduction: number;
+  rmwCoefficientKm: number;
+  rmwWindDecayPerMs: number;
+  rmwLatitudeGrowthPerDegree: number;
+  rmwMinKm: number;
+  rmwMaxKm: number;
+  rmwRelaxationHours: number;
+  shearExpansionThresholdMs: number;
+  shearExpansionPerMs: number;
+  shearExpansionMax: number;
+  landExpansionFraction: number;
+  hollandBaseB: number;
+  hollandIntensityGainB: number;
+  hollandIntensityStartKt: number;
+  hollandIntensitySpanKt: number;
+  hollandShearThresholdMs: number;
+  hollandShearBroadeningPerMs: number;
+  hollandMinB: number;
+  hollandMaxB: number;
+  translationAsymmetryMotionFactor: number;
+  translationAsymmetryMaxKt: number;
+  translationAsymmetryMaxWindFraction: number;
+  pressureAsymmetryFraction: number;
+  minimumPressureHpa: number;
+}
+
+/**
+ * Pre-calibration reference retained as an immutable benchmark. The validation
+ * harness always compares proposed parameters against this exact model.
+ */
+export const UNCALIBRATED_STRUCTURE_PARAMETERS: Readonly<StructureParameters> =
+  Object.freeze({
+    environmentalPressureHpa: 1010,
+    airDensityKgM3: 1.15,
+    surfaceWindReduction: 0.9,
+    rmwCoefficientKm: 51.6,
+    rmwWindDecayPerMs: 0.0223,
+    rmwLatitudeGrowthPerDegree: 0.0281,
+    rmwMinKm: 12,
+    rmwMaxKm: 95,
+    rmwRelaxationHours: 12,
+    shearExpansionThresholdMs: 12,
+    shearExpansionPerMs: 0.012,
+    shearExpansionMax: 0.3,
+    landExpansionFraction: 0.12,
+    hollandBaseB: 1.1,
+    hollandIntensityGainB: 1.05,
+    hollandIntensityStartKt: 30,
+    hollandIntensitySpanKt: 120,
+    hollandShearThresholdMs: 12,
+    hollandShearBroadeningPerMs: 0.012,
+    hollandMinB: 0.9,
+    hollandMaxB: 2.35,
+    translationAsymmetryMotionFactor: 0.55,
+    translationAsymmetryMaxKt: 12,
+    translationAsymmetryMaxWindFraction: 0.18,
+    pressureAsymmetryFraction: 0.5,
+    minimumPressureHpa: 870,
+  });
+
+/** Parameters used by the live simulator. Updated only after held-out gates. */
+export const DEFAULT_STRUCTURE_PARAMETERS: Readonly<StructureParameters> =
+  Object.freeze({ ...UNCALIBRATED_STRUCTURE_PARAMETERS });
 
 const QUADRANT_BEARINGS = {
   ne: 45,
@@ -49,13 +115,21 @@ function emptyRadii(): WindRadiiKm {
  * The relationship was developed for Atlantic data, so it is deliberately
  * bounded and identified as a proxy when used over the North Indian Ocean.
  */
-export function climatologicalRmwKm(vKt: number, latitude: number): number {
+export function climatologicalRmwKm(
+  vKt: number,
+  latitude: number,
+  parameters: Readonly<StructureParameters> = DEFAULT_STRUCTURE_PARAMETERS,
+): number {
   const windMs = Math.max(0, finite(vKt)) * KT_TO_MS;
   const absoluteLatitude = clamp(Math.abs(finite(latitude)), 0, 60);
   return clamp(
-    51.6 * Math.exp(-0.0223 * windMs + 0.0281 * absoluteLatitude),
-    RMW_MIN_KM,
-    RMW_MAX_KM,
+    parameters.rmwCoefficientKm *
+      Math.exp(
+        -parameters.rmwWindDecayPerMs * windMs +
+          parameters.rmwLatitudeGrowthPerDegree * absoluteLatitude,
+      ),
+    parameters.rmwMinKm,
+    parameters.rmwMaxKm,
   );
 }
 
@@ -64,32 +138,63 @@ function targetRmwKm(
   latitude: number,
   shearMs: number,
   overLand: boolean,
+  parameters: Readonly<StructureParameters>,
 ): number {
-  const shearExpansion = clamp((Math.max(0, shearMs) - 12) * 0.012, 0, 0.3);
-  const landExpansion = overLand ? 0.12 : 0;
+  const shearExpansion = clamp(
+    (Math.max(0, shearMs) - parameters.shearExpansionThresholdMs) *
+      parameters.shearExpansionPerMs,
+    0,
+    parameters.shearExpansionMax,
+  );
+  const landExpansion = overLand ? parameters.landExpansionFraction : 0;
   return clamp(
-    climatologicalRmwKm(vKt, latitude) * (1 + shearExpansion + landExpansion),
-    RMW_MIN_KM,
-    RMW_MAX_KM,
+    climatologicalRmwKm(vKt, latitude, parameters) *
+      (1 + shearExpansion + landExpansion),
+    parameters.rmwMinKm,
+    parameters.rmwMaxKm,
   );
 }
 
-function hollandShape(vKt: number, shearMs: number): number {
-  const intensity = clamp((vKt - 30) / 120, 0, 1);
-  const shearBroadening = clamp((shearMs - 12) * 0.012, 0, 0.3);
-  return clamp(1.1 + intensity * 1.05 - shearBroadening, 0.9, 2.35);
+function hollandShape(
+  vKt: number,
+  shearMs: number,
+  parameters: Readonly<StructureParameters>,
+): number {
+  const intensity = clamp(
+    (vKt - parameters.hollandIntensityStartKt) /
+      parameters.hollandIntensitySpanKt,
+    0,
+    1,
+  );
+  const shearBroadening = clamp(
+    (shearMs - parameters.hollandShearThresholdMs) *
+      parameters.hollandShearBroadeningPerMs,
+    0,
+    parameters.shearExpansionMax,
+  );
+  return clamp(
+    parameters.hollandBaseB +
+      intensity * parameters.hollandIntensityGainB -
+      shearBroadening,
+    parameters.hollandMinB,
+    parameters.hollandMaxB,
+  );
 }
 
 function motionAsymmetryKt(
   vKt: number,
   motionUms: number,
   motionVms: number,
+  parameters: Readonly<StructureParameters>,
 ): number {
   const motionKt = Math.hypot(motionUms, motionVms) / KT_TO_MS;
   return clamp(
-    motionKt * 0.55,
+    motionKt * parameters.translationAsymmetryMotionFactor,
     0,
-    Math.min(12, Math.max(0, vKt) * 0.18),
+    Math.min(
+      parameters.translationAsymmetryMaxKt,
+      Math.max(0, vKt) * parameters.translationAsymmetryMaxWindFraction,
+    ),
   );
 }
 
@@ -296,7 +401,10 @@ export interface StructureInput {
 }
 
 /** Derive one immutable-by-convention physical-structure snapshot. */
-export function deriveStormStructure(input: StructureInput): StormStructure {
+export function deriveStormStructure(
+  input: StructureInput,
+  parameters: Readonly<StructureParameters> = DEFAULT_STRUCTURE_PARAMETERS,
+): StormStructure {
   const maximumWindKt = Math.max(0, finite(input.vKt));
   const shearMs = Math.max(0, finite(input.shearMs));
   const motionUms = finite(input.motionUms);
@@ -306,26 +414,32 @@ export function deriveStormStructure(input: StructureInput): StormStructure {
     input.lat,
     shearMs,
     input.overLand,
+    parameters,
   );
   const previousRmw =
     input.previousRmwKm === undefined
       ? targetRmw
-      : clamp(finite(input.previousRmwKm, targetRmw), RMW_MIN_KM, RMW_MAX_KM);
+      : clamp(
+          finite(input.previousRmwKm, targetRmw),
+          parameters.rmwMinKm,
+          parameters.rmwMaxKm,
+        );
   const deltaHours = Math.max(0, finite(input.deltaHours));
   const relaxation =
     input.previousRmwKm === undefined
       ? 1
-      : 1 - Math.exp(-deltaHours / RMW_RELAXATION_H);
+      : 1 - Math.exp(-deltaHours / parameters.rmwRelaxationHours);
   const rmwKm = clamp(
     previousRmw + (targetRmw - previousRmw) * relaxation,
-    RMW_MIN_KM,
-    RMW_MAX_KM,
+    parameters.rmwMinKm,
+    parameters.rmwMaxKm,
   );
-  const hollandB = hollandShape(maximumWindKt, shearMs);
+  const hollandB = hollandShape(maximumWindKt, shearMs, parameters);
   const translationAsymmetryKt = motionAsymmetryKt(
     maximumWindKt,
     motionUms,
     motionVms,
+    parameters,
   );
 
   // Holland's cyclostrophic maximum-wind relation inverted for pressure
@@ -333,23 +447,25 @@ export function deriveStormStructure(input: StructureInput): StormStructure {
   // gradient-wind proxy before applying the relation.
   const pressureWindKt = Math.max(
     0,
-    maximumWindKt - translationAsymmetryKt * 0.5,
+    maximumWindKt -
+      translationAsymmetryKt * parameters.pressureAsymmetryFraction,
   );
-  const gradientWindMs = (pressureWindKt * KT_TO_MS) / SURFACE_WIND_REDUCTION;
+  const gradientWindMs =
+    (pressureWindKt * KT_TO_MS) / parameters.surfaceWindReduction;
   const pressureDeficitHpa =
-    (AIR_DENSITY_KG_M3 * Math.E * gradientWindMs * gradientWindMs) /
+    (parameters.airDensityKgM3 * Math.E * gradientWindMs * gradientWindMs) /
     hollandB /
     100;
   const centralPressureHpa = clamp(
-    ENVIRONMENTAL_PRESSURE_HPA - pressureDeficitHpa,
-    870,
-    ENVIRONMENTAL_PRESSURE_HPA,
+    parameters.environmentalPressureHpa - pressureDeficitHpa,
+    parameters.minimumPressureHpa,
+    parameters.environmentalPressureHpa,
   );
 
   const structure: StormStructure = {
     maximumWindKt,
     centralPressureHpa,
-    environmentalPressureHpa: ENVIRONMENTAL_PRESSURE_HPA,
+    environmentalPressureHpa: parameters.environmentalPressureHpa,
     rmwKm,
     hollandB,
     motionUms,

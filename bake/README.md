@@ -30,6 +30,18 @@ its progress, both bake-time asserts, and a loud SYNTHETIC banner (see below).
 | `genesis.json` | `[{lat,lon}]` | — | IBTrACS North Indian |
 | `tracks.json` | two observed ghost-track polylines | — | IBTrACS North Indian |
 
+The physical-structure calibration subset is a separate offline artifact under
+`calibration/data/`; it never ships in `public/` or the browser bundle. Rebuild
+it from the same pinned IBTrACS raw download with:
+
+```bash
+python3 bake/extract_structure_validation.py
+```
+
+The extractor verifies the raw SHA-256, keeps six-hour main-track tropical
+fixes from 2019–2024, and uses USA/JTWC columns consistently for position,
+one-minute wind, pressure, RMW, and quadrant radii.
+
 ### `env.bin` layer naming (the EnvSampler must know this)
 
 One layer **per field per month**, each `nt = 1` for the v1.0 climatology. Names

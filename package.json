@@ -7,6 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "calibrate:check": "node --experimental-strip-types calibration/run.mjs --check",
+    "calibrate:structure": "node --experimental-strip-types calibration/run.mjs",
+    "data:structure": "python3 bake/extract_structure_validation.py",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

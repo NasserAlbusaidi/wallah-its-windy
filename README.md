@@ -152,6 +152,22 @@ asymmetry, from which quadrant 34/50/64-kt radii are solved. This is a
 deterministic visualization/hazard proxy. The RMW relationship was developed
 from Atlantic storms and is not a North Indian aircraft analysis.
 
+**North Indian validation:** the offline harness under `calibration/` scores the
+exact runtime structure equations against a pinned, agency-consistent subset of
+39 IBTrACS/JTWC storms from 2019–2024. It holds out complete storms, uses modern
+quality tiers (R34 from 2019; R50/R64 from 2022), reports pressure and quadrant
+radii by intensity, subbasin, lifecycle, and quadrant, and keeps RMW
+exploratory-only. The first constrained candidate improved its calibration
+storms but worsened the untouched validation objective by 2.1%, so the gate
+correctly rejected it and left live parameters unchanged. See the generated
+[calibration report](docs/structure-calibration.md).
+
+```bash
+npm run data:structure       # re-extract from the pinned raw IBTrACS snapshot
+npm run calibrate:structure  # regenerate machine + human reports
+npm run calibrate:check      # CI regression gate; no network required
+```
+
 **Dry air (v1.1):** a fourth decay term models desert-air entrainment as a pure
 geometric proxy — no humidity field exists, so the penalty grows as the Arabian
 landmass nears the storm along its dry N/NW/W bearings (an `isLand` ray probe out
@@ -174,6 +190,7 @@ src/
   env-sampler.ts      EnvSampler over env.bin (real SST) + analytic fallback
   sim.ts              track/intensity physics: steering+beta+wander, DeMaria-Kaplan
   structure.ts        Holland pressure/wind profile, RMW evolution, quadrant radii
+  structure-validation.ts offline scoring, storm split, calibration acceptance
   storm-session.ts    recording, pause/seek/replay transport, comparison baseline
   flight-recorder.ts  immutable per-tick tape + debrief/snapshot construction
   comparison.ts       same-identity paired-run validation and result deltas
@@ -187,4 +204,6 @@ src/
   fonts/              self-hosted IBM Plex Mono woff2 (400, 500)
 test/                 vitest: grid, loader (golden vector), rng, physics, integration
 bake/                 Python data-baking (not shipped) — see bake/README.md
+calibration/          pinned IBTrACS subset, reproducible metrics + gates
+docs/                 generated physical-structure calibration report
 ```

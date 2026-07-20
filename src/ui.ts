@@ -52,12 +52,18 @@ function trackRgba(a: number): string {
 // Tunables (by eye; the design doc owns the intent, these are the knobs)
 // ---------------------------------------------------------------------------
 
-/** Fixed seed for the ambient first-load demo storm — same every visit. */
-const DEMO_SEED = 0xc0c1a; // "Gonu-ish" homage; arbitrary but constant.
-/** A plausible warm-water genesis point for the demo (central Arabian Sea, at sea). */
-const DEMO_GENESIS: LatLon = { lat: 16.2, lon: 62.5 };
-/** Demo storm's default month if no month is pre-selected (June = cyclone season). */
-const DEMO_MONTH = 5;
+/**
+ * Fixed demo storm identity — same every visit. CURATED, not arbitrary: a seed
+ * scan over the real ERA5-sampled May fields (test/ probe, 2026-07-20) picked
+ * the storm that makes Omani landfall with the wadi payoff: spawn (17.5N, 61E),
+ * May, seed 71 (synoptic plane 3) -> ~12 d life, peak ~135 kt, dies over the
+ * Sharqiya coast ~309 km from Muscat. The integration test pins this outcome so
+ * a re-bake that reshuffles sample years cannot silently kill the demo.
+ */
+const DEMO_SEED = 71;
+const DEMO_GENESIS: LatLon = { lat: 17.5, lon: 61.0 };
+/** Demo month (May, 0-indexed 4): the real pre-monsoon cyclone window. */
+const DEMO_MONTH = 4;
 
 /** Storm center this close to a coast → drop to landfall-climax slow-mo. */
 const SLOWMO_COAST_KM = 150;

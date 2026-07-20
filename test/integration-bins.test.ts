@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseBin } from '../src/loader';
-import { makeEnvSampler, envMonthSuffix } from '../src/env-sampler';
+import { makeEnvSampler, envMonthSuffix, synopticCount } from '../src/env-sampler';
 import { createSimEngine } from '../src/sim';
 import { DOMAIN, inBBox, latLonToCell } from '../src/grid';
 import { MUSCAT } from '../src/types';
@@ -125,6 +125,26 @@ describe('env.bin', () => {
     expect(envMonthSuffix(0)).toBe('04'); // Jan clamps to May
     expect(envMonthSuffix(11)).toBe('10'); // Dec clamps to Nov
   });
+
+  it('u/v/shr ship K>=3 synoptic sample planes (D10), all finite and distinct', () => {
+    for (const m of SEASON) {
+      const mm = envMonthSuffix(m);
+      for (const field of ['u', 'v', 'shr']) {
+        const layer = bin.layers.get(`${field}_${mm}`)!;
+        expect(layer.nt, `${field}_${mm} nt`).toBeGreaterThanOrEqual(3);
+        expect(allFinite(layer.data)).toBe(true);
+      }
+      // Planes must be genuinely different regimes, not copies: the mean |u|
+      // difference between plane 0 and plane 1 should be clearly nonzero.
+      const u = bin.layers.get(`u_${mm}`)!;
+      const planeSize = u.nx * u.ny;
+      let diff = 0;
+      for (let i = 0; i < planeSize; i++) diff += Math.abs(u.data[i] - u.data[planeSize + i]);
+      expect(diff / planeSize, `u_${mm} plane0 vs plane1`).toBeGreaterThan(0.1);
+      // SST stays a single climatology plane.
+      expect(bin.layers.get(`sst_${mm}`)!.nt).toBe(1);
+    }
+  });
 });
 
 describe('flowacc.bin', () => {
@@ -178,23 +198,39 @@ describe('bake <-> sim seam (the real env.bin drives the physics)', () => {
     expect(sawWarm).toBe(true);
   });
 
-  it('a demo storm lives a finite life on real data and terminates', () => {
+  it('THE demo storm (ui.ts identity) lives long, gets strong, and lands on Oman', () => {
+    // Mirrors ui.demoSpawnParams + main.doSpawn exactly: seed picks the plane.
+    const DEMO = { lat: 17.5, lon: 61.0, monthIndex: 4, seed: 71 };
+    sampler.setSynopticIndex(DEMO.seed % synopticCount(env, DEMO.monthIndex));
     const engine = createSimEngine({ env: sampler, isLand });
-    engine.spawn({ lat: 16.2, lon: 62.5, monthIndex: 5, seed: 0xc0c1a, isDemo: true });
+    engine.spawn({ ...DEMO, isDemo: true });
 
     let died = false;
+    let ticks = 0;
+    let maxV = 0;
     const MAX_TICKS = 4000; // ~41 sim-days; any real storm dies well before this
-    for (let i = 0; i < MAX_TICKS && !died; i++) {
+    for (; ticks < MAX_TICKS && !died; ticks++) {
       const events: SimEvent[] = engine.tick(15);
       const s = engine.getState();
       expect(s).not.toBeNull();
       expect(Number.isFinite(s!.lat)).toBe(true);
       expect(Number.isFinite(s!.lon)).toBe(true);
       expect(Number.isFinite(s!.vKt)).toBe(true);
+      maxV = Math.max(maxV, s!.vKt);
       died = events.some((e) => e.type === 'died');
     }
+    sampler.setSynopticIndex(-1);
     expect(died).toBe(true);
-    expect(engine.getState()!.alive).toBe(false);
+    const s = engine.getState()!;
+    expect(s.alive).toBe(false);
+    // The demo is the first thing every visitor sees — pin its quality: a
+    // multi-day major that ends over the Omani landmass (wadi payoff on screen).
+    expect((ticks * 15) / 60 / 24).toBeGreaterThan(4); // > 4 sim-days
+    expect(maxV).toBeGreaterThan(90); // a major, not a fizzle
+    expect(s.lon).toBeGreaterThan(52.5); // ends on the Omani landmass box
+    expect(s.lon).toBeLessThan(60.0);
+    expect(s.lat).toBeGreaterThan(16.5);
+    expect(s.lat).toBeLessThan(26.5);
   });
 
   it('is deterministic: same spawn+seed reproduces the identical track', () => {
@@ -206,5 +242,28 @@ describe('bake <-> sim seam (the real env.bin drives the physics)', () => {
       return { lat: s.lat, lon: s.lon, vKt: s.vKt, n: s.trackPoints.length };
     };
     expect(run()).toEqual(run());
+  });
+
+  it('synoptic plane selection changes the environment a storm feels (D10)', () => {
+    const k = synopticCount(env, 5);
+    expect(k).toBeGreaterThanOrEqual(3);
+    // The same point+month reads different steering under different planes for
+    // at least one probe point (planes are distinct regimes).
+    const probes: Array<[number, number]> = [[16, 60], [18, 64], [20, 66], [22, 62]];
+    let differs = false;
+    for (const [lat, lon] of probes) {
+      sampler.setSynopticIndex(0);
+      const a = sampler.sample(lat, lon, 5, 0);
+      sampler.setSynopticIndex(1);
+      const b = sampler.sample(lat, lon, 5, 0);
+      if (Math.abs(a.steerU - b.steerU) > 0.05 || Math.abs(a.steerV - b.steerV) > 0.05) differs = true;
+    }
+    expect(differs).toBe(true);
+    // And the selection is part of determinism: same index -> identical sample.
+    sampler.setSynopticIndex(2);
+    const x = sampler.sample(17, 61, 5, 0);
+    const y = sampler.sample(17, 61, 5, 0);
+    expect(x).toEqual(y);
+    sampler.setSynopticIndex(-1); // restore time-interp mode for other tests
   });
 });

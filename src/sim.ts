@@ -33,7 +33,7 @@ import type {
 import { DeathReason, MUSCAT } from './types';
 import { makeRng } from './rng';
 import type { Rng } from './rng';
-import { DOMAIN, inBBox, greatCircleKm, windToDegPerHour } from './grid';
+import { DOMAIN, inBBox, greatCircleKm, offsetKm, windToDegPerHour } from './grid';
 
 // ---------------------------------------------------------------------------
 // Tunable constants — the ONE place to tune the model by eye (design: "tunable
@@ -69,6 +69,16 @@ export const SIM = {
    * May ~3-9 m/s -> majors possible; June splits by sampled year (~10 free vs
    * ~23 lethal); Jul-Aug ~27-32 -> everything shredded. Recalibrate from
    * scratch if the env source ever moves to daily/hourly fields.
+   *
+   * November (v1.1 diagnosis, C6): every baked shr_10 plane sits 14.7-19.6 m/s
+   * in the genesis belt, so seed%K can NEVER land on a calm regime and 0/32
+   * probe storms reach Cat-1 — the "November fizzle". This is NOT a constant to
+   * tune here: Nov's hostile band (14-19) overlaps June's surviving planes
+   * (18-20), so no SHEAR_THRESHOLD_MS/SHEAR_K change lifts Nov without also
+   * un-shredding June/Sep. The raw ERA5 record DOES hold calm Novembers (2011
+   * 8.6 m/s, 2020 9.8) — the bake's steering-only plane picker just never
+   * selected one. Remedy is DATA-SIDE (bake/era5.py _pick_sample_years); see the
+   * build report's nov_remedy. DRYAIR_K below is unrelated to this.
    */
   SHEAR_THRESHOLD_MS: 14,
   /** Weakening per m/s of shear above threshold, kt/h (same recalibration). */
@@ -120,14 +130,29 @@ export const SIM = {
   WANDER_STEP_MS: 0.28,
   WANDER_REVERT: 0.05,
 
-  // -- v1.1 dry-air seam (eng task T11) — NO-OP in v1.0 ----------------------
+  // -- v1.1 dry-air term (design D12) ----------------------------------------
   /**
-   * Dry-air decay strength. ZERO in v1.0 (the term is a wired no-op). Weekend
-   * two sets this > 0 and fills in dryAirPenaltyKtPerH with
-   * f(distance-to-Arabian-landmass upwind), tuned against Gonu/Shaheen's real
-   * coastal weakening. Kept as a live seam so the ODE shape never changes.
+   * Peak dry-air weakening rate, kt/h, approached as the Arabian landmass nears
+   * the storm along a dry (N/NW/W) bearing (proximity → 1). A GEOMETRIC proxy for
+   * desert-air entrainment: EnvSample carries no humidity, so "how close is the
+   * upwind coast" stands in for it. Tuned against IBTrACS Gonu (2007), which fell
+   * 127→77 kt over its final ~330 km NW approach to Oman: on the real env.bin the
+   * DEMO_SEED May storm (whose track hugs the Omani coast at Cat-4) now peaks
+   * ~113 kt and makes landfall near ~90 kt — a recognizable coastal weakening
+   * instead of holding 131 kt to the beach — while clearing integration-bins'
+   * >90 kt-and-landfall pin with margin. RANGE deliberately keeps the term OFF
+   * during open-sea spin-up (>190 km from upwind land) so the peak is unharmed;
+   * it only bites on the final approach. Co-tuned with DRYAIR_RANGE_KM.
    */
-  DRYAIR_K: 0,
+  DRYAIR_K: 0.9,
+  /**
+   * Dry desert air reaches this far offshore (km); zero penalty beyond it. Set
+   * narrow on purpose: a wider reach caps intensification far out to sea and
+   * fizzles storms (and the demo) before they ever approach the coast.
+   */
+  DRYAIR_RANGE_KM: 190,
+  /** Ray-probe step (km) for the upwind isLand walk. ~RANGE/STEP probes/bearing. */
+  DRYAIR_STEP_KM: 34,
 
   // -- Bookkeeping ----------------------------------------------------------
   /** EMA retention per tick for "which term dominated recent decay". */
@@ -191,12 +216,57 @@ export function landDecayKtPerH(vKt: number): number {
 }
 
 /**
- * Dry-air intrusion penalty — kt/h. v1.0 NO-OP (returns 0): the seam for eng
- * task T11 (v1.1). Weekend two replaces the body with a distance-to-Arabian-
- * landmass term and sets SIM.DRYAIR_K > 0. Params are the future inputs.
+ * Dry (desert-air) bearings as unit (east, north) vectors: the Arabian landmass
+ * lies to the N / NW / W of the genesis belt, so those are the directions along
+ * which dry continental air is entrained into an approaching storm.
  */
-export function dryAirPenaltyKtPerH(_lat: number, _lon: number, _monthIndex: number): number {
-  return SIM.DRYAIR_K; // 0 → term contributes nothing until v1.1 tuning.
+const DRY_BEARINGS: ReadonlyArray<readonly [number, number]> = [
+  [0, 1], // N
+  [-SQRT1_2, SQRT1_2], // NW
+  [-1, 0], // W
+];
+
+/**
+ * Geometric dry-air proxy in [0,1]: how close the nearest upwind (N/NW/W) coast
+ * is. Walks isLand outward along each dry bearing in DRYAIR_STEP_KM increments up
+ * to DRYAIR_RANGE_KM (via grid.offsetKm — no inline lat/lon math here); the min
+ * hit distance across bearings sets proximity = (RANGE − dist)/RANGE. 0 when no
+ * land within range (open sea), 1 when land is at the storm. Deterministic: a
+ * fixed step grid, no RNG, no wall-clock — safe in the tick path.
+ */
+function dryLandProximity(
+  lat: number,
+  lon: number,
+  isLand: (lat: number, lon: number) => boolean,
+): number {
+  let nearestKm: number = SIM.DRYAIR_RANGE_KM;
+  for (const [east, north] of DRY_BEARINGS) {
+    for (let d: number = SIM.DRYAIR_STEP_KM; d <= SIM.DRYAIR_RANGE_KM; d += SIM.DRYAIR_STEP_KM) {
+      const p = offsetKm(lat, lon, east, north, d);
+      if (isLand(p.lat, p.lon)) {
+        if (d < nearestKm) nearestKm = d;
+        break; // nearest land along this bearing is all that matters
+      }
+    }
+  }
+  return clamp01((SIM.DRYAIR_RANGE_KM - nearestKm) / SIM.DRYAIR_RANGE_KM);
+}
+
+/**
+ * Dry-air intrusion penalty — kt/h, ≥ 0. A geometric proxy (design D12): the
+ * penalty grows as the storm nears the Arabian landmass along its dry (N/NW/W)
+ * upwind bearings, standing in for desert-air entrainment (EnvSample carries no
+ * humidity). Pure f(position, isLand); `monthIndex` is reserved for a future
+ * seasonal modulation. Returns 0 when SIM.DRYAIR_K is 0 (term disabled).
+ */
+export function dryAirPenaltyKtPerH(
+  lat: number,
+  lon: number,
+  _monthIndex: number,
+  isLand: (lat: number, lon: number) => boolean,
+): number {
+  if (SIM.DRYAIR_K <= 0) return 0;
+  return guardFinite(SIM.DRYAIR_K * dryLandProximity(lat, lon, isLand), 'dryAirPenalty');
 }
 
 /** Beta-drift steering vector (m/s), directed NW: u west-negative, v north-positive. */
@@ -215,6 +285,12 @@ interface IntensityArgs {
   monthIndex: number;
   /** Storm age in hours; omitted = mature (full shear penalty, no grace). */
   ageH?: number;
+  /**
+   * Land-mask predicate for the dry-air upwind probe. Omitted = no dry-air term
+   * (open-ocean unit tests that don't care about the coast); the engine always
+   * threads its real isLand through.
+   */
+  isLand?: (lat: number, lon: number) => boolean;
 }
 
 /** The four ODE terms plus their net dV/dt (kt/h). Internal — drives attribution. */
@@ -232,7 +308,9 @@ function intensityTerms(a: IntensityArgs): {
   const graceRamp = a.ageH === undefined ? 1 : Math.min(1, a.ageH / SIM.SHEAR_GRACE_H);
   const shearPen = graceRamp * shearPenaltyKtPerH(a.shearMs);
   const landPen = a.overLand ? landDecayKtPerH(a.vKt) : 0;
-  const dryPen = dryAirPenaltyKtPerH(a.lat, a.lon, a.monthIndex);
+  // Dry-air needs the coast geometry; without an isLand probe (bare unit tests)
+  // the term is off, matching the pre-v1.1 open-ocean behaviour.
+  const dryPen = a.isLand ? dryAirPenaltyKtPerH(a.lat, a.lon, a.monthIndex, a.isLand) : 0;
   const net = relax - shearPen - landPen - dryPen;
   return { relax, shearPen, landPen, dryPen, net };
 }
@@ -265,6 +343,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   let monthIndex = 0;
   let seed = 0;
   let demo = false;
+  let tFracHorizonH: number = SIM.EVENT_TFRAC_HORIZON_H;
 
   let lat = 0;
   let lon = 0;
@@ -280,6 +359,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   let recentCold = 0;
   let recentShear = 0;
   let recentLand = 0;
+  let recentDry = 0;
 
   // event bookkeeping
   let justSpawned = false;
@@ -316,10 +396,11 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   }
 
   function reasonFromRecent(): DeathReason {
-    const m = Math.max(recentLand, recentShear, recentCold);
+    const m = Math.max(recentLand, recentShear, recentCold, recentDry);
     if (m <= 0) return DeathReason.ColdWater; // starved with no clear driver
     if (recentLand === m) return DeathReason.Land;
     if (recentShear === m) return DeathReason.Shear;
+    if (recentDry === m) return DeathReason.DryAir;
     return DeathReason.ColdWater;
   }
 
@@ -345,6 +426,14 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     monthIndex = params.monthIndex;
     seed = params.seed >>> 0;
     demo = params.isDemo;
+    // Optional per-storm horizon (C4). A non-finite/≤0 value would make tFrac
+    // divide-by-zero or NaN, so fall back to the default in that case.
+    tFracHorizonH =
+      params.tFracHorizonH !== undefined &&
+      Number.isFinite(params.tFracHorizonH) &&
+      params.tFracHorizonH > 0
+        ? params.tFracHorizonH
+        : SIM.EVENT_TFRAC_HORIZON_H;
 
     rng = makeRng(seed);
     vKt = SIM.SPAWN_VKT;
@@ -355,6 +444,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     recentCold = 0;
     recentShear = 0;
     recentLand = 0;
+    recentDry = 0;
     peakKt = vKt;
     prevVKtForPeak = vKt;
     rising = false;
@@ -377,7 +467,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     }
 
     const dtH = dtMin / 60;
-    const tFrac = clamp01(ageH / SIM.EVENT_TFRAC_HORIZON_H);
+    const tFrac = clamp01(ageH / tFracHorizonH);
 
     // 1) Advance the wander ONCE per tick (2 draws) — used for both RK2 stages.
     pu += (rng.next() * 2 - 1) * SIM.WANDER_STEP_MS - pu * SIM.WANDER_REVERT;
@@ -402,6 +492,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       lon,
       monthIndex,
       ageH,
+      isLand,
     });
     vKt = guardFinite(Math.max(0, vKt + terms.net * dtH), 'vKt');
 
@@ -409,9 +500,11 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     const coldHere = overLand ? 0 : Math.max(0, -terms.relax);
     const landHere = overLand ? Math.max(0, -terms.relax) + terms.landPen : 0;
     const shearHere = terms.shearPen;
+    const dryHere = terms.dryPen;
     recentCold = recentCold * SIM.RECENT_DECAY + coldHere;
     recentShear = recentShear * SIM.RECENT_DECAY + shearHere;
     recentLand = recentLand * SIM.RECENT_DECAY + landHere;
+    recentDry = recentDry * SIM.RECENT_DECAY + dryHere;
 
     // 5) Trackers + narrative events.
     if (vKt > peakKt) peakKt = vKt;

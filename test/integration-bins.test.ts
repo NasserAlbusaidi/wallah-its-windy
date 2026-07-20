@@ -136,10 +136,10 @@ describe('env.bin', () => {
     expect(envMonthSuffix(11)).toBe('10'); // Dec clamps to Nov
   });
 
-  it('u/v/shr ship K>=3 synoptic sample planes (D10), all finite and distinct', () => {
+  it('steering and shear vectors ship K>=3 finite synoptic sample planes (D10)', () => {
     for (const m of SEASON) {
       const mm = envMonthSuffix(m);
-      for (const field of ['u', 'v', 'shr']) {
+      for (const field of ['u', 'v', 'shr', 'shu', 'shv']) {
         const layer = bin.layers.get(`${field}_${mm}`)!;
         expect(layer.nt, `${field}_${mm} nt`).toBeGreaterThanOrEqual(3);
         expect(allFinite(layer.data)).toBe(true);
@@ -158,6 +158,14 @@ describe('env.bin', () => {
       }
       // SST stays a single climatology plane.
       expect(bin.layers.get(`sst_${mm}`)!.nt).toBe(1);
+      const shr = bin.layers.get(`shr_${mm}`)!;
+      const shu = bin.layers.get(`shu_${mm}`)!;
+      const shv = bin.layers.get(`shv_${mm}`)!;
+      expect(shu.nt).toBe(shr.nt);
+      expect(shv.nt).toBe(shr.nt);
+      for (let i = 0; i < shr.data.length; i++) {
+        expect(Math.hypot(shu.data[i], shv.data[i])).toBeLessThan(120);
+      }
     }
   });
 });

@@ -24,8 +24,9 @@ import { DOMAIN } from '../src/grid';
 import type { ParsedBin, SimEvent } from '../src/types';
 import type { Scenario } from '../src/scenarios';
 
-// A June (monthIndex 5) event bin: sst_05 is a single climatological plane; u/v/shr
-// carry 3 time planes. u_05 ramps 0 -> 10 -> 20 across the timesteps so tFrac reads
+// A June (monthIndex 5) event bin: sst_05 is a single climatological plane; the
+// steering and shear-vector fields carry 3 time planes. u_05 ramps 0 -> 10 -> 20
+// across the timesteps so tFrac reads
 // are unambiguous. Grid is 2x2 over the domain (cell choice is irrelevant — every
 // cell in a plane holds the same value).
 const MM = envMonthSuffix(5); // '05'
@@ -39,6 +40,8 @@ function buildEventBin(): ParsedBin {
     { name: `u_${MM}`, nx: NX, ny: NY, nt: U_PLANES.length, bbox: DOMAIN, data: constantPlanes(NX, NY, U_PLANES) },
     { name: `v_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [1, 1, 1]) },
     { name: `shr_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [4, 4, 4]) },
+    { name: `shu_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [0, 0, 0]) },
+    { name: `shv_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [4, 4, 4]) },
   ]);
   return parseBin(buf);
 }

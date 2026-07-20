@@ -130,7 +130,7 @@ export function validateEventBinForScenario(
   if (!Number.isInteger(expectedNt)) {
     return `scenario windowH=${scenario.windowH} and stepH=${scenario.stepH} imply non-integer nt=${expectedNt}`;
   }
-  for (const field of ['u', 'v', 'shr']) {
+  for (const field of ['u', 'v', 'shr', 'shu', 'shv']) {
     const name = `${field}_${mm}`;
     const layer = bin.layers.get(name);
     if (!layer) return `missing ${name}`;

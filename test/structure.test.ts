@@ -7,6 +7,10 @@ import {
   windRadiusAtBearingKm,
   windRadiusFromQuadrantsKm,
 } from '../src/structure';
+import {
+  DEFAULT_STRUCTURE_PARAMETERS,
+  UNCALIBRATED_STRUCTURE_PARAMETERS,
+} from '../src/structure';
 
 describe('climatological radius of maximum wind', () => {
   it('contracts with intensity and expands modestly with latitude', () => {
@@ -76,6 +80,122 @@ describe('Holland storm structure', () => {
 
     expect(firstTick.rmwKm).toBeLessThan(initial.rmwKm);
     expect(firstTick.rmwKm).toBeGreaterThan(target);
+  });
+
+  it('evolves outer size with independent, slower memory', () => {
+    const initial = deriveStormStructure({
+      vKt: 40,
+      lat: 20,
+      lon: 60,
+      shearMs: 5,
+      overLand: false,
+      motionUms: 0,
+      motionVms: 0,
+    });
+    const next = deriveStormStructure({
+      vKt: 110,
+      lat: 20,
+      lon: 60,
+      shearMs: 5,
+      overLand: false,
+      motionUms: 0,
+      motionVms: 0,
+      previousRmwKm: initial.rmwKm,
+      previousOuterSizeKm: initial.outerSizeKm,
+      deltaHours: 0.25,
+    });
+    const instantaneous = deriveStormStructure({
+      vKt: 110,
+      lat: 20,
+      lon: 60,
+      shearMs: 5,
+      overLand: false,
+      motionUms: 0,
+      motionVms: 0,
+    });
+
+    expect(next.outerSizeKm).toBeGreaterThan(initial.outerSizeKm);
+    expect(next.outerSizeKm).toBeLessThan(instantaneous.outerSizeKm);
+    const outerProgress =
+      Math.abs(next.outerSizeKm - initial.outerSizeKm) /
+      Math.abs(instantaneous.outerSizeKm - initial.outerSizeKm);
+    const rmwProgress =
+      Math.abs(next.rmwKm - initial.rmwKm) /
+      Math.abs(instantaneous.rmwKm - initial.rmwKm);
+    expect(outerProgress).toBeLessThan(rmwProgress);
+  });
+
+  it('changes gale-force size without perturbing R50/R64 or pressure', () => {
+    const input = {
+      vKt: 100,
+      lat: 20,
+      lon: 60,
+      shearMs: 8,
+      overLand: false,
+      motionUms: 0,
+      motionVms: 0,
+    };
+    const baseline = deriveStormStructure(
+      input,
+      UNCALIBRATED_STRUCTURE_PARAMETERS,
+    );
+    const outerCore = deriveStormStructure(input, DEFAULT_STRUCTURE_PARAMETERS);
+
+    expect(maxWindRadiusKm(outerCore.r34Km)).not.toBeCloseTo(
+      maxWindRadiusKm(baseline.r34Km),
+      3,
+    );
+    expect(maxWindRadiusKm(outerCore.r50Km)).toBeCloseTo(
+      maxWindRadiusKm(baseline.r50Km),
+      6,
+    );
+    expect(maxWindRadiusKm(outerCore.r64Km)).toBeCloseTo(
+      maxWindRadiusKm(baseline.r64Km),
+      6,
+    );
+    expect(outerCore.centralPressureHpa).toBe(baseline.centralPressureHpa);
+  });
+
+  it('puts shear-driven outer winds and rainfall downshear-left', () => {
+    const structure = deriveStormStructure({
+      vKt: 90,
+      lat: 20,
+      lon: 60,
+      shearMs: 20,
+      shearUms: 20,
+      shearVms: 0,
+      overLand: false,
+      motionUms: 0,
+      motionVms: 0,
+    });
+    // Eastward shear points downshear-left toward north in the NH.
+    expect(structure.shearAsymmetryFraction).toBeGreaterThan(0);
+    expect(structure.r34Km.ne).toBeGreaterThan(structure.r34Km.se);
+    expect(structure.r34Km.nw).toBeGreaterThan(structure.r34Km.sw);
+    expect(structure.rainOffsetEastKm).toBeCloseTo(0, 8);
+    expect(structure.rainOffsetNorthKm).toBeGreaterThan(0);
+    expect(hollandWindSpeedKt(structure.rmwKm, 0, structure)).toBeCloseTo(
+      hollandWindSpeedKt(structure.rmwKm, 180, structure),
+      8,
+    );
+  });
+
+  it('keeps zero-vector shear structurally symmetric', () => {
+    const structure = deriveStormStructure({
+      vKt: 90,
+      lat: 20,
+      lon: 60,
+      shearMs: 20,
+      shearUms: 0,
+      shearVms: 0,
+      overLand: false,
+      motionUms: 0,
+      motionVms: 0,
+    });
+    expect(structure.shearAsymmetryFraction).toBe(0);
+    expect(structure.rainOffsetEastKm).toBe(0);
+    expect(structure.rainOffsetNorthKm).toBe(0);
+    expect(structure.r34Km.ne).toBeCloseTo(structure.r34Km.sw, 8);
   });
 
   it('peaks at RMW and decays both inward and outward', () => {
@@ -180,8 +300,15 @@ describe('Holland storm structure', () => {
       for (const value of [
         structure.centralPressureHpa,
         structure.rmwKm,
+        structure.outerSizeKm,
+        structure.outerWindScale,
+        structure.outerBlendStartWindKt,
+        structure.outerBlendFullWindKt,
         structure.hollandB,
         structure.translationAsymmetryKt,
+        structure.shearAsymmetryFraction,
+        Math.abs(structure.rainOffsetEastKm),
+        Math.abs(structure.rainOffsetNorthKm),
         ...Object.values(structure.r34Km),
         ...Object.values(structure.r50Km),
         ...Object.values(structure.r64Km),

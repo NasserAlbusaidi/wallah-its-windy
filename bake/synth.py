@@ -88,3 +88,16 @@ def steering_shear(
     shear = np.maximum(shear, 2.0)
 
     return u.astype(np.float64), v.astype(np.float64), shear.astype(np.float64)
+
+
+def steering_shear_vector(
+    elat: np.ndarray, elon: np.ndarray, month: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Synthetic fallback with a coherent, explicitly labelled shear vector."""
+    u, v, shear = steering_shear(elat, elon, month)
+    # Upper-minus-lower proxy rotates from easterly pre-monsoon to stronger
+    # north-easterly monsoon shear. Only used when the real ERA5 bin is absent.
+    angle = np.deg2rad(20.0 + 35.0 * MONSOON.get(month, 0.1))
+    shear_u = shear * np.cos(angle)
+    shear_v = shear * np.sin(angle)
+    return u, v, shear, shear_u, shear_v

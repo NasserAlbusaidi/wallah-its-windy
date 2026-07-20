@@ -56,9 +56,23 @@ _LEVEL_NAMES = ("pressure_level", "level", "plev", "isobaricInhPa")
 _LAT_NAMES = ("latitude", "lat")
 _LON_NAMES = ("longitude", "lon")
 
-_cache: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] | None = None
-# Per-year fields for synoptic sampling: month -> (years[n], u[n,ny,nx], v[..], shear[..])
-_yearly: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] | None = None
+_cache: dict[
+    int,
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+] | None = None
+# Per-year fields for synoptic sampling:
+# month -> (years[n], steerU, steerV, shearMagnitude, shearU, shearV).
+_yearly: dict[
+    int,
+    tuple[
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+    ],
+] | None = None
 _axes: tuple[np.ndarray, np.ndarray] | None = None  # (lat ascending, lon ascending)
 
 
@@ -147,17 +161,38 @@ def _load() -> None:
     flip_lat = lat[0] > lat[-1]
     flip = (lambda a: a[..., ::-1, :]) if flip_lat else (lambda a: a)
 
-    cache: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
-    yearly: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
+    cache: dict[
+        int,
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    ] = {}
+    yearly: dict[
+        int,
+        tuple[
+            np.ndarray,
+            np.ndarray,
+            np.ndarray,
+            np.ndarray,
+            np.ndarray,
+            np.ndarray,
+        ],
+    ] = {}
     for cal_month in sorted(set(months.tolist())):
         sel = months == cal_month
         yr = years[sel]
         u_y = flip(np.tensordot(w, u[sel][:, steer_idx], axes=(0, 1)))  # [nyear, ny, nx]
         v_y = flip(np.tensordot(w, v[sel][:, steer_idx], axes=(0, 1)))
-        shear_y = flip(np.hypot(u[sel][:, i200] - u[sel][:, i850], v[sel][:, i200] - v[sel][:, i850]))
+        shear_u_y = flip(u[sel][:, i200] - u[sel][:, i850])
+        shear_v_y = flip(v[sel][:, i200] - v[sel][:, i850])
+        shear_y = np.hypot(shear_u_y, shear_v_y)
         m0 = cal_month - 1  # store 0-indexed like SEASON_MONTHS
-        yearly[m0] = (yr, u_y, v_y, shear_y)
-        cache[m0] = (u_y.mean(axis=0), v_y.mean(axis=0), shear_y.mean(axis=0))
+        yearly[m0] = (yr, u_y, v_y, shear_y, shear_u_y, shear_v_y)
+        cache[m0] = (
+            u_y.mean(axis=0),
+            v_y.mean(axis=0),
+            shear_y.mean(axis=0),
+            shear_u_y.mean(axis=0),
+            shear_v_y.mean(axis=0),
+        )
 
     if flip_lat:
         lat = lat[::-1]
@@ -233,12 +268,22 @@ def steering_shear(
     elat: np.ndarray, elon: np.ndarray, month: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """REAL 30-yr-mean deep-layer steering (u,v) + shear; synth-compatible."""
+    u, v, s, _su, _sv = steering_shear_vector(elat, elon, month)
+    return u, v, s
+
+
+def steering_shear_vector(
+    elat: np.ndarray, elon: np.ndarray, month: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Steering plus 200–850 hPa shear magnitude and vector components."""
     _load()
     assert _cache is not None
     if month not in _cache:
         raise KeyError(f"month {month} not in ERA5 climatology (has {sorted(_cache)})")
-    u, v, s = (_to_env_grid(f, elat, elon) for f in _cache[month])
-    return u, v, s
+    u, v, s, su, sv = (
+        _to_env_grid(field, elat, elon) for field in _cache[month]
+    )
+    return u, v, s, su, sv
 
 
 def steering_shear_samples(
@@ -251,13 +296,32 @@ def steering_shear_samples(
     regime and planes 1..k-1 are the spread. The runtime selects a plane per
     spawn from the seed (see src/env-sampler.ts).
     """
+    u, v, s, _su, _sv, years = steering_shear_samples_vector(
+        elat, elon, month
+    )
+    return u, v, s, years
+
+
+def steering_shear_samples_vector(
+    elat: np.ndarray, elon: np.ndarray, month: int
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    list[int],
+]:
+    """K coherent real-year steering and shear-vector fields on the env grid."""
     _load()
     assert _yearly is not None
     if month not in _yearly:
         raise KeyError(f"month {month} not in ERA5 climatology (has {sorted(_yearly)})")
-    yr, u_y, v_y, shear_y = _yearly[month]
+    yr, u_y, v_y, shear_y, shear_u_y, shear_v_y = _yearly[month]
     idx = _pick_sample_years(u_y, v_y, shear_y, SAMPLES_PER_MONTH)
     u = np.stack([_to_env_grid(u_y[i], elat, elon) for i in idx])
     v = np.stack([_to_env_grid(v_y[i], elat, elon) for i in idx])
     s = np.stack([_to_env_grid(shear_y[i], elat, elon) for i in idx])
-    return u, v, s, [int(yr[i]) for i in idx]
+    su = np.stack([_to_env_grid(shear_u_y[i], elat, elon) for i in idx])
+    sv = np.stack([_to_env_grid(shear_v_y[i], elat, elon) for i in idx])
+    return u, v, s, su, sv, [int(yr[i]) for i in idx]

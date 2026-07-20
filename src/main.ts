@@ -133,7 +133,7 @@ const session = new StormSession();
 // --- Environment sampler (sim dependency) -----------------------------------
 // The sim requires an EnvSampler. It closes over a live holder: once env.bin
 // loads, `envBin` is set and the sampler reads the real baked fields (REAL OISST
-// SST + SYNTHETIC_V0 steering/shear — see bake/README.md); before it lands, or if
+// SST + real ERA5 steering/shear — see bake/README.md); before it lands, or if
 // the fetch 404s, it falls back to a deterministic analytic Arabian-Sea
 // climatology so the demo and user storms still form, drift and die. Both
 // branches are pure in (lat,lon,month), so the sim stays a pure function of

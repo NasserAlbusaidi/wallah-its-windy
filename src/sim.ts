@@ -371,6 +371,8 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     steerU: 0,
     steerV: 0,
     shearMs: 0,
+    shearUms: 0,
+    shearVms: 0,
     overLand: false,
     oceanKtPerH: 0,
     shearKtPerH: 0,
@@ -412,6 +414,8 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     guardFinite(e.steerU, 'env.steerU');
     guardFinite(e.steerV, 'env.steerV');
     guardFinite(e.shear, 'env.shear');
+    guardFinite(e.shearU, 'env.shearU');
+    guardFinite(e.shearV, 'env.shearV');
     return e;
   }
 
@@ -452,6 +456,8 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       steerU: sample.steerU,
       steerV: sample.steerV,
       shearMs: sample.shear,
+      shearUms: sample.shearU,
+      shearVms: sample.shearV,
       overLand,
       oceanKtPerH: terms.relax,
       shearKtPerH: terms.shearPen,
@@ -536,7 +542,10 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     structure = deriveStormStructure({
       vKt,
       lat,
+      lon,
       shearMs: initialEnv.shear,
+      shearUms: initialEnv.shearU,
+      shearVms: initialEnv.shearV,
       overLand: prevOverLand,
       motionUms: initialMotion.u,
       motionVms: initialMotion.v,
@@ -595,11 +604,15 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     structure = deriveStormStructure({
       vKt,
       lat,
+      lon,
       shearMs: e.shear,
+      shearUms: e.shearU,
+      shearVms: e.shearV,
       overLand,
       motionUms: k2.u,
       motionVms: k2.v,
       previousRmwKm: structure.rmwKm,
+      previousOuterSizeKm: structure.outerSizeKm,
       deltaHours: dtH,
     });
 

@@ -9,8 +9,9 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 
 > Status: **playable**. A deterministic storm forms, drifts, intensifies and dies
 > on real baked climate data. Its Holland-style structure carries parametric
-> central pressure, radius of maximum wind, motion asymmetry, and quadrant
-> 34/50/64-kt wind radii, rendered as a dark nautical instrument. A fixed-seed
+> central pressure, radius of maximum wind, persistent outer-core size,
+> shear/motion asymmetry, displaced rainfall, and quadrant 34/50/64-kt wind
+> radii, rendered as a dark nautical instrument. A fixed-seed
 > demo storm opens mid-life on first load. Compare June vs October at one click;
 > share any storm by its URL. User storms carry a live flight recorder that
 > explains each intensity change in numbers and plain language, then becomes a
@@ -97,7 +98,8 @@ fallback when `data/raw/era5_climatology.nc` is absent.
 
 **Synoptic samples (D10):** the track-diversity spike measured pure monthly
 means as rail-prone (keep-ratio 16 % in June < the 30 % gate), so each month's
-`u`/`v`/`shr` layer carries `nt = 4` planes — four real, coherent YEARS chosen
+`u`/`v`/`shr`/`shu`/`shv` layer carries `nt = 4` planes — four real, coherent
+YEARS chosen
 by deterministic farthest-point selection (one typical + three diverse; the
 years print at bake time). At runtime the spawn **seed picks the plane**
 (`seed % 4`, `src/env-sampler.ts`), so re-clicking the same spot summons
@@ -124,7 +126,8 @@ structure, Atlantic-derived RMW proxy, geometric dry-air proxy, and the fact tha
 downstream flood light is timed D8 routing—not a discharge, infiltration, or
 inundation model.
 
-`env.bin` encodes the month in the layer **name** (`sst_MM/u_MM/v_MM/shr_MM`,
+`env.bin` encodes the month in the layer **name**
+(`sst_MM/u_MM/v_MM/shr_MM/shu_MM/shv_MM`,
 `MM` = 0-indexed `monthIndex`, `04`=May … `10`=Nov). Consumers resolve it with
 `clamp(monthIndex, 4, 10)`; `src/env-sampler.ts` (sim) and `src/render/index.ts`
 (tint) both do, and `test/integration-bins.test.ts` guards the mapping, the
@@ -148,19 +151,21 @@ then relaxes over 12 simulated hours toward an intensity-, latitude-, shear-,
 and land-dependent target. Holland B controls profile compactness; the inverted
 Holland maximum-wind relation supplies a parametric central pressure. The
 actual simulated translation vector introduces a bounded right-of-motion
-asymmetry, from which quadrant 34/50/64-kt radii are solved. This is a
-deterministic visualization/hazard proxy. The RMW relationship was developed
-from Atlantic storms and is not a North Indian aircraft analysis.
+asymmetry. A separately evolving outer-size state relaxes over 18 hours and
+stretches only winds below 48 kt, leaving pressure and the R50/R64 inner core
+unchanged. ERA5's actual 200–850 hPa vector then stretches the outer field and
+displaces the rain source downshear-left. This is a deterministic
+visualization/hazard proxy. The RMW relationship was developed from Atlantic
+storms and is not a North Indian aircraft analysis.
 
 **North Indian validation:** the offline harness under `calibration/` scores the
 exact runtime structure equations against a pinned, agency-consistent subset of
 39 IBTrACS/JTWC storms from 2019–2024. It holds out complete storms, uses modern
 quality tiers (R34 from 2019; R50/R64 from 2022), reports pressure and quadrant
 radii by intensity, subbasin, lifecycle, and quadrant, and keeps RMW
-exploratory-only. The first constrained candidate improved its calibration
-storms but worsened the untouched validation objective by 2.1%, so the gate
-correctly rejected it and left live parameters unchanged. See the generated
-[calibration report](docs/structure-calibration.md).
+exploratory-only. The accepted outer-size calibration reduces held-out R34 MAE
+from 61.9 km to 54.5 km (12.0%) while pressure, R50, and R64 MAE remain
+unchanged. See the generated [calibration report](docs/structure-calibration.md).
 
 ```bash
 npm run data:structure       # re-extract from the pinned raw IBTrACS snapshot
@@ -189,7 +194,7 @@ src/
   loader.ts           .bin parser + validation + dequantize
   env-sampler.ts      EnvSampler over env.bin (real SST) + analytic fallback
   sim.ts              track/intensity physics: steering+beta+wander, DeMaria-Kaplan
-  structure.ts        Holland pressure/wind profile, RMW evolution, quadrant radii
+  structure.ts        two-region Holland profile, RMW/outer-size evolution, radii
   structure-validation.ts offline scoring, storm split, calibration acceptance
   storm-session.ts    recording, pause/seek/replay transport, comparison baseline
   flight-recorder.ts  immutable per-tick tape + debrief/snapshot construction

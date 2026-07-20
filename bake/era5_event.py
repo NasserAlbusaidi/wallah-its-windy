@@ -1,7 +1,7 @@
 """era5_event.py — v1.1 event steering/shear bake (counterfactual env bins).
 
 Reads the per-EVENT ERA5 hourly winds (data/raw/era5_{gonu_2007,shaheen_2021_09,
-shaheen_2021_10}.nc) and emits a WIWB env bin whose u/v/shr layers carry a TIME
+shaheen_2021_10}.nc) and emits a WIWB env bin whose steering/shear layers carry a TIME
 axis (nt = decimated hourly planes, BINARY-FORMATS.md mode 2) instead of the
 climatology's synoptic samples. Format bytes are IDENTICAL to env.bin — only the
 nt semantics differ, and that is a consumer-side routing convention.
@@ -13,7 +13,8 @@ definition, same lat-descending -> north-first row order):
 
 VORTEX FILTER (lead decision, C2): the event winds contain the real storm's own
 vortex. We wash it out with scipy.ndimage.gaussian_filter, sigma=3 cells (=1.5°)
-on the NATIVE 0.5° grid, applied to u/v/shr per time plane BEFORE regridding, so
+on the NATIVE 0.5° grid, applied to every wind field per time plane BEFORE
+regridding, so
 the baked field is the large-scale STEERING environment a counterfactual storm
 would feel — not a replay of the historical track. Spatial filtering is
 independent per plane, so we decimate to 3-hourly first (cheaper), then filter,
@@ -87,16 +88,17 @@ def _level_index(levels: np.ndarray, p: float) -> int:
 
 
 def native_steer_shear(u4: np.ndarray, v4: np.ndarray, levels: np.ndarray):
-    """Per-timestep deep-layer steering (u,v) + shear on the native grid, using
-    era5.py's exact weights and shear definition. Inputs [T,L,ny,nx]."""
+    """Per-timestep steering plus 200–850 hPa shear magnitude/components."""
     w = np.array(era5.STEER_LEVELS) / sum(era5.STEER_LEVELS)
     steer_idx = [_level_index(levels, p) for p in era5.STEER_LEVELS]
     i850 = _level_index(levels, era5.SHEAR_LEVELS[0])
     i200 = _level_index(levels, era5.SHEAR_LEVELS[1])
     u_steer = np.tensordot(w, u4[:, steer_idx], axes=(0, 1))  # [T,ny,nx]
     v_steer = np.tensordot(w, v4[:, steer_idx], axes=(0, 1))
-    shear = np.hypot(u4[:, i200] - u4[:, i850], v4[:, i200] - v4[:, i850])
-    return u_steer, v_steer, shear
+    shear_u = u4[:, i200] - u4[:, i850]
+    shear_v = v4[:, i200] - v4[:, i850]
+    shear = np.hypot(shear_u, shear_v)
+    return u_steer, v_steer, shear, shear_u, shear_v
 
 
 def _vortex_filter(field3d: np.ndarray) -> np.ndarray:
@@ -136,9 +138,10 @@ def _q_i16(a: np.ndarray, scale: float, offset: float) -> np.ndarray:
 
 
 def assemble_event_layers(mm: str, sst_raw_i16: np.ndarray,
-                          u_env: np.ndarray, v_env: np.ndarray, shr_env: np.ndarray) -> list[Layer]:
-    """Build the 4 month-suffixed WIWB layers for one event. sst nt=1 (raw int16
-    copied from env.bin); u/v/shr nt=P time planes, int16 quant scale 0.01."""
+                          u_env: np.ndarray, v_env: np.ndarray,
+                          shr_env: np.ndarray, shu_env: np.ndarray,
+                          shv_env: np.ndarray) -> list[Layer]:
+    """Build six month-suffixed layers; SST has nt=1, winds use event time."""
     nx, ny = sources.ENV_NX, sources.ENV_NY
     nt = u_env.shape[0]
     dom = sources.DOMAIN
@@ -148,6 +151,8 @@ def assemble_event_layers(mm: str, sst_raw_i16: np.ndarray,
         Layer(f"u_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(u_env, QUANT_SCALE, 0.0)),
         Layer(f"v_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(v_env, QUANT_SCALE, 0.0)),
         Layer(f"shr_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(shr_env, QUANT_SCALE, 0.0)),
+        Layer(f"shu_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(shu_env, QUANT_SCALE, 0.0)),
+        Layer(f"shv_{mm}", "int16", True, nx, ny, nt, dom, QUANT_SCALE, 0.0, _q_i16(shv_env, QUANT_SCALE, 0.0)),
     ]
 
 
@@ -206,10 +211,14 @@ def build_event_env(tag: str, month_index: int, nc_paths: list[str],
     vt_dec = vt[::DECIMATE]
     u4d, v4d = u4[::DECIMATE], v4[::DECIMATE]
 
-    u_raw, v_raw, shr_raw = native_steer_shear(u4d, v4d, levels)
+    u_raw, v_raw, shr_raw, shu_raw, shv_raw = native_steer_shear(
+        u4d, v4d, levels
+    )
     u_sm = _vortex_filter(u_raw)
     v_sm = _vortex_filter(v_raw)
     shr_sm = _vortex_filter(shr_raw)
+    shu_sm = _vortex_filter(shu_raw)
+    shv_sm = _vortex_filter(shv_raw)
 
     elat = sources.lat_centers(sources.ENV_NY)
     elon = sources.lon_centers(sources.ENV_NX)
@@ -217,10 +226,20 @@ def build_event_env(tag: str, month_index: int, nc_paths: list[str],
     u_env = _regrid_series(u_sm, lat_native, lon_native, ELAT, ELON)
     v_env = _regrid_series(v_sm, lat_native, lon_native, ELAT, ELON)
     shr_env = _regrid_series(shr_sm, lat_native, lon_native, ELAT, ELON)
+    shu_env = _regrid_series(shu_sm, lat_native, lon_native, ELAT, ELON)
+    shv_env = _regrid_series(shv_sm, lat_native, lon_native, ELAT, ELON)
 
     mm = f"{month_index:02d}"
     sst_raw = _sst_raw_from_env(env_bin_path, mm)
-    layers = assemble_event_layers(mm, sst_raw, u_env, v_env, shr_env)
+    layers = assemble_event_layers(
+        mm,
+        sst_raw,
+        u_env,
+        v_env,
+        shr_env,
+        shu_env,
+        shv_env,
+    )
 
     path = os.path.join(out_dir, f"env_{tag}.bin")
     binfmt.write_bin(path, layers)

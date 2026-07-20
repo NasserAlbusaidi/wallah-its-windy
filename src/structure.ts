@@ -7,6 +7,10 @@
  * by the NOAA/NHC Joint Hurricane Testbed:
  *   RMW = 51.6 exp(-0.0223 Vmax[m/s] + 0.0281 |latitude|).
  *
+ * A second, slowly evolving outer-size state stretches only the outer Holland
+ * profile. Deep-layer shear then applies a downshear-left outer-core asymmetry
+ * and displaces rainfall without moving the pressure/wind centre.
+ *
  * This is a deterministic, first-order structure model—not an aircraft wind
  * analysis. Its job is to keep pressure, eyewall size, wind radii, particles,
  * rainfall, replay, and exports on one physically interpretable contract.
@@ -36,6 +40,19 @@ export interface StructureParameters {
   shearExpansionPerMs: number;
   shearExpansionMax: number;
   landExpansionFraction: number;
+  outerSizeWeight: number;
+  outerSizeBaseKm: number;
+  outerSizeWindSlopeKmPerKt: number;
+  outerSizeLatitudeSlopeKmPerDegree: number;
+  outerSizeBayOffsetKm: number;
+  outerSizeBayWindSlopeBonusKmPerKt: number;
+  outerSizeShearExpansionKmPerMs: number;
+  outerSizeLandDecayFraction: number;
+  outerSizeMinKm: number;
+  outerSizeMaxKm: number;
+  outerSizeRelaxationHours: number;
+  outerBlendStartWindKt: number;
+  outerBlendFullWindKt: number;
   hollandBaseB: number;
   hollandIntensityGainB: number;
   hollandIntensityStartKt: number;
@@ -47,6 +64,12 @@ export interface StructureParameters {
   translationAsymmetryMotionFactor: number;
   translationAsymmetryMaxKt: number;
   translationAsymmetryMaxWindFraction: number;
+  shearAsymmetryThresholdMs: number;
+  shearAsymmetryPerMs: number;
+  shearAsymmetryMaxFraction: number;
+  rainOffsetThresholdMs: number;
+  rainOffsetKmPerMs: number;
+  rainOffsetMaxKm: number;
   pressureAsymmetryFraction: number;
   minimumPressureHpa: number;
 }
@@ -70,6 +93,21 @@ export const UNCALIBRATED_STRUCTURE_PARAMETERS: Readonly<StructureParameters> =
     shearExpansionPerMs: 0.012,
     shearExpansionMax: 0.3,
     landExpansionFraction: 0.12,
+    // Weight zero reproduces the original one-region benchmark exactly. The
+    // held-out calibration gate is the only route to a non-zero live weight.
+    outerSizeWeight: 0,
+    outerSizeBaseKm: 180,
+    outerSizeWindSlopeKmPerKt: -0.45,
+    outerSizeLatitudeSlopeKmPerDegree: 2,
+    outerSizeBayOffsetKm: 0,
+    outerSizeBayWindSlopeBonusKmPerKt: 0,
+    outerSizeShearExpansionKmPerMs: 2,
+    outerSizeLandDecayFraction: 0.15,
+    outerSizeMinKm: 60,
+    outerSizeMaxKm: 420,
+    outerSizeRelaxationHours: 30,
+    outerBlendStartWindKt: 48,
+    outerBlendFullWindKt: 36,
     hollandBaseB: 1.1,
     hollandIntensityGainB: 1.05,
     hollandIntensityStartKt: 30,
@@ -81,13 +119,28 @@ export const UNCALIBRATED_STRUCTURE_PARAMETERS: Readonly<StructureParameters> =
     translationAsymmetryMotionFactor: 0.55,
     translationAsymmetryMaxKt: 12,
     translationAsymmetryMaxWindFraction: 0.18,
+    shearAsymmetryThresholdMs: 9,
+    shearAsymmetryPerMs: 0.018,
+    shearAsymmetryMaxFraction: 0.22,
+    rainOffsetThresholdMs: 7,
+    rainOffsetKmPerMs: 4,
+    rainOffsetMaxKm: 48,
     pressureAsymmetryFraction: 0.5,
     minimumPressureHpa: 870,
   });
 
 /** Parameters used by the live simulator. Updated only after held-out gates. */
 export const DEFAULT_STRUCTURE_PARAMETERS: Readonly<StructureParameters> =
-  Object.freeze({ ...UNCALIBRATED_STRUCTURE_PARAMETERS });
+  Object.freeze({
+    ...UNCALIBRATED_STRUCTURE_PARAMETERS,
+    outerSizeWeight: 1,
+    outerSizeBaseKm: 120,
+    outerSizeWindSlopeKmPerKt: 1.5,
+    outerSizeLatitudeSlopeKmPerDegree: 0,
+    outerSizeBayOffsetKm: 40,
+    outerSizeBayWindSlopeBonusKmPerKt: 0.5,
+    outerSizeRelaxationHours: 18,
+  });
 
 const QUADRANT_BEARINGS = {
   ne: 45,
@@ -108,6 +161,12 @@ function finite(value: number | undefined, fallback = 0): number {
 
 function emptyRadii(): WindRadiiKm {
   return { ne: 0, se: 0, sw: 0, nw: 0 };
+}
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  if (edge1 <= edge0) return value >= edge1 ? 1 : 0;
+  const fraction = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return fraction * fraction * (3 - 2 * fraction);
 }
 
 /**
@@ -181,6 +240,77 @@ function hollandShape(
   );
 }
 
+function targetOuterSizeKm(
+  vKt: number,
+  latitude: number,
+  longitude: number,
+  shearMs: number,
+  overLand: boolean,
+  parameters: Readonly<StructureParameters>,
+): number {
+  const shearExpansion =
+    Math.max(0, shearMs - parameters.shearAsymmetryThresholdMs) *
+    parameters.outerSizeShearExpansionKmPerMs;
+  // A continuous basin weight avoids a hard discontinuity near Sri Lanka.
+  // The Bay of Bengal outer-size climatology is fitted independently from the
+  // Arabian Sea while remaining inert throughout the simulator's Oman domain.
+  const bayEntry = smoothstep(72, 80, longitude);
+  const maritimeEntry = smoothstep(98, 104, longitude);
+  const bayWeight = bayEntry * (1 - maritimeEntry);
+  const windAnomalyKt = vKt - 50;
+  const oceanTarget =
+    parameters.outerSizeBaseKm +
+    windAnomalyKt * parameters.outerSizeWindSlopeKmPerKt +
+    (Math.abs(latitude) - 15) *
+      parameters.outerSizeLatitudeSlopeKmPerDegree +
+    bayWeight *
+      (parameters.outerSizeBayOffsetKm +
+        windAnomalyKt *
+          parameters.outerSizeBayWindSlopeBonusKmPerKt) +
+    shearExpansion;
+  return clamp(
+    oceanTarget * (overLand ? 1 - parameters.outerSizeLandDecayFraction : 1),
+    parameters.outerSizeMinKm,
+    parameters.outerSizeMaxKm,
+  );
+}
+
+function hollandRatio(radiusKm: number, rmwKm: number, hollandB: number): number {
+  if (radiusKm <= 0) return 0;
+  const x = Math.min(80, Math.pow(rmwKm / radiusKm, hollandB));
+  return Math.sqrt(Math.max(0, x * Math.exp(1 - x)));
+}
+
+function referenceOuterRadiusKm(
+  thresholdKt: number,
+  rmwKm: number,
+  hollandB: number,
+  symmetricPeakKt: number,
+): number {
+  if (symmetricPeakKt < thresholdKt) return rmwKm * 4;
+  let inside = rmwKm;
+  let outside = MAX_RADIUS_KM;
+  for (let iteration = 0; iteration < 48; iteration++) {
+    const radius = (inside + outside) / 2;
+    if (symmetricPeakKt * hollandRatio(radius, rmwKm, hollandB) >= thresholdKt) {
+      inside = radius;
+    } else {
+      outside = radius;
+    }
+  }
+  return (inside + outside) / 2;
+}
+
+function downshearLeftUnit(
+  shearUms: number,
+  shearVms: number,
+): { east: number; north: number } {
+  const magnitude = Math.hypot(shearUms, shearVms);
+  if (magnitude < 1e-6) return { east: 0, north: 0 };
+  // In the northern hemisphere, left of the downshear vector (u, v) is (-v, u).
+  return { east: -shearVms / magnitude, north: shearUms / magnitude };
+}
+
 function motionAsymmetryKt(
   vKt: number,
   motionUms: number,
@@ -226,6 +356,50 @@ function localPeakWindKt(
   );
 }
 
+function outerStretchAtBearing(
+  bearingDeg: number,
+  structure: StormStructure,
+): number {
+  const angle = (bearingDeg * Math.PI) / 180;
+  const radialEast = Math.sin(angle);
+  const radialNorth = Math.cos(angle);
+  const downshearLeft = downshearLeftUnit(
+    structure.shearUms,
+    structure.shearVms,
+  );
+  const alignment =
+    radialEast * downshearLeft.east + radialNorth * downshearLeft.north;
+  return clamp(
+    structure.outerWindScale *
+      (1 + structure.shearAsymmetryFraction * alignment),
+    0.45,
+    2.5,
+  );
+}
+
+/** Map physical radius onto the inner Holland profile for the two-region wind field. */
+export function effectiveHollandRadiusKm(
+  radiusKm: number,
+  bearingDeg: number,
+  structure: StormStructure,
+): number {
+  if (radiusKm <= structure.rmwKm) return Math.max(0.001, radiusKm);
+  const unmodifiedWindKt =
+    localPeakWindKt(bearingDeg, structure) *
+    hollandRatio(radiusKm, structure.rmwKm, structure.hollandB);
+  const blend = 1 - smoothstep(
+    structure.outerBlendFullWindKt,
+    structure.outerBlendStartWindKt,
+    unmodifiedWindKt,
+  );
+  const stretch =
+    1 + (outerStretchAtBearing(bearingDeg, structure) - 1) * blend;
+  return (
+    structure.rmwKm +
+    (radiusKm - structure.rmwKm) / Math.max(0.2, stretch)
+  );
+}
+
 /** Surface-wind speed at radius/bearing from the parametric Holland profile. */
 export function hollandWindSpeedKt(
   radiusKm: number,
@@ -233,12 +407,12 @@ export function hollandWindSpeedKt(
   structure: StormStructure,
 ): number {
   if (!Number.isFinite(radiusKm) || radiusKm <= 0) return 0;
-  const radius = Math.max(0.001, radiusKm);
-  const x = Math.min(
-    80,
-    Math.pow(structure.rmwKm / radius, structure.hollandB),
+  const radius = effectiveHollandRadiusKm(
+    Math.max(0.001, radiusKm),
+    bearingDeg,
+    structure,
   );
-  const ratio = Math.sqrt(Math.max(0, x * Math.exp(1 - x)));
+  const ratio = hollandRatio(radius, structure.rmwKm, structure.hollandB);
   return localPeakWindKt(bearingDeg, structure) * ratio;
 }
 
@@ -375,12 +549,45 @@ export function interpolateStormStructure(
       fraction,
     ),
     rmwKm: mix(previous.rmwKm, current.rmwKm, fraction),
+    outerSizeKm: mix(previous.outerSizeKm, current.outerSizeKm, fraction),
+    outerWindScale: mix(
+      previous.outerWindScale,
+      current.outerWindScale,
+      fraction,
+    ),
+    outerBlendStartWindKt: mix(
+      previous.outerBlendStartWindKt,
+      current.outerBlendStartWindKt,
+      fraction,
+    ),
+    outerBlendFullWindKt: mix(
+      previous.outerBlendFullWindKt,
+      current.outerBlendFullWindKt,
+      fraction,
+    ),
     hollandB: mix(previous.hollandB, current.hollandB, fraction),
     motionUms: mix(previous.motionUms, current.motionUms, fraction),
     motionVms: mix(previous.motionVms, current.motionVms, fraction),
     translationAsymmetryKt: mix(
       previous.translationAsymmetryKt,
       current.translationAsymmetryKt,
+      fraction,
+    ),
+    shearUms: mix(previous.shearUms, current.shearUms, fraction),
+    shearVms: mix(previous.shearVms, current.shearVms, fraction),
+    shearAsymmetryFraction: mix(
+      previous.shearAsymmetryFraction,
+      current.shearAsymmetryFraction,
+      fraction,
+    ),
+    rainOffsetEastKm: mix(
+      previous.rainOffsetEastKm,
+      current.rainOffsetEastKm,
+      fraction,
+    ),
+    rainOffsetNorthKm: mix(
+      previous.rainOffsetNorthKm,
+      current.rainOffsetNorthKm,
       fraction,
     ),
     r34Km: mixRadii(previous.r34Km, current.r34Km, fraction),
@@ -392,11 +599,15 @@ export function interpolateStormStructure(
 export interface StructureInput {
   vKt: number;
   lat: number;
+  lon?: number;
   shearMs: number;
   overLand: boolean;
   motionUms: number;
   motionVms: number;
+  shearUms?: number;
+  shearVms?: number;
   previousRmwKm?: number;
+  previousOuterSizeKm?: number;
   deltaHours?: number;
 }
 
@@ -407,6 +618,8 @@ export function deriveStormStructure(
 ): StormStructure {
   const maximumWindKt = Math.max(0, finite(input.vKt));
   const shearMs = Math.max(0, finite(input.shearMs));
+  const shearUms = finite(input.shearUms);
+  const shearVms = finite(input.shearVms);
   const motionUms = finite(input.motionUms);
   const motionVms = finite(input.motionVms);
   const targetRmw = targetRmwKm(
@@ -441,6 +654,71 @@ export function deriveStormStructure(
     motionVms,
     parameters,
   );
+  const targetOuterSize = targetOuterSizeKm(
+    maximumWindKt,
+    input.lat,
+    finite(input.lon, 60),
+    shearMs,
+    input.overLand,
+    parameters,
+  );
+  const previousOuterSize =
+    input.previousOuterSizeKm === undefined
+      ? targetOuterSize
+      : clamp(
+          finite(input.previousOuterSizeKm, targetOuterSize),
+          parameters.outerSizeMinKm,
+          parameters.outerSizeMaxKm,
+        );
+  const outerRelaxation =
+    input.previousOuterSizeKm === undefined
+      ? 1
+      : 1 - Math.exp(-deltaHours / parameters.outerSizeRelaxationHours);
+  const outerSizeKm = clamp(
+    previousOuterSize +
+      (targetOuterSize - previousOuterSize) * outerRelaxation,
+    parameters.outerSizeMinKm,
+    parameters.outerSizeMaxKm,
+  );
+  const symmetricPeakKt = Math.max(
+    0,
+    maximumWindKt - translationAsymmetryKt,
+  );
+  const referenceOuterSize = referenceOuterRadiusKm(
+    34,
+    rmwKm,
+    hollandB,
+    symmetricPeakKt,
+  );
+  const calibratedOuterScale = clamp(
+    outerSizeKm / Math.max(rmwKm * 1.1, referenceOuterSize),
+    0.5,
+    2.3,
+  );
+  const outerWindScale =
+    1 +
+    (calibratedOuterScale - 1) *
+      clamp(parameters.outerSizeWeight, 0, 1);
+  const vectorMagnitude = Math.hypot(shearUms, shearVms);
+  const shearAsymmetryFraction =
+    vectorMagnitude < 1e-6
+      ? 0
+      : clamp(
+          (shearMs - parameters.shearAsymmetryThresholdMs) *
+            parameters.shearAsymmetryPerMs,
+          0,
+          parameters.shearAsymmetryMaxFraction,
+        );
+  const downshearLeft = downshearLeftUnit(shearUms, shearVms);
+  const rainOffsetKm =
+    vectorMagnitude < 1e-6
+      ? 0
+      : clamp(
+          (shearMs - parameters.rainOffsetThresholdMs) *
+            parameters.rainOffsetKmPerMs,
+          0,
+          parameters.rainOffsetMaxKm,
+        );
 
   // Holland's cyclostrophic maximum-wind relation inverted for pressure
   // deficit. The simulated maximum is a surface wind, so convert it to a
@@ -467,10 +745,19 @@ export function deriveStormStructure(
     centralPressureHpa,
     environmentalPressureHpa: parameters.environmentalPressureHpa,
     rmwKm,
+    outerSizeKm,
+    outerWindScale,
+    outerBlendStartWindKt: parameters.outerBlendStartWindKt,
+    outerBlendFullWindKt: parameters.outerBlendFullWindKt,
     hollandB,
     motionUms,
     motionVms,
     translationAsymmetryKt,
+    shearUms,
+    shearVms,
+    shearAsymmetryFraction,
+    rainOffsetEastKm: downshearLeft.east * rainOffsetKm,
+    rainOffsetNorthKm: downshearLeft.north * rainOffsetKm,
     r34Km: emptyRadii(),
     r50Km: emptyRadii(),
     r64Km: emptyRadii(),

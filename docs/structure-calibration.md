@@ -5,11 +5,11 @@
 
 ## Verdict
 
-**REJECTED — the live model remains on the pre-calibration parameters.**
+**ACCEPTED — the proposed calibration cleared every held-out gate and is eligible for the live model.**
 
-rejected: candidate did not satisfy every held-out improvement and non-regression gate. Held-out objective change:
-**-2.1%**. The search evaluated
-33 unique parameter sets using calibration storms
+accepted: held-out objective improved at least 4%, R34 MAE improved at least 10%, pressure stayed within 2%, and R50/R64 stayed within 5%. Held-out objective change:
+**4.4%**. The search evaluated
+385 unique parameter sets using calibration storms
 only.
 
 ## Data contract
@@ -35,42 +35,47 @@ Validation storm IDs:
 
 Each observation conditions the live `src/structure.ts` model on observed
 one-minute intensity, latitude, land proximity and a centred finite-difference
-track-motion vector. The model evolves its own RMW through each storm in time
-order. IBTrACS has no environmental-shear field, so validation uses a declared
-neutral shear of 8 m/s. This isolates the parametric structure contract; it is
-not a historical atmosphere replay.
+track-motion vector. The model evolves its own RMW and persistent outer-size
+state through each storm in time order. IBTrACS has no environmental-shear
+field, so validation uses a declared neutral shear of 8 m/s with no directional
+vector. This isolates the parametric structure contract; it is not a historical
+atmosphere replay.
 
 Parameter search minimizes the mean normalized MAE of pressure, R34, R50 and
 R64 on calibration storms. The held-out candidate is accepted only if:
 
-1. objective improves by at least 2%;
+1. objective improves by at least 4%;
 2. pressure MAE stays within 2% of baseline;
-3. combined wind-radius MAE improves; and
-4. no individual wind threshold regresses by more than 5%.
+3. R34 MAE improves by at least 10%; and
+4. R50 and R64 do not regress by more than 5%.
 
 ## Held-out results
 
 Objective: baseline **0.421**,
-proposed **0.429**, deployed
-**0.421**.
+proposed **0.402**, deployed
+**0.402**.
 
 Metric cells are **MAE / bias / RMSE (sample count)**.
 
 | Metric | Unit | Baseline MAE / bias / RMSE (n) | Proposed MAE / bias / RMSE (n) | Deployed MAE / bias / RMSE (n) |
 | --- | --- | ---: | ---: | ---: |
-| Pressure | hPa | 3.6 / 0.4 / 4.4 (131) | 4.1 / 1.8 / 4.9 (131) | 3.6 / 0.4 / 4.4 (131) |
-| R34 quadrants | km | 61.9 / -2.4 / 75.9 (460) | 61.6 / 5.3 / 75.7 (460) | 61.9 / -2.4 / 75.9 (460) |
-| R50 quadrants | km | 33.1 / 1.3 / 49.5 (60) | 31.9 / 6.7 / 44.2 (60) | 33.1 / 1.3 / 49.5 (60) |
-| R64 quadrants | km | 19.0 / 16.1 / 27.6 (36) | 20.1 / 18.0 / 28.8 (36) | 19.0 / 16.1 / 27.6 (36) |
+| Pressure | hPa | 3.6 / 0.4 / 4.4 (131) | 3.6 / 0.4 / 4.4 (131) | 3.6 / 0.4 / 4.4 (131) |
+| R34 quadrants | km | 61.9 / -2.4 / 75.9 (460) | 54.5 / -8.5 / 66.2 (460) | 54.5 / -8.5 / 66.2 (460) |
+| R50 quadrants | km | 33.1 / 1.3 / 49.5 (60) | 33.1 / 1.3 / 49.5 (60) | 33.1 / 1.3 / 49.5 (60) |
+| R64 quadrants | km | 19.0 / 16.1 / 27.6 (36) | 19.0 / 16.1 / 27.6 (36) | 19.0 / 16.1 / 27.6 (36) |
 | RMW exploratory | km | 19.2 / -1.3 / 23.8 (131) | 19.2 / -1.3 / 23.8 (131) | 19.2 / -1.3 / 23.8 (131) |
 
 ## Proposed parameter changes
 
 | Parameter | Baseline | Proposed |
 | --- | ---: | ---: |
-| `environmentalPressureHpa` | 1010 | 1012 |
-| `translationAsymmetryMotionFactor` | 0.55 | 0.35 |
-| `translationAsymmetryMaxKt` | 12 | 8 |
+| `outerSizeWeight` | 0 | 1 |
+| `outerSizeBaseKm` | 180 | 120 |
+| `outerSizeWindSlopeKmPerKt` | -0.45 | 1.5 |
+| `outerSizeLatitudeSlopeKmPerDegree` | 2 | 0 |
+| `outerSizeBayOffsetKm` | 0 | 40 |
+| `outerSizeBayWindSlopeBonusKmPerKt` | 0 | 0.5 |
+| `outerSizeRelaxationHours` | 30 | 18 |
 
 ## Held-out slices
 
@@ -78,40 +83,40 @@ Metric cells are **MAE / bias / RMSE (sample count)**.
 
 | Slice | Pressure | R34 | R50 | R64 | RMW exploratory |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 34-63 kt | 3.2 / 1.1 / 3.7 (88) | 64.6 / -25.7 / 78.4 (288) | 51.7 / -40.9 / 72.6 (20) | — | 21.8 / -6.8 / 26.6 (88) |
-| 64-95 kt | 4.0 / -0.1 / 4.9 (36) | 62.3 / 39.9 / 76.4 (144) | 16.4 / 14.6 / 22.3 (20) | 8.8 / 2.8 / 11.1 (16) | 13.5 / 8.8 / 16.6 (36) |
-| 96+ kt | 7.6 / -5.7 / 8.2 (7) | 32.7 / 19.4 / 36.8 (28) | 31.0 / 30.4 / 39.6 (20) | 27.1 / 26.9 / 35.7 (20) | 15.6 / 15.6 / 16.8 (7) |
+| 34-63 kt | 3.2 / 1.1 / 3.7 (88) | 58.1 / -25.3 / 71.4 (288) | 51.7 / -40.9 / 72.6 (20) | — | 21.8 / -6.8 / 26.6 (88) |
+| 64-95 kt | 4.0 / -0.1 / 4.9 (36) | 51.0 / 18.3 / 59.1 (144) | 16.4 / 14.6 / 22.3 (20) | 8.8 / 2.8 / 11.1 (16) | 13.5 / 8.8 / 16.6 (36) |
+| 96+ kt | 7.6 / -5.7 / 8.2 (7) | 35.4 / 26.2 / 40.6 (28) | 31.0 / 30.4 / 39.6 (20) | 27.1 / 26.9 / 35.7 (20) | 15.6 / 15.6 / 16.8 (7) |
 
 ### By subbasin
 
 | Slice | Pressure | R34 | R50 | R64 | RMW exploratory |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| AS | 4.1 / 0.1 / 4.9 (77) | 61.1 / 28.3 / 73.8 (280) | 24.2 / 16.2 / 31.3 (48) | 19.0 / 16.1 / 27.6 (36) | 17.9 / 3.8 / 22.2 (77) |
-| BB | 3.0 / 0.8 / 3.6 (53) | 63.7 / -50.2 / 79.5 (176) | 68.5 / -58.2 / 91.2 (12) | — | 21.4 / -8.7 / 26.2 (53) |
-| MM | 0.1 / -0.1 / 0.1 (1) | 44.5 / -44.5 / 50.2 (4) | — | — | 1.3 / -1.3 / 1.3 (1) |
+| AS | 4.1 / 0.1 / 4.9 (77) | 51.7 / 10.8 / 62.0 (280) | 24.2 / 16.2 / 31.3 (48) | 19.0 / 16.1 / 27.6 (36) | 17.9 / 3.8 / 22.2 (77) |
+| BB | 3.0 / 0.8 / 3.6 (53) | 59.2 / -38.5 / 72.7 (176) | 68.5 / -58.2 / 91.2 (12) | — | 21.4 / -8.7 / 26.2 (53) |
+| MM | 0.1 / -0.1 / 0.1 (1) | 45.5 / -45.5 / 50.5 (4) | — | — | 1.3 / -1.3 / 1.3 (1) |
 
 ### By lifecycle
 
 | Slice | Pressure | R34 | R50 | R64 | RMW exploratory |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| early | 2.8 / 0.5 / 3.5 (29) | 64.3 / -23.9 / 77.0 (100) | 27.8 / -27.8 / 27.8 (4) | — | 21.4 / -8.1 / 25.9 (29) |
-| late | 4.0 / 1.2 / 4.7 (53) | 62.7 / 18.1 / 73.6 (168) | 17.7 / -3.5 / 35.8 (24) | 7.6 / 2.7 / 10.0 (20) | 15.9 / 4.0 / 19.7 (53) |
-| middle | 3.8 / -0.6 / 4.5 (49) | 60.1 / -9.1 / 77.2 (192) | 45.3 / 8.6 / 59.4 (32) | 33.3 / 32.9 / 39.8 (16) | 21.4 / -3.0 / 26.4 (49) |
+| early | 2.8 / 0.5 / 3.5 (29) | 58.6 / -29.0 / 71.4 (100) | 27.8 / -27.8 / 27.8 (4) | — | 21.4 / -8.1 / 25.9 (29) |
+| late | 4.0 / 1.2 / 4.7 (53) | 55.3 / 11.1 / 63.1 (168) | 17.7 / -3.5 / 35.8 (24) | 7.6 / 2.7 / 10.0 (20) | 15.9 / 4.0 / 19.7 (53) |
+| middle | 3.8 / -0.6 / 4.5 (49) | 51.7 / -15.1 / 66.1 (192) | 45.3 / 8.6 / 59.4 (32) | 33.3 / 32.9 / 39.8 (16) | 21.4 / -3.0 / 26.4 (49) |
 
 ### By quadrant
 
 | Slice | Pressure | R34 | R50 | R64 | RMW exploratory |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| ne | — | 55.0 / 14.0 / 69.3 (115) | 25.4 / 21.6 / 31.4 (15) | 21.8 / 21.8 / 30.0 (9) | — |
-| nw | — | 62.2 / 2.7 / 80.0 (115) | 20.3 / 16.5 / 28.1 (15) | 18.2 / 13.7 / 27.8 (9) | — |
-| se | — | 59.9 / -3.5 / 70.7 (115) | 42.3 / -12.0 / 59.5 (15) | 18.7 / 18.1 / 27.6 (9) | — |
-| sw | — | 70.7 / -22.8 / 82.7 (115) | 44.4 / -20.8 / 66.8 (15) | 17.3 / 11.0 / 24.6 (9) | — |
+| ne | — | 44.9 / 8.4 / 56.6 (115) | 25.4 / 21.6 / 31.4 (15) | 21.8 / 21.8 / 30.0 (9) | — |
+| nw | — | 55.5 / -3.1 / 68.3 (115) | 20.3 / 16.5 / 28.1 (15) | 18.2 / 13.7 / 27.8 (9) | — |
+| se | — | 51.6 / -10.2 / 60.4 (115) | 42.3 / -12.0 / 59.5 (15) | 18.7 / 18.1 / 27.6 (9) | — |
+| sw | — | 66.0 / -29.2 / 77.6 (115) | 44.4 / -20.8 / 66.8 (15) | 17.3 / 11.0 / 24.6 (9) | — |
 
 ## Full-sample deployed reference
 
 Across all 39 storms, the deployed model has objective
-**0.490** and combined R34/R50/R64 MAE
-**58.0 km**.
+**0.452** and combined R34/R50/R64 MAE
+**50.0 km**.
 
 ## Limitations
 
@@ -119,8 +124,8 @@ Across all 39 storms, the deployed model has objective
   R50/R64 quality control from 2022.
 - JTWC RMW remains non-QC; it is shown for diagnosis but cannot tune the model.
 - Best-track pressure is not aircraft ground truth in this basin.
-- Neutral shear means this report cannot calibrate the model's shear-broadening
-  terms.
+- Neutral non-directional shear means this report cannot calibrate
+  shear-driven wind asymmetry or rain displacement.
 - Positive reported radii are scored; blank/zero operational cells are treated
   as unavailable, not as observed zero-size quadrants.
 - The validation split is a model-development holdout, not an independent

@@ -101,6 +101,9 @@ export interface EnvSample {
   steerV: number;
   /** Deep-layer vertical wind shear magnitude, m/s. */
   shear: number;
+  /** 200–850 hPa shear vector, upper minus lower wind, east/north m/s. */
+  shearU: number;
+  shearV: number;
 }
 
 /**
@@ -148,6 +151,9 @@ export interface StormDiagnostics {
   steerU: number;
   steerV: number;
   shearMs: number;
+  /** 200–850 hPa shear vector used by structure and rainfall. */
+  shearUms: number;
+  shearVms: number;
   overLand: boolean;
   oceanKtPerH: number;
   shearKtPerH: number;
@@ -165,8 +171,8 @@ export interface WindRadiiKm {
 }
 
 /**
- * Parametric inner-core structure derived from the simulated intensity,
- * latitude, environment, and translation vector.
+ * Parametric inner- and outer-core structure derived from the simulated
+ * intensity, latitude, environment, and translation vector.
  *
  * These values make the renderer and recorder physically coherent; they are
  * not aircraft observations or an operational wind-field analysis.
@@ -180,6 +186,13 @@ export interface StormStructure {
   environmentalPressureHpa: number;
   /** Radius of maximum surface wind—the eyewall scale. */
   rmwKm: number;
+  /** Slowly evolving outer-core size state, independent of the instantaneous RMW. */
+  outerSizeKm: number;
+  /** Radial stretch applied outside the inner core by the two-region profile. */
+  outerWindScale: number;
+  /** Wind-speed bounds over which the inner and outer profiles are blended. */
+  outerBlendStartWindKt: number;
+  outerBlendFullWindKt: number;
   /** Holland radial-profile shape parameter. */
   hollandB: number;
   /** Actual simulated translation vector, east/north, m/s. */
@@ -187,6 +200,14 @@ export interface StormStructure {
   motionVms: number;
   /** Motion-induced maximum-wind asymmetry applied to the symmetric vortex. */
   translationAsymmetryKt: number;
+  /** Actual 200–850 hPa shear vector carried by this structure snapshot. */
+  shearUms: number;
+  shearVms: number;
+  /** Maximum downshear-left outer-core radial stretch fraction. */
+  shearAsymmetryFraction: number;
+  /** Rain-source displacement from the wind centre, east/north, kilometres. */
+  rainOffsetEastKm: number;
+  rainOffsetNorthKm: number;
   r34Km: WindRadiiKm;
   r50Km: WindRadiiKm;
   r64Km: WindRadiiKm;

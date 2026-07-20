@@ -156,6 +156,7 @@ function drawType(
     `WIND ${Math.round(frame.vKt)} KT`,
     `MSLP ${Math.round(frame.structure.centralPressureHpa)} HPA`,
     `RMW ${Math.round(frame.structure.rmwKm)} KM`,
+    `OUTER ${Math.round(frame.structure.outerSizeKm)} KM`,
     `R34 ${Math.round(maxWindRadiusKm(frame.structure.r34Km))} KM`,
   ];
   ctx.fillText(structureMetrics.join('   ·   '), 70, 798);

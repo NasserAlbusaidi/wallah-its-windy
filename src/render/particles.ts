@@ -47,6 +47,12 @@ interface ParticleGeometry {
   motionX: number;
   motionY: number;
   asymmetryFraction: number;
+  outerScale: number;
+  outerBlendStartFraction: number;
+  outerBlendFullFraction: number;
+  shearX: number;
+  shearY: number;
+  shearAsymmetryFraction: number;
 }
 
 function geometry(ctx: DrawCtx): ParticleGeometry {
@@ -59,6 +65,12 @@ function geometry(ctx: DrawCtx): ParticleGeometry {
       motionX: 0,
       motionY: 0,
       asymmetryFraction: 0,
+      outerScale: 1,
+      outerBlendStartFraction: 0.5,
+      outerBlendFullFraction: 0.38,
+      shearX: 0,
+      shearY: 0,
+      shearAsymmetryFraction: 0,
     };
   }
   const rMax = Math.max(
@@ -79,6 +91,14 @@ function geometry(ctx: DrawCtx): ParticleGeometry {
     motionX: structure.motionUms,
     motionY: structure.motionVms,
     asymmetryFraction: structure.translationAsymmetryKt / maximum,
+    outerScale: structure.outerWindScale,
+    outerBlendStartFraction:
+      structure.outerBlendStartWindKt / maximum,
+    outerBlendFullFraction:
+      structure.outerBlendFullWindKt / maximum,
+    shearX: structure.shearUms,
+    shearY: structure.shearVms,
+    shearAsymmetryFraction: structure.shearAsymmetryFraction,
   };
 }
 
@@ -211,12 +231,12 @@ export class ParticleLayer implements RenderModule {
     const { rMax, spawnR } = geometryValue;
     const vMax = VMAX_BASE * (0.5 + 0.5 * intensity);
 
-    // Downshear drift (clip units/sec) from env shear + steering-direction proxy.
+    // Downshear drift (clip units/sec) from the actual 200–850 hPa vector.
     let driftX = 0;
     let driftY = 0;
     if (ctx.env && ctx.env.shear > SHEAR_THRESHOLD) {
-      const su = ctx.env.steerU;
-      const sv = ctx.env.steerV;
+      const su = ctx.env.shearU;
+      const sv = ctx.env.shearV;
       const mag = Math.hypot(su, sv) || 1;
       const g = SHEAR_K * (ctx.env.shear - SHEAR_THRESHOLD);
       driftX = (su / mag) * g;
@@ -239,6 +259,15 @@ export class ParticleLayer implements RenderModule {
         motionX: geometryValue.motionX,
         motionY: geometryValue.motionY,
         asymmetryFraction: geometryValue.asymmetryFraction,
+        outerScale: geometryValue.outerScale,
+        outerBlendStartFraction:
+          geometryValue.outerBlendStartFraction,
+        outerBlendFullFraction:
+          geometryValue.outerBlendFullFraction,
+        shearX: geometryValue.shearX,
+        shearY: geometryValue.shearY,
+        shearAsymmetryFraction:
+          geometryValue.shearAsymmetryFraction,
         inflow: INFLOW_RAD,
       });
       fx += w.wx * dt;

@@ -26,7 +26,14 @@ import {
 
 // --- Synthetic environment stubs -------------------------------------------
 
-const BASE: EnvSample = { sstC: 29, steerU: 0, steerV: 0, shear: 0 };
+const BASE: EnvSample = {
+  sstC: 29,
+  steerU: 0,
+  steerV: 0,
+  shear: 0,
+  shearU: 0,
+  shearV: 0,
+};
 
 /** Uniform environment everywhere. */
 function env(over: Partial<EnvSample> = {}): EnvSampler {

@@ -148,28 +148,32 @@ const SEARCH_AXES: ReadonlyArray<{
   values: readonly number[];
 }> = [
   {
-    key: 'environmentalPressureHpa',
-    values: [1010, 1005, 1008, 1012, 1015],
+    key: 'outerSizeWeight',
+    values: [0, 0.5, 0.75, 1],
   },
   {
-    key: 'rmwCoefficientKm',
-    values: [51.6, 41.28, 46.44, 56.76, 61.92],
+    key: 'outerSizeBaseKm',
+    values: [100, 120, 140, 160, 180],
   },
   {
-    key: 'hollandBaseB',
-    values: [1.1, 0.9, 1.3, 1.5],
+    key: 'outerSizeWindSlopeKmPerKt',
+    values: [0.5, 1, 1.5, 2, 2.5],
   },
   {
-    key: 'hollandIntensityGainB',
-    values: [1.05, 0.7, 1.4],
+    key: 'outerSizeLatitudeSlopeKmPerDegree',
+    values: [0, 2, 4],
   },
   {
-    key: 'translationAsymmetryMotionFactor',
-    values: [0.55, 0.35, 0.75],
+    key: 'outerSizeRelaxationHours',
+    values: [18, 30, 48, 72],
   },
   {
-    key: 'translationAsymmetryMaxKt',
-    values: [12, 8, 16],
+    key: 'outerSizeBayOffsetKm',
+    values: [0, 20, 40, 60],
+  },
+  {
+    key: 'outerSizeBayWindSlopeBonusKmPerKt',
+    values: [0, 0.5, 1, 1.5],
   },
 ];
 
@@ -420,22 +424,26 @@ export function evaluateStructureModel(
   for (const fixes of byStorm.values()) {
     fixes.sort((a, b) => a.iso.localeCompare(b.iso));
     let previousRmwKm: number | undefined;
+    let previousOuterSizeKm: number | undefined;
     for (let index = 0; index < fixes.length; index++) {
       const observation = fixes[index];
       const structure = deriveStormStructure(
         {
           vKt: observation.windKt,
           lat: observation.lat,
+          lon: observation.lon,
           shearMs: NEUTRAL_SHEAR_MS,
           overLand: observation.overLand,
           motionUms: observation.motionUms,
           motionVms: observation.motionVms,
           previousRmwKm,
+          previousOuterSizeKm,
           deltaHours: observation.deltaHours,
         },
         parameters,
       );
       previousRmwKm = structure.rmwKm;
+      previousOuterSizeKm = structure.outerSizeKm;
       fixesEvaluated++;
 
       if (observation.windKt < 34) continue;
@@ -541,11 +549,11 @@ function validationGate(
     proposed.metrics.pressure.mae !== null &&
     baseline.metrics.pressure.mae !== null &&
     proposed.metrics.pressure.mae <= baseline.metrics.pressure.mae * 1.02;
-  const radiiOkay =
-    proposed.combinedRadiusMaeKm !== null &&
-    baseline.combinedRadiusMaeKm !== null &&
-    proposed.combinedRadiusMaeKm <= baseline.combinedRadiusMaeKm;
-  const thresholdsOkay = (['r34', 'r50', 'r64'] as const).every((key) => {
+  const r34Improved =
+    proposed.metrics.r34.mae !== null &&
+    baseline.metrics.r34.mae !== null &&
+    proposed.metrics.r34.mae <= baseline.metrics.r34.mae * 0.9;
+  const innerThresholdsOkay = (['r50', 'r64'] as const).every((key) => {
     const proposedMae = proposed.metrics[key].mae;
     const baselineMae = baseline.metrics[key].mae;
     return (
@@ -555,10 +563,13 @@ function validationGate(
     );
   });
   const accepted =
-    improvement >= 0.02 && pressureOkay && radiiOkay && thresholdsOkay;
+    improvement >= 0.04 &&
+    pressureOkay &&
+    r34Improved &&
+    innerThresholdsOkay;
   const reason = accepted
-    ? 'accepted: held-out objective improved at least 2%, pressure stayed within 2%, combined radii improved, and no wind threshold regressed more than 5%'
-    : 'rejected: candidate did not satisfy every held-out improvement and non-regression gate';
+    ? 'accepted: held-out objective improved at least 4%, R34 MAE improved at least 10%, pressure stayed within 2%, and R50/R64 stayed within 5%'
+    : 'rejected: candidate did not satisfy every held-out outer-size improvement and inner-core non-regression gate';
   return { accepted, reason, improvement: rounded(improvement) };
 }
 
@@ -590,6 +601,37 @@ export function calibrateStructureModel(
 
   let proposedParameters = { ...baselineParameters };
   let proposedCalibration = scoreCalibration(proposedParameters);
+
+  // The outer-size intercept, intensity slope, and Bay-of-Bengal adjustment
+  // interact strongly. Seed the coordinate search with a small deterministic
+  // joint grid so its result cannot depend on which coupled axis happens to be
+  // visited first.
+  for (const outerSizeBaseKm of [100, 120, 140, 160, 180]) {
+    for (const outerSizeWindSlopeKmPerKt of [0.5, 1, 1.5, 2, 2.5]) {
+      for (const outerSizeBayOffsetKm of [0, 20, 40, 60, 80]) {
+        for (const outerSizeBayWindSlopeBonusKmPerKt of [0, 0.5, 1]) {
+          const candidate = {
+            ...baselineParameters,
+            outerSizeWeight: 1,
+            outerSizeBaseKm,
+            outerSizeWindSlopeKmPerKt,
+            outerSizeLatitudeSlopeKmPerDegree: 0,
+            outerSizeBayOffsetKm,
+            outerSizeBayWindSlopeBonusKmPerKt,
+            outerSizeRelaxationHours: 18,
+          };
+          const evaluation = scoreCalibration(candidate);
+          if (
+            evaluation.objective <
+            proposedCalibration.objective - 0.000001
+          ) {
+            proposedParameters = candidate;
+            proposedCalibration = evaluation;
+          }
+        }
+      }
+    }
+  }
   for (let pass = 0; pass < 3; pass++) {
     let changed = false;
     for (const axis of SEARCH_AXES) {

@@ -37,7 +37,8 @@ puts row 0 at the north edge). Nothing else may reimplement it.
 The byte layout is identical either way; what the planes MEAN is a contract
 between the bake that wrote the file and the code that routes it:
 
-1. **Synoptic samples** (v1.0 climatology `env.bin` `u/v/shr`, `nt = 4`): each
+1. **Synoptic samples** (v1.0 climatology `env.bin`
+   `u/v/shr/shu/shv`, `nt = 4`): each
    plane is a distinct real YEAR's month (bake/era5.py picks them; plane 0 =
    most typical). Consumers SELECT one plane per storm — the spawn seed picks
    `seed % nt` in explicit `synoptic-plane` mode — and `tFrac` is ignored.
@@ -219,7 +220,8 @@ The counterfactual mode (`bake/bake.py events`) adds four files:
 
 - **`env_gonu.bin` / `env_shaheen.bin`** — the SAME WIWB format as `env.bin`
   (version 1, identical 88-byte records, 40×24, int16 quant scale 0.01, north
-  row 0). The ONLY difference is the `nt` mode-2 **time axis**: `u/v/shr` planes
+  row 0). The ONLY difference is the `nt` mode-2 **time axis**:
+  `u/v/shr/shu/shv` planes
   are consecutive 3-hourly steps (gonu `nt=64`, shaheen `nt=168`), consumed by
   selecting `event-timeline` mode and interpolating along `tFrac`. Layers keep
   the month-suffix names (`sst_05,u_05,v_05,shr_05` for gonu; `..._08` for

@@ -195,15 +195,15 @@ describe('event env bins (byte-format-identical to env.bin, nt as a time axis)',
       const bin = loadBin(c.file);
       const mm = envMonthSuffix(c.monthIndex);
 
-      it('u/v/shr carry a real time axis (nt>1), finite, in physical range', () => {
-        for (const field of ['u', 'v', 'shr']) {
+      it('steering and shear vectors carry a real, finite time axis', () => {
+        for (const field of ['u', 'v', 'shr', 'shu', 'shv']) {
           const layer = bin.layers.get(`${field}_${mm}`);
           expect(layer, `${field}_${mm}`).toBeDefined();
           expect(layer!.nt, `${field}_${mm} nt`).toBeGreaterThan(1);
           expect(allFinite(layer!.data)).toBe(true);
         }
         // Steering components stay sane (< 60 m/s); shear non-negative, bounded.
-        for (const field of ['u', 'v']) {
+        for (const field of ['u', 'v', 'shu', 'shv']) {
           const d = bin.layers.get(`${field}_${mm}`)!.data;
           for (let i = 0; i < d.length; i++) expect(Math.abs(d[i])).toBeLessThan(60);
         }

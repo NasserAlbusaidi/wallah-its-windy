@@ -23,6 +23,9 @@ export interface EnvAtStorm {
   sstC: number;
   /** Deep-layer shear magnitude, m/s. */
   shear: number;
+  /** 200–850 hPa shear vector, upper minus lower wind. */
+  shearU: number;
+  shearV: number;
   steerU: number;
   steerV: number;
 }

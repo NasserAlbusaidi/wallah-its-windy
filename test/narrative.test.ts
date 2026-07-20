@@ -12,6 +12,8 @@ function diagnostics(
     steerU: 1,
     steerV: 1,
     shearMs: 5,
+    shearUms: 3,
+    shearVms: 4,
     overLand: false,
     oceanKtPerH: 1,
     shearKtPerH: 0,

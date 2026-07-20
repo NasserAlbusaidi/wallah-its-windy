@@ -90,10 +90,12 @@ def test_event_bin_roundtrip() -> None:
     u = rng.uniform(-12, 12, size=(nt, ny, nx))
     v = rng.uniform(-12, 12, size=(nt, ny, nx))
     shr = rng.uniform(0, 25, size=(nt, ny, nx))
+    shu = rng.uniform(-20, 20, size=(nt, ny, nx))
+    shv = rng.uniform(-20, 20, size=(nt, ny, nx))
     sst_raw = np.clip(np.round((28.0 - 20.0) / 0.01), -32768, 32767).astype(np.int16)
     sst_raw = np.full(ny * nx, int(sst_raw), dtype=np.int16)
 
-    layers = era5_event.assemble_event_layers("05", sst_raw, u, v, shr)
+    layers = era5_event.assemble_event_layers("05", sst_raw, u, v, shr, shu, shv)
     with tempfile.NamedTemporaryFile("wb", suffix=".bin", delete=False) as fh:
         binfmt.write_bin(fh.name, layers)
         path = fh.name
@@ -102,9 +104,11 @@ def test_event_bin_roundtrip() -> None:
     finally:
         os.unlink(path)
 
-    assert set(parsed) == {"sst_05", "u_05", "v_05", "shr_05"}, set(parsed)
+    assert set(parsed) == {
+        "sst_05", "u_05", "v_05", "shr_05", "shu_05", "shv_05"
+    }, set(parsed)
     assert parsed["sst_05"].nt == 1, parsed["sst_05"].nt
-    for nm in ("u_05", "v_05", "shr_05"):
+    for nm in ("u_05", "v_05", "shr_05", "shu_05", "shv_05"):
         L = parsed[nm]
         assert L.nt == nt, (nm, L.nt)
         assert L.quantized is True, nm

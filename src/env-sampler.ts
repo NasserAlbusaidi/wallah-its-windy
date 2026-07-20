@@ -9,16 +9,17 @@
  * (spawn, month, seed); every output is finite (the sim guards on NaN).
  *
  * env.bin encodes the month in the layer NAME, not a timestep axis: bake writes
- * `sst_MM / u_MM / v_MM / shr_MM` where MM is the 0-indexed monthIndex, zero-
- * padded, for the season it bakes (bake/bake.py SEASON_MONTHS = [4..10] =
+ * `sst_MM / u_MM / v_MM / shr_MM / shu_MM / shv_MM`, where MM is the
+ * 0-indexed monthIndex, zero-padded, for the season it bakes
+ * (bake/bake.py SEASON_MONTHS = [4..10] =
  * May..Nov). This is the ONE place the sim resolves those names — it must agree
  * with bake/bake.py and src/render/index.ts (envMonthNames). Off-season months
  * clamp to the nearest season month; the Arabian-Sea cyclone season is all that
- * is baked. tFrac interpolates along a layer's timestep axis (a no-op at the
- * v1.0 nt=1 climatology; live for v1.1 per-storm event files).
+ * is baked. `tFrac` is inert for the frozen climatology plane and interpolates
+ * the chronological axis in v1.1 per-storm event files.
  *
  * SYNOPTIC SAMPLES (D10): a v1.0 climatology bake may instead carry nt=K
- * distinct real-year planes per u/v/shr layer (bake/era5.py). Those planes are
+ * distinct coherent real-year planes per steering/shear layer (bake/era5.py).
  * ALTERNATIVE regimes to pick per spawn (seed % K), NOT a time axis. The
  * explicit EnvSamplingMode discriminates those frozen planes from v1.1 event
  * files, whose nt IS chronological time.
@@ -94,13 +95,17 @@ export function sampleEnvBin(
   const su = pickLayer(bin, [`u_${mm}`, 'u', 'steerU', 'steeru']);
   const sv = pickLayer(bin, [`v_${mm}`, 'v', 'steerV', 'steerv']);
   const sh = pickLayer(bin, [`shr_${mm}`, 'shear', 'shr']);
-  if (!sst || !su || !sv || !sh) return null;
+  const shU = pickLayer(bin, [`shu_${mm}`, 'shearU', 'shearu']);
+  const shV = pickLayer(bin, [`shv_${mm}`, 'shearV', 'shearv']);
+  if (!sst || !su || !sv || !sh || !shU || !shV) return null;
   return {
     // SST bakes nt=1, so either mode degenerates to its only plane.
     sstC: sampleLayer(sst, lat, lon, tFrac, mode),
     steerU: sampleLayer(su, lat, lon, tFrac, mode),
     steerV: sampleLayer(sv, lat, lon, tFrac, mode),
     shear: sampleLayer(sh, lat, lon, tFrac, mode),
+    shearU: sampleLayer(shU, lat, lon, tFrac, mode),
+    shearV: sampleLayer(shV, lat, lon, tFrac, mode),
   };
 }
 
@@ -159,7 +164,10 @@ export function makeEnvSampler(getBin: () => ParsedBin | null): SelectableEnvSam
       // the fallback could never kill a storm by shear and DeathReason.Shear
       // would be unreachable in degraded (env.bin-missing) mode.
       const shear = clamp(9 + 9 * Math.max(0, Math.cos((monthIndex - 7) * (Math.PI / 6))) + 0.5 * (la - 18), 5, 26);
-      return { sstC, steerU, steerV, shear };
+      const shearAngle = (20 + 35 * Math.max(0, Math.cos((monthIndex - 7) * (Math.PI / 6)))) * Math.PI / 180;
+      const shearU = shear * Math.cos(shearAngle);
+      const shearV = shear * Math.sin(shearAngle);
+      return { sstC, steerU, steerV, shear, shearU, shearV };
     },
   };
 }

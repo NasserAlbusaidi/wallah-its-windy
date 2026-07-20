@@ -29,7 +29,12 @@
 
 import { TOKENS } from '../tokens';
 import { flowOffsetGlsl, HYDRO_ROUTE_CFL } from '../hydro-routing';
-import { DOMAIN } from '../grid';
+import {
+  DOMAIN,
+  clipToLatLon,
+  latLonToClip,
+  offsetKm,
+} from '../grid';
 import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
 import { bindTex, makeProgram, makeQuadVao, makeRenderTarget, disposeRenderTarget } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
@@ -81,6 +86,11 @@ uniform float u_rMax;
 uniform float u_hollandB;
 uniform vec2 u_motion;
 uniform float u_asymmetry;
+uniform float u_outerScale;
+uniform float u_outerBlendStartFraction;
+uniform float u_outerBlendFullFraction;
+uniform vec2 u_shear;
+uniform float u_shearAsymmetry;
 uniform float u_inflow;
 uniform float u_rainAmount; // storm intensity, 0 when no storm (decay-only)
 
@@ -113,6 +123,11 @@ void main() {
     u_hollandB,
     u_motion,
     u_asymmetry,
+    u_outerScale,
+    u_outerBlendStartFraction,
+    u_outerBlendFullFraction,
+    u_shear,
+    u_shearAsymmetry,
     u_inflow
   );
   float eE = elev(uv + vec2(u_elevTexel.x, 0.0));
@@ -265,8 +280,30 @@ export class RainLayer {
     gl.uniform1f(u('u_fallbackTransportPerH'), FALLBACK_TRANSPORT_PER_H);
     gl.uniform1f(u('u_dtH'), ctx.frame.hydroDeltaH);
     const c = ctx.centerClip;
-    gl.uniform2f(u('u_center'), c ? c.x : 0, c ? c.y : 0);
     const structure = ctx.structure;
+    let rainCenter = c;
+    if (c && structure) {
+      const offsetDistanceKm = Math.hypot(
+        structure.rainOffsetEastKm,
+        structure.rainOffsetNorthKm,
+      );
+      if (offsetDistanceKm > 1e-6) {
+        const centreLatLon = clipToLatLon(c.x, c.y, DOMAIN);
+        const shifted = offsetKm(
+          centreLatLon.lat,
+          centreLatLon.lon,
+          structure.rainOffsetEastKm / offsetDistanceKm,
+          structure.rainOffsetNorthKm / offsetDistanceKm,
+          offsetDistanceKm,
+        );
+        rainCenter = latLonToClip(shifted.lat, shifted.lon, DOMAIN);
+      }
+    }
+    gl.uniform2f(
+      u('u_center'),
+      rainCenter ? rainCenter.x : 0,
+      rainCenter ? rainCenter.y : 0,
+    );
     const rMax = structure
       ? Math.max(
           0.015,
@@ -284,6 +321,24 @@ export class RainLayer {
     gl.uniform1f(
       u('u_asymmetry'),
       (structure?.translationAsymmetryKt ?? 0) / maximumWind,
+    );
+    gl.uniform1f(u('u_outerScale'), structure?.outerWindScale ?? 1);
+    gl.uniform1f(
+      u('u_outerBlendStartFraction'),
+      (structure?.outerBlendStartWindKt ?? 48) / maximumWind,
+    );
+    gl.uniform1f(
+      u('u_outerBlendFullFraction'),
+      (structure?.outerBlendFullWindKt ?? 36) / maximumWind,
+    );
+    gl.uniform2f(
+      u('u_shear'),
+      structure?.shearUms ?? 0,
+      structure?.shearVms ?? 0,
+    );
+    gl.uniform1f(
+      u('u_shearAsymmetry'),
+      structure?.shearAsymmetryFraction ?? 0,
     );
     gl.uniform1f(u('u_inflow'), INFLOW_RAD);
     // Only a live storm over the map produces rain; after death the last state

@@ -4,7 +4,7 @@ bake.py — build the baked map data for "Wallah It's Windy".
 
 Produces five files the browser loads by default (BINARY-FORMATS.md is the contract):
   public/data/terrain.bin   elevation (int16 m) + land mask, ~2 km grid
-  public/data/env.bin       SST (REAL) + steering u/v + shear (SYNTHETIC), 0.5 deg,
+  public/data/env.bin       SST + steering + shear magnitude/vector, 0.5 deg,
                             per-(field,month) layers for May..Nov
   public/data/flowacc.bin   HydroSHEDS ACC + DIR + travel time on the terrain grid
   public/data/genesis.json  IBTrACS first-fix points of storms that reached Oman
@@ -21,10 +21,11 @@ Reproduction, sources, licenses, and the active ERA5/HydroSHEDS pipelines are in
 bake/README.md. Zero-auth sources; raw downloads cache under data/raw/.
 
 env.bin LAYER NAMING (consumed by the EnvSampler): one layer per field per month,
-each nt=1 for v1.0 climatology. Names: "sst_MM", "u_MM", "v_MM", "shr_MM" where MM
-is the 0-indexed calendar month zero-padded (May=04 .. Nov=10). month and the
-timestep axis (nt) are ORTHOGONAL: monthIndex picks the layer, tFrac interpolates
-along that layer's nt (=1 now; a v1.1 event file grows nt to hourly steps).
+with month-named fields. Names: "sst_MM", "u_MM", "v_MM", "shr_MM", "shu_MM",
+"shv_MM", where MM is the 0-indexed calendar month zero-padded (May=04 ..
+Nov=10). Month and the timestep axis (nt) are ORTHOGONAL: monthIndex picks the
+layer; SST has nt=1, climatology winds have K frozen synoptic planes, and event
+winds use nt as chronological time.
 """
 
 from __future__ import annotations
@@ -113,7 +114,7 @@ def build_env() -> str:
         return np.clip(raw, -32768, 32767).astype(np.int16).ravel(order="C")
 
     # Synoptic samples (D10): when the source can provide K distinct real years
-    # per month, u/v/shr ship as nt=K planes (plane 0 = most typical year) and
+    # Per month, steering/shear fields ship as nt=K coherent real-year planes.
     # the runtime picks a plane per spawn from the seed. SST stays nt=1 (OISST
     # long-term-mean; its year-to-year spread is second-order for this toy).
     has_samples = hasattr(ENV_SRC, "steering_shear_samples")
@@ -125,22 +126,29 @@ def build_env() -> str:
         sst = sst_by_month[m]
         sst_lo, sst_hi = min(sst_lo, float(sst.min())), max(sst_hi, float(sst.max()))
         if has_samples:
-            u, v, shr, years = ENV_SRC.steering_shear_samples(ELAT, ELON, m)
+            u, v, shr, shu, shv, years = (
+                ENV_SRC.steering_shear_samples_vector(ELAT, ELON, m)
+            )
             sample_years[m] = years
         else:
-            u1, v1, shr1 = ENV_SRC.steering_shear(ELAT, ELON, m)
+            u1, v1, shr1, shu1, shv1 = ENV_SRC.steering_shear_vector(
+                ELAT, ELON, m
+            )
             u, v, shr = u1[None], v1[None], shr1[None]
+            shu, shv = shu1[None], shv1[None]
         nt = u.shape[0]
         mm = f"{m:02d}"
         layers.append(Layer(f"sst_{mm}", "int16", True, nx, ny, 1, DOMAIN, 0.01, 20.0, q_i16(sst, 0.01, 20.0)))
         layers.append(Layer(f"u_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(u, 0.01, 0.0)))
         layers.append(Layer(f"v_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(v, 0.01, 0.0)))
         layers.append(Layer(f"shr_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(shr, 0.01, 0.0)))
+        layers.append(Layer(f"shu_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(shu, 0.01, 0.0)))
+        layers.append(Layer(f"shv_{mm}", "int16", True, nx, ny, nt, DOMAIN, 0.01, 0.0, q_i16(shv, 0.01, 0.0)))
 
     path = os.path.join(OUT_DIR, "env.bin")
     binfmt.write_bin(path, layers)
     # Report the seasonal signal so the synthetic field is inspectable.
-    print(f"      grid {nx}x{ny} | {len(layers)} layers ({len(sources.SEASON_MONTHS)} months x 4 fields) | {_mb(path)}")
+    print(f"      grid {nx}x{ny} | {len(layers)} layers ({len(sources.SEASON_MONTHS)} months x 6 fields) | {_mb(path)}")
     print(f"      SST [REAL] {sst_lo:.1f}..{sst_hi:.1f} degC | steering+shear [{ENV_SRC.TAG}]:")
     for m in sources.SEASON_MONTHS:
         u, v, shr = ENV_SRC.steering_shear(ELAT, ELON, m)

@@ -6,7 +6,7 @@
  * To keep that literally true the wind field lives here in exactly two mirrored
  * forms—a TS function {@link vortexWind} for CPU particle advection, and a GLSL
  * string pasted into the rain shader. Both consume the simulated RMW, Holland B,
- * motion vector, and translation asymmetry.
+ * persistent outer scale, motion asymmetry, and deep-layer shear asymmetry.
  *
  * Cyclonic sense is counter-clockwise (northern hemisphere) in a frame with
  * x = east, y = north. `inflow` tilts the tangential wind toward the centre
@@ -45,6 +45,16 @@ export interface VortexParams {
   motionY: number;
   /** Fraction of vMax reserved for right-of-motion enhancement. */
   asymmetryFraction: number;
+  /** Persistent stretch of the gale-force outer wind region. */
+  outerScale: number;
+  /** vMax fractions bounding the inner-to-outer profile blend. */
+  outerBlendStartFraction: number;
+  outerBlendFullFraction: number;
+  /** 200–850 hPa shear vector in the same east/north frame. */
+  shearX: number;
+  shearY: number;
+  /** Maximum downshear-left radial stretch fraction in the outer region. */
+  shearAsymmetryFraction: number;
   /** Inflow angle, radians (~0.35 = 20°). */
   inflow: number;
 }
@@ -67,7 +77,34 @@ export function vortexWind(px: number, py: number, p: VortexParams): { wx: numbe
   const alignment = tx * mx + ty * my;
   const localMaximum =
     p.vMax * Math.max(0, 1 - asymmetry + asymmetry * alignment);
-  const spd = hollandSpeed(r, p.rMax, localMaximum, p.hollandB);
+  const unmodified = hollandSpeed(r, p.rMax, localMaximum, p.hollandB);
+  const fullWind = p.vMax * p.outerBlendFullFraction;
+  const startWind = p.vMax * p.outerBlendStartFraction;
+  const blendFraction = Math.max(
+    0,
+    Math.min(1, (startWind - unmodified) / Math.max(1e-6, startWind - fullWind)),
+  );
+  const blend = blendFraction * blendFraction * (3 - 2 * blendFraction);
+  const shearMagnitude = Math.hypot(p.shearX, p.shearY);
+  const downshearLeftX = shearMagnitude > 1e-6 ? -p.shearY / shearMagnitude : 0;
+  const downshearLeftY = shearMagnitude > 1e-6 ? p.shearX / shearMagnitude : 0;
+  const shearAlignment = rxu * downshearLeftX + ryu * downshearLeftY;
+  const outerStretch = Math.max(
+    0.45,
+    Math.min(
+      2.5,
+      p.outerScale * (1 + p.shearAsymmetryFraction * shearAlignment),
+    ),
+  );
+  const stretch = 1 + (outerStretch - 1) * blend;
+  const effectiveR =
+    r <= p.rMax ? r : p.rMax + (r - p.rMax) / Math.max(0.2, stretch);
+  const spd = hollandSpeed(
+    effectiveR,
+    p.rMax,
+    localMaximum,
+    p.hollandB,
+  );
   const c = Math.cos(p.inflow);
   const s = Math.sin(p.inflow);
   const wxu = c * tx - s * rxu;
@@ -89,6 +126,11 @@ vec2 vortexWind(
   float hollandB,
   vec2 motion,
   float asymmetryFraction,
+  float outerScale,
+  float outerBlendStartFraction,
+  float outerBlendFullFraction,
+  vec2 shear,
+  float shearAsymmetryFraction,
   float inflow
 ) {
   vec2 d = pt - c;
@@ -103,7 +145,29 @@ vec2 vortexWind(
     0.0,
     1.0 - asymmetry + asymmetry * dot(t, motionUnit)
   );
-  float x = min(80.0, pow(rMax / r, hollandB));
+  float x0 = min(80.0, pow(rMax / r, hollandB));
+  float unmodified = localMaximum * sqrt(max(0.0, x0 * exp(1.0 - x0)));
+  float fullWind = vMax * outerBlendFullFraction;
+  float startWind = vMax * outerBlendStartFraction;
+  float blendFraction = clamp(
+    (startWind - unmodified) / max(1e-6, startWind - fullWind),
+    0.0,
+    1.0
+  );
+  float blend = blendFraction * blendFraction * (3.0 - 2.0 * blendFraction);
+  float shearMagnitude = length(shear);
+  vec2 downshearLeft = shearMagnitude > 1e-6
+    ? vec2(-shear.y, shear.x) / shearMagnitude
+    : vec2(0.0);
+  float shearAlignment = dot(ru, downshearLeft);
+  float outerStretch = clamp(
+    outerScale * (1.0 + shearAsymmetryFraction * shearAlignment),
+    0.45,
+    2.5
+  );
+  float stretch = mix(1.0, outerStretch, blend);
+  float effectiveR = r <= rMax ? r : rMax + (r - rMax) / max(0.2, stretch);
+  float x = min(80.0, pow(rMax / effectiveR, hollandB));
   float spd = localMaximum * sqrt(max(0.0, x * exp(1.0 - x)));
   float cc = cos(inflow), ss = sin(inflow);
   vec2 wu = cc * t - ss * ru;            // tilt inward

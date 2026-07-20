@@ -159,6 +159,7 @@ export class UiController {
     pressure: HTMLOutputElement;
     rmw: HTMLOutputElement;
     windRadii: HTMLOutputElement;
+    outerShear: HTMLOutputElement;
     motion: HTMLOutputElement;
     debrief: HTMLElement;
     verdict: HTMLElement;
@@ -222,6 +223,7 @@ export class UiController {
       pressure: dom('flight-pressure'),
       rmw: dom('flight-rmw'),
       windRadii: dom('flight-wind-radii'),
+      outerShear: dom('flight-outer-shear'),
       motion: dom('flight-motion'),
       debrief: dom('flight-debrief'),
       verdict: dom('flight-verdict'),
@@ -542,6 +544,14 @@ export class UiController {
     f.windRadii.textContent =
       `${Math.round(maxWindRadiusKm(structure.r34Km))} / ` +
       `${Math.round(maxWindRadiusKm(structure.r64Km))} km`;
+    const rainOffsetKm = Math.hypot(
+      structure.rainOffsetEastKm,
+      structure.rainOffsetNorthKm,
+    );
+    f.outerShear.textContent =
+      `${Math.round(structure.outerSizeKm)} km · ` +
+      `${Math.round(structure.shearAsymmetryFraction * 100)}% · ` +
+      `rain ${Math.round(rainOffsetKm)} km`;
     f.motion.textContent =
       `${compactDirection(structure.motionUms, structure.motionVms)} ` +
       `${motionSpeed.toFixed(1)} · ${structure.translationAsymmetryKt.toFixed(1)} kt`;

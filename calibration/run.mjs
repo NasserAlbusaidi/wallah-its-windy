@@ -130,18 +130,19 @@ Validation storm IDs:
 
 Each observation conditions the live \`src/structure.ts\` model on observed
 one-minute intensity, latitude, land proximity and a centred finite-difference
-track-motion vector. The model evolves its own RMW through each storm in time
-order. IBTrACS has no environmental-shear field, so validation uses a declared
-neutral shear of 8 m/s. This isolates the parametric structure contract; it is
-not a historical atmosphere replay.
+track-motion vector. The model evolves its own RMW and persistent outer-size
+state through each storm in time order. IBTrACS has no environmental-shear
+field, so validation uses a declared neutral shear of 8 m/s with no directional
+vector. This isolates the parametric structure contract; it is not a historical
+atmosphere replay.
 
 Parameter search minimizes the mean normalized MAE of pressure, R34, R50 and
 R64 on calibration storms. The held-out candidate is accepted only if:
 
-1. objective improves by at least 2%;
+1. objective improves by at least 4%;
 2. pressure MAE stays within 2% of baseline;
-3. combined wind-radius MAE improves; and
-4. no individual wind threshold regresses by more than 5%.
+3. R34 MAE improves by at least 10%; and
+4. R50 and R64 do not regress by more than 5%.
 
 ## Held-out results
 
@@ -197,8 +198,8 @@ Across all ${fullDeployed.storms} storms, the deployed model has objective
   R50/R64 quality control from 2022.
 - JTWC RMW remains non-QC; it is shown for diagnosis but cannot tune the model.
 - Best-track pressure is not aircraft ground truth in this basin.
-- Neutral shear means this report cannot calibrate the model's shear-broadening
-  terms.
+- Neutral non-directional shear means this report cannot calibrate
+  shear-driven wind asymmetry or rain displacement.
 - Positive reported radii are scored; blank/zero operational cells are treated
   as unavailable, not as observed zero-size quadrants.
 - The validation split is a model-development holdout, not an independent
@@ -250,10 +251,10 @@ const output = {
     objective:
       'mean normalized MAE: pressure/15 hPa, R34/100 km, R50/75 km, R64/50 km',
     rmwInObjective: false,
-    minimumHeldOutImprovementFraction: 0.02,
+    minimumHeldOutImprovementFraction: 0.04,
+    minimumR34ImprovementFraction: 0.1,
     maximumPressureRegressionFraction: 0.02,
-    maximumPerThresholdRegressionFraction: 0.05,
-    requireCombinedRadiiImprovement: true,
+    maximumInnerThresholdRegressionFraction: 0.05,
   },
   calibration: result,
   fullDeployed,

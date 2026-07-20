@@ -10,6 +10,8 @@ const DIAGNOSTICS: StormDiagnostics = {
   steerU: -2,
   steerV: 3,
   shearMs: 8,
+  shearUms: 6,
+  shearVms: 5,
   overLand: false,
   oceanKtPerH: 1,
   shearKtPerH: 0,

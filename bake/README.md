@@ -25,7 +25,7 @@ its progress, both bake-time asserts, and a loud SYNTHETIC banner (see below).
 | file | layers | grid | source |
 |------|--------|------|--------|
 | `terrain.bin` | `elev` (int16 m), `landmask` (uint8) | 1040×668 (~2 km) | GMRT (real bathy+topo) |
-| `env.bin` | `sst_MM`,`u_MM`,`v_MM`,`shr_MM` × 7 months | 40×24 (0.5°) | OISST + ERA5 |
+| `env.bin` | `sst_MM`,`u_MM`,`v_MM`,`shr_MM`,`shu_MM`,`shv_MM` × 7 months | 40×24 (0.5°) | OISST + ERA5 |
 | `flowacc.bin` | `flowacc` (uint16 log), `flowdir` (uint8 D8), `travmin` (uint8 minutes), `basin` (uint16 compatibility) | 1040×668 | HydroSHEDS v1.1 ACC+DIR |
 | `genesis.json` | `[{lat,lon}]` | — | IBTrACS North Indian |
 | `tracks.json` | two observed ghost-track polylines | — | IBTrACS North Indian |
@@ -44,21 +44,24 @@ one-minute wind, pressure, RMW, and quadrant radii.
 
 ### `env.bin` layer naming (the EnvSampler must know this)
 
-One layer **per field per month**, each `nt = 1` for the v1.0 climatology. Names
-(≤ 8-byte limit forces the short forms):
+One layer **per field per month**. SST has `nt = 1`; the five wind fields have
+`nt = 4` coherent real-year synoptic planes. Names (≤ 8-byte limit forces the
+short forms):
 
 ```
 sst_MM   SST °C          int16 quant scale 0.01 offset 20.0   (real OISST)
-u_MM     steering U m/s  int16 quant scale 0.01 offset 0.0    (SYNTHETIC_V0)
-v_MM     steering V m/s  int16 quant scale 0.01 offset 0.0    (SYNTHETIC_V0)
-shr_MM   shear mag m/s   int16 quant scale 0.01 offset 0.0    (SYNTHETIC_V0)
+u_MM     steering U m/s  int16 quant scale 0.01 offset 0.0    (ERA5)
+v_MM     steering V m/s  int16 quant scale 0.01 offset 0.0    (ERA5)
+shr_MM   shear mag m/s   int16 quant scale 0.01 offset 0.0    (ERA5)
+shu_MM   shear U m/s     int16 quant scale 0.01 offset 0.0    (ERA5 V200−V850)
+shv_MM   shear V m/s     int16 quant scale 0.01 offset 0.0    (ERA5 V200−V850)
 ```
 
 `MM` is the **0-indexed calendar month, zero-padded**: May=`04` … Nov=`10` (only
 these 7 exist). **Month and the timestep axis (`nt`) are orthogonal**: `monthIndex`
-picks the layer, `tFrac` interpolates along that layer's `nt`. For v1.0 `nt=1` so
-`tFrac` is a no-op; a v1.1 event file grows one field's `nt` to hourly steps
-without any format change. Recommended sampler lookup:
+picks the layer. In climatology mode, the seed freezes one of the wind layers'
+synoptic planes and `tFrac` is ignored; in event mode, `tFrac` interpolates
+chronological planes without any format change. Recommended sampler lookup:
 
 ```
 name = `sst_${String(clamp(monthIndex,4,10)).padStart(2,'0')}`
@@ -117,6 +120,9 @@ computed per year-month. The SHIPPED planes are single years (no cross-year
 averaging); the 30-yr climatological mean (mean-of-magnitudes, so opposing
 years cannot cancel to calm) exists only in `era5.steering_shear()` for the
 bake report and the spike baseline.
+
+The magnitude and both vector components are carried together so structure and
+rainfall use the real downshear direction rather than a steering proxy.
 
 **Synoptic samples (D10):** monthly means alone FAILed the spike (June
 keep-ratio 16 % < 30 %), so `steering_shear_samples()` ships 4 real YEARS per
@@ -180,7 +186,7 @@ bake/.venv/bin/python bake/bake.py events
 emits `public/data/env_gonu.bin`, `public/data/env_shaheen.bin`, and
 `public/data/scenarios.json`. The env bins are the **same WIWB format** as
 env.bin (version 1, identical 88-byte records) — only the `nt` semantics differ:
-`u/v/shr` carry a **time axis** (`nt` = 3-hourly steps, `tFrac` interpolates)
+`u/v/shr/shu/shv` carry a **time axis** (`nt` = 3-hourly steps, `tFrac` interpolates)
 instead of the climatology's synoptic samples. Layers keep the month-suffix
 convention so the existing sampler resolves them unchanged: gonu → `sst_05,
 u_05, v_05, shr_05`; shaheen → `..._08`. Gonu = `era5_gonu_2007.nc` (192 h → 64
@@ -191,7 +197,8 @@ planes, windowH 189). Shaheen = `era5_shaheen_2021_09.nc` + `_10.nc` stitched by
 storm's own vortex; baked verbatim they would replay the historical track rather
 than provide a clean counterfactual steering environment. We wash the vortex out
 with `scipy.ndimage.gaussian_filter`, **sigma = 3 native cells (1.5°)** on the
-0.5° grid, applied to `u/v/shr` per time plane before regridding to 40×24. The
+0.5° grid, applied to all steering/shear fields per time plane before regridding
+to 40×24. The
 bake reports mean `|raw − smoothed|` steering speed at the real storm's track
 positions vs the far-field: **gonu near 9.0 vs far 0.8 m/s**, **shaheen near 2.4
 vs far 0.7 m/s** — the filter removes the tight vortex (near ≫ far, and far

@@ -127,6 +127,10 @@
             <dd><output id="flight-wind-radii">—</output></dd>
           </div>
           <div class="flight-readout">
+            <dt>outer / shear</dt>
+            <dd><output id="flight-outer-shear">—</output></dd>
+          </div>
+          <div class="flight-readout">
             <dt>motion / bias</dt>
             <dd><output id="flight-motion">—</output></dd>
           </div>
@@ -217,18 +221,20 @@
         <section>
           <h3>Observed inputs</h3>
           <p>
-            OISST sea-surface temperatures, ERA5 steering winds and shear,
-            IBTrACS tracks, and GMRT terrain shape the sandbox.
+            OISST sea-surface temperatures, ERA5 steering winds and the full
+            200–850 hPa shear vector, IBTrACS tracks, and GMRT terrain shape
+            the sandbox.
           </p>
         </section>
         <section>
           <h3>Deliberate simplifications</h3>
           <p>
             Track and intensity remain a point-storm model. A parametric Holland
-            wind field derives pressure, eyewall scale, and quadrant wind radii;
-            those are simulated structure, not aircraft observations. Dry air
-            is a geometric coastal proxy. Wadi light follows timed HydroSHEDS D8
-            routes, but it is not a discharge or inundation model.
+            wind field derives pressure, eyewall scale, a persistent outer-core
+            size, and quadrant wind radii; those are simulated structure, not
+            aircraft observations. Dry air is a geometric coastal proxy. Wadi
+            light follows timed HydroSHEDS D8 routes, but it is not a discharge
+            or inundation model.
           </p>
         </section>
         <section>
@@ -236,8 +242,10 @@
           <p>
             The amber ring marks radius of maximum wind. Cyan contours show the
             parametric 34- and 64-knot footprints. Forward motion strengthens
-            the right side. The RMW climatology is an Atlantic-derived proxy,
-            explicitly bounded for this North Indian Ocean sandbox.
+            the right side; deep-layer shear stretches the outer wind field and
+            shifts rainfall downshear-left. The RMW climatology is an
+            Atlantic-derived proxy, explicitly bounded for this North Indian
+            Ocean sandbox.
           </p>
         </section>
         <section>

@@ -79,7 +79,7 @@ import {
 export interface RenderResources {
   /** terrain.bin + flowacc.bin merged: elev + landmask + flowacc + basin layers. */
   terrain: ParsedBin | null;
-  /** env.bin: per-month named layers sst_MM/u_MM/v_MM/shr_MM (MM = 04..10). */
+  /** env.bin: sst/steering/shear magnitude+vector layers (MM = 04..10). */
   env: ParsedBin | null;
   /** genesis.json points (historic genesis zones). */
   genesis: LatLon[];
@@ -102,14 +102,24 @@ function clamp01(x: number): number {
 }
 
 /**
- * env.bin encodes the month in the layer NAME: bake writes `sst_MM/u_MM/v_MM/shr_MM`
+ * env.bin encodes the month in the layer NAME: bake writes
+ * `sst_MM/u_MM/v_MM/shr_MM/shu_MM/shv_MM`
  * where MM is the 0-indexed monthIndex (bake SEASON_MONTHS = [4..10] = May..Nov),
  * zero-padded — so the suffix is monthIndex itself, NOT monthIndex+1. Off-season
  * months clamp to the nearest season month. Mirror of env-sampler.envMonthSuffix.
  */
-function envMonthNames(monthIndex: number): { sst: string; u: string; v: string; shr: string } {
+function envMonthNames(monthIndex: number): {
+  sst: string; u: string; v: string; shr: string; shu: string; shv: string;
+} {
   const mm = String(Math.min(10, Math.max(4, monthIndex))).padStart(2, '0');
-  return { sst: `sst_${mm}`, u: `u_${mm}`, v: `v_${mm}`, shr: `shr_${mm}` };
+  return {
+    sst: `sst_${mm}`,
+    u: `u_${mm}`,
+    v: `v_${mm}`,
+    shr: `shr_${mm}`,
+    shu: `shu_${mm}`,
+    shv: `shv_${mm}`,
+  };
 }
 
 function emptyGpu(): GpuTextures {

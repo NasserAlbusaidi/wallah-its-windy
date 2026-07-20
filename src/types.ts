@@ -270,6 +270,8 @@ export interface FrameState {
   replayMode: boolean;
   /** Completed baseline track retained while a same-storm comparison runs. */
   comparisonTrack: TrackPoint[] | null;
+  /** Simulated hours advanced since the previous rendered frame, for hydrology. */
+  hydroDeltaH: number;
   /**
    * Explicit interpretation of the active environment's `nt` axis. Render cues
    * must use the same mode as physics or event timelines freeze visually.

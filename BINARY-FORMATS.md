@@ -174,6 +174,25 @@ Continuous hex (whitespace-insensitive), the exact string in the test:
 
 ---
 
+## `flowacc.bin` hydrology layers
+
+All four layers share the terrain grid and domain bbox:
+
+| layer | dtype | meaning |
+|---|---|---|
+| `flowacc` | quantized uint16, scale `0.0001` | `log10(1 + HydroSHEDS upstream cell count)`, block-MAX reduced |
+| `flowdir` | uint8 | HydroSHEDS/ESRI D8 code: 1 E, 2 SE, 4 S, 8 SW, 16 W, 32 NW, 64 N, 128 NE; 0 outlet/unrouted |
+| `travmin` | uint8 | visualization-scale minutes to the `flowdir` neighbour; 0 when unrouted |
+| `basin` | uint16 | outlet id retained for compatibility with pre-DIR clients |
+
+`flowdir` and `travmin` are exact categorical data and require NEAREST texture
+filtering. The runtime advances a conservative pulse using
+`hydroDeltaH / (travmin / 60)`, capped for explicit-step stability. Travel time
+changes animation timing only; it is not an observed discharge or flood-depth
+estimate.
+
+---
+
 ## Genesis zones — `public/data/genesis.json`
 
 Historic genesis points ship as **JSON, not binary**: the payload is tiny

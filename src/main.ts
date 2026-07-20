@@ -973,7 +973,7 @@ function buildStorm(): { storm: StormState | null; prev: StormState | null } {
   return { storm: live, prev };
 }
 
-function render(alpha: number, nowMs: number): void {
+function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
   const { storm, prev } = buildStorm();
   const frame: FrameState = {
     storm,
@@ -986,6 +986,7 @@ function render(alpha: number, nowMs: number): void {
     paused: session.paused || session.replayMode,
     replayMode: session.replayMode,
     comparisonTrack: session.comparisonTrack,
+    hydroDeltaH,
     envSamplingMode: envSampler.getSamplingMode(),
     envTFrac:
       activeScenario && storm
@@ -1032,6 +1033,7 @@ function frame(nowMs: number): void {
   dbgFrames++;
   dbgLastDt = dtRealMs;
 
+  let hydroDeltaH = 0;
   if (session.replayPlaying) {
     session.advanceReplay(dtRealMs);
   } else if (!session.paused && !session.replayMode) {
@@ -1046,11 +1048,12 @@ function frame(nowMs: number): void {
       ticks++;
     }
     dbgTicks += ticks;
+    hydroDeltaH = ticks * (SIM_DT_MIN / 60);
     if (ticks >= MAX_TICKS_PER_FRAME) accumulatorMin = 0; // shed backlog, stay real-time
   }
 
   const alpha = accumulatorMin / SIM_DT_MIN; // 0..1 between fixed steps
-  render(alpha, nowMs);
+  render(alpha, nowMs, hydroDeltaH);
   requestAnimationFrame(frame);
 }
 

@@ -5,7 +5,7 @@
  * resolved the "read-write-same-texture" trap by making the accumulator a
  * ping-pong pair and turning decay into a per-frame MULTIPLY knob (RAIN_DECAY,
  * 0.90–1.00): each frame the update pass reads target A and writes
- *   newAccum = decay*A + rainSource + basinTransport   into target B, then swaps.
+ *   newAccum = decay*A + rainSource + routedTransport  into target B, then swaps.
  * "Additive blending" is realised as this in-shader add so decay and transport —
  * which hardware ONE,ONE blending cannot express — become possible.
  *
@@ -14,14 +14,12 @@
  * elevation texture. max(0,·) clamps lee slopes to zero — orographic-only by
  * design.
  *
- * Basin-glow transport (T9) — the trick, documented plainly: instead of routing
- * water with flow-direction data, each frame a cell pulls a fraction of the
- * accumulated rain from any of its 4 neighbours that is HIGHER (uphill) and in
- * the SAME basin. Rain therefore migrates one cell downhill along a basin per
- * frame, so a dump on Jebel Akhdar marches down to the Batinah wadis over a few
- * seconds — a hand-tuned travel lag (TRANSPORT_RATE + neighbour step), legible
- * not hydrological, no volume conservation. Falls back to elevation-only when no
- * basin layer is baked.
+ * Timed DIR routing (v1.2): flowacc.bin now carries official HydroSHEDS ACC+DIR
+ * plus `travmin`, the visualization-scale travel time to the next 2 km cell.
+ * Each update conservatively removes one time-scaled share from a cell and adds
+ * shares only from neighbours whose D8 arrow points into it. The pulse therefore
+ * follows observed hydrography over simulated hours. Old bins still fall back to
+ * the former same-basin/elevation approximation instead of failing to render.
  *
  * The composite pass tints high flow-accumulation channels wadi-dry→wadi-flood by
  * local accumulated rain — the brightest layer in the luminance ranking. Flood
@@ -30,15 +28,16 @@
  */
 
 import { TOKENS } from '../tokens';
+import { flowOffsetGlsl, HYDRO_ROUTE_CFL } from '../hydro-routing';
 import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
 import { bindTex, makeProgram, makeQuadVao, makeRenderTarget, disposeRenderTarget } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
 import type { DrawCtx, GpuTextures } from './context';
 
 /** Per-frame decay multiply — THE knob (eng task T5, valid 0.90–1.00). */
-const RAIN_DECAY = 0.985;
+const RAIN_DECAY_PER_H = 0.72;
 const RAIN_GAIN = 45.0; // folds in the metres→slope scale of ∇h
-const TRANSPORT_RATE = 0.11; // fraction pulled from each uphill same-basin neighbour
+const FALLBACK_TRANSPORT_PER_H = 0.44;
 const RMAX_BASE = 0.11; // mirror of particles' base radius (clip units here)
 // Channel window on the normalized baked log10(1+acc) values. These preserve the
 // old visual cutoffs after removing the renderer's accidental second logarithm:
@@ -64,12 +63,16 @@ uniform sampler2D u_src;    // previous accumulation (half-res)
 uniform sampler2D u_elev;   // R16F metres
 uniform sampler2D u_land;
 uniform sampler2D u_basin;  // RG8 basin id (lo, hi) — compare BOTH channels
+uniform sampler2D u_flowdir; // R8 exact HydroSHEDS D8 code / 255
+uniform sampler2D u_travmin; // R8 travel minutes / 255
 uniform float u_hasBasin;
+uniform float u_hasRouting;
 uniform vec2 u_elevTexel;
 uniform vec2 u_rtexel;      // rain-FBO texel size
-uniform float u_decay;
+uniform float u_decayPerH;
 uniform float u_gain;
-uniform float u_transport;
+uniform float u_fallbackTransportPerH;
+uniform float u_dtH;
 uniform vec2 u_center;      // storm centre, clip
 uniform float u_rMax;
 uniform float u_inflow;
@@ -78,6 +81,15 @@ uniform float u_rainAmount; // storm intensity, 0 when no storm (decay-only)
 ${VORTEX_GLSL}
 
 float elev(vec2 p) { return texture(u_elev, p).r; }
+
+${flowOffsetGlsl()}
+
+float routeFraction(vec2 p) {
+  vec2 direction = flowOffset(p);
+  if (dot(direction, direction) < 0.5) return 0.0;
+  float minutes = max(8.0, texture(u_travmin, p).r * 255.0);
+  return min(${HYDRO_ROUTE_CFL.toFixed(2)}, u_dtH / (minutes / 60.0));
+}
 
 void main() {
   vec2 uv = v_uv;
@@ -94,15 +106,26 @@ void main() {
   float eS = elev(uv + vec2(0.0,  u_elevTexel.y));
   vec2 grad = vec2(eE - eW, eN - eS);
   float upslope = max(0.0, dot(w, grad));
-  float rain = u_rainAmount * upslope * u_gain * step(0.5, land);
-  rain = min(rain, 0.15); // bound a single frame's contribution
+  float rainRate = u_rainAmount * upslope * u_gain * step(0.5, land);
+  float rain = min(rainRate, 0.6) * u_dtH;
 
-  // Basin-glow downstream transport, CONSERVATIVE: a cell GAINS from each
-  // strictly-higher same-basin neighbour and LOSES the matching share to each
-  // strictly-lower one, so glow migrates downstream (travel lag = frames) without
-  // amplifying. A copy-only pull would self-sustain (4*rate >> decay loss) and
-  // light channels permanently; balancing gain against loss lets decay drain it,
-  // so the flood fades after the rain stops. Legible, not hydrological.
+  // Exact D8 transport: only neighbours whose arrow points toward this cell can
+  // contribute. Each routed cell loses exactly one corresponding share.
+  vec2 routeOffs[8] = vec2[8](
+    vec2( u_rtexel.x, 0.0), vec2( u_rtexel.x,  u_rtexel.y),
+    vec2(0.0,  u_rtexel.y), vec2(-u_rtexel.x,  u_rtexel.y),
+    vec2(-u_rtexel.x, 0.0), vec2(-u_rtexel.x, -u_rtexel.y),
+    vec2(0.0, -u_rtexel.y), vec2( u_rtexel.x, -u_rtexel.y));
+  float routedIn = 0.0;
+  for (int i = 0; i < 8; i++) {
+    vec2 p = uv + routeOffs[i];
+    vec2 towardHere = -sign(routeOffs[i]);
+    float aimsHere = 1.0 - step(0.1, length(flowOffset(p) - towardHere));
+    routedIn += texture(u_src, p).r * routeFraction(p) * aimsHere;
+  }
+  float routedNet = routedIn - aHere * routeFraction(uv);
+
+  // Compatibility path for old flowacc.bin files that have basin but no DIR.
   vec2 bh = texture(u_basin, uv).rg;   // this cell's basin id, split across R+G
   vec2 offs[4] = vec2[4](
     vec2( u_rtexel.x, 0.0), vec2(-u_rtexel.x, 0.0),
@@ -119,9 +142,12 @@ void main() {
     inflow += texture(u_src, p).r * step(eh + 1.0, en) * sameB; // neighbour uphill
     outCount += step(en + 1.0, eh) * sameB;                     // neighbour downhill
   }
-  float net = (inflow - aHere * outCount) * u_transport;
+  float fallbackRate = min(0.2, u_dtH * u_fallbackTransportPerH);
+  float fallbackNet = (inflow - aHere * outCount) * fallbackRate;
+  float net = mix(fallbackNet, routedNet, step(0.5, u_hasRouting));
 
-  float acc = clamp(u_decay * aHere + rain + net, 0.0, 1.5);
+  float decay = pow(u_decayPerH, u_dtH);
+  float acc = clamp(decay * aHere + rain + net, 0.0, 1.5);
   o = vec4(acc, 0.0, 0.0, 1.0);
 }`;
 
@@ -198,7 +224,7 @@ export class RainLayer {
     // source, decay or transport) while the sim is stopped. composite() still
     // draws the frozen state. Return before any GL state change (screen FBO is
     // bound here) so nothing leaks.
-    if (ctx.frame.paused) return;
+    if (ctx.frame.paused || ctx.frame.hydroDeltaH <= 0) return;
     const src = this.targets[this.cur];
     const dst = this.targets[1 - this.cur];
     if (!this.updProg || !src || !dst || !gpu.elev || !gpu.land || !gpu.terrainGrid) return;
@@ -213,18 +239,23 @@ export class RainLayer {
     bindTex(gl, 1, gpu.elev, u('u_elev'));
     bindTex(gl, 2, gpu.land, u('u_land'));
     bindTex(gl, 3, gpu.basin ?? gpu.land, u('u_basin')); // dummy bind when absent
+    bindTex(gl, 4, gpu.flowDir ?? gpu.land, u('u_flowdir'));
+    bindTex(gl, 5, gpu.travelMin ?? gpu.land, u('u_travmin'));
     gl.uniform1f(u('u_hasBasin'), gpu.hasBasin ? 1 : 0);
+    gl.uniform1f(u('u_hasRouting'), gpu.hasFlowRouting ? 1 : 0);
     gl.uniform2f(u('u_elevTexel'), 1 / gpu.terrainGrid.nx, 1 / gpu.terrainGrid.ny);
     gl.uniform2f(u('u_rtexel'), 1 / this.rtW, 1 / this.rtH);
-    gl.uniform1f(u('u_decay'), RAIN_DECAY);
+    gl.uniform1f(u('u_decayPerH'), RAIN_DECAY_PER_H);
     gl.uniform1f(u('u_gain'), RAIN_GAIN);
-    gl.uniform1f(u('u_transport'), TRANSPORT_RATE);
+    gl.uniform1f(u('u_fallbackTransportPerH'), FALLBACK_TRANSPORT_PER_H);
+    gl.uniform1f(u('u_dtH'), ctx.frame.hydroDeltaH);
     const c = ctx.centerClip;
     gl.uniform2f(u('u_center'), c ? c.x : 0, c ? c.y : 0);
     gl.uniform1f(u('u_rMax'), RMAX_BASE * (0.7 + 0.6 * ctx.intensity01));
     gl.uniform1f(u('u_inflow'), INFLOW_RAD);
-    // Only a live storm over the map produces rain; else decay + transport only.
-    const raining = c && ctx.vKt > 0 ? ctx.intensity01 : 0;
+    // Only a live storm over the map produces rain; after death the last state
+    // remains renderable, but must drive decay + downstream transport only.
+    const raining = c && ctx.frame.storm?.alive && ctx.vKt > 0 ? ctx.intensity01 : 0;
     gl.uniform1f(u('u_rainAmount'), raining);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);

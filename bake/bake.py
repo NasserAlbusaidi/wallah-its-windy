@@ -6,7 +6,7 @@ Produces five files the browser loads by default (BINARY-FORMATS.md is the contr
   public/data/terrain.bin   elevation (int16 m) + land mask, ~2 km grid
   public/data/env.bin       SST (REAL) + steering u/v + shear (SYNTHETIC), 0.5 deg,
                             per-(field,month) layers for May..Nov
-  public/data/flowacc.bin   log flow accumulation + basin-ID on the terrain grid
+  public/data/flowacc.bin   HydroSHEDS ACC + DIR + travel time on the terrain grid
   public/data/genesis.json  IBTrACS first-fix points of storms that reached Oman
   public/data/tracks.json   IBTrACS full polylines for the ghost-track overlay
 
@@ -17,7 +17,7 @@ out — see era5_event.py):
 
 Run:  bake/.venv/bin/python bake/bake.py           (default 5-file bake)
       bake/.venv/bin/python bake/bake.py events     (event bins + scenarios)
-Reproduction, sources, licenses, and the ERA5 / HydroSHEDS drop-in TODOs are in
+Reproduction, sources, licenses, and the active ERA5/HydroSHEDS pipelines are in
 bake/README.md. Zero-auth sources; raw downloads cache under data/raw/.
 
 env.bin LAYER NAMING (consumed by the EnvSampler): one layer per field per month,
@@ -39,6 +39,7 @@ import binfmt
 import era5
 import era5_event
 import hydro
+import hydrosheds
 import sources
 import synth
 from binfmt import Layer
@@ -150,13 +151,24 @@ def build_env() -> str:
 
 
 def build_flowacc(terrain_path: str) -> tuple[str, str]:
-    print("[3/5] flowacc.bin  (D8 flow accumulation + basins from real DEM)")
+    print("[3/5] flowacc.bin  (HydroSHEDS ACC + DIR + timed downstream routing)")
     parsed = binfmt.parse_bin(open(terrain_path, "rb").read())
     ny, nx = parsed["elev"].ny, parsed["elev"].nx
     elev = parsed["elev"].data.reshape(ny, nx)
     landmask = parsed["landmask"].data.reshape(ny, nx).astype(np.uint8)
 
-    flowacc_log, basin = hydro.flow_accumulation_and_basins(elev, landmask)
+    if os.environ.get("WIW_HYDRO_FALLBACK") == "1":
+        flowacc_log, basin = hydro.flow_accumulation_and_basins(elev, landmask)
+        flowdir = np.zeros_like(landmask, dtype=np.uint8)
+        travmin = np.zeros_like(landmask, dtype=np.uint8)
+        provenance = (
+            "EXPLICIT FALLBACK: priority-flood D8 from GMRT DEM; "
+            "no timed DIR routing"
+        )
+    else:
+        flowacc_log, flowdir, travmin, basin, provenance = hydrosheds.load(
+            nx, ny, landmask
+        )
     passed, msg = hydro.connectivity_check(flowacc_log, landmask)
 
     def q_u16(a: np.ndarray, scale: float) -> np.ndarray:
@@ -166,6 +178,8 @@ def build_flowacc(terrain_path: str) -> tuple[str, str]:
     basin_clip = np.clip(basin, 0, 65535).astype(np.uint16)
     layers = [
         Layer("flowacc", "uint16", True, nx, ny, 1, DOMAIN, acc_scale, 0.0, q_u16(flowacc_log, acc_scale)),
+        Layer("flowdir", "uint8", False, nx, ny, 1, DOMAIN, 1.0, 0.0, flowdir.ravel(order="C")),
+        Layer("travmin", "uint8", False, nx, ny, 1, DOMAIN, 1.0, 0.0, travmin.ravel(order="C")),
         Layer("basin", "uint16", False, nx, ny, 1, DOMAIN, 1.0, 0.0, basin_clip.ravel(order="C")),
     ]
     path = os.path.join(OUT_DIR, "flowacc.bin")
@@ -174,6 +188,7 @@ def build_flowacc(terrain_path: str) -> tuple[str, str]:
     print(
         f"      flowacc log10(1+acc) 0..{float(flowacc_log.max()):.2f} | {n_basins} basins | {_mb(path)}"
     )
+    print(f"      {provenance}")
     print(f"      {msg}")
     return path, msg
 

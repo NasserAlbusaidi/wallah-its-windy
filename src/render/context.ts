@@ -31,6 +31,10 @@ export interface GpuTextures {
   acc: WebGLTexture | null;
   basin: WebGLTexture | null;
   hasBasin: boolean;
+  /** HydroSHEDS D8 code and per-step travel minutes, both exact R8 textures. */
+  flowDir: WebGLTexture | null;
+  travelMin: WebGLTexture | null;
+  hasFlowRouting: boolean;
   /** Env (0.5°) grid for the SST tint. */
   envGrid: GridSpec | null;
   sst: WebGLTexture | null;

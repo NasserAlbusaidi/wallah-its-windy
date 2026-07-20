@@ -235,13 +235,32 @@ describe('November post-monsoon rescue (C6)', () => {
 
 describe('flowacc.bin', () => {
   const bin = loadBin('flowacc.bin');
-  it('has a non-negative flow-accumulation field and a basin field', () => {
+  it('ships observed ACC, exact D8 direction, travel time, and basin compatibility', () => {
     const acc = bin.layers.get('flowacc');
+    const dir = bin.layers.get('flowdir');
+    const travel = bin.layers.get('travmin');
     const basin = bin.layers.get('basin');
     expect(acc).toBeDefined();
+    expect(dir).toBeDefined();
+    expect(travel).toBeDefined();
     expect(basin).toBeDefined();
     expect(allFinite(acc!.data)).toBe(true);
     expect(range(acc!.data).min).toBeGreaterThanOrEqual(0);
+    const codes = new Set(Array.from(dir!.data));
+    for (const code of codes) {
+      expect([0, 1, 2, 4, 8, 16, 32, 64, 128]).toContain(code);
+    }
+    let routed = 0;
+    for (let index = 0; index < dir!.data.length; index++) {
+      if (dir!.data[index] === 0) {
+        expect(travel!.data[index]).toBe(0);
+        continue;
+      }
+      routed++;
+      expect(travel!.data[index]).toBeGreaterThanOrEqual(8);
+      expect(travel!.data[index]).toBeLessThanOrEqual(120);
+    }
+    expect(routed).toBeGreaterThan(200_000);
     expect(allFinite(basin!.data)).toBe(true);
   });
 });

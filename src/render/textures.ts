@@ -25,6 +25,22 @@ export function normalizeLoggedFlowAccumulation(value: number, maxValue: number)
   return Math.max(0, Math.min(1, value / maxValue));
 }
 
+/**
+ * True only when both timed-routing layers carry real route values.
+ * Explicit offline fallback bakes keep zero-filled layers for schema stability.
+ */
+export function hasTimedFlowRouting(
+  flowDir: BinLayer | null,
+  travelMinutes: BinLayer | null,
+): boolean {
+  return (
+    flowDir !== null &&
+    travelMinutes !== null &&
+    planeMax(flowDir) > 0 &&
+    planeMax(travelMinutes) > 0
+  );
+}
+
 /** Find a layer by any of `names` (exact first, then case-insensitive). */
 export function pickLayer(bin: ParsedBin | null, names: readonly string[]): BinLayer | null {
   if (!bin) return null;

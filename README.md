@@ -68,15 +68,16 @@ dimension, bbox, and quantization scale comes from the file header.
 
 ```bash
 python3 -m venv bake/.venv
-bake/.venv/bin/python -m pip install numpy scipy h5py
+bake/.venv/bin/python -m pip install -r bake/requirements.txt
 bake/.venv/bin/python bake/bake.py          # ~15s; writes public/data/*
 ```
 
 - Binary format + golden test vector: **`BINARY-FORMATS.md`**.
-- Full provenance, licenses, and the swap-in TODOs: **`bake/README.md`**.
+- Full provenance, licenses, and bake details: **`bake/README.md`**.
 - Sources (all auth-free): **GMRT** bathymetry+topography (`terrain.bin`),
   **NOAA OISST** SST climatology (`env.bin` SST — real), **IBTrACS** North-Indian
-  tracks (`genesis.json`), D8 flow-accumulation from the real DEM (`flowacc.bin`).
+  tracks (`genesis.json`), and official **HydroSHEDS v1.1** ACC+DIR hydrography
+  with per-cell travel time (`flowacc.bin`).
 - Raw downloads cache under `data/raw/` (gitignored); the venv under `bake/.venv`.
 
 ### Provenance — steering/shear are REAL ERA5 (with synoptic samples)
@@ -111,8 +112,9 @@ That contract is also visible in the interface: event options are labelled as
 environments, the picker displays “not a historical reconstruction,” and every
 event flight tape carries a counterfactual marker. Scientific limitations are
 not hidden in documentation: the in-app model notes identify the point-vortex
-core, empirical intensity equation, geometric dry-air proxy, and the current
-rain-accumulation-versus-routed-flood distinction.
+core, empirical intensity equation, geometric dry-air proxy, and the fact that
+downstream flood light is timed D8 routing—not a discharge, infiltration, or
+inundation model.
 
 `env.bin` encodes the month in the layer **name** (`sst_MM/u_MM/v_MM/shr_MM`,
 `MM` = 0-indexed `monthIndex`, `04`=May … `10`=Nov). Consumers resolve it with

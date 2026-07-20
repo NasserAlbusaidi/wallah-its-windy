@@ -1,6 +1,6 @@
 # bake — baked map data for *Wallah It's Windy*
 
-Turns free, public, no-auth geodata into the four small files the browser loads.
+Turns free, public, no-auth geodata into the five small files the browser loads.
 Nothing here ships to the browser; it runs once at build time. The output format
 is LAW: see [`../BINARY-FORMATS.md`](../BINARY-FORMATS.md). This directory is the
 Python source of truth for the *actual* grid dimensions the self-describing `.bin`
@@ -12,7 +12,7 @@ headers advertise (the runtime hardcodes none of them).
 cd cyclone-sim
 python3 -m venv bake/.venv
 bake/.venv/bin/python -m pip install --upgrade pip
-bake/.venv/bin/python -m pip install numpy scipy h5py
+bake/.venv/bin/python -m pip install -r bake/requirements.txt
 bake/.venv/bin/python bake/bake.py
 ```
 
@@ -20,14 +20,15 @@ macOS, Python 3.14, numpy 2.x. Raw downloads cache under `data/raw/` (gitignored
 a second run reuses them. Total runtime ≈ 15 s after downloads. The script prints
 its progress, both bake-time asserts, and a loud SYNTHETIC banner (see below).
 
-## Outputs (`public/data/`, ~4.9 MB raw, budget ≤ 7 MB)
+## Outputs (`public/data/`, ~6.5 MB raw, budget ≤ 7 MB)
 
 | file | layers | grid | source |
 |------|--------|------|--------|
 | `terrain.bin` | `elev` (int16 m), `landmask` (uint8) | 1040×668 (~2 km) | GMRT (real bathy+topo) |
-| `env.bin` | `sst_MM`,`u_MM`,`v_MM`,`shr_MM` × 7 months | 40×24 (0.5°) | SST **real** (OISST); steering/shear **synthetic** |
-| `flowacc.bin` | `flowacc` (uint16, log), `basin` (uint16) | 1040×668 | D8 from the real DEM |
+| `env.bin` | `sst_MM`,`u_MM`,`v_MM`,`shr_MM` × 7 months | 40×24 (0.5°) | OISST + ERA5 |
+| `flowacc.bin` | `flowacc` (uint16 log), `flowdir` (uint8 D8), `travmin` (uint8 minutes), `basin` (uint16 compatibility) | 1040×668 | HydroSHEDS v1.1 ACC+DIR |
 | `genesis.json` | `[{lat,lon}]` | — | IBTrACS North Indian |
+| `tracks.json` | two observed ghost-track polylines | — | IBTrACS North Indian |
 
 ### `env.bin` layer naming (the EnvSampler must know this)
 
@@ -66,15 +67,22 @@ Months outside May–Nov are not baked (no Arabian-Sea cyclone season) — clamp
 - **IBTrACS v04r01** North Indian basin CSV.
   `https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/csv/ibtracs.NI.list.v04r01.csv`
   License: public domain; cite Knapp et al. (2010) + Gahtan et al. (2024).
-- **HydroSHEDS** (intended flow-accumulation source) — see TODO below.
-- **ERA5** (intended steering/shear source) — see TODO below.
+- **HydroSHEDS v1.1** Europe/Middle-East 30 arc-second ACC+DIR GeoTIFFs.
+  `https://data.hydrosheds.org/file/hydrosheds-v1-acc/hyd_eu_acc_30s.zip`
+  `https://data.hydrosheds.org/file/hydrosheds-v1-dir/hyd_eu_dir_30s.zip`
+  License: HydroSHEDS © WWF; cite Lehner, B., Verdin, K., Jarvis, A. (2008),
+  *Eos* 89(10).
+- **ERA5** pressure-level winds for climatological samples and event windows —
+  see the active pipeline below.
 
 ## Downsample rules (eng task T3)
 
-- elevation → block **mean**; land mask → **any-land-wins**; (basin → mode, ACC →
-  block-max apply only to the HydroSHEDS path — the D8 fallback computes natively
-  on the terrain grid, no downsample). Bake-time connectivity assert confirms the
-  top-1 % ACC cells form connected channels, not speckle.
+- elevation → block **mean**; land mask → **any-land-wins**.
+- HydroSHEDS ACC → **block-MAX**, preserving narrow high-accumulation channels.
+- HydroSHEDS DIR → the D8 code at that same maximum-ACC source pixel, followed
+  until it crosses into a neighbouring 2 km target cell.
+- `travmin` → distance to that neighbour divided by a visualization-scale channel
+  velocity of 2–10 km/h. The runtime integrates it against simulated hours.
 
 ## Bake-time asserts (eng task T6)
 
@@ -236,16 +244,23 @@ with runtime-like per-sample assignment, the spike PASSes: June 50 %, October
 65 % (gate ≥ 30 %). The spike stays a standalone diagnostic, deliberately NOT wired
 into `bake.py`'s gate (no WebGL, no bake format — design D10).
 
-## TODO: real HydroSHEDS flow accumulation (currently D8-from-DEM)
+## HydroSHEDS timed routing — ACTIVE (2026-07-20)
 
-`flowacc.bin` is computed by priority-flood D8 on the real GMRT DEM
-(`bake/hydro.py`), the sanctioned fallback: HydroSHEDS distributes only large
-continental GeoTIFFs (need GDAL/rasterio) and its `data.hydrosheds.org` ACC/DIR
-paths 404'd on two documented attempts. To use official HydroSHEDS ACC + DIR:
-download the continental `*_acc_30s` and `*_dir_30s` grids that cover the Arabian
-Peninsula (check whether Oman lands in the **af** or **as** continent clip — it
-straddles ~52–60°E), clip to 50–70°E/15–27°N, then downsample to the terrain grid
-with **ACC = block-MAX** (mean destroys 1-cell wadi channels) and **basin = mode**.
-Drop it in as `hydro.load_hydrosheds_acc_dir()` returning the same
-`(flowacc_log, basin)` pair. License: HydroSHEDS © WWF; free, cite Lehner, B.,
-Verdin, K., Jarvis, A. (2008), *Eos* 89(10).
+The old priority-flood D8 approximation is closed. HydroSHEDS v1.1 restored
+working GeoTIFF endpoints, and the Europe/Middle-East tile covers the full
+50–70°E / 15–27°N domain. `bake/hydrosheds.py` downloads, clips, and coherently
+reduces official 30 arc-second ACC+DIR to the terrain grid. The committed bake
+covers 235,734 of 273,610 GMRT-land cells and routes 233,561 of them; uncovered
+cells are mostly coastline/source-mask disagreement and deliberately carry no
+invented channel.
+
+The browser reads `flowdir` and `travmin` directly. A cell loses a time-scaled
+share only toward its one D8 downstream neighbour; a cell gains only from
+neighbours whose arrow points into it. The update is volume-conservative before
+decay and advances from simulated hours, not rendered frame count. `basin` stays
+in the file so an older client can fall back safely.
+
+For an explicit offline fallback only, set `WIW_HYDRO_FALLBACK=1`. That invokes
+the former GMRT priority-flood implementation in `bake/hydro.py`, emits zero
+`flowdir`/`travmin`, and makes the runtime use its legacy elevation/basin
+transport. A normal bake requires Rasterio and real HydroSHEDS inputs.

@@ -45,6 +45,7 @@ import {
   buildBasinRG8Tex,
   buildElevationTex,
   buildR8Tex,
+  hasTimedFlowRouting,
   pickLayer,
   planeMax,
   normalizeLoggedFlowAccumulation,
@@ -78,6 +79,8 @@ const ELEV_NAMES = ['elev', 'elevation', 'dem', 'z'];
 const LAND_NAMES = ['landmask', 'land', 'mask', 'lsm'];
 const ACC_NAMES = ['flowacc', 'acc', 'accum', 'facc'];
 const BASIN_NAMES = ['basin', 'basinid', 'basin_id', 'catchment'];
+const FLOW_DIR_NAMES = ['flowdir', 'dir'];
+const TRAVEL_NAMES = ['travmin', 'travel'];
 
 const LOAD_FADE_MS = 700; // data-arrival fade-in (design D2)
 const MAX_DT_SEC = 0.05;
@@ -105,6 +108,9 @@ function emptyGpu(): GpuTextures {
     acc: null,
     basin: null,
     hasBasin: false,
+    flowDir: null,
+    travelMin: null,
+    hasFlowRouting: false,
     envGrid: null,
     sst: null,
     genesisClip: null,
@@ -412,11 +418,24 @@ export class RenderPipeline implements RenderLayer {
     const landL = pickLayer(bin, LAND_NAMES);
     const accL = pickLayer(bin, ACC_NAMES);
     const basinL = pickLayer(bin, BASIN_NAMES);
-    for (const t of [this.gpu.elev, this.gpu.land, this.gpu.acc, this.gpu.basin]) if (t) gl.deleteTexture(t);
+    const flowDirL = pickLayer(bin, FLOW_DIR_NAMES);
+    const travelL = pickLayer(bin, TRAVEL_NAMES);
+    for (const t of [
+      this.gpu.elev,
+      this.gpu.land,
+      this.gpu.acc,
+      this.gpu.basin,
+      this.gpu.flowDir,
+      this.gpu.travelMin,
+    ]) {
+      if (t) gl.deleteTexture(t);
+    }
     this.gpu.elev = this.gpu.land = this.gpu.acc = this.gpu.basin = null;
+    this.gpu.flowDir = this.gpu.travelMin = null;
     this.gpu.hasBasin = false;
+    this.gpu.hasFlowRouting = false;
 
-    const grid = elevL ?? landL ?? accL ?? basinL;
+    const grid = elevL ?? landL ?? accL ?? flowDirL ?? travelL ?? basinL;
     if (grid) this.gpu.terrainGrid = { nx: grid.nx, ny: grid.ny, bbox: grid.bbox };
     if (elevL) this.gpu.elev = buildElevationTex(gl, elevL);
     if (landL) this.gpu.land = buildR8Tex(gl, landL, 0, (v) => (v > 0.5 ? 1 : 0), gl.LINEAR);
@@ -436,6 +455,27 @@ export class RenderPipeline implements RenderLayer {
       // drainage boundaries. The rain shader compares both channels.
       this.gpu.basin = buildBasinRG8Tex(gl, basinL, 0);
       this.gpu.hasBasin = true;
+    }
+    const hasRouteValues = hasTimedFlowRouting(flowDirL, travelL);
+    if (flowDirL && travelL) {
+      this.gpu.flowDir = buildR8Tex(
+        gl,
+        flowDirL,
+        0,
+        (value) => value / 255,
+        gl.NEAREST,
+      );
+      this.gpu.travelMin = buildR8Tex(
+        gl,
+        travelL,
+        0,
+        (value) => value / 255,
+        gl.NEAREST,
+      );
+      // Explicit offline-fallback bakes retain zero-filled layers for a stable
+      // binary schema. Treat those as absent so old basin/elevation transport
+      // remains functional instead of selecting an inert DIR path.
+      this.gpu.hasFlowRouting = hasRouteValues;
     }
     if ((this.gpu.elev || this.gpu.land) && this.terrainReadyMs < 0) this.terrainReadyMs = performance.now();
   }
@@ -475,7 +515,17 @@ export class RenderPipeline implements RenderLayer {
     const gl = this.gl;
     if (!gl) return;
     const g = this.gpu;
-    for (const t of [g.elev, g.land, g.acc, g.basin, g.sst]) if (t) gl.deleteTexture(t);
+    for (const t of [
+      g.elev,
+      g.land,
+      g.acc,
+      g.basin,
+      g.flowDir,
+      g.travelMin,
+      g.sst,
+    ]) {
+      if (t) gl.deleteTexture(t);
+    }
   }
 
   // --- per-frame context -----------------------------------------------------

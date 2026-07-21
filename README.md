@@ -17,9 +17,12 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > share any storm by its URL. User storms carry a live flight recorder that
 > explains each intensity change in numbers and plain language, then becomes a
 > debrief, controlled-comparison lab, export station, and replay timeline.
-> Ten historical environments also have deterministic, observed-initialization
-> hindcasts with honest track/intensity/pressure scoring and a separate
-> counterfactual mode. The map can switch among terrain, simulated infrared,
+> Ten featured historical environments also have deterministic,
+> observed-initialization hindcasts with honest track/intensity/pressure
+> scoring and a separate counterfactual mode. A separate frozen 30-storm
+> observational benchmark measures the exact runtime at 12/24/48/72 hours
+> against a no-future-information persistence baseline. The map can switch
+> among terrain, simulated infrared,
 > SST, humidity, ocean heat, shear, and simulated rain-radar views. A worker-run
 > forecast laboratory adds deterministic ensembles, track-probability fields,
 > and same-storm sensitivity experiments without blocking the map.
@@ -112,15 +115,22 @@ bake/.venv/bin/python -m pip install -r bake/requirements.txt
 bake/.venv/bin/python bake/bake.py          # ~15s; writes public/data/*
 bake/.venv/bin/python bake/fetch_event_benchmark.py # CDS-cached 10-storm inputs
 bake/.venv/bin/python bake/bake.py events   # event bins + frozen catalogue
+npm run data:fidelity:catalog               # freeze the 30-storm HF-1 catalogue
+npm run data:fidelity:fetch                 # fetch the 20 additional ERA5 cases
+npm run data:fidelity:bake                  # bake offline-only forcing bins
+npm run fidelity                            # regenerate metrics, reference + report
 ```
 
 - Binary format + golden test vector: **`BINARY-FORMATS.md`**.
 - Full provenance, licenses, and bake details: **`bake/README.md`**.
-- Sources (all auth-free): **GMRT** bathymetry+topography (`terrain.bin`),
+- Sources: **GMRT** bathymetry+topography (`terrain.bin`),
   **NOAA OISST** SST climatology (`env.bin` SST — real), **IBTrACS** North-Indian
   tracks (`genesis.json`), and official **HydroSHEDS v1.1** ACC+DIR hydrography
   with per-cell travel time (`flowacc.bin`). ERA5 supplies steering, shear, and
   600/700-hPa relative humidity; NOAA WOA23 supplies OHC26.
+- GMRT, NOAA, and HydroSHEDS downloads are public and auth-free. ERA5
+  reproduction requires a configured CDS API token and accepted Copernicus
+  licence.
 - Raw downloads cache under `data/raw/` (gitignored); the venv under `bake/.venv`.
 
 ### Provenance — steering/shear are REAL ERA5 (with synoptic samples)
@@ -165,6 +175,27 @@ candidate unless it improves the equal-storm held-out objective without breaking
 per-storm wind, mean pressure, or track gates. CI re-runs the same runtime model
 against the committed bins; it downloads nothing.
 
+**HF-1 observational truth benchmark:** the broader reference is frozen at 30
+Arabian Sea systems: 18 development, 6 validation, and 6 permanent final-test
+storms. The ten featured browser cases are reused byte-for-byte; 20 additional
+compact event bins live only under `calibration/data/fidelity/` and never enter
+the browser bundle. This is a frozen, stratified coverage set rather than a
+random or exhaustive sample, and IBTrACS best track is a post-analysis
+verification reference rather than error-free ground truth. Every storm uses
+USA/JTWC position, one-minute wind, and pressure consistently, begins at the
+first >=34 kt fix at least 1.2 degrees
+inside the product domain, and then runs freely with no observed-state nudging.
+Initial `NATURE` is `TS`, or `NR` only for older archive rows that have a valid
+USA/JTWC wind but no reported nature.
+Exact 12/24/48/72-hour errors include track, along/cross-track displacement,
+wind, and pressure. The comparison baseline extrapolates only motion observed
+before initialization at constant spherical speed/bearing and holds the initial
+intensity and pressure fixed; it cannot read a future fix. Uncertainty is a
+deterministic 2,000-member
+storm-level bootstrap. Development is available for future tuning, validation
+is the <=5% regression gate, and final test is always report-only. See the
+generated [HF-1 benchmark report](docs/fidelity-benchmark.md).
+
 Scientific limitations are not hidden: this is still a deterministic point-vortex
 track/intensity model, not an operational atmospheric model. Its convection,
 ocean coupling, and rain rates are bounded parameterizations; WOA23 is monthly
@@ -179,6 +210,10 @@ inundation.
 `clamp(monthIndex, 4, 10)`; `src/env-sampler.ts` (sim) and `src/render/index.ts`
 (tint) both do, and `test/integration-bins.test.ts` guards the mapping, the
 plane count, and plane distinctness.
+
+Chronological event bins are different: they use the exact 0-indexed calendar
+suffix, including December (`11`) in the offline HF-1 catalogue. Only
+climatology layers clamp to the May–November shipped season.
 
 **Physics note:** the shear penalty (`src/sim.ts`, threshold 14 m/s vs the
 classic instantaneous ~10) is calibrated EMPIRICALLY against the shipped
@@ -226,6 +261,7 @@ unchanged. See the generated [calibration report](docs/structure-calibration.md)
 npm run data:structure       # re-extract from the pinned raw IBTrACS snapshot
 npm run calibrate:structure  # regenerate machine + human reports
 npm run calibrate:intensity  # ten-storm search + untouched holdout decision
+npm run fidelity             # 30-storm lead-time observational reference
 npm run calibrate:check      # CI regression gate; no network required
 ```
 
@@ -265,6 +301,7 @@ src/
   flight-recorder.ts  immutable per-tick tape + debrief/snapshot construction
   hindcast.ts         observed-fix interpolation + track/intensity/pressure scores
   hindcast-benchmark.ts exact multi-storm runner + equal-storm aggregation
+  fidelity-verification.ts exact lead errors, persistence + bootstrap intervals
   ensemble.ts         deterministic perturbations, probability grid, summaries
   ensemble.worker.ts  off-main-thread runs + decoded-bin URL cache
   weather-layers.ts   seven map-product labels, provenance, and legends
@@ -279,6 +316,6 @@ src/
   fonts/              self-hosted IBM Plex Mono woff2 (400, 500)
 test/                 vitest: grid, loader (golden vector), rng, physics, integration
 bake/                 Python data-baking (not shipped) — see bake/README.md
-calibration/          pinned IBTrACS subset, reproducible metrics + gates
-docs/                 generated physical-structure calibration report
+calibration/          pinned IBTrACS subsets, offline forcing, metrics + gates
+docs/                 generated calibration and observational benchmark reports
 ```

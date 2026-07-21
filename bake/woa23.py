@@ -33,12 +33,20 @@ BASE = (
     "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/"
     "temperature/netcdf/decav/1.00"
 )
+DIRECT_BASE = (
+    "https://www.ncei.noaa.gov/data/oceans/woa/WOA23/DATA/"
+    "temperature/netcdf/decav/1.00"
+)
 
 _cache: dict[int, np.ndarray] = {}
 
 
 def _filename(month_index: int) -> str:
     return f"woa23_decav_t{month_index + 1:02d}_01_arabian.nc"
+
+
+def _global_filename(month_index: int) -> str:
+    return f"woa23_decav_t{month_index + 1:02d}_01_global.nc"
 
 
 def _url(month_index: int) -> str:
@@ -55,6 +63,27 @@ def _url(month_index: int) -> str:
         }
     )
     return f"{BASE}/{source_name}?{query}"
+
+
+def _global_url(month_index: int) -> str:
+    source_name = f"woa23_decav_t{month_index + 1:02d}_01.nc"
+    return f"{DIRECT_BASE}/{source_name}"
+
+
+def _source_path(month_index: int) -> str:
+    """Prefer the small NCSS subset; fall back to NOAA's full official file."""
+    global_filename = _global_filename(month_index)
+    global_path = os.path.join(sources.RAW_DIR, global_filename)
+    if os.path.exists(global_path) and os.path.getsize(global_path) > 0:
+        return sources.ensure_download(_global_url(month_index), global_filename)
+    try:
+        return sources.ensure_download(_url(month_index), _filename(month_index))
+    except (OSError, TimeoutError) as error:
+        print(
+            "  [fallback] WOA23 subset unavailable; downloading the official "
+            f"full monthly file ({error})"
+        )
+        return sources.ensure_download(_global_url(month_index), global_filename)
 
 
 def _unpack_temperature(ds) -> np.ndarray:
@@ -92,11 +121,14 @@ def load_ohc(month_index: int) -> np.ndarray:
 
     import h5py
 
-    path = sources.ensure_download(_url(month_index), _filename(month_index))
+    path = _source_path(month_index)
     with h5py.File(path, "r") as f:
         temperature = _unpack_temperature(f["t_an"])
         depth = np.asarray(f["depth"][...], dtype=np.float64)
-        depth_bounds = np.asarray(f["depth_bounds"][...], dtype=np.float64)
+        # NCSS names the coordinate bounds ``depth_bounds`` while NOAA's full
+        # official NetCDF uses its native ``depth_bnds`` name.
+        bounds_name = "depth_bounds" if "depth_bounds" in f else "depth_bnds"
+        depth_bounds = np.asarray(f[bounds_name][...], dtype=np.float64)
         lat = np.asarray(f["lat"][...], dtype=np.float64)
         lon = np.asarray(f["lon"][...], dtype=np.float64)
 

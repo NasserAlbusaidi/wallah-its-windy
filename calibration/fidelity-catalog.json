@@ -1,0 +1,1225 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "name": "NOAA IBTrACS v04r01 North Indian basin",
+    "path": "data/raw/ibtracs.NI.csv",
+    "sha256": "02f6af3b7e12ee76e88866995b4451b85867a2b7f20ed2666f8561024d671b62",
+    "agency": "USA/JTWC columns only"
+  },
+  "protocol": {
+    "domain": [
+      50.0,
+      70.0,
+      15.0,
+      27.0
+    ],
+    "interiorMarginDeg": 1.2,
+    "minimumWindKt": 34,
+    "initialNature": [
+      "TS",
+      "NR"
+    ],
+    "initialNatureCounts": {
+      "TS": 26,
+      "NR": 4
+    },
+    "eventPaddingHours": 24,
+    "partitions": {
+      "development": 18,
+      "test": 6,
+      "validation": 6
+    },
+    "selectionPolicy": "code-reviewed stratified coverage set: ten featured cases plus twenty additional systems spanning 1980-2024, seasons, and intensities; frozen before simulation; not random or exhaustive",
+    "testPolicy": "permanent; never used for parameter selection or acceptance"
+  },
+  "storms": [
+    {
+      "id": "as1980",
+      "sid": "1980317N11075",
+      "label": "arabian sea system 1980",
+      "year": 1980,
+      "partition": "development",
+      "seed": 198000,
+      "publicEventId": null,
+      "monthIndex": 10,
+      "initialFix": {
+        "iso": "1980-11-17T09:00:00Z",
+        "lat": 16.3,
+        "lon": 66.8,
+        "windKt": 35,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1980-11-19T03:00:00Z",
+      "eventStartIso": "1980-11-16T00:00:00Z",
+      "eventEndIso": "1980-11-20T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1980,
+          "month": 11,
+          "days": [
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "suffix": "_1980_11"
+        }
+      ],
+      "maxWindKt": 35,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1981",
+      "sid": "1981298N07083",
+      "label": "arabian sea system 1981",
+      "year": 1981,
+      "partition": "development",
+      "seed": 198101,
+      "publicEventId": null,
+      "monthIndex": 9,
+      "initialFix": {
+        "iso": "1981-10-31T06:00:00Z",
+        "lat": 16.4,
+        "lon": 67.3,
+        "windKt": 60,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1981-11-02T00:00:00Z",
+      "eventStartIso": "1981-10-30T00:00:00Z",
+      "eventEndIso": "1981-11-03T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1981,
+          "month": 10,
+          "days": [
+            30,
+            31
+          ],
+          "suffix": "_1981_10"
+        },
+        {
+          "year": 1981,
+          "month": 11,
+          "days": [
+            1,
+            2,
+            3
+          ],
+          "suffix": "_1981_11"
+        }
+      ],
+      "maxWindKt": 60,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1982",
+      "sid": "1982309N12066",
+      "label": "arabian sea system 1982",
+      "year": 1982,
+      "partition": "development",
+      "seed": 198202,
+      "publicEventId": null,
+      "monthIndex": 10,
+      "initialFix": {
+        "iso": "1982-11-07T09:00:00Z",
+        "lat": 16.4,
+        "lon": 67.6,
+        "windKt": 63,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1982-11-08T03:00:00Z",
+      "eventStartIso": "1982-11-06T00:00:00Z",
+      "eventEndIso": "1982-11-09T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1982,
+          "month": 11,
+          "days": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "suffix": "_1982_11"
+        }
+      ],
+      "maxWindKt": 85,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1983",
+      "sid": "1983216N23088",
+      "label": "arabian sea system 1983",
+      "year": 1983,
+      "partition": "development",
+      "seed": 198303,
+      "publicEventId": null,
+      "monthIndex": 7,
+      "initialFix": {
+        "iso": "1983-08-09T15:00:00Z",
+        "lat": 21.0,
+        "lon": 62.3,
+        "windKt": 35,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1983-08-10T12:00:00Z",
+      "eventStartIso": "1983-08-08T00:00:00Z",
+      "eventEndIso": "1983-08-11T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1983,
+          "month": 8,
+          "days": [
+            8,
+            9,
+            10,
+            11
+          ],
+          "suffix": "_1983_08"
+        }
+      ],
+      "maxWindKt": 45,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1985",
+      "sid": "1985148N15067",
+      "label": "arabian sea system 1985",
+      "year": 1985,
+      "partition": "test",
+      "seed": 198504,
+      "publicEventId": null,
+      "monthIndex": 4,
+      "initialFix": {
+        "iso": "1985-05-28T18:00:00Z",
+        "lat": 16.5,
+        "lon": 67.6,
+        "windKt": 40,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1985-06-01T00:00:00Z",
+      "eventStartIso": "1985-05-27T00:00:00Z",
+      "eventEndIso": "1985-06-02T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1985,
+          "month": 5,
+          "days": [
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "suffix": "_1985_05"
+        },
+        {
+          "year": 1985,
+          "month": 6,
+          "days": [
+            1,
+            2
+          ],
+          "suffix": "_1985_06"
+        }
+      ],
+      "maxWindKt": 50,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1987",
+      "sid": "1987155N16061",
+      "label": "arabian sea system 1987",
+      "year": 1987,
+      "partition": "development",
+      "seed": 198705,
+      "publicEventId": null,
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "1987-06-06T21:00:00Z",
+        "lat": 16.5,
+        "lon": 66.0,
+        "windKt": 50,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1987-06-12T00:00:00Z",
+      "eventStartIso": "1987-06-05T00:00:00Z",
+      "eventEndIso": "1987-06-13T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1987,
+          "month": 6,
+          "days": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "suffix": "_1987_06"
+        }
+      ],
+      "maxWindKt": 50,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1992",
+      "sid": "1992273N12077",
+      "label": "arabian sea system 1992",
+      "year": 1992,
+      "partition": "development",
+      "seed": 199206,
+      "publicEventId": null,
+      "monthIndex": 9,
+      "initialFix": {
+        "iso": "1992-10-01T06:00:00Z",
+        "lat": 17.5,
+        "lon": 66.3,
+        "windKt": 35,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1992-10-04T12:00:00Z",
+      "eventStartIso": "1992-09-30T00:00:00Z",
+      "eventEndIso": "1992-10-05T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1992,
+          "month": 9,
+          "days": [
+            30
+          ],
+          "suffix": "_1992_09"
+        },
+        {
+          "year": 1992,
+          "month": 10,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "suffix": "_1992_10"
+        }
+      ],
+      "maxWindKt": 55,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1993",
+      "sid": "1993316N11070",
+      "label": "arabian sea system 1993",
+      "year": 1993,
+      "partition": "test",
+      "seed": 199307,
+      "publicEventId": null,
+      "monthIndex": 10,
+      "initialFix": {
+        "iso": "1993-11-13T06:00:00Z",
+        "lat": 16.8,
+        "lon": 63.7,
+        "windKt": 55,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1993-11-16T00:00:00Z",
+      "eventStartIso": "1993-11-12T00:00:00Z",
+      "eventEndIso": "1993-11-17T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1993,
+          "month": 11,
+          "days": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ],
+          "suffix": "_1993_11"
+        }
+      ],
+      "maxWindKt": 80,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1994",
+      "sid": "1994157N17074",
+      "label": "arabian sea system 1994",
+      "year": 1994,
+      "partition": "development",
+      "seed": 199408,
+      "publicEventId": null,
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "1994-06-07T00:00:00Z",
+        "lat": 18.8,
+        "lon": 66.3,
+        "windKt": 35,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1994-06-09T18:00:00Z",
+      "eventStartIso": "1994-06-06T00:00:00Z",
+      "eventEndIso": "1994-06-10T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1994,
+          "month": 6,
+          "days": [
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "suffix": "_1994_06"
+        }
+      ],
+      "maxWindKt": 45,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1995",
+      "sid": "1995284N17074",
+      "label": "arabian sea system 1995",
+      "year": 1995,
+      "partition": "validation",
+      "seed": 199509,
+      "publicEventId": null,
+      "monthIndex": 9,
+      "initialFix": {
+        "iso": "1995-10-13T03:00:00Z",
+        "lat": 17.0,
+        "lon": 68.8,
+        "windKt": 45,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1995-10-18T12:00:00Z",
+      "eventStartIso": "1995-10-12T00:00:00Z",
+      "eventEndIso": "1995-10-19T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1995,
+          "month": 10,
+          "days": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "suffix": "_1995_10"
+        }
+      ],
+      "maxWindKt": 50,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1998",
+      "sid": "1998152N11075",
+      "label": "arabian sea cyclone 1998",
+      "year": 1998,
+      "partition": "validation",
+      "seed": 199810,
+      "publicEventId": null,
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "1998-06-07T15:00:00Z",
+        "lat": 16.2,
+        "lon": 67.7,
+        "windKt": 85,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1998-06-09T06:00:00Z",
+      "eventStartIso": "1998-06-06T00:00:00Z",
+      "eventEndIso": "1998-06-10T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1998,
+          "month": 6,
+          "days": [
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "suffix": "_1998_06"
+        }
+      ],
+      "maxWindKt": 105,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1998dec",
+      "sid": "1998346N10072",
+      "label": "arabian sea system dec 1998",
+      "year": 1998,
+      "partition": "development",
+      "seed": 199811,
+      "publicEventId": null,
+      "monthIndex": 11,
+      "initialFix": {
+        "iso": "1998-12-15T00:00:00Z",
+        "lat": 16.2,
+        "lon": 66.1,
+        "windKt": 60,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1998-12-17T18:00:00Z",
+      "eventStartIso": "1998-12-14T00:00:00Z",
+      "eventEndIso": "1998-12-18T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1998,
+          "month": 12,
+          "days": [
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "suffix": "_1998_12"
+        }
+      ],
+      "maxWindKt": 65,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as1999",
+      "sid": "1999135N12073",
+      "label": "arabian sea cyclone 1999",
+      "year": 1999,
+      "partition": "test",
+      "seed": 199912,
+      "publicEventId": null,
+      "monthIndex": 4,
+      "initialFix": {
+        "iso": "1999-05-17T18:00:00Z",
+        "lat": 16.3,
+        "lon": 68.6,
+        "windKt": 90,
+        "presMb": null
+      },
+      "lastDomainFixIso": "1999-05-21T09:00:00Z",
+      "eventStartIso": "1999-05-16T00:00:00Z",
+      "eventEndIso": "1999-05-22T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1999,
+          "month": 5,
+          "days": [
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22
+          ],
+          "suffix": "_1999_05"
+        }
+      ],
+      "maxWindKt": 110,
+      "minimumPressureMb": null
+    },
+    {
+      "id": "as2001",
+      "sid": "2001141N14068",
+      "label": "arabian sea cyclone 2001",
+      "year": 2001,
+      "partition": "test",
+      "seed": 200113,
+      "publicEventId": null,
+      "monthIndex": 4,
+      "initialFix": {
+        "iso": "2001-05-24T09:00:00Z",
+        "lat": 16.8,
+        "lon": 68.5,
+        "windKt": 110,
+        "presMb": 927
+      },
+      "lastDomainFixIso": "2001-05-29T12:00:00Z",
+      "eventStartIso": "2001-05-23T00:00:00Z",
+      "eventEndIso": "2001-05-30T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2001,
+          "month": 5,
+          "days": [
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30
+          ],
+          "suffix": "_2001_05"
+        }
+      ],
+      "maxWindKt": 110,
+      "minimumPressureMb": 927
+    },
+    {
+      "id": "mukda2006",
+      "sid": "2006262N19069",
+      "label": "mukda 2006",
+      "year": 2006,
+      "partition": "validation",
+      "seed": 200614,
+      "publicEventId": null,
+      "monthIndex": 8,
+      "initialFix": {
+        "iso": "2006-09-21T12:00:00Z",
+        "lat": 19.7,
+        "lon": 66.3,
+        "windKt": 35,
+        "presMb": 997
+      },
+      "lastDomainFixIso": "2006-09-26T12:00:00Z",
+      "eventStartIso": "2006-09-20T00:00:00Z",
+      "eventEndIso": "2006-09-27T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2006,
+          "month": 9,
+          "days": [
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27
+          ],
+          "suffix": "_2006_09"
+        }
+      ],
+      "maxWindKt": 55,
+      "minimumPressureMb": 984
+    },
+    {
+      "id": "gonu2007",
+      "sid": "2007151N14072",
+      "label": "gonu 2007",
+      "year": 2007,
+      "partition": "development",
+      "seed": 200715,
+      "publicEventId": "gonu",
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "2007-06-03T03:00:00Z",
+        "lat": 16.4,
+        "lon": 67.6,
+        "windKt": 63,
+        "presMb": 976
+      },
+      "lastDomainFixIso": "2007-06-08T00:00:00Z",
+      "eventStartIso": "2007-06-02T00:00:00Z",
+      "eventEndIso": "2007-06-09T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2007,
+          "month": 6,
+          "days": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "suffix": "_2007_06"
+        }
+      ],
+      "maxWindKt": 145,
+      "minimumPressureMb": 898
+    },
+    {
+      "id": "as2007",
+      "sid": "2007172N15088",
+      "label": "arabian sea system jun 2007",
+      "year": 2007,
+      "partition": "development",
+      "seed": 200716,
+      "publicEventId": null,
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "2007-06-25T06:00:00Z",
+        "lat": 22.9,
+        "lon": 67.3,
+        "windKt": 35,
+        "presMb": 992
+      },
+      "lastDomainFixIso": "2007-06-26T21:00:00Z",
+      "eventStartIso": "2007-06-24T00:00:00Z",
+      "eventEndIso": "2007-06-27T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2007,
+          "month": 6,
+          "days": [
+            24,
+            25,
+            26,
+            27
+          ],
+          "suffix": "_2007_06"
+        }
+      ],
+      "maxWindKt": 50,
+      "minimumPressureMb": 985
+    },
+    {
+      "id": "phet2010",
+      "sid": "2010151N14065",
+      "label": "phet 2010",
+      "year": 2010,
+      "partition": "development",
+      "seed": 201017,
+      "publicEventId": "phet",
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "2010-06-01T06:00:00Z",
+        "lat": 16.3,
+        "lon": 62.7,
+        "windKt": 55,
+        "presMb": 982
+      },
+      "lastDomainFixIso": "2010-06-06T21:00:00Z",
+      "eventStartIso": "2010-05-31T00:00:00Z",
+      "eventEndIso": "2010-06-07T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2010,
+          "month": 5,
+          "days": [
+            31
+          ],
+          "suffix": "_2010_05"
+        },
+        {
+          "year": 2010,
+          "month": 6,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "suffix": "_2010_06"
+        }
+      ],
+      "maxWindKt": 125,
+      "minimumPressureMb": 929
+    },
+    {
+      "id": "keila2011",
+      "sid": "2011302N13062",
+      "label": "keila 2011",
+      "year": 2011,
+      "partition": "development",
+      "seed": 201118,
+      "publicEventId": null,
+      "monthIndex": 10,
+      "initialFix": {
+        "iso": "2011-11-02T00:00:00Z",
+        "lat": 16.2,
+        "lon": 55.2,
+        "windKt": 35,
+        "presMb": 996
+      },
+      "lastDomainFixIso": "2011-11-05T06:00:00Z",
+      "eventStartIso": "2011-11-01T00:00:00Z",
+      "eventEndIso": "2011-11-06T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2011,
+          "month": 11,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "suffix": "_2011_11"
+        }
+      ],
+      "maxWindKt": 55,
+      "minimumPressureMb": 982
+    },
+    {
+      "id": "nanauk2014",
+      "sid": "2014159N12068",
+      "label": "nanauk 2014",
+      "year": 2014,
+      "partition": "development",
+      "seed": 201419,
+      "publicEventId": null,
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "2014-06-10T15:00:00Z",
+        "lat": 16.3,
+        "lon": 67.8,
+        "windKt": 48,
+        "presMb": 987
+      },
+      "lastDomainFixIso": "2014-06-14T12:00:00Z",
+      "eventStartIso": "2014-06-09T00:00:00Z",
+      "eventEndIso": "2014-06-15T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2014,
+          "month": 6,
+          "days": [
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "suffix": "_2014_06"
+        }
+      ],
+      "maxWindKt": 55,
+      "minimumPressureMb": 982
+    },
+    {
+      "id": "nilofar2014",
+      "sid": "2014297N11062",
+      "label": "nilofar 2014",
+      "year": 2014,
+      "partition": "development",
+      "seed": 201420,
+      "publicEventId": "nilofar",
+      "monthIndex": 9,
+      "initialFix": {
+        "iso": "2014-10-28T09:00:00Z",
+        "lat": 16.4,
+        "lon": 61.8,
+        "windKt": 108,
+        "presMb": 943
+      },
+      "lastDomainFixIso": "2014-11-01T12:00:00Z",
+      "eventStartIso": "2014-10-27T00:00:00Z",
+      "eventEndIso": "2014-11-02T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2014,
+          "month": 10,
+          "days": [
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "suffix": "_2014_10"
+        },
+        {
+          "year": 2014,
+          "month": 11,
+          "days": [
+            1,
+            2
+          ],
+          "suffix": "_2014_11"
+        }
+      ],
+      "maxWindKt": 115,
+      "minimumPressureMb": 937
+    },
+    {
+      "id": "ashobaa2015",
+      "sid": "2015157N13069",
+      "label": "ashobaa 2015",
+      "year": 2015,
+      "partition": "development",
+      "seed": 201521,
+      "publicEventId": "ashobaa",
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "2015-06-07T12:00:00Z",
+        "lat": 16.4,
+        "lon": 68.5,
+        "windKt": 40,
+        "presMb": 993
+      },
+      "lastDomainFixIso": "2015-06-12T06:00:00Z",
+      "eventStartIso": "2015-06-06T00:00:00Z",
+      "eventEndIso": "2015-06-13T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2015,
+          "month": 6,
+          "days": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "suffix": "_2015_06"
+        }
+      ],
+      "maxWindKt": 55,
+      "minimumPressureMb": 982
+    },
+    {
+      "id": "mekunu2018",
+      "sid": "2018136N11054",
+      "label": "mekunu 2018",
+      "year": 2018,
+      "partition": "development",
+      "seed": 201822,
+      "publicEventId": "mekunu",
+      "monthIndex": 4,
+      "initialFix": {
+        "iso": "2018-05-25T12:00:00Z",
+        "lat": 16.3,
+        "lon": 54.4,
+        "windKt": 100,
+        "presMb": 948
+      },
+      "lastDomainFixIso": "2018-05-27T06:00:00Z",
+      "eventStartIso": "2018-05-24T00:00:00Z",
+      "eventEndIso": "2018-05-28T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2018,
+          "month": 5,
+          "days": [
+            24,
+            25,
+            26,
+            27,
+            28
+          ],
+          "suffix": "_2018_05"
+        }
+      ],
+      "maxWindKt": 100,
+      "minimumPressureMb": 948
+    },
+    {
+      "id": "vayu2019",
+      "sid": "2019160N11073",
+      "label": "vayu 2019",
+      "year": 2019,
+      "partition": "development",
+      "seed": 201923,
+      "publicEventId": "vayu",
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "2019-06-13T21:00:00Z",
+        "lat": 21.0,
+        "lon": 68.7,
+        "windKt": 98,
+        "presMb": 950
+      },
+      "lastDomainFixIso": "2019-06-18T03:00:00Z",
+      "eventStartIso": "2019-06-12T00:00:00Z",
+      "eventEndIso": "2019-06-19T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2019,
+          "month": 6,
+          "days": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "suffix": "_2019_06"
+        }
+      ],
+      "maxWindKt": 100,
+      "minimumPressureMb": 948
+    },
+    {
+      "id": "hikaa2019",
+      "sid": "2019264N19071",
+      "label": "hikaa 2019",
+      "year": 2019,
+      "partition": "development",
+      "seed": 201924,
+      "publicEventId": "hikaa",
+      "monthIndex": 8,
+      "initialFix": {
+        "iso": "2019-09-22T12:00:00Z",
+        "lat": 20.4,
+        "lon": 68.0,
+        "windKt": 35,
+        "presMb": 999
+      },
+      "lastDomainFixIso": "2019-09-26T06:00:00Z",
+      "eventStartIso": "2019-09-21T00:00:00Z",
+      "eventEndIso": "2019-09-27T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2019,
+          "month": 9,
+          "days": [
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27
+          ],
+          "suffix": "_2019_09"
+        }
+      ],
+      "maxWindKt": 90,
+      "minimumPressureMb": 969
+    },
+    {
+      "id": "kyarr2019",
+      "sid": "2019296N15066",
+      "label": "kyarr 2019",
+      "year": 2019,
+      "partition": "validation",
+      "seed": 201925,
+      "publicEventId": "kyarr",
+      "monthIndex": 9,
+      "initialFix": {
+        "iso": "2019-10-26T21:00:00Z",
+        "lat": 16.9,
+        "lon": 68.6,
+        "windKt": 128,
+        "presMb": 932
+      },
+      "lastDomainFixIso": "2019-11-01T12:00:00Z",
+      "eventStartIso": "2019-10-25T00:00:00Z",
+      "eventEndIso": "2019-11-02T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2019,
+          "month": 10,
+          "days": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "suffix": "_2019_10"
+        },
+        {
+          "year": 2019,
+          "month": 11,
+          "days": [
+            1,
+            2
+          ],
+          "suffix": "_2019_11"
+        }
+      ],
+      "maxWindKt": 135,
+      "minimumPressureMb": 924
+    },
+    {
+      "id": "maha2019",
+      "sid": "2019301N05081",
+      "label": "maha 2019",
+      "year": 2019,
+      "partition": "test",
+      "seed": 201926,
+      "publicEventId": null,
+      "monthIndex": 10,
+      "initialFix": {
+        "iso": "2019-11-02T03:00:00Z",
+        "lat": 16.3,
+        "lon": 68.5,
+        "windKt": 53,
+        "presMb": 994
+      },
+      "lastDomainFixIso": "2019-11-07T00:00:00Z",
+      "eventStartIso": "2019-11-01T00:00:00Z",
+      "eventEndIso": "2019-11-08T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2019,
+          "month": 11,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "suffix": "_2019_11"
+        }
+      ],
+      "maxWindKt": 105,
+      "minimumPressureMb": 959
+    },
+    {
+      "id": "shaheen2021",
+      "sid": "2021267N18094",
+      "label": "shaheen 2021",
+      "year": 2021,
+      "partition": "validation",
+      "seed": 202127,
+      "publicEventId": "shaheen",
+      "monthIndex": 8,
+      "initialFix": {
+        "iso": "2021-09-30T18:00:00Z",
+        "lat": 22.8,
+        "lon": 66.0,
+        "windKt": 35,
+        "presMb": 997
+      },
+      "lastDomainFixIso": "2021-10-04T06:00:00Z",
+      "eventStartIso": "2021-09-29T00:00:00Z",
+      "eventEndIso": "2021-10-05T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2021,
+          "month": 9,
+          "days": [
+            29,
+            30
+          ],
+          "suffix": "_2021_09"
+        },
+        {
+          "year": 2021,
+          "month": 10,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "suffix": "_2021_10"
+        }
+      ],
+      "maxWindKt": 70,
+      "minimumPressureMb": 976
+    },
+    {
+      "id": "biparjoy2023",
+      "sid": "2023156N10067",
+      "label": "biparjoy 2023",
+      "year": 2023,
+      "partition": "validation",
+      "seed": 202328,
+      "publicEventId": "biparjoy",
+      "monthIndex": 5,
+      "initialFix": {
+        "iso": "2023-06-09T18:00:00Z",
+        "lat": 16.3,
+        "lon": 67.4,
+        "windKt": 70,
+        "presMb": 976
+      },
+      "lastDomainFixIso": "2023-06-16T09:00:00Z",
+      "eventStartIso": "2023-06-08T00:00:00Z",
+      "eventEndIso": "2023-06-17T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2023,
+          "month": 6,
+          "days": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ],
+          "suffix": "_2023_06"
+        }
+      ],
+      "maxWindKt": 110,
+      "minimumPressureMb": 944
+    },
+    {
+      "id": "asna2024",
+      "sid": "2024238N25077",
+      "label": "asna 2024",
+      "year": 2024,
+      "partition": "test",
+      "seed": 202429,
+      "publicEventId": null,
+      "monthIndex": 7,
+      "initialFix": {
+        "iso": "2024-08-29T21:00:00Z",
+        "lat": 23.2,
+        "lon": 68.8,
+        "windKt": 38,
+        "presMb": 988
+      },
+      "lastDomainFixIso": "2024-09-03T06:00:00Z",
+      "eventStartIso": "2024-08-28T00:00:00Z",
+      "eventEndIso": "2024-09-04T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2024,
+          "month": 8,
+          "days": [
+            28,
+            29,
+            30,
+            31
+          ],
+          "suffix": "_2024_08"
+        },
+        {
+          "year": 2024,
+          "month": 9,
+          "days": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "suffix": "_2024_09"
+        }
+      ],
+      "maxWindKt": 40,
+      "minimumPressureMb": 987
+    }
+  ]
+}

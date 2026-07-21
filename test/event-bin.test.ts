@@ -14,7 +14,12 @@
 import { describe, it, expect } from 'vitest';
 import { buildWiwbBin, constantPlanes } from './helpers/wiwb';
 import { parseBin } from '../src/loader';
-import { makeEnvSampler, synopticCount, envMonthSuffix } from '../src/env-sampler';
+import {
+  eventMonthSuffix,
+  makeEnvSampler,
+  synopticCount,
+  envMonthSuffix,
+} from '../src/env-sampler';
 import {
   acceptEventBinForScenario,
   validateEventBinForScenario,
@@ -34,16 +39,16 @@ const NX = 2;
 const NY = 2;
 const U_PLANES = [0, 10, 20];
 
-function buildEventBin(): ParsedBin {
+function buildEventBin(mm = MM): ParsedBin {
   const buf = buildWiwbBin([
-    { name: `sst_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [29, 29, 29]) },
-    { name: `u_${MM}`, nx: NX, ny: NY, nt: U_PLANES.length, bbox: DOMAIN, data: constantPlanes(NX, NY, U_PLANES) },
-    { name: `v_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [1, 1, 1]) },
-    { name: `shr_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [4, 4, 4]) },
-    { name: `shu_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [0, 0, 0]) },
-    { name: `shv_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [4, 4, 4]) },
-    { name: `rh_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [70, 70, 70]) },
-    { name: `ohc_${MM}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [60, 60, 60]) },
+    { name: `sst_${mm}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [29, 29, 29]) },
+    { name: `u_${mm}`, nx: NX, ny: NY, nt: U_PLANES.length, bbox: DOMAIN, data: constantPlanes(NX, NY, U_PLANES) },
+    { name: `v_${mm}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [1, 1, 1]) },
+    { name: `shr_${mm}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [4, 4, 4]) },
+    { name: `shu_${mm}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [0, 0, 0]) },
+    { name: `shv_${mm}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [4, 4, 4]) },
+    { name: `rh_${mm}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [70, 70, 70]) },
+    { name: `ohc_${mm}`, nx: NX, ny: NY, nt: 3, bbox: DOMAIN, data: constantPlanes(NX, NY, [60, 60, 60]) },
   ]);
   return parseBin(buf);
 }
@@ -117,6 +122,15 @@ describe('event bin: nt semantics are explicit', () => {
     expect(sampler.sample(lat, lon, 5, 0.5).steerU).toBeCloseTo(10, 6);
     // Between planes 0 and 1: tFrac 0.25 -> tf=0.5 -> 0 + (10-0)*0.5 = 5.
     expect(sampler.sample(lat, lon, 5, 0.25).steerU).toBeCloseTo(5, 6);
+  });
+
+  it('reads an exact December suffix instead of climatology-clamped November', () => {
+    const december = buildEventBin(eventMonthSuffix(11));
+    const scenario = { ...SCENARIO, monthIndex: 11 };
+    expect(validateEventBinForScenario(december, scenario)).toBeNull();
+    const sampler = makeEnvSampler(() => december);
+    sampler.setSamplingMode({ kind: 'event-timeline' });
+    expect(sampler.sample(21, 60, 11, 0.5).steerU).toBeCloseTo(10, 6);
   });
 
   it('synoptic-plane mode freezes one plane and ignores tFrac', () => {

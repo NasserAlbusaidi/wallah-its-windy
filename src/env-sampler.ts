@@ -14,10 +14,11 @@
  * 0-indexed monthIndex, zero-padded, for the season it bakes
  * (bake/bake.py SEASON_MONTHS = [4..10] =
  * May..Nov). This is the ONE place the sim resolves those names — it must agree
- * with bake/bake.py and src/render/index.ts (envMonthNames). Off-season months
- * clamp to the nearest season month; the Arabian-Sea cyclone season is all that
- * is baked. `tFrac` is inert for the frozen climatology plane and interpolates
- * the chronological axis in v1.1 per-storm event files.
+ * with bake/bake.py and src/render/index.ts (envMonthNames). Climatology
+ * off-season months clamp to the nearest season month; chronological event bins
+ * retain the exact calendar suffix (HF-1 includes one December case). `tFrac`
+ * is inert for the frozen climatology plane and interpolates the chronological
+ * axis in v1.1 per-storm event files.
  *
  * SYNOPTIC SAMPLES (D10): a v1.0 climatology bake may instead carry nt=K
  * distinct coherent real-year planes per steering/shear layer (bake/era5.py).
@@ -39,6 +40,12 @@ import type {
 /** Season layer suffix for a monthIndex, clamped to bake's [4..10] and padded. */
 export function envMonthSuffix(monthIndex: number): string {
   const m = Math.min(10, Math.max(4, Math.round(monthIndex)));
+  return String(m).padStart(2, '0');
+}
+
+/** Exact calendar suffix for chronological event bins, including off-season. */
+export function eventMonthSuffix(monthIndex: number): string {
+  const m = Math.min(11, Math.max(0, Math.round(monthIndex)));
   return String(m).padStart(2, '0');
 }
 
@@ -91,7 +98,10 @@ export function sampleEnvBin(
   tFrac: number,
   mode: EnvSamplingMode,
 ): EnvSample | null {
-  const mm = envMonthSuffix(monthIndex);
+  const mm =
+    mode.kind === 'event-timeline'
+      ? eventMonthSuffix(monthIndex)
+      : envMonthSuffix(monthIndex);
   const sst = pickLayer(bin, [`sst_${mm}`, 'sst']);
   const su = pickLayer(bin, [`u_${mm}`, 'u', 'steerU', 'steeru']);
   const sv = pickLayer(bin, [`v_${mm}`, 'v', 'steerV', 'steerv']);

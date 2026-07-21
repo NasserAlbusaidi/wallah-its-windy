@@ -5,6 +5,7 @@
  */
 
 import { FlightRecorder } from './flight-recorder';
+import type { FlightFrame } from './flight-recorder';
 import { scoreHindcast, type HindcastScore } from './hindcast';
 import { makeEnvSampler } from './env-sampler';
 import { sampleLayerBilinear } from './raster-sampler';
@@ -27,6 +28,11 @@ export interface HindcastCaseResult {
   label: string;
   partition: BenchmarkPartition;
   score: HindcastScore;
+}
+
+export interface DetailedHindcastCaseResult {
+  result: HindcastCaseResult;
+  frames: FlightFrame[];
 }
 
 export interface HindcastAggregate {
@@ -88,11 +94,11 @@ export function aggregateHindcasts(
   };
 }
 
-export function runHindcastCase(
+export function runDetailedHindcastCase(
   benchmarkCase: HindcastCase,
   terrain: ParsedBin,
   intensityParameters?: Partial<IntensityParameters>,
-): HindcastCaseResult {
+): DetailedHindcastCaseResult {
   const { scenario, environment, track } = benchmarkCase;
   if (!scenario.hindcast || !scenario.benchmarkPartition) {
     throw new Error(`${scenario.id}: incomplete benchmark metadata`);
@@ -137,18 +143,34 @@ export function runHindcastCase(
     if (events.some((event) => event.type === 'died')) break;
   }
 
+  const frames = recorder.framesSnapshot();
   const score = scoreHindcast(
-    recorder.framesSnapshot(),
+    frames,
     track,
     scenario.hindcast.startIso,
   );
   if (!score) throw new Error(`${scenario.id}: hindcast produced no score`);
   return {
-    id: scenario.id,
-    label: scenario.label,
-    partition: scenario.benchmarkPartition,
-    score,
+    result: {
+      id: scenario.id,
+      label: scenario.label,
+      partition: scenario.benchmarkPartition,
+      score,
+    },
+    frames,
   };
+}
+
+export function runHindcastCase(
+  benchmarkCase: HindcastCase,
+  terrain: ParsedBin,
+  intensityParameters?: Partial<IntensityParameters>,
+): HindcastCaseResult {
+  return runDetailedHindcastCase(
+    benchmarkCase,
+    terrain,
+    intensityParameters,
+  ).result;
 }
 
 export function evaluateHindcastCases(

@@ -14,7 +14,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseBin } from '../src/loader';
-import { makeEnvSampler, envMonthSuffix, synopticCount } from '../src/env-sampler';
+import {
+  eventMonthSuffix,
+  makeEnvSampler,
+  envMonthSuffix,
+  synopticCount,
+} from '../src/env-sampler';
 import { DEMO_GENESIS, DEMO_MONTH, DEMO_SEED } from '../src/ui';
 import { createSimEngine, SIM } from '../src/sim';
 import { cellToLatLon, DOMAIN, inBBox, latLonToCell } from '../src/grid';
@@ -144,6 +149,8 @@ describe('env.bin', () => {
     expect(envMonthSuffix(5)).toBe('05'); // June -> sst_05, NOT sst_06 (the fixed bug)
     expect(envMonthSuffix(0)).toBe('04'); // Jan clamps to May
     expect(envMonthSuffix(11)).toBe('10'); // Dec clamps to Nov
+    expect(eventMonthSuffix(11)).toBe('11'); // event forcing stays December
+    expect(eventMonthSuffix(0)).toBe('00'); // chronological events are exact
   });
 
   it('steering and shear vectors ship K>=3 finite synoptic sample planes (D10)', () => {

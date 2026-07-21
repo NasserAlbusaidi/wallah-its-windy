@@ -42,6 +42,26 @@ The extractor verifies the raw SHA-256, keeps six-hour main-track tropical
 fixes from 2019–2024, and uses USA/JTWC columns consistently for position,
 one-minute wind, pressure, RMW, and quadrant radii.
 
+The larger HF-1 replay reference is also offline-only. It freezes 30 storms,
+reuses the ten public event bins, and bakes 20 additional compact bins under
+`calibration/data/fidelity/`:
+
+```bash
+npm run data:fidelity:catalog
+npm run data:fidelity:fetch
+npm run data:fidelity:bake
+npm run fidelity
+```
+
+`bake/fidelity_catalog.py` owns the reviewed storm identities and permanent
+18/6/6 split and rejects any change to the pinned raw IBTrACS checksum.
+`bake/fetch_fidelity_benchmark.py` issues resumable, month-sized
+ERA5 requests with the same variables, domain, grid, and hours as the featured
+event pipeline. `bake/bake_fidelity_benchmark.py` uses the same vortex filter,
+3-hour temporal reduction, WOA23 OHC interpolation, and WIWB writer as the
+public event bake. Raw NetCDF files stay gitignored; only the compact benchmark
+artifacts are committed. None of these 20 bins is copied to `public/`.
+
 ### `env.bin` layer naming (the EnvSampler must know this)
 
 One layer **per field per month**. SST and OHC have `nt = 1`; the five wind
@@ -94,7 +114,8 @@ Months outside May–Nov are not baked (no Arabian-Sea cyclone season) — clamp
 - **ERA5** 600/700-hPa relative humidity and event-time SST, fetched by
   `bake/fetch_era5.py` with the same domain/time axes as the winds.
 - **NOAA World Ocean Atlas 2023**, monthly 1° temperature profiles. `bake/woa23.py`
-  downloads NCSS subsets and integrates heat above 26 °C as
+  downloads NCSS subsets (with the official full monthly file as a resilient
+  fallback) and integrates heat above 26 °C as
   `rho * cp * integral(max(T−26,0) dz) / 1e7` to kJ/cm².
 
 ## Downsample rules (eng task T3)
@@ -151,6 +172,18 @@ files, require a configured CDS API token and accepted Copernicus licence, and
 are safe to resume. WOA23 needs no credentials and is fetched lazily by
 `bake/woa23.py`.
 
+`bake/fetch_fidelity_benchmark.py` extends that identical request contract to
+the 20 HF-1-only storms. It enforces CDS's queue limit by allowing only one
+active request per dataset while pressure-level and surface requests progress
+in parallel. It skips every complete cached file, uses bounded transient retries
+(rather than cdsapi's multi-hour default), honors queue-limit responses with a
+two-minute cooldown, and accepts `--ids` for a partial repair. The corresponding
+bake command accepts the same option but
+will not write an incomplete scenario index unless the other cases already
+exist from an earlier complete bake. A cache hit is accepted only after its
+NetCDF variables and full hourly time axis validate; interrupted downloads are
+removed and repaired rather than mistaken for complete source data.
+
 ### Event bake — `bake/era5_event.py`
 
 Opt-in, NOT part of the default bake (it must never touch env.bin/terrain.bin/
@@ -166,6 +199,9 @@ env.bin (version 1, identical 88-byte records) — only the `nt` semantics diffe
 All eight fields (`sst/u/v/shr/shu/shv/rh/ohc`) share a 3-hourly chronological
 axis and are interpolated by `tFrac`. Cross-month inputs are stitched by
 `valid_time`; every `windowH` is derived from the resulting aligned axis.
+Chronological event layers retain their exact 0-indexed start-month suffix;
+unlike climatology, an offline December case therefore uses `_11`, not the
+clamped November `_10`.
 
 **Vortex filter (why, and the diagnostic).** Event winds contain the real
 storm's own vortex; baked verbatim they would feed the observed circulation back

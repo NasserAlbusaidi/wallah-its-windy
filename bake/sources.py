@@ -68,8 +68,17 @@ def ensure_download(url: str, filename: str, timeout: int = 180) -> str:
         return path
     print(f"  [get]   {filename} <- {url[:70]}...")
     req = urllib.request.Request(url, headers={"User-Agent": "wallah-its-windy-bake/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp, open(path, "wb") as fh:
-        fh.write(resp.read())
+    part_path = f"{path}.part"
+    if os.path.exists(part_path):
+        os.unlink(part_path)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp, open(part_path, "wb") as fh:
+            fh.write(resp.read())
+        os.replace(part_path, path)
+    except Exception:
+        if os.path.exists(part_path):
+            os.unlink(part_path)
+        raise
     print(f"  [ok]    {filename} ({os.path.getsize(path)//1024} KB)")
     return path
 

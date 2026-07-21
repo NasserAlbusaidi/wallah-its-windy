@@ -16,7 +16,7 @@
  * when the catalogue is empty.
  */
 
-import { envMonthSuffix } from './env-sampler';
+import { eventMonthSuffix } from './env-sampler';
 import type { EnvSamplingMode, ParsedBin } from './types';
 
 /** The picker value + hash sentinel for the default (non-event) regime. */
@@ -30,7 +30,11 @@ export interface ScenarioSpawn {
 }
 
 export type EventRunMode = 'hindcast' | 'counterfactual';
-export type BenchmarkPartition = 'calibration' | 'validation';
+export type BenchmarkPartition =
+  | 'calibration'
+  | 'development'
+  | 'validation'
+  | 'test';
 
 /** Observed tropical-storm fix used to initialize a scored hindcast. */
 export interface HindcastInitialization {
@@ -143,7 +147,9 @@ function parseScenario(v: unknown): Scenario | null {
     hindcast: parseHindcast(v.hindcast),
     benchmarkPartition:
       v.benchmarkPartition === 'calibration' ||
-      v.benchmarkPartition === 'validation'
+      v.benchmarkPartition === 'development' ||
+      v.benchmarkPartition === 'validation' ||
+      v.benchmarkPartition === 'test'
         ? v.benchmarkPartition
         : null,
   };
@@ -179,7 +185,7 @@ export function validateEventBinForScenario(
   bin: ParsedBin,
   scenario: Scenario,
 ): string | null {
-  const mm = envMonthSuffix(scenario.monthIndex);
+  const mm = eventMonthSuffix(scenario.monthIndex);
   const expectedNt = scenario.windowH / scenario.stepH + 1;
   if (!Number.isInteger(expectedNt)) {
     return `scenario windowH=${scenario.windowH} and stepH=${scenario.stepH} imply non-integer nt=${expectedNt}`;

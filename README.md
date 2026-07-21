@@ -27,6 +27,11 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > forecast laboratory adds deterministic ensembles, track-probability fields,
 > and same-storm sensitivity experiments without blocking the map.
 
+The current scientific and product sequence is maintained in
+**[ROADMAP.md](ROADMAP.md)**. HF-2 dynamic upper-ocean and intensity physics is
+the next milestone; live forecasting is planned as a provider-neutral forecast
+postprocessor, not as a replacement for official guidance.
+
 ## Stack
 
 Vite + vanilla TypeScript + WebGL2, **zero runtime dependencies** (dev-only:
@@ -318,4 +323,5 @@ test/                 vitest: grid, loader (golden vector), rng, physics, integr
 bake/                 Python data-baking (not shipped) — see bake/README.md
 calibration/          pinned IBTrACS subsets, offline forcing, metrics + gates
 docs/                 generated calibration and observational benchmark reports
+ROADMAP.md             staged fidelity, forecasting, validation + product plan
 ```

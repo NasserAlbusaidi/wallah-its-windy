@@ -47,6 +47,8 @@ use validation storms, and the six test storms are report-only final audits.
   negative paired-difference interval favors the model.
 - Confidence intervals are deterministic 2,000-member storm-level bootstrap
   intervals. Storms, not individual fixes, are the sampling unit.
+- Machine metrics retain 9 decimal places so ARM64 and
+  x86_64 runs remain byte-identical despite sub-picometre libm differences.
 
 ## Full-run aggregate
 

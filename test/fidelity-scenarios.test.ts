@@ -33,7 +33,10 @@ interface FidelityTracks {
 }
 
 interface FidelityReference {
-  protocol: { finalTestIsAcceptanceGate: boolean };
+  protocol: {
+    finalTestIsAcceptanceGate: boolean;
+    numericPrecisionDecimalPlaces: number;
+  };
   validation: unknown;
   test?: unknown;
 }
@@ -86,6 +89,7 @@ describe('HF-1 generated scenario assets', () => {
     }
     expect(counts).toEqual({ development: 18, validation: 6, test: 6 });
     expect(reference.protocol.finalTestIsAcceptanceGate).toBe(false);
+    expect(reference.protocol.numericPrecisionDecimalPlaces).toBe(9);
     expect(reference.validation).toBeDefined();
     expect(reference.test).toBeUndefined();
   });

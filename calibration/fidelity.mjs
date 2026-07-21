@@ -18,6 +18,10 @@ const RESULTS_PATH = resolve(ROOT, 'calibration/fidelity-results.json');
 const REFERENCE_PATH = resolve(ROOT, 'calibration/fidelity-reference.json');
 const REPORT_PATH = resolve(ROOT, 'docs/fidelity-benchmark.md');
 const CHECK = process.argv.includes('--check');
+// IEEE-754 trig differs by a few 1e-13 units between ARM64 and x86_64 libm.
+// Nine decimal places remain many orders finer than the data/model resolution
+// while making the machine artefact byte-stable across supported CI platforms.
+const RESULT_DECIMAL_PLACES = 9;
 const vite = await createServer({
   root: ROOT,
   appType: 'custom',
@@ -86,6 +90,24 @@ async function loadBinArtifact(path) {
 
 function digest(text) {
   return createHash('sha256').update(text).digest('hex');
+}
+
+function canonicalizeNumbers(value) {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return value;
+    const rounded = Number(value.toFixed(RESULT_DECIMAL_PLACES));
+    return Object.is(rounded, -0) ? 0 : rounded;
+  }
+  if (Array.isArray(value)) return value.map(canonicalizeNumbers);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        canonicalizeNumbers(item),
+      ]),
+    );
+  }
+  return value;
 }
 
 function n(value, digits = 1) {
@@ -178,6 +200,7 @@ function referenceOf(output) {
       maximumValidationRegressionFraction: 0.05,
       requiredLeadSampleRetentionFraction: 1,
       finalTestIsAcceptanceGate: false,
+      numericPrecisionDecimalPlaces: RESULT_DECIMAL_PLACES,
     },
     validation: {
       aggregate: output.aggregate.validation,
@@ -306,6 +329,8 @@ use validation storms, and the six test storms are report-only final audits.
   negative paired-difference interval favors the model.
 - Confidence intervals are deterministic 2,000-member storm-level bootstrap
   intervals. Storms, not individual fixes, are the sampling unit.
+- Machine metrics retain ${RESULT_DECIMAL_PLACES} decimal places so ARM64 and
+  x86_64 runs remain byte-identical despite sub-picometre libm differences.
 
 ## Full-run aggregate
 
@@ -496,6 +521,7 @@ const outputBase = {
       replicates: FIDELITY_BOOTSTRAP_REPLICATES,
       deterministic: true,
     },
+    numericPrecisionDecimalPlaces: RESULT_DECIMAL_PLACES,
   },
   cases,
   aggregate: Object.fromEntries(
@@ -514,16 +540,19 @@ const outputBase = {
   ),
 };
 
+const canonicalBase = canonicalizeNumbers(outputBase);
 let reference;
 try {
-  reference = JSON.parse(await readFile(REFERENCE_PATH, 'utf8'));
+  reference = canonicalizeNumbers(
+    JSON.parse(await readFile(REFERENCE_PATH, 'utf8')),
+  );
 } catch {
-  reference = referenceOf(outputBase);
+  reference = referenceOf(canonicalBase);
 }
-const output = {
-  ...outputBase,
-  referenceComparison: compareReference(outputBase, reference),
-};
+const output = canonicalizeNumbers({
+  ...canonicalBase,
+  referenceComparison: compareReference(canonicalBase, reference),
+});
 const resultsText = `${JSON.stringify(output, null, 2)}\n`;
 const referenceText = `${JSON.stringify(reference, null, 2)}\n`;
 const reportText = makeReport(output);

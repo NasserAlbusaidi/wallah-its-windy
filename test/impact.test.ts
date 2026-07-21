@@ -1,0 +1,152 @@
+import { describe, expect, it } from 'vitest';
+import {
+  experiencedWindPhrase,
+  floodRiskTier,
+  IMPACT_CITIES,
+  ImpactTracker,
+} from '../src/impact';
+import type { StormDiagnostics, StormState } from '../src/types';
+import { deriveStormStructure } from '../src/structure';
+
+const DIAGNOSTICS: StormDiagnostics = {
+  sstC: 29,
+  effectiveSstC: 29,
+  midlevelRhPct: 70,
+  ohcKjCm2: 60,
+  organization: 0.7,
+  organizationTarget: 0.8,
+  coldWakeC: 0,
+  mpiKt: 120,
+  steerU: -2,
+  steerV: 3,
+  shearMs: 8,
+  shearUms: 6,
+  shearVms: 5,
+  overLand: false,
+  oceanKtPerH: 1,
+  shearKtPerH: 0,
+  landKtPerH: 0,
+  dryAirKtPerH: 0,
+  netKtPerH: 1,
+  eyewallRainMmH: 12,
+  rainbandRainMmH: 5,
+  orographicRainMmH: 2,
+  totalRainMmH: 19,
+};
+
+function storm(lat: number, lon: number, vKt: number, alive = true): StormState {
+  return {
+    lat,
+    lon,
+    vKt,
+    ageH: 12,
+    trackPoints: [],
+    alive,
+    isDemo: false,
+    organization: 0.7,
+    coldWakeC: 0,
+    diagnostics: { ...DIAGNOSTICS },
+    structure: deriveStormStructure({
+      vKt,
+      lat,
+      lon,
+      shearMs: 8,
+      overLand: false,
+      motionUms: -2,
+      motionVms: 3,
+    }),
+  };
+}
+
+describe('flood risk proxy tiers', () => {
+  // Table-driven boundaries: wadi flash floods start well below humid-climate
+  // totals, and the tier drives user-facing risk copy.
+  const CASES: Array<[number, string]> = [
+    [0, 'minimal'],
+    [29.9, 'minimal'],
+    [30, 'moderate'],
+    [79.9, 'moderate'],
+    [80, 'high'],
+    [149.9, 'high'],
+    [150, 'extreme'],
+    [500, 'extreme'],
+  ];
+  it.each(CASES)('%s mm tiers as %s', (mm, tier) => {
+    expect(floodRiskTier(mm)).toBe(tier);
+  });
+});
+
+describe('ImpactTracker', () => {
+  it('accumulates rain near the storm and reports it at the closest city', () => {
+    const tracker = new ImpactTracker();
+    const nearMuscat = storm(23.2, 58.9, 90);
+    for (let i = 0; i < 24; i++) tracker.record(nearMuscat, 0.25);
+    const summary = tracker.summary(nearMuscat);
+    const muscat = summary.cities.find((c) => c.city.id === 'muscat')!;
+    expect(muscat.rainMm).toBeGreaterThan(0);
+    expect(muscat.peakWindKt).toBeGreaterThan(20);
+    expect(muscat.closestKm).toBeLessThan(120);
+    // A far city sees nothing from a storm near Muscat.
+    const karachi = summary.cities.find((c) => c.city.id === 'karachi')!;
+    expect(karachi.rainMm).toBe(0);
+  });
+
+  it('is deterministic: identical tick sequences give identical summaries', () => {
+    const run = () => {
+      const tracker = new ImpactTracker();
+      for (let i = 0; i < 12; i++) {
+        tracker.record(storm(21 + i * 0.1, 60 - i * 0.1, 60 + i), 0.25);
+      }
+      return tracker.summary(null);
+    };
+    expect(run()).toEqual(run());
+  });
+
+  it('reset() clears the grid, the version moving so the GPU re-uploads', () => {
+    const tracker = new ImpactTracker();
+    tracker.record(storm(22, 60, 80), 1);
+    const before = tracker.rainView().version;
+    expect(tracker.rainView().mm.some((v) => v > 0)).toBe(true);
+    tracker.reset();
+    expect(tracker.rainView().version).toBeGreaterThan(before);
+    expect(tracker.rainView().mm.every((v) => v === 0)).toBe(true);
+    const summary = tracker.summary(null);
+    expect(summary.maxLandRainMm).toBe(0);
+    expect(summary.cities.every((c) => c.peakWindKt === 0)).toBe(true);
+  });
+
+  it('a dead storm deposits nothing', () => {
+    const tracker = new ImpactTracker();
+    tracker.record(storm(22, 60, 80, false), 1);
+    expect(tracker.rainView().mm.every((v) => v === 0)).toBe(true);
+  });
+
+  it('offers a live city only when one is in reach', () => {
+    const tracker = new ImpactTracker();
+    const offshore = storm(16, 66, 70); // far southeast open sea
+    tracker.record(offshore, 0.25);
+    expect(tracker.summary(offshore).live).toBeNull();
+    // (23.0N, 59.0E) sits ~72 km from Sur and ~91 km from Muscat — the live
+    // slot goes to the closest in-reach city.
+    const closing = storm(23.0, 59.0, 70);
+    tracker.record(closing, 0.25);
+    expect(tracker.summary(closing).live?.city.id).toBe('sur');
+  });
+
+  it('covers the coastal cities the domain can threaten', () => {
+    const ids = IMPACT_CITIES.map((c) => c.id);
+    expect(ids).toContain('muscat');
+    expect(ids).toContain('salalah');
+    expect(ids).toContain('karachi');
+  });
+});
+
+describe('experienced wind phrasing', () => {
+  it('maps peak winds onto honest marine-scale phrases', () => {
+    expect(experiencedWindPhrase(10)).toBe('light winds');
+    expect(experiencedWindPhrase(25)).toBe('gusty winds');
+    expect(experiencedWindPhrase(40)).toBe('gale-force winds');
+    expect(experiencedWindPhrase(55)).toBe('storm-force winds');
+    expect(experiencedWindPhrase(100)).toBe('cat 3 winds');
+  });
+});

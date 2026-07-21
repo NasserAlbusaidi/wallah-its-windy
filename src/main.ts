@@ -66,11 +66,12 @@ import { TapGesture } from './tap-gesture';
 import { cloneStormStructure } from './structure';
 import { scoreHindcast, type HindcastScore } from './hindcast';
 import {
-  isWeatherLayerId,
+  DEFAULT_WEATHER_LAYER,
   weatherLayerDefinition,
   WEATHER_LAYERS,
   type WeatherLayerId,
 } from './weather-layers';
+import { ImpactTracker } from './impact';
 import {
   requestEnsemble,
   requestSensitivity,
@@ -131,10 +132,8 @@ const compareRun = must(document.getElementById('compare-run') as HTMLButtonElem
 const compareClear = must(document.getElementById('compare-clear') as HTMLButtonElement | null, '#compare-clear');
 const exportCard = must(document.getElementById('export-card') as HTMLButtonElement | null, '#export-card');
 const exportReplay = must(document.getElementById('export-replay') as HTMLButtonElement | null, '#export-replay');
-const weatherLayerSelect = must(
-  document.getElementById('weather-layer') as HTMLSelectElement | null,
-  '#weather-layer',
-);
+const mapFrame = must(document.getElementById('map-frame'), '#map-frame');
+const layerButtons = must(document.getElementById('layer-buttons'), '#layer-buttons');
 const weatherLegend = must(document.getElementById('weather-legend'), '#weather-legend');
 const weatherLegendName = must(
   document.getElementById('weather-legend-name'),
@@ -243,6 +242,9 @@ const ui = new UiController({
   reducedMotion: prefersReducedMotion,
 });
 const session = new StormSession();
+// Deterministic landfall-impact bookkeeping (rain grid + city exposure); reset
+// per spawn, fed the same fixed ticks the recorder sees.
+const impact = new ImpactTracker();
 
 // --- Environment sampler (sim dependency) -----------------------------------
 // The sim requires an EnvSampler. It closes over a live holder: once env.bin
@@ -314,7 +316,35 @@ try {
 }
 
 // --- Canvas sizing ----------------------------------------------------------
+/**
+ * Metric aspect of the domain (ground metres east-west : north-south at the
+ * mid latitude), so the chart is not stretched to the window shape.
+ */
+const MAP_ASPECT =
+  ((DOMAIN.lonMax - DOMAIN.lonMin) *
+    Math.cos((((DOMAIN.latMin + DOMAIN.latMax) / 2) * Math.PI) / 180)) /
+  (DOMAIN.latMax - DOMAIN.latMin);
+/** Fraction of the fitted rect the chart occupies — the "zoomed out" framing. */
+const MAP_FILL = 0.92;
+
+/** Fit the chart frame into the window: aspect-correct, centered, framed. */
+function layoutMapFrame(): void {
+  const availW = window.innerWidth;
+  const availH = window.innerHeight;
+  let w = availW * MAP_FILL;
+  let h = w / MAP_ASPECT;
+  if (h > availH * MAP_FILL) {
+    h = availH * MAP_FILL;
+    w = h * MAP_ASPECT;
+  }
+  mapFrame.style.left = `${Math.round((availW - w) / 2)}px`;
+  mapFrame.style.top = `${Math.round((availH - h) / 2)}px`;
+  mapFrame.style.width = `${Math.round(w)}px`;
+  mapFrame.style.height = `${Math.round(h)}px`;
+}
+
 function resize(): void {
+  layoutMapFrame();
   const profile = chooseRenderProfile({
     width: glCanvas.clientWidth,
     dpr: window.devicePixelRatio || 1,
@@ -516,6 +546,7 @@ async function loadAll(): Promise<void> {
   // (see build report) — not wired here; storm particles/track still render.
   mergedTerrainBin = mergedTerrain(bins);
   ui.setLandMask(findLandMask(mergedTerrainBin));
+  impact.setLandMask(findLandMask(mergedTerrainBin));
   ui.setGenesis(genesisPoints);
   climatologyBin = bins.get('env') ?? null;
   envBin = climatologyBin;
@@ -587,6 +618,8 @@ let accumulatorMin = 0;
 let currentRunLabel = '';
 let hindcastScoreCache: HindcastScore | null = null;
 let hindcastScoreFrameCount = -1;
+/** vKt at the recorded landfall frame, resolved once per landfall. */
+let landfallKtCache: { frameIndex: number; vKt: number } | null = null;
 const pendingMapCaptures: Array<(canvas: HTMLCanvasElement) => void> = [];
 
 function headOf(s: StormState): Head {
@@ -737,6 +770,8 @@ function doSpawn(
   );
   hindcastScoreCache = null;
   hindcastScoreFrameCount = -1;
+  landfallKtCache = null;
+  impact.reset();
   currHead = s ? headOf(s) : null;
   prevHead = currHead;
   accumulatorMin = 0;
@@ -757,7 +792,10 @@ function warmUp(hours: number): void {
     try {
       const events = engine.tick(SIM_DT_MIN);
       const state = engine.getState();
-      if (state) session.record(state, events);
+      if (state) {
+        session.record(state, events);
+        impact.record(state, SIM_DT_MIN / 60);
+      }
       dead = events.some((e) => e.type === 'died');
     } catch (err) {
       console.warn('[warmup] tick threw:', err);
@@ -940,32 +978,75 @@ function readPickerMonth(): number {
 // storm; land -> ripple, no storm.
 const mapTap = new TapGesture();
 
+// Minimal stroke icons for the layer rail — one glyph per layer id.
+const LAYER_ICONS: Record<WeatherLayerId, string> = {
+  wind: '<path d="M1.5 5.5h7.6a2 2 0 1 0-1.9-2.6M1.5 8.5h11a2 2 0 1 1-1.9 2.6M1.5 11.5h5.5"/>',
+  rain: '<circle cx="8" cy="9.5" r="1.1"/><path d="M8 6a3.5 3.5 0 0 1 3.5 3.5M8 2.5a7 7 0 0 1 7 7"/>',
+  infrared:
+    '<path d="M4.6 11.5h6.9a2.5 2.5 0 0 0 .4-4.97A4 4 0 0 0 4.2 6.6a2.5 2.5 0 0 0 .4 4.9Z"/>',
+  accum:
+    '<path d="M8 2.2C8 2.2 4.9 6 4.9 8.5a3.1 3.1 0 0 0 6.2 0C11.1 6 8 2.2 8 2.2Z"/><path d="M3 14h10"/>',
+  sst: '<path d="M6.8 2.8a1.2 1.2 0 0 1 2.4 0v6a2.8 2.8 0 1 1-2.4 0Z"/>',
+  humidity:
+    '<path d="M8 2.5C8 2.5 4.8 6.4 4.8 8.9a3.2 3.2 0 0 0 6.4 0C11.2 6.4 8 2.5 8 2.5Z"/><path d="M6.4 9.2a1.6 1.6 0 0 0 1.6 1.6"/>',
+  ohc: '<path d="M2 10.5q1.5-1.5 3 0t3 0t3 0t3 0M2 13q1.5-1.5 3 0t3 0t3 0t3 0"/><path d="M6 3q1 1.2 0 2.4q-1 1.2 0 2.4M10 3q1 1.2 0 2.4q-1 1.2 0 2.4"/>',
+  shear:
+    '<path d="M2 5.5h9M11 5.5 8.8 3.3M11 5.5 8.8 7.7M14 10.5H5M5 10.5l2.2-2.2M5 10.5l2.2 2.2"/>',
+  terrain: '<path d="M1.5 12.5 6 5l2.4 4 2.1-3 4 6.5Z"/>',
+};
+
+function layerIconSvg(id: WeatherLayerId): string {
+  return (
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" ' +
+    `aria-hidden="true">${LAYER_ICONS[id]}</svg>`
+  );
+}
+
 function setWeatherLayer(layer: WeatherLayerId): void {
   activeWeatherLayer = layer;
-  weatherLayerSelect.value = layer;
   renderCtrl?.setWeatherLayer?.(layer);
   const definition = weatherLayerDefinition(layer);
   weatherLegend.dataset.layer = layer;
   weatherLegendName.textContent = definition.shortLabel;
   weatherLegendUnit.textContent = definition.unit;
   weatherLegendScale.textContent = definition.legend;
+  for (const button of layerButtons.querySelectorAll<HTMLButtonElement>('.layer-button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.layer === layer));
+  }
 }
 
-weatherLayerSelect.replaceChildren(
-  ...WEATHER_LAYERS.map((definition) => {
-    const option = document.createElement('option');
-    option.value = definition.id;
-    option.textContent = definition.label;
-    option.selected = definition.id === 'terrain';
-    return option;
+// Build the Windy-style rail: one button per catalogue layer, in order, with
+// the Digit1..Digit9 key hint the keyboard handler mirrors.
+layerButtons.replaceChildren(
+  ...WEATHER_LAYERS.map((definition, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'layer-button';
+    button.dataset.layer = definition.id;
+    button.setAttribute('aria-pressed', 'false');
+    button.setAttribute('aria-label', definition.label);
+    button.title = definition.label;
+    // The SVG markup is a compile-time constant (LAYER_ICONS above); the
+    // catalogue text goes through textContent so it is never parsed as HTML.
+    button.innerHTML = layerIconSvg(definition.id);
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = definition.shortLabel;
+    const key = document.createElement('span');
+    key.className = 'key';
+    key.textContent = String(index + 1);
+    button.append(label, key);
+    button.addEventListener('click', () => {
+      setWeatherLayer(definition.id);
+      // Drop focus so the keydown form-control guard doesn't eat the very
+      // Digit1-9 shortcuts this button advertises in its key hint.
+      button.blur();
+    });
+    return button;
   }),
 );
-weatherLayerSelect.addEventListener('change', () => {
-  if (isWeatherLayerId(weatherLayerSelect.value)) {
-    setWeatherLayer(weatherLayerSelect.value);
-  }
-});
-setWeatherLayer('terrain');
+setWeatherLayer(DEFAULT_WEATHER_LAYER);
 
 function currentAnalysisUrls(): { envUrl: string; terrainUrl: string } {
   const envPath = activeScenario?.bin ?? 'data/env.bin';
@@ -1147,7 +1228,7 @@ window.addEventListener('keydown', (e) => {
   ) {
     return;
   }
-  if (/^Digit[1-7]$/.test(e.code)) {
+  if (/^Digit[1-9]$/.test(e.code)) {
     const index = Number(e.code.slice(-1)) - 1;
     const definition = WEATHER_LAYERS[index];
     if (definition) {
@@ -1363,7 +1444,10 @@ function tickSim(nowMs: number): void {
     return;
   }
   const s = engine.getState();
-  if (s) session.record(s, events);
+  if (s) {
+    session.record(s, events);
+    impact.record(s, SIM_DT_MIN / 60);
+  }
   currHead = s ? headOf(s) : null;
   for (const ev of events) ui.onSimEvent(ev, nowMs);
 }
@@ -1450,6 +1534,7 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
       activeScenario && storm
         ? eventTimeFraction(storm.ageH, activeScenario.windowH)
         : 0,
+    rainAccum: impact.rainView(),
   };
 
   // main owns the base clear of both canvases (guards against any render layer
@@ -1486,7 +1571,23 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
     hindcastScore: activeHindcastScore(),
     comparisonActive: session.comparisonBaseline !== null,
     comparison: session.comparison(),
+    impact: impact.summary(storm),
+    landfallKt: landfallWindKt(),
   });
+}
+
+/** Wind at the recorded landfall frame, cached per landfall (stormAt is O(n)). */
+function landfallWindKt(): number | null {
+  const landfall = session.recorder.debrief()?.landfall ?? null;
+  if (!landfall) return null;
+  if (landfallKtCache?.frameIndex !== landfall.frameIndex) {
+    const at = session.recorder.stormAt(landfall.frameIndex);
+    landfallKtCache = {
+      frameIndex: landfall.frameIndex,
+      vKt: at?.vKt ?? 0,
+    };
+  }
+  return landfallKtCache.vKt;
 }
 
 function frame(nowMs: number): void {

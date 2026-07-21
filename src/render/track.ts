@@ -14,6 +14,7 @@
  */
 
 import { TOKENS } from '../tokens';
+import { categoryRgba } from '../category';
 import { clipToLatLon, latLonToClip, offsetKm } from '../grid';
 import {
   maxWindRadiusKm,
@@ -169,7 +170,9 @@ export class TrackLayer {
       );
     }
 
-    // Dotted, age-faded track polyline.
+    // Dotted, age-faded track polyline, coloured by Saffir–Simpson class of
+    // each segment (the standard tracker convention) so the storm's history —
+    // TD spin-up, peak category, decay — reads directly off the map.
     const track = ctx.track;
     if (track && track.length > 1) {
       g.lineWidth = Math.max(1, unit * 0.0018);
@@ -184,7 +187,10 @@ export class TrackLayer {
         // age term) multiplies by `fade` so it drains smoothly to 0 during the
         // ~10 s aftermath instead of flooring at 0.12 then popping to nothing.
         const ageFrac = i / (track.length - 1);
-        g.strokeStyle = trackRgba((0.12 + 0.5 * ageFrac) * fade);
+        g.strokeStyle = categoryRgba(
+          track[i].vKt,
+          (0.18 + 0.5 * ageFrac) * fade,
+        );
         g.beginPath();
         g.moveTo(ax, ay);
         g.lineTo(bx, by);

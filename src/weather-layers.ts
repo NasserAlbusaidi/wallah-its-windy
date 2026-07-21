@@ -1,13 +1,21 @@
-/** User-facing weather-map layer catalogue and scientific legend contracts. */
+/**
+ * User-facing weather-map layer catalogue and scientific legend contracts.
+ *
+ * Order is load-bearing: it is the layer rail's top-to-bottom order AND the
+ * Digit1..Digit9 keyboard mapping. Wind leads (the Windy-style default view);
+ * the terrain instrument closes the list as the plain base chart.
+ */
 
 export type WeatherLayerId =
-  | 'terrain'
+  | 'wind'
+  | 'rain'
   | 'infrared'
+  | 'accum'
   | 'sst'
   | 'humidity'
   | 'ohc'
   | 'shear'
-  | 'rain';
+  | 'terrain';
 
 export interface WeatherLayerDefinition {
   id: WeatherLayerId;
@@ -20,25 +28,42 @@ export interface WeatherLayerDefinition {
 
 export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
   {
-    id: 'terrain',
-    label: 'terrain instrument',
-    shortLabel: 'terrain',
-    legend: 'bathymetry · topography · storm structure',
-    unit: '',
-    simulated: false,
+    id: 'wind',
+    label: 'wind flow',
+    shortLabel: 'wind',
+    legend: '0 · 12 · 25 · 38 · 50+',
+    unit: 'm/s · steering + storm vortex',
+    simulated: true,
+  },
+  {
+    id: 'rain',
+    label: 'simulated rain radar',
+    shortLabel: 'radar',
+    legend: 'light · moderate · heavy · extreme',
+    unit: 'reflectivity-style rain-rate proxy',
+    simulated: true,
   },
   {
     id: 'infrared',
     label: 'simulated infrared',
-    shortLabel: 'infrared',
+    shortLabel: 'clouds',
     legend: 'warm surface → cold convective cloud tops',
     unit: '°C brightness temperature proxy',
     simulated: true,
   },
   {
+    id: 'accum',
+    label: 'storm-total rainfall',
+    shortLabel: 'rain accum',
+    // Ticks sit at the shader's equal-interval color stops (linear 0-300 mm).
+    legend: '0 · 75 · 150 · 225 · 300+',
+    unit: 'mm · parametric storm-total proxy',
+    simulated: true,
+  },
+  {
     id: 'sst',
     label: 'sea-surface temperature',
-    shortLabel: 'sst',
+    shortLabel: 'sea temp',
     legend: '24 · 26 · 28 · 30 · 32',
     unit: '°C',
     simulated: false,
@@ -68,14 +93,17 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     simulated: false,
   },
   {
-    id: 'rain',
-    label: 'simulated rain radar',
-    shortLabel: 'rain radar',
-    legend: 'light · moderate · heavy · extreme',
-    unit: 'reflectivity-style rain-rate proxy',
-    simulated: true,
+    id: 'terrain',
+    label: 'terrain instrument',
+    shortLabel: 'terrain',
+    legend: 'bathymetry · topography · storm structure',
+    unit: 'bathymetry · topography',
+    simulated: false,
   },
 ] as const;
+
+/** The layer shown at boot — the Windy-style animated wind map. */
+export const DEFAULT_WEATHER_LAYER: WeatherLayerId = 'wind';
 
 const IDS = new Set<WeatherLayerId>(
   WEATHER_LAYERS.map((layer) => layer.id),

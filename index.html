@@ -12,10 +12,14 @@
   </head>
   <body>
     <div id="app">
-      <!-- WebGL2 map (terrain, env glow, particles, rain) -->
-      <canvas id="gl-canvas"></canvas>
-      <!-- 2D vector overlay (track dots, halos, debug) above the map -->
-      <canvas id="overlay-canvas"></canvas>
+      <!-- The chart: an aspect-correct, framed map (JS sizes it in resize()).
+           Ghost labels are appended here at runtime so they track the frame. -->
+      <div id="map-frame">
+        <!-- WebGL2 map (terrain, env glow, particles, rain) -->
+        <canvas id="gl-canvas"></canvas>
+        <!-- 2D vector overlay (track dots, halos, debug) above the map -->
+        <canvas id="overlay-canvas"></canvas>
+      </div>
 
       <!-- thin cyan loading line -->
       <div id="progress"></div>
@@ -57,26 +61,24 @@
         </p>
       </div>
 
-      <section id="weather-view" class="chrome" aria-label="Weather map layer">
-        <label for="weather-layer">Map layer</label>
-        <select id="weather-layer" aria-label="Weather map layer">
-          <option value="terrain" selected>terrain instrument</option>
-        </select>
-        <div id="weather-legend" data-layer="terrain">
-          <span id="weather-legend-name">terrain</span>
-          <span id="weather-legend-unit">bathymetry · topography</span>
+      <!-- Windy-style layer rail: one tap per layer, keys 1-9 mirror the
+           top-to-bottom order. Buttons are generated from weather-layers.ts. -->
+      <nav id="layer-rail" class="chrome" aria-label="Map layers">
+        <div id="layer-buttons" role="group" aria-label="Layer picker"></div>
+        <div id="weather-legend" data-layer="wind">
+          <span id="weather-legend-name">wind</span>
+          <span id="weather-legend-unit">m/s</span>
           <span class="weather-scale" aria-hidden="true"></span>
-          <span id="weather-legend-scale">
-            bathymetry · topography · storm structure
-          </span>
+          <span id="weather-legend-scale">0 · 12 · 25 · 38 · 50+</span>
         </div>
-      </section>
+      </nav>
 
       <!-- Flight recorder: live physics explanation, then an immutable
            post-storm debrief + scrub transport. All controls observe recorded
            frames; they never rewind the deterministic simulation engine. -->
       <section id="flight-recorder" class="chrome" aria-label="Storm flight recorder" hidden>
         <header class="flight-head">
+          <span id="flight-category" data-cat="td">TD</span>
           <span id="flight-status">live tape</span>
           <output id="flight-clock">0 h</output>
           <span id="flight-label"></span>
@@ -95,9 +97,31 @@
           <span>Waiting for the first physics step.</span>
         </p>
 
+        <!-- Category scale: where the storm sits now (bright needle) and how
+             far the current ocean could still take it (hollow MPI needle). -->
+        <div id="intensity-scale" aria-label="Current intensity and potential">
+          <div class="scale-bar" aria-hidden="true">
+            <div id="scale-needle-now" class="scale-needle now"></div>
+            <div id="scale-needle-potential" class="scale-needle potential"></div>
+          </div>
+          <div class="scale-ticks" aria-hidden="true">
+            <span style="left: 0%">td</span>
+            <span style="left: 21.25%">ts</span>
+            <span style="left: 40%">1</span>
+            <span style="left: 51.9%">2</span>
+            <span style="left: 60%">3</span>
+            <span style="left: 70.6%">4</span>
+            <span style="left: 85.6%">5</span>
+          </div>
+          <p id="intensity-note">—</p>
+        </div>
+
         <p id="flight-contract" hidden>
           counterfactual tape · the observed storm is the faint ghost track
         </p>
+
+        <!-- Live coastal exposure while a city is inside the storm's reach. -->
+        <p id="impact-live" hidden></p>
 
         <dl class="flight-readouts" aria-label="Current storm physics">
           <div class="flight-readout primary">
@@ -173,6 +197,15 @@
             <div><dt>landfall</dt><dd id="debrief-landfall">—</dd></div>
             <div id="debrief-compare-row"><dt>history</dt><dd id="debrief-compare">—</dd></div>
           </dl>
+
+          <!-- Landfall / coastal impact: parametric wind + storm-total rain
+               proxies from the model, never observations. -->
+          <section id="impact-report" aria-label="Coastal impact" hidden>
+            <h2>coastal impact · parametric proxy</h2>
+            <p id="impact-headline">—</p>
+            <dl class="comparison-grid impact-grid" id="impact-cities"></dl>
+            <p id="impact-flood">—</p>
+          </section>
 
           <section id="hindcast-score" aria-label="Historical hindcast score" hidden>
             <h2>observed-fix verification</h2>
@@ -374,10 +407,24 @@
           <h3>Weather views</h3>
           <p>
             SST, humidity, ocean heat, and shear show the exact baked field being
-            sampled by the model. Infrared and rain-radar views are explicitly
-            simulated structural proxies derived from the live vortex—not
-            satellite brightness temperatures or observed radar reflectivity.
-            Keys 1–7 switch layers.
+            sampled by the model. The wind view superposes the active ERA5
+            steering field with the parametric Holland vortex; infrared, rain-radar,
+            and storm-total rainfall views are simulated structural proxies
+            derived from the live vortex—not satellite brightness temperatures,
+            observed reflectivity, or a precipitation analysis. Keys 1–9 switch
+            layers.
+          </p>
+        </section>
+        <section>
+          <h3>Category and impact</h3>
+          <p>
+            The category chip and coloured track use the Saffir–Simpson wind
+            scale on the simulated 1-minute sustained wind. "Potential" marks
+            the model's DeMaria–Kaplan maximum potential intensity for the
+            water under the storm — a ceiling, not a forecast. City winds come
+            from the parametric wind profile at each city's range and bearing;
+            flash-flood risk is a threshold proxy on parametric storm-total
+            rain, not a discharge or inundation model.
           </p>
         </section>
       </form>

@@ -34,7 +34,14 @@ uniform sampler2D u_ohc;
 uniform sampler2D u_ohcNext;
 uniform sampler2D u_shear;
 uniform sampler2D u_shearNext;
+uniform sampler2D u_steerU;
+uniform sampler2D u_steerUNext;
+uniform sampler2D u_steerV;
+uniform sampler2D u_steerVNext;
+uniform sampler2D u_rainTotal;
 uniform sampler2D u_land;
+uniform float u_hasSteer;
+uniform float u_hasAccum;
 uniform float u_planeBlend;
 uniform vec2 u_sstRange;
 uniform vec4 u_warm;
@@ -47,6 +54,8 @@ uniform float u_intensity;
 uniform float u_organization;
 uniform float u_ageH;
 uniform float u_metricX;
+uniform float u_vmaxMs;
+uniform float u_hollandB;
 uniform vec3 u_palette0;
 uniform vec3 u_palette1;
 uniform vec3 u_palette2;
@@ -159,6 +168,52 @@ void main() {
     return;
   }
 
+  // Wind-flow fill: |baked steering + a symmetric Holland vortex| in m/s,
+  // coloured 0..50. The particle trails on top carry direction; this plate
+  // carries magnitude, Windy-style.
+  if (u_mode == 7) {
+    vec2 steer = u_hasSteer * (vec2(
+      mix(texture(u_steerU, v_uv).r, texture(u_steerUNext, v_uv).r, u_planeBlend),
+      mix(texture(u_steerV, v_uv).r, texture(u_steerVNext, v_uv).r, u_planeBlend)
+    ) * 50.0 - vec2(25.0));
+    vec2 wind = steer;
+    if (u_hasStorm > 0.5) {
+      vec2 cell = vec2(v_uv.x * 2.0 - 1.0, 1.0 - v_uv.y * 2.0);
+      vec2 radial = vec2((cell.x - u_center.x) * u_metricX, cell.y - u_center.y);
+      float r = length(radial);
+      if (r > 1e-5) {
+        float x = min(80.0, pow(max(0.008, u_rMax) / r, u_hollandB));
+        float spd = u_vmaxMs * sqrt(max(0.0, x * exp(1.0 - x)));
+        vec2 ru = radial / r;
+        vec2 t = vec2(-ru.y, ru.x); // CCW tangential
+        vec2 dir = 0.94 * t - 0.34 * ru; // ~20-degree low-level inflow
+        wind += dir * spd;
+      }
+    }
+    float speed = length(wind);
+    float speedN = clamp(speed / 50.0, 0.0, 1.0);
+    vec3 color = fiveStop(
+      speedN,
+      u_palette0, u_palette1, u_palette2, u_palette3, u_palette4
+    );
+    // Calm stays near-transparent so the chart shows through; strong wind
+    // saturates — the Windy read where the field glows only where it matters.
+    o = vec4(color, (0.22 + 0.5 * speedN) * u_fade);
+    return;
+  }
+
+  // Storm-total rainfall (impact proxy): 0..300 mm accumulated by the tracker.
+  if (u_mode == 8) {
+    float mmN = u_hasAccum * texture(u_rainTotal, v_uv).r;
+    vec3 color = fiveStop(
+      mmN,
+      u_palette0, u_palette1, u_palette2, u_palette3, u_palette4
+    );
+    float alpha = smoothstep(0.008, 0.07, mmN) * 0.85;
+    o = vec4(color, alpha * u_fade);
+    return;
+  }
+
   // Rain-radar mode: a cold, low-luminance plate beneath the rain accumulator.
   o = vec4(u_rainPlate, 0.72 * u_fade);
 }`;
@@ -171,6 +226,8 @@ const MODE: Record<WeatherLayerId, number> = {
   ohc: 4,
   shear: 5,
   rain: 6,
+  wind: 7,
+  accum: 8,
 };
 
 const PALETTE: Record<WeatherLayerId, readonly [
@@ -187,6 +244,8 @@ const PALETTE: Record<WeatherLayerId, readonly [
   ohc: ['ohc0', 'ohc1', 'ohc2', 'ohc3', 'ohc4'],
   shear: ['shear0', 'shear1', 'shear2', 'shear3', 'shear4'],
   rain: ['radar0', 'radar1', 'radar2', 'radar3', 'radar4'],
+  wind: ['wind0', 'wind1', 'wind2', 'wind3', 'wind4'],
+  accum: ['precip0', 'precip1', 'precip2', 'precip3', 'precip4'],
 };
 
 export class EnvLayer implements RenderModule {
@@ -239,6 +298,18 @@ export class EnvLayer implements RenderModule {
     bind(6, gpu.shear, 'u_shear');
     bind(7, gpu.shearNext, 'u_shearNext');
     bind(8, gpu.land, 'u_land');
+    // Dummy-bind absent steering/accum textures (sampling them is gated by
+    // u_hasSteer / near-zero alpha) so no unit is left on a stale texture.
+    const hasSteer = Boolean(
+      gpu.steerU && gpu.steerUNext && gpu.steerV && gpu.steerVNext,
+    );
+    bind(9, gpu.steerU ?? gpu.land, 'u_steerU');
+    bind(10, gpu.steerUNext ?? gpu.land, 'u_steerUNext');
+    bind(11, gpu.steerV ?? gpu.land, 'u_steerV');
+    bind(12, gpu.steerVNext ?? gpu.land, 'u_steerVNext');
+    bind(13, gpu.rainAccum ?? gpu.land, 'u_rainTotal');
+    gl.uniform1f(u('u_hasSteer'), hasSteer ? 1 : 0);
+    gl.uniform1f(u('u_hasAccum'), gpu.rainAccum ? 1 : 0);
     gl.uniform1f(u('u_planeBlend'), gpu.envBlend);
     gl.uniform2f(u('u_sstRange'), SST_MIN_C, SST_MAX_C);
     gl.uniform4fv(u('u_warm'), TOKENS.sstWarm.rgba01);
@@ -260,6 +331,8 @@ export class EnvLayer implements RenderModule {
       ctx.frame.storm?.organization ?? 0,
     );
     gl.uniform1f(u('u_ageH'), ctx.frame.storm?.ageH ?? 0);
+    gl.uniform1f(u('u_vmaxMs'), (ctx.structure?.maximumWindKt ?? 0) * 0.514444);
+    gl.uniform1f(u('u_hollandB'), ctx.structure?.hollandB ?? 1.35);
     const palette = PALETTE[ctx.weatherLayer];
     for (let i = 0; i < palette.length; i += 1) {
       gl.uniform3fv(

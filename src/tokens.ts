@@ -76,6 +76,30 @@ const RAW: readonly RawToken[] = [
   { key: 'radar4', cssVar: '--radar-4', rgb: [250, 82, 20], a: 1 },
   { key: 'radar5', cssVar: '--radar-5', rgb: [204, 15, 122], a: 1 },
   { key: 'rainPlate', cssVar: '--rain-plate', rgb: [3, 6, 14], a: 1 },
+  // Wind-speed palette (Windy-style flow map): calm indigo -> teal -> green ->
+  // amber -> magenta across 0..50 m/s. Consumed by the wind fill shader, the
+  // particle-trail colouring, and the rail legend gradient.
+  { key: 'wind0', cssVar: '--wind-0', rgb: [40, 56, 110], a: 1 },
+  { key: 'wind1', cssVar: '--wind-1', rgb: [46, 135, 150], a: 1 },
+  { key: 'wind2', cssVar: '--wind-2', rgb: [88, 171, 88], a: 1 },
+  { key: 'wind3', cssVar: '--wind-3', rgb: [227, 179, 57], a: 1 },
+  { key: 'wind4', cssVar: '--wind-4', rgb: [204, 64, 120], a: 1 },
+  // Storm-total accumulated-rain palette (impact proxy): dry -> soaked.
+  { key: 'precip0', cssVar: '--precip-0', rgb: [10, 20, 34], a: 1 },
+  { key: 'precip1', cssVar: '--precip-1', rgb: [38, 108, 168], a: 1 },
+  { key: 'precip2', cssVar: '--precip-2', rgb: [62, 186, 130], a: 1 },
+  { key: 'precip3', cssVar: '--precip-3', rgb: [240, 208, 74], a: 1 },
+  { key: 'precip4', cssVar: '--precip-4', rgb: [201, 79, 157], a: 1 },
+  // Saffir–Simpson category ramp — the standard tracker palette every storm map
+  // uses (TD blue .. Cat-5 red), so the category of a track segment or chip is
+  // readable on sight. Consumed by category.ts, track.ts, and the chip CSS.
+  { key: 'catTd', cssVar: '--cat-td', rgb: [94, 186, 255], a: 1 },
+  { key: 'catTs', cssVar: '--cat-ts', rgb: [0, 250, 244], a: 1 },
+  { key: 'cat1', cssVar: '--cat-1', rgb: [255, 255, 204], a: 1 },
+  { key: 'cat2', cssVar: '--cat-2', rgb: [255, 231, 117], a: 1 },
+  { key: 'cat3', cssVar: '--cat-3', rgb: [255, 193, 64], a: 1 },
+  { key: 'cat4', cssVar: '--cat-4', rgb: [255, 143, 32], a: 1 },
+  { key: 'cat5', cssVar: '--cat-5', rgb: [255, 96, 96], a: 1 },
 ] as const;
 
 export type TokenKey = (typeof RAW)[number]['key'];

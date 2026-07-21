@@ -54,6 +54,13 @@ export interface GpuTextures {
   ohcNext: WebGLTexture | null;
   shear: WebGLTexture | null;
   shearNext: WebGLTexture | null;
+  /** Deep-layer steering components for the wind layer, normalized R8. */
+  steerU: WebGLTexture | null;
+  steerUNext: WebGLTexture | null;
+  steerV: WebGLTexture | null;
+  steerVNext: WebGLTexture | null;
+  /** Storm-total rain grid (impact tracker), re-uploaded on version change. */
+  rainAccum: WebGLTexture | null;
   /** Fractional interpolation from each current texture to its next texture. */
   envBlend: number;
   /** Genesis-zone points in clip space (x,y interleaved), or null when absent. */
@@ -93,6 +100,11 @@ export interface DrawCtx {
   /** Env sampled at the storm centre, or null when unavailable. */
   env: EnvAtStorm | null;
   weatherLayer: WeatherLayerId;
+  /**
+   * CPU steering-wind sampler for the wind-flow particle layer (m/s at a
+   * point, current env plane), or null before env.bin lands.
+   */
+  steeringAt: ((lat: number, lon: number) => { u: number; v: number }) | null;
 }
 
 /** Lifecycle shared by every internal layer module. Draw signatures vary. */

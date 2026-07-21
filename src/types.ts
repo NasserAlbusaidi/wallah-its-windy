@@ -337,6 +337,21 @@ export interface SimEngine {
 export type EnvTextures = Map<string, WebGLTexture>;
 
 /**
+ * Read-only view of the impact tracker's storm-total rain grid (mm), for the
+ * accumulated-rainfall map layer. `version` increments whenever the grid
+ * changes so the renderer re-uploads its texture only when needed. Row order
+ * matches BinLayer (row 0 = north edge).
+ */
+export interface RainAccumView {
+  nx: number;
+  ny: number;
+  bbox: BBox;
+  /** Storm-total rain per cell, millimetres. */
+  mm: Float32Array;
+  version: number;
+}
+
+/**
  * The immutable per-frame render input. main.ts builds this every animation
  * frame from the interpolated sim state; render layers only read it.
  */
@@ -370,6 +385,8 @@ export interface FrameState {
   envSamplingMode: EnvSamplingMode;
   /** Current normalized event time; ignored in synoptic-plane mode. */
   envTFrac: number;
+  /** Storm-total rain grid for the accumulated-rainfall layer, or null. */
+  rainAccum: RainAccumView | null;
 }
 
 /**

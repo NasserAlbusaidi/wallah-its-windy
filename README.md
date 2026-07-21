@@ -57,9 +57,15 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
 ## Controls
 
 - Click open water to spawn a storm.
-- Change **Map layer** or press 1–7 for terrain, simulated infrared, SST,
-  humidity, OHC, shear, and simulated rain-radar views. SST/RH/OHC/shear render
-  the exact active baked plane; IR and radar are explicitly simulated proxies.
+- Pick a layer on the right-edge rail (or press 1–9): wind flow, simulated
+  rain radar, simulated infrared, storm-total rainfall, SST, humidity, OHC,
+  shear, and the terrain instrument. SST/RH/OHC/shear render the exact active
+  baked plane; wind superposes ERA5 steering with the parametric vortex; IR,
+  radar, and storm-total rainfall are explicitly simulated proxies.
+- The storm panel shows the live Saffir–Simpson category chip, an intensity
+  bar with the model's MPI "potential" marker, and — near or after landfall —
+  a coastal-impact report (parametric city winds, storm-total rain, and a
+  flash-flood proxy tier). The track is coloured by category.
 - Open **forecast laboratory** to run a 20/40/80-member deterministic ensemble.
   The map shows every member plus the fraction of members entering each grid
   cell. Peak-intensity quantiles and landfall/hurricane/major probabilities are
@@ -309,7 +315,10 @@ src/
   fidelity-verification.ts exact lead errors, persistence + bootstrap intervals
   ensemble.ts         deterministic perturbations, probability grid, summaries
   ensemble.worker.ts  off-main-thread runs + decoded-bin URL cache
-  weather-layers.ts   seven map-product labels, provenance, and legends
+  weather-layers.ts   nine map-product labels, provenance, and legends
+  category.ts         Saffir–Simpson thresholds, chip copy, tracker colours
+  impact.ts           storm-total rain grid + per-city exposure (impact proxy)
+  render/wind.ts      Windy-style full-map wind flow (particles + trails)
   comparison.ts       same-identity paired-run validation and result deltas
   narrative.ts        exact intensity budget -> plain-language dominant cause
   export.ts           dependency-free PNG card + WebM replay renderer

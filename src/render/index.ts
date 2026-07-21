@@ -62,10 +62,12 @@ import {
   SST_MIN_C,
 } from './textures';
 import { sampleEnvBin } from '../env-sampler';
+import { sampleLayerBilinear } from '../raster-sampler';
 import type { DrawCtx, EnvAtStorm, GpuTextures } from './context';
 import { TerrainLayer } from './terrain';
 import { EnvLayer } from './env';
 import { ParticleLayer } from './particles';
+import { WindLayer } from './wind';
 import { RainLayer } from './rain';
 import { RadarLayer } from './radar';
 import { TrackLayer } from './track';
@@ -154,6 +156,11 @@ function emptyGpu(): GpuTextures {
     ohcNext: null,
     shear: null,
     shearNext: null,
+    steerU: null,
+    steerUNext: null,
+    steerV: null,
+    steerVNext: null,
+    rainAccum: null,
     envBlend: 0,
     genesisClip: null,
   };
@@ -189,10 +196,13 @@ export class RenderPipeline implements RenderLayer {
   private terrain = new TerrainLayer();
   private env = new EnvLayer();
   private particles = new ParticleLayer();
+  private wind = new WindLayer();
   private rain = new RainLayer();
   private radar = new RadarLayer();
   private ghosts = new GhostLayer();
   private track = new TrackLayer();
+  /** Version of the impact rain grid currently uploaded (-1 = none). */
+  private accumVersion = -1;
 
   private width = 1;
   private height = 1;
@@ -233,6 +243,7 @@ export class RenderPipeline implements RenderLayer {
     this.height = Math.max(1, height);
     this.env.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
+    this.wind.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
     this.radar.resize(this.width, this.height);
     this.ghosts.resize(this.width, this.height);
@@ -243,6 +254,7 @@ export class RenderPipeline implements RenderLayer {
     const gl = this.gl;
     if (!gl || this.contextLost) return;
     this.syncEnvPlane(frame);
+    this.syncRainAccum(frame);
     const ctx = this.buildCtx(frame);
     const terrainFade = this.fadeSince(this.terrainReadyMs, ctx.nowMs);
     const glowFade = this.fadeSince(this.glowReadyMs, ctx.nowMs);
@@ -262,7 +274,13 @@ export class RenderPipeline implements RenderLayer {
     this.radar.draw(ctx);
     this.rain.update(ctx, this.gpu);
     this.rain.composite(ctx, this.gpu, terrainFade);
-    if (!ctx.reduced) this.particles.draw(ctx);
+    // The wind layer already renders the vortex flow, so the storm-spiral
+    // swarm yields to it (two swarms would double-draw the same wind field).
+    if (ctx.weatherLayer === 'wind') {
+      this.wind.draw(ctx);
+    } else if (!ctx.reduced) {
+      this.particles.draw(ctx);
+    }
 
     if (this.overlay) {
       this.overlay.clearRect(0, 0, this.width, this.height);
@@ -284,6 +302,7 @@ export class RenderPipeline implements RenderLayer {
     this.terrain.dispose();
     this.env.dispose();
     this.particles.dispose();
+    this.wind.dispose();
     this.rain.dispose();
     this.radar.dispose();
     this.ghosts.dispose();
@@ -314,12 +333,14 @@ export class RenderPipeline implements RenderLayer {
   }
 
   setWeatherLayer(layer: WeatherLayerId): void {
+    if (layer !== this.weatherLayer) this.wind.clearTrails();
     this.weatherLayer = layer;
   }
 
   /** Decorative workload only; deterministic physics and flight tapes are untouched. */
   setParticleBudget(count: number): void {
     this.particles.setBudget(count);
+    this.wind.setBudget(count);
   }
 
   /** Highlight one ghost polyline (~2x alpha) as the active scenario; null clears
@@ -438,6 +459,7 @@ export class RenderPipeline implements RenderLayer {
     this.terrain.init(gl);
     this.env.init(gl);
     this.particles.init(gl);
+    this.wind.init(gl, this.caps);
     this.rain.init(gl, this.caps);
     this.radar.init(gl);
     if (this.overlay) {
@@ -446,6 +468,7 @@ export class RenderPipeline implements RenderLayer {
     }
     this.env.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
+    this.wind.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
     this.radar.resize(this.width, this.height);
     this.ghosts.resize(this.width, this.height);
@@ -462,12 +485,14 @@ export class RenderPipeline implements RenderLayer {
   private onRestored = (): void => {
     this.contextLost = false;
     this.gpu = emptyGpu();
+    this.accumVersion = -1; // impact grid texture must re-upload post-restore
     this.initGl(); // resources still held — rebuild GPU state, no re-fetch
   };
 
   private rebuildAllTextures(): void {
     this.disposeTextures();
     this.gpu = emptyGpu();
+    this.accumVersion = -1;
     this.applyTerrain();
     this.envPlane = -1;
     this.envNextPlane = -1;
@@ -555,6 +580,8 @@ export class RenderPipeline implements RenderLayer {
     const rhL = pickLayer(bin, [n.rh, 'rh']);
     const ohcL = pickLayer(bin, [n.ohc, 'ohc']);
     const shearL = pickLayer(bin, [n.shr, 'shear', 'shr']);
+    const steerUL = pickLayer(bin, [n.u, 'u']);
+    const steerVL = pickLayer(bin, [n.v, 'v']);
     for (const texture of [
       this.gpu.sst,
       this.gpu.sstNext,
@@ -564,6 +591,10 @@ export class RenderPipeline implements RenderLayer {
       this.gpu.ohcNext,
       this.gpu.shear,
       this.gpu.shearNext,
+      this.gpu.steerU,
+      this.gpu.steerUNext,
+      this.gpu.steerV,
+      this.gpu.steerVNext,
     ]) {
       if (texture) gl.deleteTexture(texture);
     }
@@ -575,6 +606,10 @@ export class RenderPipeline implements RenderLayer {
     this.gpu.ohcNext = null;
     this.gpu.shear = null;
     this.gpu.shearNext = null;
+    this.gpu.steerU = null;
+    this.gpu.steerUNext = null;
+    this.gpu.steerV = null;
+    this.gpu.steerVNext = null;
     if (sstL) {
       this.gpu.envGrid = { nx: sstL.nx, ny: sstL.ny, bbox: sstL.bbox };
       this.gpu.sst = buildR8Tex(
@@ -641,8 +676,88 @@ export class RenderPipeline implements RenderLayer {
         gl.LINEAR,
       );
     }
+    // Steering components for the wind fill: [-25, +25] m/s -> [0, 1].
+    const steerNorm = (value: number) => (value + 25) / 50;
+    if (steerUL && steerVL) {
+      this.gpu.steerU = buildR8Tex(
+        gl,
+        steerUL,
+        Math.min(plane, steerUL.nt - 1),
+        steerNorm,
+        gl.LINEAR,
+      );
+      this.gpu.steerUNext = buildR8Tex(
+        gl,
+        steerUL,
+        Math.min(nextPlane, steerUL.nt - 1),
+        steerNorm,
+        gl.LINEAR,
+      );
+      this.gpu.steerV = buildR8Tex(
+        gl,
+        steerVL,
+        Math.min(plane, steerVL.nt - 1),
+        steerNorm,
+        gl.LINEAR,
+      );
+      this.gpu.steerVNext = buildR8Tex(
+        gl,
+        steerVL,
+        Math.min(nextPlane, steerVL.nt - 1),
+        steerNorm,
+        gl.LINEAR,
+      );
+    }
     this.envPlane = plane;
     this.envNextPlane = nextPlane;
+  }
+
+  /**
+   * Upload the impact tracker's storm-total rain grid when its version moves.
+   * R8, 0..300 mm normalized — a 200×120 grid, so re-uploads are trivial.
+   */
+  private syncRainAccum(frame: FrameState): void {
+    const gl = this.gl;
+    if (!gl) return;
+    const view = frame.rainAccum;
+    if (!view) {
+      if (this.gpu.rainAccum) {
+        gl.deleteTexture(this.gpu.rainAccum);
+        this.gpu.rainAccum = null;
+      }
+      this.accumVersion = -1;
+      return;
+    }
+    if (view.version === this.accumVersion && this.gpu.rainAccum) return;
+    const bytes = new Uint8Array(view.nx * view.ny);
+    for (let i = 0; i < bytes.length; i++) {
+      const n = view.mm[i] / 300;
+      bytes[i] = n <= 0 ? 0 : n >= 1 ? 255 : Math.round(n * 255);
+    }
+    if (!this.gpu.rainAccum) {
+      const tex = gl.createTexture();
+      if (!tex) return;
+      this.gpu.rainAccum = tex;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, this.gpu.rainAccum);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.R8,
+      view.nx,
+      view.ny,
+      0,
+      gl.RED,
+      gl.UNSIGNED_BYTE,
+      bytes,
+    );
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    this.accumVersion = view.version;
   }
 
   private syncEnvPlane(frame: FrameState): void {
@@ -708,6 +823,11 @@ export class RenderPipeline implements RenderLayer {
       g.ohcNext,
       g.shear,
       g.shearNext,
+      g.steerU,
+      g.steerUNext,
+      g.steerV,
+      g.steerVNext,
+      g.rainAccum,
     ]) {
       if (t) gl.deleteTexture(t);
     }
@@ -819,7 +939,48 @@ export class RenderPipeline implements RenderLayer {
       comparisonTrack: frame.comparisonTrack,
       env,
       weatherLayer: this.weatherLayer,
+      steeringAt: this.buildSteeringSampler(),
     };
+  }
+
+  /**
+   * CPU steering sampler for the wind particle layer, reading the SAME
+   * plane pair + blend the wind fill shader shows (kept fresh by
+   * syncEnvPlane) so trails and fill never disagree mid-interpolation.
+   * Returns null before env.bin lands — the particles then ride vortex-only.
+   */
+  private buildSteeringSampler():
+    | ((lat: number, lon: number) => { u: number; v: number })
+    | null {
+    const bin = this.res.env;
+    if (!bin) return null;
+    const names = envMonthNames(this.monthIndex);
+    const uL = pickLayer(bin, [names.u, 'u']);
+    const vL = pickLayer(bin, [names.v, 'v']);
+    if (!uL || !vL) return null;
+    const plane = Math.max(0, this.envPlane);
+    const nextPlane = Math.max(plane, this.envNextPlane);
+    const blend = this.gpu.envBlend;
+    const read = (layer: BinLayer, lat: number, lon: number): number => {
+      const a = sampleLayerBilinear(
+        layer,
+        Math.min(plane, layer.nt - 1),
+        lat,
+        lon,
+      );
+      if (blend <= 0) return a;
+      const b = sampleLayerBilinear(
+        layer,
+        Math.min(nextPlane, layer.nt - 1),
+        lat,
+        lon,
+      );
+      return a + (b - a) * blend;
+    };
+    return (lat: number, lon: number) => ({
+      u: read(uL, lat, lon),
+      v: read(vL, lat, lon),
+    });
   }
 
   private fadeSince(readyMs: number, nowMs: number): number {

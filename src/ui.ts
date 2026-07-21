@@ -27,8 +27,11 @@ import type {
 } from './types';
 import { DeathReason, AFTERMATH_FADE_MS } from './types';
 import { randomSeed, type HashState } from './rng';
-import { latLonToCell, latLonToClip } from './grid';
+import { DOMAIN, greatCircleKm, latLonToCell, latLonToClip } from './grid';
 import { TOKENS } from './tokens';
+import { intensityFraction, stormCategory } from './category';
+import { experiencedWindPhrase } from './impact';
+import type { ImpactSummary } from './impact';
 import type { GhostLabelAnchor } from './tracks';
 import type { RunComparison } from './comparison';
 import {
@@ -131,6 +134,10 @@ export interface FlightRecorderView {
   hindcastScore: HindcastScore | null;
   comparisonActive: boolean;
   comparison: RunComparison | null;
+  /** Landfall-impact bookkeeping for this run (cities, rain, flood proxy). */
+  impact: ImpactSummary | null;
+  /** Sustained wind at the recorded landfall frame, or null (no landfall). */
+  landfallKt: number | null;
 }
 
 interface Ripple {
@@ -193,6 +200,15 @@ export class UiController {
     scrubber: HTMLInputElement;
     jumps: HTMLElement;
     landfallJump: HTMLButtonElement;
+    category: HTMLElement;
+    needleNow: HTMLElement;
+    needlePotential: HTMLElement;
+    intensityNote: HTMLElement;
+    impactLive: HTMLElement;
+    impactReport: HTMLElement;
+    impactHeadline: HTMLElement;
+    impactCities: HTMLElement;
+    impactFlood: HTMLElement;
   };
   private state: UiState = { kind: 'loading', progress: 0 };
   private ripples: Ripple[] = [];
@@ -215,6 +231,8 @@ export class UiController {
   private ghostContainer: HTMLElement | null = null;
   /** Which ghost is the active scenario (brighter label); null = none. */
   private activeGhostId: string | null = null;
+  /** Content signature of the rendered impact-city rows (skip rebuilds). */
+  private impactCitiesKey = '';
 
   constructor(host: UiHost) {
     this.host = host;
@@ -268,6 +286,15 @@ export class UiController {
       scrubber: dom('flight-scrubber'),
       jumps: dom('flight-jumps'),
       landfallJump: dom('flight-landfall'),
+      category: dom('flight-category'),
+      needleNow: dom('scale-needle-now'),
+      needlePotential: dom('scale-needle-potential'),
+      intensityNote: dom('intensity-note'),
+      impactLive: dom('impact-live'),
+      impactReport: dom('impact-report'),
+      impactHeadline: dom('impact-headline'),
+      impactCities: dom('impact-cities'),
+      impactFlood: dom('impact-flood'),
     };
 
     const details = dom<HTMLButtonElement>('flight-details-toggle');
@@ -612,6 +639,52 @@ export class UiController {
       `${compactDirection(structure.motionUms, structure.motionVms)} ` +
       `${motionSpeed.toFixed(1)} · ${structure.translationAsymmetryKt.toFixed(1)} kt`;
 
+    // Category chip + intensity scale: where the storm sits on the SSHS band
+    // and how far the model's live MPI says this water could still take it.
+    const category = stormCategory(storm.vKt);
+    f.category.dataset.cat = category.id;
+    f.category.textContent = category.chip;
+    f.needleNow.style.left = `${(intensityFraction(storm.vKt) * 100).toFixed(1)}%`;
+    const potentialKt = d.mpiKt;
+    const hasPotential = potentialKt > 1 && !d.overLand;
+    f.needlePotential.hidden = !hasPotential;
+    if (hasPotential) {
+      f.needlePotential.style.left =
+        `${(intensityFraction(potentialKt) * 100).toFixed(1)}%`;
+    }
+    if (d.overLand) {
+      f.intensityNote.textContent =
+        `${Math.round(storm.vKt)} kt · over land — no ocean fuel, decaying`;
+    } else if (potentialKt <= storm.vKt + 3) {
+      f.intensityNote.textContent =
+        `${Math.round(storm.vKt)} kt · at its ceiling for this water ` +
+        `(mpi ${Math.round(potentialKt)} kt)`;
+    } else {
+      const potentialCategory = stormCategory(potentialKt);
+      f.intensityNote.textContent =
+        `${Math.round(storm.vKt)} kt now · this ocean supports ` +
+        `${potentialCategory.chip.toLowerCase()} (mpi ${Math.round(potentialKt)} kt)`;
+    }
+
+    // Live coastal exposure: visible while a city is inside the storm's reach.
+    const liveImpact = view.impact?.live ?? null;
+    const showLive = liveImpact !== null && storm.alive && !complete;
+    f.impactLive.hidden = !showLive;
+    if (showLive && liveImpact) {
+      const distanceKm = Math.round(
+        greatCircleKm(
+          { lat: storm.lat, lon: storm.lon },
+          liveImpact.city,
+        ),
+      );
+      const rain = Math.round(liveImpact.rainMm);
+      f.impactLive.textContent =
+        liveImpact.peakWindKt >= 20
+          ? `${liveImpact.city.label} · ${distanceKm} km · ` +
+            `${experiencedWindPhrase(liveImpact.peakWindKt)} so far · ${rain} mm rain`
+          : `watching ${liveImpact.city.label} · ${distanceKm} km out`;
+    }
+
     f.scrubber.max = String(Math.max(0, view.frameCount - 1));
     f.scrubber.value = String(Math.max(0, view.frameIndex));
     f.scrubber.disabled = !complete || view.frameCount < 2;
@@ -645,6 +718,60 @@ export class UiController {
         summary.historicalDeltaKt ?? 0,
         summary.historicalPeakKt,
       );
+    }
+
+    // Coastal-impact report: parametric wind + rain proxies for this run.
+    const impact = view.impact;
+    f.impactReport.hidden = impact === null;
+    if (impact) {
+      if (summary.landfall && view.landfallKt !== null) {
+        const landfallCategory = stormCategory(view.landfallKt);
+        f.impactHeadline.textContent =
+          `ashore as a ${landfallCategory.name} · ` +
+          `${Math.round(view.landfallKt)} kt near ` +
+          formatLatLon(summary.landfall.lat, summary.landfall.lon);
+      } else {
+        const closestKm = summary.death.closestApproachKm;
+        f.impactHeadline.textContent = !Number.isFinite(closestKm)
+          ? 'stayed offshore · never neared muscat'
+          : closestKm <= 25
+            ? 'stayed offshore · skirted muscat inside 25 km'
+            : `stayed offshore · closest pass ${Math.round(closestKm)} km from muscat`;
+      }
+      const exposed = impact.cities
+        .filter((entry) => entry.peakWindKt >= 20)
+        .slice(0, 3);
+      // Rows: [city, phrase · kt · mm], or one all-clear line with no city
+      // attached (a global statement must not read as a per-city record).
+      const rows: Array<[string, string]> =
+        exposed.length > 0
+          ? exposed.map((entry) => [
+              entry.city.label,
+              `${experiencedWindPhrase(entry.peakWindKt)} · ` +
+                `${Math.round(entry.peakWindKt)} kt · ` +
+                `${Math.round(entry.rainMm)} mm`,
+            ])
+          : [['coast', 'no damaging winds reached any city']];
+      // The recorder repaints every frame; rebuild this list only on change.
+      const rowsKey = rows.flat().join('|');
+      if (rowsKey !== this.impactCitiesKey) {
+        this.impactCitiesKey = rowsKey;
+        f.impactCities.replaceChildren(
+          ...rows.map(([city, detailText]) => {
+            const wrap = document.createElement('div');
+            const term = document.createElement('dt');
+            term.textContent = city;
+            const detail = document.createElement('dd');
+            detail.textContent = detailText;
+            wrap.append(term, detail);
+            return wrap;
+          }),
+        );
+      }
+      f.impactFlood.dataset.risk = impact.floodRisk;
+      f.impactFlood.textContent =
+        `flash-flood proxy ${impact.floodRisk} · ` +
+        `max storm-total ${Math.round(impact.maxLandRainMm)} mm over land`;
     }
 
     const score = view.hindcastScore;
@@ -823,6 +950,8 @@ export class UiController {
     const w = cv.width;
     const h = cv.height;
 
+    this.drawGraticule(ctx, w, h);
+
     if (this.genesis.length > 0) {
       const glowR = Math.max(w, h) * 0.06;
       ctx.save();
@@ -856,6 +985,48 @@ export class UiController {
       ctx.lineWidth = Math.max(1, w * 0.0015);
       ctx.stroke();
     }
+  }
+
+  /**
+   * Faint 5° graticule + coordinate labels — the chart-frame furniture that
+   * makes the letterboxed map read as a charted area rather than a screenshot.
+   * Drawn beneath the genesis glow; deliberately near-invisible (chart lines,
+   * not data). Canvas text is a deliberate exception to the DOM-type rule:
+   * these labels reproject every frame with the map exactly like the grid.
+   */
+  private drawGraticule(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+  ): void {
+    const line = trackRgba(0.05);
+    const label = trackRgba(0.3);
+    const font = Math.max(8, Math.round(h * 0.013));
+    ctx.save();
+    ctx.strokeStyle = line;
+    ctx.lineWidth = Math.max(1, h * 0.0008);
+    ctx.fillStyle = label;
+    ctx.font = `${font}px "IBM Plex Mono", monospace`;
+    ctx.textBaseline = 'bottom';
+    for (let lon = DOMAIN.lonMin + 5; lon < DOMAIN.lonMax; lon += 5) {
+      const x = this.pxX(lon, w);
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+      ctx.textAlign = 'center';
+      ctx.fillText(`${lon}°e`, x, h - font * 0.4);
+    }
+    for (let lat = DOMAIN.latMin + 5; lat < DOMAIN.latMax; lat += 5) {
+      const y = this.pxY(lat, h);
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.fillText(`${lat}°n`, font * 0.5, y - font * 0.2);
+    }
+    ctx.restore();
   }
 
   /** lon -> device-pixel x, via grid.ts clip space (the only coordinate owner). */

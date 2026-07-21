@@ -40,7 +40,13 @@ import type {
 } from './types';
 import { UiController, DEMO_MONTH } from './ui';
 import { createSimEngine } from './sim';
-import { makeEnvSampler, synopticCount } from './env-sampler';
+import { makeEnvSampler, sampleEnvBin, synopticCount } from './env-sampler';
+import { sampleOceanProfileBin } from './ocean-profile-sampler';
+import {
+  observedInitialMotionMs,
+  pressureWindSamplerFromBin,
+} from './steering';
+import { sampleLayerBilinear } from './raster-sampler';
 import { parseTracks, toGhostPolylines, computeLabelAnchors } from './tracks';
 import type { GhostPolyline, StormTrack } from './tracks';
 import {
@@ -72,6 +78,9 @@ import {
   type WeatherLayerId,
 } from './weather-layers';
 import { ImpactTracker } from './impact';
+import { createPointProbeReading } from './point-probe';
+import { simulatedStormName } from './storm-names';
+import { findHistoricalAnalog, type HistoricalAnalog } from './historical-analog';
 import {
   requestEnsemble,
   requestSensitivity,
@@ -221,6 +230,11 @@ const sensitivityOrgValue = must(
   document.getElementById('sensitivity-org-value'),
   '#sensitivity-org-value',
 );
+const pointProbeEl = must(document.getElementById('point-probe'), '#point-probe');
+const pointProbePin = must(
+  document.getElementById('point-probe-pin') as HTMLButtonElement | null,
+  '#point-probe-pin',
+);
 
 const gl = glCanvas.getContext('webgl2', { antialias: true, alpha: false });
 if (!gl) {
@@ -260,13 +274,22 @@ const impact = new ImpactTracker();
 // returning from an event restores it.
 let envBin: ParsedBin | null = null;
 let climatologyBin: ParsedBin | null = null;
+let oceanBin: ParsedBin | null = null;
+let steeringBin: ParsedBin | null = null;
+/** Merged terrain+flowacc bin, retained so a scenario switch can re-inject it. */
+let mergedTerrainBin: ParsedBin | null = null;
 const envSampler = makeEnvSampler(() => envBin);
+const pressureWindSampler = pressureWindSamplerFromBin(
+  () => steeringBin,
+  () => envSampler.getSamplingMode(),
+);
 
 // --- Scenario runtime (counterfactual event replays, C8) --------------------
 /** Validated scenario catalogue (data/scenarios.json); empty disables the picker. */
 let scenarios: Scenario[] = [];
 /** Parsed event bins, cached so re-toggling a scenario never refetches. */
 const eventBinCache = new Map<string, ParsedBin>();
+const eventSteeringBinCache = new Map<string, ParsedBin>();
 /** The active event, or null for climatology (the default sandbox). */
 let activeScenario: Scenario | null = null;
 let activeRunMode: EventRunMode = 'counterfactual';
@@ -282,7 +305,17 @@ let analysisRequestSeq = 0;
 // --- Sim + render construction (defensive against half-done siblings) --------
 let engine: SimEngine | null = null;
 try {
-  engine = createSimEngine({ env: envSampler, isLand: (lat, lon) => ui.isLand(lat, lon) });
+  engine = createSimEngine({
+    env: envSampler,
+    isLand: (lat, lon) => ui.isLand(lat, lon),
+    terrainHeightM: (lat, lon) => {
+      const elevation = mergedTerrainBin?.layers.get('elev');
+      return elevation ? sampleLayerBilinear(elevation, 0, lat, lon) : 0;
+    },
+    pressureWindSampler,
+    oceanProfileSampler: (lat, lon, monthIndex) =>
+      sampleOceanProfileBin(oceanBin, lat, lon, monthIndex),
+  });
 } catch (err) {
   console.warn('[boot] sim engine unavailable — running as a static map:', err);
 }
@@ -372,7 +405,7 @@ function resize(): void {
   }
   // DOM ghost labels are positioned in CSS px and do not auto-reproject like the
   // canvas layers — re-layout them on every resize so they track the map.
-  ui.layoutGhostLabels();
+  ui.layoutMapOverlays();
 }
 window.addEventListener('resize', resize);
 resize();
@@ -397,6 +430,7 @@ function asset(path: string): string {
 const MANIFEST: LoadItem[] = [
   { url: asset('data/terrain.bin'), label: 'terrain', kind: 'bin', key: 'terrain', weight: 3 },
   { url: asset('data/env.bin'), label: 'environment', kind: 'bin', key: 'env', weight: 2 },
+  { url: asset('data/ocean.bin'), label: 'upper ocean', kind: 'bin', key: 'ocean', weight: 2 },
   { url: asset('data/flowacc.bin'), label: 'wadi network', kind: 'bin', key: 'flowacc', weight: 2 },
   { url: asset('data/genesis.json'), label: 'genesis zones', kind: 'json', key: 'genesis', weight: 1 },
   // Historic ghost tracks (C7). Missing/404 degrades to null -> no ghosts, no labels.
@@ -411,8 +445,6 @@ let genesisPoints: LatLon[] = [];
 let parsedTracks: StormTrack[] | null = null;
 /** Parsed scenario catalogue, or null when the file is absent/malformed. */
 let parsedScenarios: Scenario[] | null = null;
-/** Merged terrain+flowacc bin, retained so a scenario switch can re-inject it. */
-let mergedTerrainBin: ParsedBin | null = null;
 /** Ghost polylines for the render facade, retained across scenario switches. */
 let ghostTracks: GhostPolyline[] = [];
 
@@ -550,6 +582,7 @@ async function loadAll(): Promise<void> {
   ui.setGenesis(genesisPoints);
   climatologyBin = bins.get('env') ?? null;
   envBin = climatologyBin;
+  oceanBin = bins.get('ocean') ?? null;
 
   // Ghost tracks (C7): the facade draws the polylines; ui owns the DOM labels.
   // parsedTracks is null when tracks.json is absent/malformed -> empty everywhere.
@@ -573,6 +606,13 @@ async function loadAll(): Promise<void> {
   // rides the right physics (never a silent climatology fallback — C8). Otherwise
   // the ambient demo (design T1), fast-forwarded so it opens mid-life.
   const shared = readHash();
+  sharedNameOverride =
+    shared?.stormName && shared.stormNameCatalogueVersion
+      ? {
+          name: shared.stormName,
+          catalogueVersion: shared.stormNameCatalogueVersion,
+        }
+      : null;
   const sharedScenario = shared ? findScenario(scenarios, shared.env) : null;
   if (shared && sharedScenario) {
     const bin = await loadEventBin(sharedScenario);
@@ -616,11 +656,21 @@ let prevHead: Head | null = null;
 let currHead: Head | null = null;
 let accumulatorMin = 0;
 let currentRunLabel = '';
+let currentRunName: ReturnType<typeof simulatedStormName> | null = null;
+let sharedNameOverride: {
+  name: string;
+  catalogueVersion: string;
+} | null = null;
 let hindcastScoreCache: HindcastScore | null = null;
 let hindcastScoreFrameCount = -1;
 /** vKt at the recorded landfall frame, resolved once per landfall. */
 let landfallKtCache: { frameIndex: number; vKt: number } | null = null;
 const pendingMapCaptures: Array<(canvas: HTMLCanvasElement) => void> = [];
+let analogCache: {
+  frameBucket: number;
+  complete: boolean;
+  result: HistoricalAnalog | null;
+} | null = null;
 
 function headOf(s: StormState): Head {
   return {
@@ -656,11 +706,41 @@ function flushMapCaptures(): void {
 }
 
 function labelForRun(params: SpawnParams): string {
-  if (activeScenario) return `${activeScenario.label} ${activeRunMode}`;
+  if (activeScenario && activeRunMode === 'hindcast') {
+    return `${activeScenario.label} hindcast`;
+  }
   const option = Array.from(monthSelect.options).find(
     (candidate) => Number(candidate.value) === params.monthIndex,
   );
-  return `${(option?.textContent ?? 'season').toLowerCase()} climatology`;
+  const environment = activeScenario
+    ? `${activeScenario.label} counterfactual`
+    : `${(option?.textContent ?? 'season').toLowerCase()} climatology`;
+  const identity = currentRunName ?? simulatedStormName(params.seed);
+  return `${identity.label} · ${environment}`;
+}
+
+function activeAnalog(): HistoricalAnalog | null {
+  if (!parsedTracks || parsedTracks.length === 0) return null;
+  const complete = session.complete;
+  // During a live run, update on each simulated hour (four 15-minute frames).
+  // Completion always receives an exact final comparison.
+  const frameBucket = complete
+    ? session.recorder.frameCount
+    : Math.floor(session.recorder.frameCount / 4);
+  if (
+    analogCache &&
+    analogCache.frameBucket === frameBucket &&
+    analogCache.complete === complete
+  ) {
+    return analogCache.result;
+  }
+  const result = findHistoricalAnalog(
+    session.recorder.trackSnapshot(),
+    parsedTracks,
+    { complete },
+  );
+  analogCache = { frameBucket, complete, result };
+  return result;
 }
 
 function activeHistoricalPeakKt(): number | undefined {
@@ -722,10 +802,33 @@ function doSpawn(
   // In event mode, thread the scenario window as the tFrac horizon so sim-hours map
   // onto event-hours (C4). Ambient clicks in event mode inherit it too, so they
   // read the same time axis as the canonical replay.
-  const spawn: SpawnParams =
+  let spawn: SpawnParams =
     inEvent && params.tFracHorizonH === undefined
       ? { ...params, tFracHorizonH: activeScenario!.windowH }
       : params;
+  if (
+    inEvent &&
+    activeRunMode === 'hindcast' &&
+    activeScenario?.hindcast &&
+    parsedTracks
+  ) {
+    const track = parsedTracks.find(
+      (candidate) => candidate.id === activeScenario!.ghostId,
+    );
+    const motion = track
+      ? observedInitialMotionMs(
+          track.points,
+          activeScenario.hindcast.startIso,
+        )
+      : null;
+    if (motion) {
+      spawn = {
+        ...spawn,
+        initialMotionUms: motion.u,
+        initialMotionVms: motion.v,
+      };
+    }
+  }
   try {
     engine.spawn(spawn);
   } catch (err) {
@@ -740,6 +843,19 @@ function doSpawn(
     ? 'spawn or select a storm'
     : 'ready · worker cache will reuse this environment';
   const s = engine.getState();
+  const generatedName = simulatedStormName(spawn.seed);
+  currentRunName =
+    activeScenario && activeRunMode === 'hindcast'
+      ? null
+      : sharedNameOverride
+        ? {
+            ...generatedName,
+            name: sharedNameOverride.name,
+            label: `Simulated Cyclone ${sharedNameOverride.name}`,
+            catalogueVersion: sharedNameOverride.catalogueVersion,
+          }
+        : generatedName;
+  sharedNameOverride = null;
   currentRunLabel = labelForRun(spawn);
   if (s) {
     session.start(
@@ -750,6 +866,9 @@ function doSpawn(
         seed: spawn.seed,
         isDemo: spawn.isDemo,
         label: currentRunLabel,
+        stormName: currentRunName?.name,
+        stormNameCatalogueVersion: currentRunName?.catalogueVersion,
+        stormNameOfficial: currentRunName?.official,
         counterfactual:
           activeScenario !== null && activeRunMode === 'counterfactual',
         hindcast: activeScenario !== null && activeRunMode === 'hindcast',
@@ -771,6 +890,7 @@ function doSpawn(
   hindcastScoreCache = null;
   hindcastScoreFrameCount = -1;
   landfallKtCache = null;
+  analogCache = null;
   impact.reset();
   currHead = s ? headOf(s) : null;
   prevHead = currHead;
@@ -779,7 +899,15 @@ function doSpawn(
     // The scenario id doubles as the hash env key; validate it so a
     // catalogue that ever adds an id outside the known set can't emit a bad hash.
     const env = activeScenario && isEnvHashKey(activeScenario.id) ? activeScenario.id : undefined;
-    writeHash({ lat: spawn.lat, lon: spawn.lon, monthIndex: spawn.monthIndex, seed: spawn.seed, env });
+    writeHash({
+      lat: spawn.lat,
+      lon: spawn.lon,
+      monthIndex: spawn.monthIndex,
+      seed: spawn.seed,
+      env,
+      stormName: currentRunName?.name,
+      stormNameCatalogueVersion: currentRunName?.catalogueVersion,
+    });
   }
 }
 
@@ -818,7 +946,10 @@ function warmUp(hours: number): void {
  */
 async function loadEventBin(scenario: Scenario): Promise<ParsedBin | null> {
   const cached = eventBinCache.get(scenario.id);
-  if (cached) return cached;
+  if (cached) {
+    await loadEventSteeringBin(scenario);
+    return cached;
+  }
   const item: LoadItem = { url: asset(scenario.bin), label: scenario.label, kind: 'bin', key: 'event', weight: 2 };
   progressEl.removeAttribute('data-done'); // re-reveal the progress line for the toggle
   const buf = await loadWithProgress(item, (frac) => ui.reportProgress(frac));
@@ -833,9 +964,32 @@ async function loadEventBin(scenario: Scenario): Promise<ParsedBin | null> {
     );
     if (!bin) return null;
     eventBinCache.set(scenario.id, bin);
+    await loadEventSteeringBin(scenario);
     return bin;
   } catch (err) {
     console.warn(`[scenario] ${scenario.label} bin parsed badly:`, err);
+    return null;
+  }
+}
+
+/** Load optional HF-3 pressure-level winds without making them a hard runtime
+ * dependency; diagnostics expose the deep-layer fallback when absent. */
+async function loadEventSteeringBin(
+  scenario: Scenario,
+): Promise<ParsedBin | null> {
+  const cached = eventSteeringBinCache.get(scenario.id);
+  if (cached) return cached;
+  const relative = scenario.bin.replace(/(^|\/)env_/, '$1steering_');
+  try {
+    const response = await fetch(asset(relative));
+    if (!response.ok) return null;
+    const parsed = parseBin(await response.arrayBuffer());
+    const required = ['u850', 'v850', 'u500', 'v500', 'u250', 'v250'];
+    if (!required.every((name) => parsed.layers.has(name))) return null;
+    eventSteeringBinCache.set(scenario.id, parsed);
+    return parsed;
+  } catch (error) {
+    console.warn(`[scenario] ${scenario.label} pressure steering unavailable:`, error);
     return null;
   }
 }
@@ -855,6 +1009,7 @@ function applyEventEnv(
   activeScenario = scenario;
   activeRunMode = mode;
   envBin = bin; // sampler live-swap — the sim reads the event env on its next tick
+  steeringBin = eventSteeringBinCache.get(scenario.id) ?? null;
   // Sync the scenario picker to the active event (C8 fidelity). On the shared-URL
   // boot path nothing else sets it, so without this the picker keeps its DOM
   // default 'climatology' while the event runs — and, because selecting the
@@ -896,6 +1051,7 @@ function applyClimatologyEnv(month: number): void {
   activeScenario = null;
   activeRunMode = 'counterfactual';
   envBin = climatologyBin;
+  steeringBin = null;
   monthSelect.disabled = false;
   monthSelect.value = String(month);
   scenarioSelect.value = CLIMATOLOGY_ID;
@@ -977,6 +1133,128 @@ function readPickerMonth(): number {
 // before screen -> clip -> lat/lon conversion. Ocean -> fresh deterministic
 // storm; land -> ripple, no storm.
 const mapTap = new TapGesture();
+let probePosition: LatLon | null = null;
+let probePinned = false;
+let probeTouch: {
+  id: number;
+  startX: number;
+  startY: number;
+  latestX: number;
+  latestY: number;
+  timer: number;
+} | null = null;
+
+function mapPointFromClient(clientX: number, clientY: number): LatLon | null {
+  const rect = glCanvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  const clipX = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const clipY = -(((clientY - rect.top) / rect.height) * 2 - 1);
+  const point = clipToLatLon(clipX, clipY);
+  return inBBox(point.lat, point.lon, DOMAIN) ? point : null;
+}
+
+function probePlacement(point: LatLon): {
+  xPx: number;
+  yPx: number;
+  widthPx: number;
+  heightPx: number;
+  pinned: boolean;
+} {
+  const rect = glCanvas.getBoundingClientRect();
+  const clip = latLonToClip(point.lat, point.lon, DOMAIN);
+  return {
+    xPx: ((clip.x + 1) / 2) * rect.width,
+    yPx: ((1 - clip.y) / 2) * rect.height,
+    widthPx: rect.width,
+    heightPx: rect.height,
+    pinned: probePinned,
+  };
+}
+
+function displayedStorm(): StormState | null {
+  const live = engine ? engine.getState() : null;
+  return session.stormView(live).storm;
+}
+
+function pointProbeReadingAt(point: LatLon, storm: StormState | null) {
+  const monthIndex = currentSpawn?.monthIndex ?? readPickerMonth();
+  const tFrac =
+    activeScenario && storm
+      ? eventTimeFraction(storm.ageH, activeScenario.windowH)
+      : 0;
+  const direct = envBin
+    ? sampleEnvBin(
+        envBin,
+        point.lat,
+        point.lon,
+        monthIndex,
+        tFrac,
+        envSampler.getSamplingMode(),
+      )
+    : null;
+  const environment =
+    direct ?? envSampler.sample(point.lat, point.lon, monthIndex, tFrac);
+  const monthLabel = Array.from(monthSelect.options).find(
+    (option) => Number(option.value) === monthIndex,
+  )?.textContent;
+  const environmentKind = direct
+    ? activeScenario
+      ? 'analysis' as const
+      : 'climatology' as const
+    : 'fallback' as const;
+  return createPointProbeReading({
+    ...point,
+    environment,
+    storm,
+    environmentKind,
+    environmentLabel: activeScenario
+      ? `${activeScenario.label} event fields`
+      : direct
+        ? `${(monthLabel ?? 'season').toLowerCase()} monthly fields`
+        : 'analytic degraded mode',
+    validTimeLabel: activeScenario && storm
+      ? `event +${storm.ageH.toFixed(1)} h`
+      : 'monthly climatology',
+  });
+}
+
+function refreshPointProbe(storm: StormState | null = displayedStorm()): void {
+  if (!probePosition || pointProbeEl.hidden) return;
+  ui.showPointProbe(
+    pointProbeReadingAt(probePosition, storm),
+    probePlacement(probePosition),
+  );
+}
+
+function showPointProbeAt(clientX: number, clientY: number): void {
+  const point = mapPointFromClient(clientX, clientY);
+  if (!point) {
+    if (!probePinned) ui.hidePointProbe();
+    return;
+  }
+  probePosition = point;
+  const storm = displayedStorm();
+  ui.showPointProbe(
+    pointProbeReadingAt(point, storm),
+    probePlacement(point),
+  );
+}
+
+function clearProbeTouch(pointerId?: number): void {
+  if (!probeTouch || (pointerId !== undefined && probeTouch.id !== pointerId)) return;
+  window.clearTimeout(probeTouch.timer);
+  probeTouch = null;
+}
+
+pointProbePin.addEventListener('click', () => {
+  if (!probePosition) return;
+  probePinned = !probePinned;
+  ui.setPointProbePinned(probePinned);
+  if (!probePinned && !pointProbeEl.matches(':hover')) ui.hidePointProbe();
+});
+pointProbeEl.addEventListener('pointerleave', () => {
+  if (!probePinned) ui.hidePointProbe();
+});
 
 // Minimal stroke icons for the layer rail — one glyph per layer id.
 const LAYER_ICONS: Record<WeatherLayerId, string> = {
@@ -1048,11 +1326,23 @@ layerButtons.replaceChildren(
 );
 setWeatherLayer(DEFAULT_WEATHER_LAYER);
 
-function currentAnalysisUrls(): { envUrl: string; terrainUrl: string } {
+function currentAnalysisUrls(): {
+  envUrl: string;
+  terrainUrl: string;
+  steeringUrl?: string;
+  oceanUrl: string;
+} {
   const envPath = activeScenario?.bin ?? 'data/env.bin';
+  const steeringPath = activeScenario
+    ? activeScenario.bin.replace(/(^|\/)env_/, '$1steering_')
+    : null;
   return {
     envUrl: new URL(asset(envPath), window.location.href).href,
     terrainUrl: new URL(asset('data/terrain.bin'), window.location.href).href,
+    ...(steeringPath
+      ? { steeringUrl: new URL(asset(steeringPath), window.location.href).href }
+      : {}),
+    oceanUrl: new URL(asset('data/ocean.bin'), window.location.href).href,
   };
 }
 
@@ -1098,8 +1388,10 @@ ensembleRun.addEventListener('click', () => {
       ensembleLandfall.textContent = percentage(result.landfallProbability);
       ensembleResults.hidden = false;
       ensembleStatus.value =
+        `${currentRunName?.label ?? 'historical hindcast'} · ` +
         `${result.members.length} deterministic members · ` +
-        `${((performance.now() - startedAt) / 1000).toFixed(1)} s · probability field on map`;
+        `${((performance.now() - startedAt) / 1000).toFixed(1)} s · ` +
+        'perturbation-frequency field on map';
     })
     .catch((error: unknown) => {
       if (requestSeq !== analysisRequestSeq) return;
@@ -1181,21 +1473,72 @@ sensitivityRun.addEventListener('click', () => {
 
 glCanvas.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'mouse' && event.button !== 0) return;
+  if (event.pointerType === 'touch' && probePinned) {
+    probePinned = false;
+    probePosition = null;
+    ui.hidePointProbe();
+    return;
+  }
   mapTap.start(event.pointerId, event.clientX, event.clientY, event.timeStamp);
+  if (event.pointerType === 'touch') {
+    clearProbeTouch();
+    const id = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const timer = window.setTimeout(() => {
+      if (!probeTouch || probeTouch.id !== id) return;
+      mapTap.cancel(id);
+      probePinned = true;
+      showPointProbeAt(probeTouch.latestX, probeTouch.latestY);
+      ui.setPointProbePinned(true);
+      probeTouch = null;
+    }, 650);
+    probeTouch = {
+      id,
+      startX,
+      startY,
+      latestX: startX,
+      latestY: startY,
+      timer,
+    };
+  }
 });
 glCanvas.addEventListener('pointermove', (event) => {
   mapTap.move(event.pointerId, event.clientX, event.clientY);
+  if (event.pointerType === 'mouse' && event.buttons === 0 && !probePinned) {
+    showPointProbeAt(event.clientX, event.clientY);
+  }
+  if (probeTouch?.id === event.pointerId) {
+    probeTouch.latestX = event.clientX;
+    probeTouch.latestY = event.clientY;
+    if (
+      Math.hypot(
+        event.clientX - probeTouch.startX,
+        event.clientY - probeTouch.startY,
+      ) > 10
+    ) {
+      clearProbeTouch(event.pointerId);
+    }
+  }
 });
 glCanvas.addEventListener('pointercancel', (event) => {
+  clearProbeTouch(event.pointerId);
   mapTap.cancel(event.pointerId);
 });
+glCanvas.addEventListener('pointerleave', (event) => {
+  if (
+    !probePinned &&
+    !(event.relatedTarget instanceof Node && pointProbeEl.contains(event.relatedTarget))
+  ) {
+    ui.hidePointProbe();
+  }
+});
 glCanvas.addEventListener('pointerup', (e) => {
+  clearProbeTouch(e.pointerId);
   if (!mapTap.end(e.pointerId, e.clientX, e.clientY, e.timeStamp)) return;
-  const rect = glCanvas.getBoundingClientRect();
-  const clipX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  const clipY = -(((e.clientY - rect.top) / rect.height) * 2 - 1); // screen y is flipped
-  const { lat, lon } = clipToLatLon(clipX, clipY);
-  if (!inBBox(lat, lon, DOMAIN)) return;
+  const point = mapPointFromClient(e.clientX, e.clientY);
+  if (!point) return;
+  const { lat, lon } = point;
   const params = ui.handlePointer(lat, lon, engine !== null, performance.now());
   if (params) {
     if (activeScenario) {
@@ -1235,6 +1578,12 @@ window.addEventListener('keydown', (e) => {
       e.preventDefault();
       setWeatherLayer(definition.id);
     }
+    return;
+  }
+  if (e.code === 'Escape' && probePinned) {
+    probePinned = false;
+    probePosition = null;
+    ui.hidePointProbe();
     return;
   }
   if (e.code !== 'Space') return;
@@ -1555,6 +1904,9 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
 
   ui.drawOverlay(nowMs); // genesis glow + ripples, on top of the track
   ui.update(nowMs); // expire the aftermath fade back to the rarity copy
+  const impactSummary = impact.summary(storm);
+  ui.updateCityMarkers(storm, impactSummary);
+  refreshPointProbe(storm);
   ui.updateFlightRecorder({
     storm,
     label: currentRunLabel,
@@ -1571,8 +1923,10 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
     hindcastScore: activeHindcastScore(),
     comparisonActive: session.comparisonBaseline !== null,
     comparison: session.comparison(),
-    impact: impact.summary(storm),
+    impact: impactSummary,
     landfallKt: landfallWindKt(),
+    intensitySeries: session.recorder.intensitySeries(),
+    historicalAnalog: storm?.isDemo ? null : activeAnalog(),
   });
 }
 

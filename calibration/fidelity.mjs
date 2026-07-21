@@ -14,10 +14,46 @@ const SCENARIOS_PATH = resolve(
 );
 const TRACKS_PATH = resolve(ROOT, 'calibration/data/fidelity-tracks.json');
 const TERRAIN_PATH = resolve(ROOT, 'public/data/terrain.bin');
-const RESULTS_PATH = resolve(ROOT, 'calibration/fidelity-results.json');
+const OCEAN_PATH = resolve(ROOT, 'public/data/ocean.bin');
+const EVENT_OCEAN_PATH = resolve(ROOT, 'calibration/data/hf2a-event-ocean.bin');
+const EVENT_OCEAN_META_PATH = resolve(ROOT, 'calibration/data/hf2a-event-ocean.json');
+const INITIAL_STRUCTURE_PATH = resolve(ROOT, 'calibration/data/hf2-initial-structure.json');
+const HF3_STEERING_META_PATH = resolve(ROOT, 'calibration/data/hf3-steering-manifest.json');
+const PARTITION_FILTER = process.argv
+  .find((argument) => argument.startsWith('--partition='))
+  ?.slice('--partition='.length);
+if (
+  PARTITION_FILTER &&
+  !['development', 'validation', 'test'].includes(PARTITION_FILTER)
+) {
+  throw new Error(`invalid partition filter: ${PARTITION_FILTER}`);
+}
+const ACTIVE_PARTITIONS = PARTITION_FILTER
+  ? [PARTITION_FILTER]
+  : ['development', 'validation', 'test'];
+const RESULT_TAG = process.argv
+  .find((argument) => argument.startsWith('--tag='))
+  ?.slice('--tag='.length);
+if (RESULT_TAG && !/^[a-z0-9-]+$/.test(RESULT_TAG)) {
+  throw new Error(`invalid result tag: ${RESULT_TAG}`);
+}
+const RESULTS_PATH = resolve(
+  ROOT,
+  PARTITION_FILTER
+    ? `calibration/fidelity-${PARTITION_FILTER}${RESULT_TAG ? `-${RESULT_TAG}` : ''}.json`
+    : 'calibration/fidelity-results.json',
+);
 const REFERENCE_PATH = resolve(ROOT, 'calibration/fidelity-reference.json');
 const REPORT_PATH = resolve(ROOT, 'docs/fidelity-benchmark.md');
 const CHECK = process.argv.includes('--check');
+function numberArgument(name, fallback) {
+  const prefix = `--${name}=`;
+  const raw = process.argv.find((argument) => argument.startsWith(prefix));
+  if (!raw) return fallback;
+  const value = Number(raw.slice(prefix.length));
+  if (!Number.isFinite(value)) throw new Error(`invalid ${name}: ${raw}`);
+  return value;
+}
 // IEEE-754 trig differs by a few 1e-13 units between ARM64 and x86_64 libm.
 // Nine decimal places remain many orders finer than the data/model resolution
 // while making the machine artefact byte-stable across supported CI platforms.
@@ -36,14 +72,17 @@ const [
     FIDELITY_BOOTSTRAP_REPLICATES,
     FIDELITY_LEAD_HOURS,
     PERSISTENCE_LOOKBACK_MAX_HOURS,
+    trainClimatologyPersistence,
     verifyLeadTimes,
   },
   { parseBin },
   { parseScenarios },
-  { DEFAULT_INTENSITY_PARAMETERS },
+  { DEFAULT_INTENSITY_PARAMETERS, DEFAULT_TRACK_PARAMETERS },
   { parseTracks },
   { DOMAIN, inBBox },
   { scoreHindcast },
+  { sampleOceanProfileBin, sampleEventOceanProfileBin },
+  { observedInitialMotionMs, pressureWindSamplerFromBin },
 ] = await Promise.all([
   vite.ssrLoadModule('/src/hindcast-benchmark.ts'),
   vite.ssrLoadModule('/src/fidelity-verification.ts'),
@@ -53,7 +92,53 @@ const [
   vite.ssrLoadModule('/src/tracks.ts'),
   vite.ssrLoadModule('/src/grid.ts'),
   vite.ssrLoadModule('/src/hindcast.ts'),
+  vite.ssrLoadModule('/src/ocean-profile-sampler.ts'),
+  vite.ssrLoadModule('/src/steering.ts'),
 ]);
+const RUNTIME_INTENSITY_PARAMETERS = Object.freeze({
+  ...DEFAULT_INTENSITY_PARAMETERS,
+  intensifyKPerH: numberArgument(
+    'intensify',
+    DEFAULT_INTENSITY_PARAMETERS.intensifyKPerH,
+  ),
+  shearKtPerHPerMs: numberArgument(
+    'shearK',
+    DEFAULT_INTENSITY_PARAMETERS.shearKtPerHPerMs,
+  ),
+  dryAirK: numberArgument('dryK', DEFAULT_INTENSITY_PARAMETERS.dryAirK),
+  organizationIntensification: numberArgument(
+    'orgGain',
+    DEFAULT_INTENSITY_PARAMETERS.organizationIntensification,
+  ),
+});
+const RUNTIME_TRACK_PARAMETERS = Object.freeze({
+  ...DEFAULT_TRACK_PARAMETERS,
+  environmentalSteeringBlend: numberArgument(
+    'steeringBlend',
+    DEFAULT_TRACK_PARAMETERS.environmentalSteeringBlend,
+  ),
+  motionResponseHours: numberArgument(
+    'motionResponseH',
+    DEFAULT_TRACK_PARAMETERS.motionResponseHours,
+  ),
+  initialMotionBlendHours: numberArgument(
+    'initialMotionBlendH',
+    DEFAULT_TRACK_PARAMETERS.initialMotionBlendHours,
+  ),
+  betaDriftScale: numberArgument(
+    'betaScale',
+    DEFAULT_TRACK_PARAMETERS.betaDriftScale,
+  ),
+  terrainDriftMaxMs: numberArgument(
+    'terrainDrift',
+    DEFAULT_TRACK_PARAMETERS.terrainDriftMaxMs,
+  ),
+  wanderStepMs: numberArgument('wanderStep', DEFAULT_TRACK_PARAMETERS.wanderStepMs),
+  wanderRevertFraction: numberArgument(
+    'wanderRevert',
+    DEFAULT_TRACK_PARAMETERS.wanderRevertFraction,
+  ),
+});
 
 function contiguousInDomainTrack(track, startIso) {
   const startMs = Date.parse(startIso);
@@ -428,10 +513,29 @@ if (
 
 const terrainArtifact = await loadBinArtifact(TERRAIN_PATH);
 const terrain = terrainArtifact.parsed;
+const oceanArtifact = await loadBinArtifact(OCEAN_PATH);
+const eventOceanArtifact = await loadBinArtifact(EVENT_OCEAN_PATH);
+const eventOceanMetadataText = await readFile(EVENT_OCEAN_META_PATH, 'utf8');
+const eventOceanMetadata = JSON.parse(eventOceanMetadataText);
+const initialStructureText = await readFile(INITIAL_STRUCTURE_PATH, 'utf8');
+const initialStructure = JSON.parse(initialStructureText);
+const hf3SteeringMetadataText = await readFile(HF3_STEERING_META_PATH, 'utf8');
+const hf3SteeringMetadata = JSON.parse(hf3SteeringMetadataText);
 const trackById = new Map(tracks.map((track) => [track.id, track]));
+const CLIPER_MODEL = trainClimatologyPersistence(
+  scenarios
+    .filter((scenario) => scenario.benchmarkPartition === 'development')
+    .map((scenario) => {
+      const track = trackById.get(scenario.ghostId);
+      if (!track) throw new Error(`${scenario.id}: missing CLIPER training track`);
+      return { track, startIso: scenario.hindcast.startIso };
+    }),
+);
 const cases = [];
 const environmentManifest = [];
+const pressureSteeringManifest = [];
 for (const scenario of scenarios) {
+  if (PARTITION_FILTER && scenario.benchmarkPartition !== PARTITION_FILTER) continue;
   const track = trackById.get(scenario.ghostId);
   if (!track) throw new Error(`${scenario.id}: missing ${scenario.ghostId}`);
   const environmentArtifact = await loadBinArtifact(resolve(ROOT, scenario.bin));
@@ -440,7 +544,21 @@ for (const scenario of scenarios) {
     id: scenario.id,
     ...environmentArtifact.manifest,
   });
+  const pressureSteeringRecord = hf3SteeringMetadata.storms.find(
+    (item) => item.id === scenario.id,
+  );
+  if (!pressureSteeringRecord) {
+    throw new Error(`${scenario.id}: missing HF-3 pressure steering metadata`);
+  }
+  const pressureSteeringArtifact = await loadBinArtifact(
+    resolve(ROOT, pressureSteeringRecord.path),
+  );
+  pressureSteeringManifest.push({
+    id: scenario.id,
+    ...pressureSteeringArtifact.manifest,
+  });
   const startIso = scenario.hindcast.startIso;
+  const initialMotion = observedInitialMotionMs(track.points, startIso);
   const inDomainTrack = contiguousInDomainTrack(track, startIso);
   if (inDomainTrack.points.length === 0) {
     throw new Error(`${scenario.id}: no contiguous in-domain verification fixes`);
@@ -448,6 +566,30 @@ for (const scenario of scenarios) {
   const detailed = runDetailedHindcastCase(
     { scenario, track: inDomainTrack, environment },
     terrain,
+    RUNTIME_INTENSITY_PARAMETERS,
+    (lat, lon, monthIndex) => {
+      const eventProfile = eventOceanMetadata.events.find(
+        (item) => item.id === scenario.id,
+      );
+      return (
+        (eventProfile
+          ? sampleEventOceanProfileBin(
+              eventOceanArtifact.parsed,
+              lat,
+              lon,
+              eventProfile.layerIndex,
+            )
+          : null) ??
+        sampleOceanProfileBin(oceanArtifact.parsed, lat, lon, monthIndex)
+      );
+    },
+    initialStructure.storms.find((item) => item.id === scenario.id),
+    initialMotion ? { u: initialMotion.u, v: initialMotion.v } : undefined,
+    pressureWindSamplerFromBin(
+      () => pressureSteeringArtifact.parsed,
+      () => ({ kind: 'event-timeline' }),
+    ),
+    RUNTIME_TRACK_PARAMETERS,
   );
   const lastObservedMs = Date.parse(inDomainTrack.points.at(-1).iso);
   const commonEndH = (lastObservedMs - Date.parse(startIso)) / 3_600_000;
@@ -469,6 +611,8 @@ for (const scenario of scenarios) {
       detailed.frames,
       track,
       startIso,
+      undefined,
+      CLIPER_MODEL,
     ),
   });
 }
@@ -478,6 +622,7 @@ const byPartition = (partition) =>
 const outputBase = {
   schemaVersion: 1,
   generatedBy: 'calibration/fidelity.mjs',
+  ...(PARTITION_FILTER ? { partitionFilter: PARTITION_FILTER } : {}),
   source: {
     tracks: 'NOAA IBTrACS v04r01 North Indian basin USA/JTWC fields',
     environment: 'ERA5 event fields and WOA23 monthly ocean heat content',
@@ -501,9 +646,28 @@ const outputBase = {
       sha256: digest(tracksText),
     },
     terrain: terrainArtifact.manifest,
+    oceanProfiles: oceanArtifact.manifest,
+    eventOceanProfiles: eventOceanArtifact.manifest,
+    eventOceanMetadata: {
+      path: 'calibration/data/hf2a-event-ocean.json',
+      bytes: Buffer.byteLength(eventOceanMetadataText),
+      sha256: digest(eventOceanMetadataText),
+    },
+    initialStructure: {
+      path: 'calibration/data/hf2-initial-structure.json',
+      bytes: Buffer.byteLength(initialStructureText),
+      sha256: digest(initialStructureText),
+    },
+    pressureLevelSteeringMetadata: {
+      path: 'calibration/data/hf3-steering-manifest.json',
+      bytes: Buffer.byteLength(hf3SteeringMetadataText),
+      sha256: digest(hf3SteeringMetadataText),
+    },
+    pressureLevelSteering: pressureSteeringManifest,
     environments: environmentManifest,
   },
-  runtimeParameters: DEFAULT_INTENSITY_PARAMETERS,
+  runtimeParameters: RUNTIME_INTENSITY_PARAMETERS,
+  runtimeTrackParameters: RUNTIME_TRACK_PARAMETERS,
   verificationProtocol: {
     leadHours: [...FIDELITY_LEAD_HOURS],
     domain: DOMAIN,
@@ -516,6 +680,12 @@ const outputBase = {
       pressure: 'held at initialization when available',
       futureFixesAllowed: false,
     },
+    climatologyPersistence: {
+      trainingPartition: 'development',
+      predictors: 'pre-initialization motion plus basin-mean displacement by lead',
+      fit: CLIPER_MODEL,
+      validationAndTestExcludedFromFit: true,
+    },
     bootstrap: {
       samplingUnit: 'storm',
       replicates: FIDELITY_BOOTSTRAP_REPLICATES,
@@ -525,13 +695,13 @@ const outputBase = {
   },
   cases,
   aggregate: Object.fromEntries(
-    ['development', 'validation', 'test'].map((partition) => [
+    ACTIVE_PARTITIONS.map((partition) => [
       partition,
       aggregateHindcasts(byPartition(partition)),
     ]),
   ),
   leadTimes: Object.fromEntries(
-    ['development', 'validation', 'test'].map((partition) => [
+    ACTIVE_PARTITIONS.map((partition) => [
       partition,
       aggregateLeadTimes(
         byPartition(partition).map((row) => row.leadTimes),
@@ -549,15 +719,32 @@ try {
 } catch {
   reference = referenceOf(canonicalBase);
 }
-const output = canonicalizeNumbers({
-  ...canonicalBase,
-  referenceComparison: compareReference(canonicalBase, reference),
-});
+const output = canonicalizeNumbers(
+  PARTITION_FILTER
+    ? canonicalBase
+    : {
+        ...canonicalBase,
+        referenceComparison: compareReference(canonicalBase, reference),
+      },
+);
 const resultsText = `${JSON.stringify(output, null, 2)}\n`;
 const referenceText = `${JSON.stringify(reference, null, 2)}\n`;
-const reportText = makeReport(output);
+const reportText = PARTITION_FILTER ? '' : makeReport(output);
 
-if (CHECK) {
+if (PARTITION_FILTER && CHECK) {
+  const matches = await compare(RESULTS_PATH, resultsText);
+  if (!matches) {
+    console.error(`[fidelity] FAIL ${PARTITION_FILTER} artifact drift`);
+    process.exitCode = 1;
+  } else {
+    console.log(`[fidelity] PASS ${PARTITION_FILTER} artifact stable`);
+  }
+} else if (PARTITION_FILTER) {
+  await writeFile(RESULTS_PATH, resultsText);
+  console.log(
+    `[fidelity] wrote ${RESULTS_PATH.slice(ROOT.length + 1)} (${cases.length} ${PARTITION_FILTER} storms)`,
+  );
+} else if (CHECK) {
   const matches = await Promise.all([
     compare(RESULTS_PATH, resultsText),
     compare(REFERENCE_PATH, referenceText),

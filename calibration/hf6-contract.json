@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-6",
+  "frozenAt": "2026-07-21T15:10:00+04:00",
+  "sealId": "hf6-arabian-v1-2026-07-21",
+  "catalogue": {
+    "minimumStorms": 60,
+    "maximumStorms": 100,
+    "minimumInitializationsPerStorm": 2,
+    "minimumSealedCanonicalStorms": 8,
+    "sealedCohortOverlapWithHF1": 0,
+    "selectionMayUseSimulatedOutcome": false
+  },
+  "sealedConfirmation": {
+    "candidateFreezeRequired": ["HF-2", "HF-3"],
+    "requiredLeadsH": [12, 24, 48],
+    "hf2IntensityLeadsH": [24, 48],
+    "hf3TrackLeadsH": [12, 24, 48],
+    "minimumSkillAgainstLinearPersistence": 0,
+    "minimumSampleRetentionFraction": 0.9,
+    "maximumIntensityOrPressureRegressionFraction": 0.05,
+    "retuningAfterFirstLookAllowed": false
+  },
+  "prospective": {
+    "minimumMaturedForecastsBeforeSkillClaim": 12,
+    "minimumDistinctStorms": 4,
+    "issueBeforeObservations": true,
+    "pastRunMutationAllowed": false,
+    "officialGuidanceComparisonRequiredWhenCompatible": true
+  },
+  "outcomes": [
+    "landfall-position-time",
+    "peak-intensity-time",
+    "rapid-intensification",
+    "dissipation",
+    "rmw",
+    "r34",
+    "r50",
+    "r64",
+    "threshold-events"
+  ],
+  "strata": [
+    "season",
+    "initial-intensity",
+    "motion",
+    "land-interaction",
+    "data-era",
+    "forecast-difficulty",
+    "observation-availability"
+  ],
+  "claimRule": "The broader catalogue and first-look sealed evaluation can reject frozen candidates. Only a matured prospective archive can support a stronger forecast-skill or probability claim."
+}

@@ -56,6 +56,40 @@ describe('rng: URL hash round-trips a shareable storm', () => {
     expect(readHash('#')).toBeNull();
     expect(readHash('#lat=1&lon=2')).toBeNull(); // missing month + seed
   });
+
+  it('round-trips a versioned simulated name without breaking legacy URLs', () => {
+    const state: HashState = {
+      lat: 18.234,
+      lon: 63.512,
+      monthIndex: 5,
+      seed: 13,
+      stormName: 'Biparjoy',
+      stormNameCatalogueVersion: 'wmo-escap-nio-2020-v1',
+    };
+    const encoded = encodeHash(state);
+    expect(encoded).toContain(
+      'storm=Biparjoy&namev=wmo-escap-nio-2020-v1',
+    );
+    expect(readHash(`#${encoded}`)).toMatchObject({
+      stormName: 'Biparjoy',
+      stormNameCatalogueVersion: 'wmo-escap-nio-2020-v1',
+    });
+  });
+
+  it('drops an unpaired or unsafe display identity', () => {
+    const base: HashState = {
+      lat: 18.234,
+      lon: 63.512,
+      monthIndex: 5,
+      seed: 13,
+    };
+    expect(encodeHash({ ...base, stormName: '<script>' })).toBe(
+      encodeHash(base),
+    );
+    expect(
+      readHash(`#${encodeHash(base)}&storm=Biparjoy`)?.stormName,
+    ).toBeUndefined();
+  });
 });
 
 describe('rng: optional scenario env key (C8) is backward compatible', () => {

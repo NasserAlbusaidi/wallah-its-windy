@@ -9,6 +9,8 @@ import {
 import { makeEnvSampler } from './env-sampler';
 import { parseBin } from './loader';
 import { sampleLayerBilinear } from './raster-sampler';
+import { pressureWindSamplerFromBin } from './steering';
+import { sampleOceanProfileBin } from './ocean-profile-sampler';
 import type {
   AnalysisWorkerRequest,
   AnalysisWorkerResponse,
@@ -40,16 +42,29 @@ function post(response: AnalysisWorkerResponse): void {
 }
 
 async function handle(request: AnalysisWorkerRequest): Promise<void> {
-  const [envBin, terrainBin] = await Promise.all([
+  const [envBin, terrainBin, steeringBin, oceanBin] = await Promise.all([
     loadBin(request.envUrl),
     loadBin(request.terrainUrl),
+    request.steeringUrl ? loadBin(request.steeringUrl) : Promise.resolve(null),
+    request.oceanUrl ? loadBin(request.oceanUrl) : Promise.resolve(null),
   ]);
   const land = terrainBin.layers.get('landmask');
   if (!land) throw new Error('terrain.bin is missing landmask');
   const isLand = (lat: number, lon: number): boolean =>
     sampleLayerBilinear(land, 0, lat, lon) > 0.5;
+  const elevation = terrainBin.layers.get('elev');
   const sampler = makeEnvSampler(() => envBin);
   sampler.setSamplingMode(request.samplingMode);
+  const physicalDependencies = {
+    pressureWindSampler: pressureWindSamplerFromBin(
+      () => steeringBin,
+      () => request.samplingMode,
+    ),
+    oceanProfileSampler: (lat: number, lon: number, monthIndex: number) =>
+      sampleOceanProfileBin(oceanBin, lat, lon, monthIndex),
+    terrainHeightM: (lat: number, lon: number) =>
+      elevation ? sampleLayerBilinear(elevation, 0, lat, lon) : 0,
+  };
 
   if (request.type === 'ensemble') {
     const members = makeEnsembleMembers(request.spawn, request.count);
@@ -62,6 +77,8 @@ async function handle(request: AnalysisWorkerRequest): Promise<void> {
           isLand,
           spawn: member.spawn,
           intensityParameters: member.intensityParameters,
+          trackParameters: member.trackParameters,
+          ...physicalDependencies,
           maxHours: ANALYSIS_HORIZON_H,
         }),
       );
@@ -84,6 +101,7 @@ async function handle(request: AnalysisWorkerRequest): Promise<void> {
     env: sampler,
     isLand,
     spawn: request.spawn,
+    ...physicalDependencies,
     maxHours: ANALYSIS_HORIZON_H,
   });
   const perturbed = runStorm({
@@ -100,6 +118,7 @@ async function handle(request: AnalysisWorkerRequest): Promise<void> {
         ),
       ),
     },
+    ...physicalDependencies,
     maxHours: ANALYSIS_HORIZON_H,
   });
   post({

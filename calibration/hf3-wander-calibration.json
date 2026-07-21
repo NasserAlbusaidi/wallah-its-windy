@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-3",
+  "partition": "development",
+  "method": "Fit an isotropic Ornstein-Uhlenbeck unresolved-motion term to post-36h observed segment-velocity residuals after selected deterministic steering. Convert pooled lag correlation and stationary variance to the 15-minute uniform-innovation engine parameterization.",
+  "exclusions": [
+    "validation and permanent test storms",
+    "the first 36 hours represented by the explicit pre-advisory motion correction",
+    "segments outside the product domain"
+  ],
+  "bounds": {
+    "wanderStepMs": [
+      0.05,
+      0.6
+    ],
+    "wanderRevertFraction": [
+      0.005,
+      0.15
+    ]
+  },
+  "diagnostics": {
+    "storms": 16,
+    "vectorSegments": 254,
+    "componentSamples": 508,
+    "meanResidualMs": -0.7699874745075572,
+    "componentStdDevMs": 2.371392197375346,
+    "meanSegmentHours": 2.9881889763779528,
+    "lagPairs": 476,
+    "lagCorrelation": 0.8532164968205987,
+    "rawUniformStepMs": 0.6649872980542673,
+    "rawRevertFraction": 0.013192982509869888
+  },
+  "selected": {
+    "wanderStepMs": 0.6,
+    "wanderRevertFraction": 0.013192982509869888
+  },
+  "manifests": {
+    "scenariosSha256": "86e2aa4b35cd2d79ab6bdcacf4f202cc37b8cc8620d0775d959c4688f654a4e7",
+    "tracksSha256": "6d0e10c88a436cf9e2777fe168eee8c6c163b1ec8934f921218ef67cafbacf30",
+    "steeringManifestSha256": "6f35a2e577fc13de78f9a09efffc3c551e1fdbe006910f13740bacefdf5ba1c1",
+    "sourceArtifacts": [
+      {
+        "id": "as1980",
+        "environmentSha256": "2b70d86f0bc8abdd98195658f5ce2af61bca5362b1c0494557dcc7405712cff5",
+        "pressureSteeringSha256": "dd88e3880ee81abc91e16cd2298e3c9388770e8c0a578f9f5b243a2681c61577"
+      },
+      {
+        "id": "as1981",
+        "environmentSha256": "c30729e11a81876a4904032665e32233c9b56eb02a7413cb30577dadb11f50ff",
+        "pressureSteeringSha256": "637a132899af36c828e226fdea345f08b909d49fe7e9f4197c144bc835694e6e"
+      },
+      {
+        "id": "as1982",
+        "environmentSha256": "79e04dac35f80f78edabfd90dc6457e535ef8fedf787af9505be140ede696430",
+        "pressureSteeringSha256": "3644b22c013eb70194bfc5a1fb28543b75273ac7b264eb3253ffe2ee5c464035"
+      },
+      {
+        "id": "as1983",
+        "environmentSha256": "6787832c607c3abfadb50af4afc82ec4739bfe0e89d1d62932475097e8bcd71a",
+        "pressureSteeringSha256": "48fcb8d4974c558e5b77e1e4626e03c2d9cf9ebe1b02261005d45bf2043ad95d"
+      },
+      {
+        "id": "as1987",
+        "environmentSha256": "90bb17d166534924d5f27c372fb4b24c4d3635c83ace7529ef65b9c39511f0ed",
+        "pressureSteeringSha256": "99042f0cee4977877d8a36f497c5f79c3b737d171b519984bcd7c53607ff8b02"
+      },
+      {
+        "id": "as1992",
+        "environmentSha256": "845d4f1dc88738101c89bc60a8e07118300e81cdd53009fba7a59f18a2568b02",
+        "pressureSteeringSha256": "6c4212fc4fa9b1c4890842e8e4cf29ab76846aa9a769a8611e63efdecefb2425"
+      },
+      {
+        "id": "as1994",
+        "environmentSha256": "d9d1fcd8338bbd31b2cc21b42dd94dfd3840d83960d3755682f2933bbe1cc6d8",
+        "pressureSteeringSha256": "e11180af54e619cc5a1d7f01c7d0469fa4cf158a86a7bf2654736f46208bc36d"
+      },
+      {
+        "id": "as1998dec",
+        "environmentSha256": "7e5d699c434b865acfc51525ab460dc866d610c5867e57f04e8942e4379b9775",
+        "pressureSteeringSha256": "b5a69c68f89816a1b553e5b38f90c04e6f4e006902071e612fcf81db0019a4de"
+      },
+      {
+        "id": "gonu2007",
+        "environmentSha256": "31895447c0ebf783b49f8ff36721d73d5777a38056bbd0c190b1dc719ba311a1",
+        "pressureSteeringSha256": "603207f916d307661121b8829dafe1a667705579b37173c4c57c85f42bb21c0c"
+      },
+      {
+        "id": "as2007",
+        "environmentSha256": "2bc892bda8de9a526109a8062d6f0bc72c38e559a29e9f13d3ca0b50cde9e021",
+        "pressureSteeringSha256": "8760605539e9b99c41af2a6a0d687d41ea0c4791bc13924ef4cf8d8a2272403a"
+      },
+      {
+        "id": "phet2010",
+        "environmentSha256": "b28c3fdd8a028e3aa32b13c92b51a680808ac943eb3e2ad8fca350c1a24a473f",
+        "pressureSteeringSha256": "404611affcaa0df2cb548fc7c6e00f2ceb45927af1ec5f01513b0b7f5be4187d"
+      },
+      {
+        "id": "keila2011",
+        "environmentSha256": "fcf46edb30aa25a491df00c89d1d2631315c63f2bfff949b8fac2d82da449e54",
+        "pressureSteeringSha256": "e630b08e50522f573301dc04768deb515a00593c21c24fcad8ab9ff890d79a1e"
+      },
+      {
+        "id": "nanauk2014",
+        "environmentSha256": "5d8e5e1a76e6a7700570cb5dbfde1d1a8762e1bf50c597bdafc5bb980d482e0e",
+        "pressureSteeringSha256": "623eeecc0576ac903495c2302fd5e20761aa10947d1675d5e98738fa7329773b"
+      },
+      {
+        "id": "nilofar2014",
+        "environmentSha256": "112cc53475e3f6785b402bf16f354ed838f28c6d0b5b4b468f403ab9bb789125",
+        "pressureSteeringSha256": "5a2d942a268d31f4855cf971ca721bec8770c5b3b94a7f3c701682c02eb4777d"
+      },
+      {
+        "id": "ashobaa2015",
+        "environmentSha256": "31b488c1de438049ef55a49d82ff68ddd5138396ca2e3f2f854919297b72e4a8",
+        "pressureSteeringSha256": "ae790caea954f35a18cc569d7b3782457f3c8bee0dc335694ffcdb377808801f"
+      },
+      {
+        "id": "mekunu2018",
+        "environmentSha256": "2091f5e59d2d3bec1d7eac6adb34e72749349ac15f649a694af279ae123a6f31",
+        "pressureSteeringSha256": "42dce75de313fbce4190566aad35bf3556a32c9f1eebdf6900441e94a731f26f"
+      },
+      {
+        "id": "vayu2019",
+        "environmentSha256": "5097ed6b26568302008ecbf29d653db6109385c7bb8a503e4a4fce29571d3da1",
+        "pressureSteeringSha256": "377584d3af5debf4bd6b96ae07723b36801c842a3b9c7ab972ef3f19938f2ad4"
+      },
+      {
+        "id": "hikaa2019",
+        "environmentSha256": "1b8fd2e726f1f67d65a914ee70a3f421bb428e33f29cee000cf7e6a4f77e1c4a",
+        "pressureSteeringSha256": "be5d75f093837c5e33572ca58a4255979017158f13cf6f0dfaa0dd7f5417f8ee"
+      }
+    ]
+  },
+  "usage": "Wander is disabled in deterministic hindcasts. These parameters apply only to sandbox stochastic paths and the HF-4 unresolved-physics ensemble component."
+}

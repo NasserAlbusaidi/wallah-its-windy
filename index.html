@@ -19,6 +19,30 @@
         <canvas id="gl-canvas"></canvas>
         <!-- 2D vector overlay (track dots, halos, debug) above the map -->
         <canvas id="overlay-canvas"></canvas>
+
+        <!-- Geographic product overlays. Markers and cards are DOM so their
+             exact readings remain keyboard/touch accessible. -->
+        <div id="city-markers" aria-label="Impact cities"></div>
+        <aside id="city-detail" class="chrome" aria-live="polite" hidden>
+          <button id="city-detail-close" type="button" aria-label="Close city details">×</button>
+          <strong id="city-detail-name">city</strong>
+          <span id="city-detail-current">—</span>
+          <span id="city-detail-run">—</span>
+        </aside>
+        <aside id="point-probe" class="chrome" aria-live="polite" hidden>
+          <header>
+            <strong id="point-probe-coords">—</strong>
+            <button id="point-probe-pin" type="button" aria-pressed="false">pin</button>
+          </header>
+          <dl>
+            <div><dt>modeled wind</dt><dd id="point-probe-wind">—</dd></div>
+            <div><dt>sst</dt><dd id="point-probe-sst">—</dd></div>
+            <div><dt>mid rh</dt><dd id="point-probe-rh">—</dd></div>
+            <div><dt>shear</dt><dd id="point-probe-shear">—</dd></div>
+            <div><dt>ohc</dt><dd id="point-probe-ohc">—</dd></div>
+          </dl>
+          <p id="point-probe-source">—</p>
+        </aside>
       </div>
 
       <!-- thin cyan loading line -->
@@ -115,6 +139,31 @@
           </div>
           <p id="intensity-note">—</p>
         </div>
+
+        <div
+          id="intensity-sparkline"
+          role="img"
+          aria-label="Recorded storm wind intensity over time"
+          tabindex="0"
+        >
+          <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+            <g class="sparkline-thresholds">
+              <line data-kt="34" x1="0" x2="100"></line>
+              <line data-kt="64" x1="0" x2="100"></line>
+              <line data-kt="83" x1="0" x2="100"></line>
+              <line data-kt="96" x1="0" x2="100"></line>
+              <line data-kt="113" x1="0" x2="100"></line>
+              <line data-kt="137" x1="0" x2="100"></line>
+            </g>
+            <path id="intensity-sparkline-path"></path>
+            <line id="intensity-sparkline-cursor" y1="0" y2="32"></line>
+            <circle id="intensity-sparkline-peak" r="1.35"></circle>
+            <circle id="intensity-sparkline-landfall" r="1.35" hidden></circle>
+          </svg>
+          <output id="intensity-sparkline-value">—</output>
+        </div>
+
+        <p id="historical-analog" hidden></p>
 
         <p id="flight-contract" hidden>
           counterfactual tape · the observed storm is the faint ghost track

@@ -30,12 +30,17 @@ import { randomSeed, type HashState } from './rng';
 import { DOMAIN, greatCircleKm, latLonToCell, latLonToClip } from './grid';
 import { TOKENS } from './tokens';
 import { intensityFraction, stormCategory } from './category';
-import { experiencedWindPhrase } from './impact';
+import {
+  experiencedWindPhrase,
+  IMPACT_CITIES,
+  windAtPointKt,
+} from './impact';
 import type { ImpactSummary } from './impact';
 import type { GhostLabelAnchor } from './tracks';
 import type { RunComparison } from './comparison';
 import {
   compassDirection,
+  type FlightIntensityPoint,
   type ReplayMilestones,
   type StormDebrief,
 } from './flight-recorder';
@@ -43,6 +48,13 @@ import { explainIntensity } from './narrative';
 import { maxWindRadiusKm } from './structure';
 import type { HindcastScore } from './hindcast';
 import type { EventRunMode } from './scenarios';
+import type { PointProbeReading } from './point-probe';
+import type { HistoricalAnalog } from './historical-analog';
+import {
+  buildIntensitySparkline,
+  nearestIntensityIndex,
+  type IntensitySparklineGeometry,
+} from './intensity-sparkline';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -62,10 +74,10 @@ function trackRgba(a: number): string {
   return `rgba(${TRACK_RGB},${a})`;
 }
 
-function dom<T extends HTMLElement = HTMLElement>(id: string): T {
+function dom<T extends Element = HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`ui: missing #${id}`);
-  return element as T;
+  return element as unknown as T;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,13 +86,13 @@ function dom<T extends HTMLElement = HTMLElement>(id: string): T {
 
 /**
  * Fixed demo storm identity — same every visit. CURATED, not arbitrary: a seed
- * scan over the bilinearly sampled real May fields (test probe, 2026-07-20) picked
+ * scan over the bilinearly sampled real May fields (HF-2A selector, 2026-07-21) picked
  * the storm that makes Omani landfall with the wadi payoff: spawn (17.5N, 61E),
- * May, seed 671 (synoptic plane 3) -> ~7.7 d life, peak ~109 kt, dies over the
- * Sharqiya coast ~246 km from Muscat. The integration test pins this outcome so
+ * May, seed 1727 (synoptic plane 3) -> ~5.8 d life, peak ~96.8 kt, dies over
+ * southern Oman near 19.30N, 57.40E. The integration test pins this outcome so
  * a re-bake that reshuffles sample years cannot silently kill the demo.
  */
-export const DEMO_SEED = 671;
+export const DEMO_SEED = 1727;
 export const DEMO_GENESIS: LatLon = { lat: 17.5, lon: 61.0 };
 /** Demo month (May, 0-indexed 4): the real pre-monsoon cyclone window. */
 export const DEMO_MONTH = 4;
@@ -138,6 +150,18 @@ export interface FlightRecorderView {
   impact: ImpactSummary | null;
   /** Sustained wind at the recorded landfall frame, or null (no landfall). */
   landfallKt: number | null;
+  /** Stable immutable wind/age strip from the recorder. */
+  intensitySeries: readonly FlightIntensityPoint[];
+  /** Closest shipped track under the explicitly geometric similarity metric. */
+  historicalAnalog: HistoricalAnalog | null;
+}
+
+export interface PointProbePlacement {
+  xPx: number;
+  yPx: number;
+  widthPx: number;
+  heightPx: number;
+  pinned: boolean;
 }
 
 interface Ripple {
@@ -209,6 +233,13 @@ export class UiController {
     impactHeadline: HTMLElement;
     impactCities: HTMLElement;
     impactFlood: HTMLElement;
+    sparkline: HTMLElement;
+    sparklinePath: SVGPathElement;
+    sparklineCursor: SVGLineElement;
+    sparklinePeak: SVGCircleElement;
+    sparklineLandfall: SVGCircleElement;
+    sparklineValue: HTMLOutputElement;
+    analog: HTMLElement;
   };
   private state: UiState = { kind: 'loading', progress: 0 };
   private ripples: Ripple[] = [];
@@ -233,6 +264,21 @@ export class UiController {
   private activeGhostId: string | null = null;
   /** Content signature of the rendered impact-city rows (skip rebuilds). */
   private impactCitiesKey = '';
+  private readonly cityMarkerRoot = dom('city-markers');
+  private readonly cityDetail = dom('city-detail');
+  private readonly cityDetailName = dom('city-detail-name');
+  private readonly cityDetailCurrent = dom('city-detail-current');
+  private readonly cityDetailRun = dom('city-detail-run');
+  private readonly cityMarkers = new Map<string, HTMLButtonElement>();
+  private cityImpact: ImpactSummary | null = null;
+  private cityStorm: StormState | null = null;
+  private readonly pointProbe = dom('point-probe');
+  private readonly pointProbePin = dom<HTMLButtonElement>('point-probe-pin');
+  private sparklineSeries: readonly FlightIntensityPoint[] = [];
+  private sparklineGeometry: IntensitySparklineGeometry =
+    buildIntensitySparkline([]);
+  private sparklineDefaultIndex = 0;
+  private sparklineInspectIndex: number | null = null;
 
   constructor(host: UiHost) {
     this.host = host;
@@ -295,6 +341,13 @@ export class UiController {
       impactHeadline: dom('impact-headline'),
       impactCities: dom('impact-cities'),
       impactFlood: dom('impact-flood'),
+      sparkline: dom('intensity-sparkline'),
+      sparklinePath: dom<SVGPathElement>('intensity-sparkline-path'),
+      sparklineCursor: dom<SVGLineElement>('intensity-sparkline-cursor'),
+      sparklinePeak: dom<SVGCircleElement>('intensity-sparkline-peak'),
+      sparklineLandfall: dom<SVGCircleElement>('intensity-sparkline-landfall'),
+      sparklineValue: dom('intensity-sparkline-value'),
+      analog: dom('historical-analog'),
     };
 
     const details = dom<HTMLButtonElement>('flight-details-toggle');
@@ -308,6 +361,262 @@ export class UiController {
     const modelToggle = dom<HTMLButtonElement>('model-toggle');
     const modelDialog = dom<HTMLDialogElement>('model-dialog');
     modelToggle.addEventListener('click', () => modelDialog.showModal());
+
+    this.buildCityMarkers();
+    dom<HTMLButtonElement>('city-detail-close').addEventListener('click', () => {
+      this.cityDetail.hidden = true;
+    });
+    this.bindSparklineInspection();
+  }
+
+  // -------------------------------------------------------------------------
+  // Geographic product overlays: city markers + point probe
+  // -------------------------------------------------------------------------
+
+  private buildCityMarkers(): void {
+    this.cityMarkerRoot.replaceChildren();
+    this.cityMarkers.clear();
+    for (const city of IMPACT_CITIES) {
+      const marker = document.createElement('button');
+      marker.type = 'button';
+      marker.className = 'city-marker';
+      marker.dataset.city = city.id;
+      marker.dataset.exposed = 'false';
+      marker.textContent = city.label;
+      marker.addEventListener('click', () => this.openCityDetail(city.id));
+      this.cityMarkerRoot.appendChild(marker);
+      this.cityMarkers.set(city.id, marker);
+    }
+    this.layoutCityMarkers();
+  }
+
+  /** Reproject all DOM labels after a chart resize (and later after pan/zoom). */
+  layoutMapOverlays(): void {
+    this.layoutGhostLabels();
+    this.layoutCityMarkers();
+  }
+
+  private layoutCityMarkers(): void {
+    const width = this.host.overlayCanvas.clientWidth;
+    const height = this.host.overlayCanvas.clientHeight;
+    if (width <= 0 || height <= 0) return;
+    const placed: Array<{ x: number; y: number; side: string }> = [];
+    for (const city of IMPACT_CITIES) {
+      const marker = this.cityMarkers.get(city.id);
+      if (!marker) continue;
+      const x = this.pxX(city.lon, width);
+      let y = this.pxY(city.lat, height);
+      const side = city.lon >= 64.5 ? 'left' : 'right';
+      // Static labels are sparse, but Muscat/Sur and the Makran cities can
+      // collide on compact screens. Nudge only close neighbours on one side.
+      for (const prior of placed) {
+        if (
+          prior.side === side &&
+          Math.abs(prior.x - x) < 125 &&
+          Math.abs(prior.y - y) < 14
+        ) {
+          y = Math.min(height - 9, prior.y + 14);
+        }
+      }
+      marker.dataset.side = side;
+      marker.style.left = `${x}px`;
+      marker.style.top = `${y}px`;
+      placed.push({ x, y, side });
+    }
+  }
+
+  /** Update glow and exact accessible readings from the current displayed frame. */
+  updateCityMarkers(
+    storm: StormState | null,
+    impact: ImpactSummary | null,
+  ): void {
+    this.cityStorm = storm;
+    this.cityImpact = impact;
+    const accumulated = new Map(
+      (impact?.cities ?? []).map((entry) => [entry.city.id, entry]),
+    );
+    for (const city of IMPACT_CITIES) {
+      const marker = this.cityMarkers.get(city.id);
+      if (!marker) continue;
+      const currentWindKt =
+        storm && storm.alive ? windAtPointKt(storm, city) : 0;
+      const run = accumulated.get(city.id);
+      const exposed = currentWindKt >= 34;
+      marker.dataset.exposed = String(exposed);
+      const exact =
+        `${city.label}: ${currentWindKt.toFixed(1)} kt modeled now; ` +
+        `run peak ${run ? run.peakWindKt.toFixed(1) : '0.0'} kt`;
+      marker.setAttribute('aria-label', exact);
+      marker.title = exact;
+    }
+  }
+
+  private openCityDetail(cityId: string): void {
+    const city = IMPACT_CITIES.find((candidate) => candidate.id === cityId);
+    const marker = this.cityMarkers.get(cityId);
+    if (!city || !marker) return;
+    const run = this.cityImpact?.cities.find(
+      (entry) => entry.city.id === cityId,
+    );
+    const currentWindKt =
+      this.cityStorm && this.cityStorm.alive
+        ? windAtPointKt(this.cityStorm, city)
+        : 0;
+    this.cityDetailName.textContent = city.label;
+    this.cityDetailCurrent.textContent =
+      `modeled now · ${currentWindKt.toFixed(1)} kt`;
+    this.cityDetailRun.textContent = run
+      ? `run peak ${run.peakWindKt.toFixed(1)} kt · closest ` +
+        `${Number.isFinite(run.closestKm) ? `${Math.round(run.closestKm)} km` : '—'} · ` +
+        `${Math.round(run.rainMm)} mm parametric rain`
+      : 'run totals not available yet';
+    this.cityDetail.style.left = marker.style.left;
+    this.cityDetail.style.top = marker.style.top;
+    this.cityDetail.hidden = false;
+  }
+
+  showPointProbe(
+    reading: PointProbeReading,
+    placement: PointProbePlacement,
+  ): void {
+    const cardWidth = Math.min(220, Math.max(0, placement.widthPx - 16));
+    const cardHeight = 104;
+    const preferredLeft =
+      placement.xPx + 12 + cardWidth <= placement.widthPx
+        ? placement.xPx + 12
+        : placement.xPx - cardWidth - 12;
+    const preferredTop =
+      placement.yPx + 12 + cardHeight <= placement.heightPx
+        ? placement.yPx + 12
+        : placement.yPx - cardHeight - 12;
+    this.pointProbe.hidden = false;
+    this.pointProbe.style.width = `${cardWidth}px`;
+    this.pointProbe.style.left =
+      `${Math.max(8, Math.min(placement.widthPx - cardWidth - 8, preferredLeft))}px`;
+    this.pointProbe.style.top =
+      `${Math.max(8, Math.min(placement.heightPx - cardHeight - 8, preferredTop))}px`;
+    this.pointProbePin.setAttribute('aria-pressed', String(placement.pinned));
+    this.pointProbePin.textContent = placement.pinned ? 'pinned' : 'pin';
+    dom('point-probe-coords').textContent =
+      `${reading.lat.toFixed(2)}°n · ${reading.lon.toFixed(2)}°e`;
+    dom('point-probe-wind').textContent =
+      reading.modeledWindKt === null
+        ? '—'
+        : `${reading.modeledWindKt.toFixed(1)} kt`;
+    dom('point-probe-sst').textContent = `${reading.sstC.toFixed(1)}°c`;
+    dom('point-probe-rh').textContent = `${reading.midlevelRhPct.toFixed(0)}%`;
+    dom('point-probe-shear').textContent = `${reading.shearMs.toFixed(1)} m/s`;
+    dom('point-probe-ohc').textContent = `${reading.ohcKjCm2.toFixed(0)} kJ/cm²`;
+    dom('point-probe-source').textContent =
+      `${reading.environmentKind} · ${reading.environmentLabel} · ` +
+      `${reading.validTimeLabel} · wind is simulated`;
+  }
+
+  hidePointProbe(): void {
+    this.pointProbe.hidden = true;
+  }
+
+  setPointProbePinned(pinned: boolean): void {
+    this.pointProbePin.setAttribute('aria-pressed', String(pinned));
+    this.pointProbePin.textContent = pinned ? 'pinned' : 'pin';
+  }
+
+  // -------------------------------------------------------------------------
+  // Intensity sparkline inspection
+  // -------------------------------------------------------------------------
+
+  private bindSparklineInspection(): void {
+    const root = this.flight.sparkline;
+    root.addEventListener('pointermove', (event) => {
+      const rect = root.getBoundingClientRect();
+      if (rect.width <= 0 || this.sparklineSeries.length === 0) return;
+      this.sparklineInspectIndex = nearestIntensityIndex(
+        this.sparklineSeries,
+        (event.clientX - rect.left) / rect.width,
+      );
+      this.paintSparklineCursor();
+    });
+    root.addEventListener('pointerleave', () => {
+      this.sparklineInspectIndex = null;
+      this.paintSparklineCursor();
+    });
+    root.addEventListener('keydown', (event) => {
+      if (this.sparklineSeries.length === 0) return;
+      const current = this.sparklineInspectIndex ?? this.sparklineDefaultIndex;
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      this.sparklineInspectIndex =
+        event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? this.sparklineSeries.length - 1
+            : Math.max(
+                0,
+                Math.min(
+                  this.sparklineSeries.length - 1,
+                  current + (event.key === 'ArrowLeft' ? -1 : 1),
+                ),
+              );
+      this.paintSparklineCursor();
+    });
+    root.addEventListener('blur', () => {
+      this.sparklineInspectIndex = null;
+      this.paintSparklineCursor();
+    });
+  }
+
+  private updateSparkline(view: FlightRecorderView): void {
+    if (this.sparklineSeries !== view.intensitySeries) {
+      this.sparklineSeries = view.intensitySeries;
+      this.sparklineGeometry = buildIntensitySparkline(view.intensitySeries);
+      this.flight.sparklinePath.setAttribute('d', this.sparklineGeometry.path);
+      for (const threshold of this.flight.sparkline.querySelectorAll<SVGLineElement>(
+        '.sparkline-thresholds line',
+      )) {
+        const windKt = Number(threshold.dataset.kt);
+        const y = 32 - (windKt / this.sparklineGeometry.maxWindKt) * 32;
+        threshold.setAttribute('y1', y.toFixed(2));
+        threshold.setAttribute('y2', y.toFixed(2));
+      }
+      const peak = this.sparklineGeometry.points[this.sparklineGeometry.peakIndex];
+      if (peak) {
+        this.flight.sparklinePeak.setAttribute('cx', peak.x.toFixed(2));
+        this.flight.sparklinePeak.setAttribute('cy', peak.y.toFixed(2));
+      }
+    }
+    this.sparklineDefaultIndex = Math.max(
+      0,
+      Math.min(view.intensitySeries.length - 1, view.frameIndex),
+    );
+    const landfallIndex = view.milestones?.landfall ?? null;
+    const landfall =
+      landfallIndex === null
+        ? null
+        : this.sparklineGeometry.points[landfallIndex] ?? null;
+    if (landfall) this.flight.sparklineLandfall.removeAttribute('hidden');
+    else this.flight.sparklineLandfall.setAttribute('hidden', '');
+    if (landfall) {
+      this.flight.sparklineLandfall.setAttribute('cx', landfall.x.toFixed(2));
+      this.flight.sparklineLandfall.setAttribute('cy', landfall.y.toFixed(2));
+    }
+    this.paintSparklineCursor();
+  }
+
+  private paintSparklineCursor(): void {
+    const index = this.sparklineInspectIndex ?? this.sparklineDefaultIndex;
+    const point = this.sparklineGeometry.points[index];
+    if (!point) return;
+    this.flight.sparklineCursor.setAttribute('x1', point.x.toFixed(2));
+    this.flight.sparklineCursor.setAttribute('x2', point.x.toFixed(2));
+    const exact = `${point.ageH.toFixed(1)} h · ${point.vKt.toFixed(1)} kt`;
+    this.flight.sparklineValue.textContent = exact;
+    const peak = this.sparklineGeometry.points[this.sparklineGeometry.peakIndex];
+    this.flight.sparkline.setAttribute(
+      'aria-label',
+      `Recorded storm intensity. Selected ${exact}. ` +
+        `Peak ${peak ? `${peak.vKt.toFixed(1)} knots at ${peak.ageH.toFixed(1)} hours` : 'unavailable'}. ` +
+        'Use left and right arrow keys to inspect exact recorded frames.',
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -591,6 +900,21 @@ export class UiController {
               : 'live tape';
     f.clock.textContent = flightClock(storm.ageH);
     f.label.textContent = view.label;
+    this.updateSparkline(view);
+    f.analog.hidden = view.historicalAnalog === null;
+    if (view.historicalAnalog) {
+      const analog = view.historicalAnalog;
+      f.analog.textContent =
+        `${analog.activePrefix ? 'closest so far' : 'historical analog'} · ` +
+        `${analog.name} ${analog.year} · geometric match ${analog.score}/100`;
+      f.analog.title =
+        `Shape error ${analog.shapeErrorKm.toFixed(0)} km · ` +
+        `direction error ${analog.directionErrorDeg.toFixed(0)}°` +
+        (analog.intensityErrorKt === null
+          ? ''
+          : ` · intensity error ${analog.intensityErrorKt.toFixed(1)} kt`) +
+        ' · similarity is not a causal or forecast claim';
+    }
 
     const d = storm.diagnostics;
     const explanation = explainIntensity(d, storm.structure);

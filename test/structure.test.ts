@@ -12,6 +12,43 @@ import {
   UNCALIBRATED_STRUCTURE_PARAMETERS,
 } from '../src/structure';
 
+describe('agency structure initialization', () => {
+  it('uses exact-fix wind radii only for provided quadrants', () => {
+    const structure = deriveStormStructure({
+      vKt: 80,
+      lat: 18,
+      lon: 64,
+      shearMs: 8,
+      overLand: false,
+      motionUms: 2,
+      motionVms: 1,
+      initialR34Km: { ne: 210, sw: 125 },
+      initialR50Km: { ne: 95 },
+    });
+
+    expect(structure.r34Km.ne).toBe(210);
+    expect(structure.r34Km.sw).toBe(125);
+    expect(structure.r50Km.ne).toBe(95);
+    expect(structure.r34Km.se).toBeGreaterThan(0);
+    expect(structure.windRadiiSource).toBe('agency-observed');
+
+    const next = deriveStormStructure({
+      vKt: 80,
+      lat: 18,
+      lon: 64,
+      shearMs: 8,
+      overLand: false,
+      motionUms: 2,
+      motionVms: 1,
+      previousRmwKm: structure.rmwKm,
+      previousOuterSizeKm: structure.outerSizeKm,
+      deltaHours: 1,
+    });
+    expect(next.windRadiiSource).toBe('model-derived');
+    expect(next.r34Km.ne).not.toBe(210);
+  });
+});
+
 describe('climatological radius of maximum wind', () => {
   it('contracts with intensity and expands modestly with latitude', () => {
     expect(climatologicalRmwKm(100, 20)).toBeLessThan(

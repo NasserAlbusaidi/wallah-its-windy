@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-5",
+  "implementationStatus": "complete",
+  "operationalLiveStatus": "disabled-no-scheduled-provider-feed",
+  "decision": "The provider-neutral normalization, visible-failure, cycle-integrity, and immutable-archive contracts are implemented. Live output remains disabled until a lawful scheduled feed is configured and prospectively verified.",
+  "manifests": {
+    "contractSha256": "5d002bb5dc57347eddb7af2bdfe06e115cb6c123e32509bed20ff9aae310599d",
+    "sampleRunSha256": "c044047a42c1ec594df166f91f7c90accc34108c56861f4bf45cae61c861de6c",
+    "archiverSha256": "ca661fe58be8d25fd139f4625149da7f130f82592bcf0de1588dfa47ee7946e4"
+  },
+  "checks": [
+    {
+      "id": "sample-cycle-validates",
+      "pass": true,
+      "errors": []
+    },
+    {
+      "id": "agency-advisory-provider-seam",
+      "pass": true
+    },
+    {
+      "id": "agency-advisory-sample-manifest",
+      "pass": true
+    },
+    {
+      "id": "atmospheric-grid-provider-seam",
+      "pass": true
+    },
+    {
+      "id": "atmospheric-grid-sample-manifest",
+      "pass": true
+    },
+    {
+      "id": "sea-surface-temperature-provider-seam",
+      "pass": true
+    },
+    {
+      "id": "sea-surface-temperature-sample-manifest",
+      "pass": true
+    },
+    {
+      "id": "upper-ocean-provider-seam",
+      "pass": true
+    },
+    {
+      "id": "upper-ocean-sample-manifest",
+      "pass": true
+    },
+    {
+      "id": "immutable-archive-publication",
+      "pass": true
+    },
+    {
+      "id": "climatology-fallback-not-current",
+      "pass": true
+    },
+    {
+      "id": "side-by-side-guidance-present",
+      "pass": true
+    },
+    {
+      "id": "operational-feed-is-not-falsely-configured",
+      "pass": true
+    }
+  ]
+}

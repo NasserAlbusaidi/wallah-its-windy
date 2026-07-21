@@ -427,3 +427,47 @@ def build_event_env(tag: str, month_index: int, nc_paths: list[str],
         "vortex_near_far": diag,
         "start_iso": _dt.datetime.fromtimestamp(int(vt[0]), _dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+
+
+def build_pressure_wind_sidecar(nc_paths: list[str], output_path: str) -> dict:
+    """Bake aligned, individually vortex-filtered 850/500/250-hPa winds.
+
+    This is a separate HF-3 artifact so adding pressure levels cannot mutate the
+    frozen HF-1/HF-2 environment bytes. All six layers share the same 3-hourly
+    axis and grid; filtering happens at each native pressure level before
+    regridding and depth weighting.
+    """
+    vt, u4, v4, lat_native, lon_native, levels = _load_series(nc_paths)
+    vt_dec = vt[::DECIMATE]
+    u4d, v4d = u4[::DECIMATE], v4[::DECIMATE]
+    elat = sources.lat_centers(sources.ENV_NY)
+    elon = sources.lon_centers(sources.ENV_NX)
+    ELAT, ELON = np.meshgrid(elat, elon, indexing="ij")
+    fields: dict[str, np.ndarray] = {}
+    for pressure in (850, 500, 250):
+        index = _level_index(levels, float(pressure))
+        fields[f"u{pressure}"] = _regrid_series(
+            _vortex_filter(u4d[:, index]), lat_native, lon_native, ELAT, ELON
+        )
+        fields[f"v{pressure}"] = _regrid_series(
+            _vortex_filter(v4d[:, index]), lat_native, lon_native, ELAT, ELON
+        )
+    nx, ny = sources.ENV_NX, sources.ENV_NY
+    layers = [
+        Layer(name, "int16", True, nx, ny, values.shape[0], sources.DOMAIN,
+              QUANT_SCALE, 0.0, _q_i16(values, QUANT_SCALE, 0.0))
+        for name, values in fields.items()
+    ]
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    binfmt.write_bin(output_path, layers)
+    return {
+        "path": output_path,
+        "planes": int(vt_dec.size),
+        "stepH": DECIMATE,
+        "windowH": int((vt_dec.size - 1) * DECIMATE),
+        "startIso": _dt.datetime.fromtimestamp(
+            int(vt_dec[0]), _dt.timezone.utc
+        ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "levelsHpa": [850, 500, 250],
+        "vortexFilterSigmaNativeCells": VORTEX_SIGMA,
+    }

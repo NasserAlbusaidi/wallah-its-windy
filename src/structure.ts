@@ -196,7 +196,7 @@ function targetRmwKm(
   vKt: number,
   latitude: number,
   shearMs: number,
-  overLand: boolean,
+  landExposureFraction: number,
   parameters: Readonly<StructureParameters>,
 ): number {
   const shearExpansion = clamp(
@@ -205,7 +205,8 @@ function targetRmwKm(
     0,
     parameters.shearExpansionMax,
   );
-  const landExpansion = overLand ? parameters.landExpansionFraction : 0;
+  const landExpansion =
+    clamp(landExposureFraction, 0, 1) * parameters.landExpansionFraction;
   return clamp(
     climatologicalRmwKm(vKt, latitude, parameters) *
       (1 + shearExpansion + landExpansion),
@@ -245,7 +246,7 @@ function targetOuterSizeKm(
   latitude: number,
   longitude: number,
   shearMs: number,
-  overLand: boolean,
+  landExposureFraction: number,
   parameters: Readonly<StructureParameters>,
 ): number {
   const shearExpansion =
@@ -269,7 +270,10 @@ function targetOuterSizeKm(
           parameters.outerSizeBayWindSlopeBonusKmPerKt) +
     shearExpansion;
   return clamp(
-    oceanTarget * (overLand ? 1 - parameters.outerSizeLandDecayFraction : 1),
+    oceanTarget *
+      (1 -
+        clamp(landExposureFraction, 0, 1) *
+          parameters.outerSizeLandDecayFraction),
     parameters.outerSizeMinKm,
     parameters.outerSizeMaxKm,
   );
@@ -549,7 +553,11 @@ export function interpolateStormStructure(
       fraction,
     ),
     rmwKm: mix(previous.rmwKm, current.rmwKm, fraction),
+    rmwSource: current.rmwSource ?? previous.rmwSource,
     outerSizeKm: mix(previous.outerSizeKm, current.outerSizeKm, fraction),
+    outerSizeSource: current.outerSizeSource ?? previous.outerSizeSource,
+    windRadiiSource:
+      current.windRadiiSource ?? previous.windRadiiSource,
     outerWindScale: mix(
       previous.outerWindScale,
       current.outerWindScale,
@@ -602,13 +610,45 @@ export interface StructureInput {
   lon?: number;
   shearMs: number;
   overLand: boolean;
+  /** Continuous vortex land fraction; center-land is the fallback for archives. */
+  landExposureFraction?: number;
   motionUms: number;
   motionVms: number;
   shearUms?: number;
   shearVms?: number;
   previousRmwKm?: number;
   previousOuterSizeKm?: number;
+  rmwSource?: StormStructure['rmwSource'];
+  outerSizeSource?: StormStructure['outerSizeSource'];
+  /** Optional exact-fix agency radii; missing quadrants stay model-derived. */
+  initialR34Km?: Partial<WindRadiiKm>;
+  initialR50Km?: Partial<WindRadiiKm>;
+  initialR64Km?: Partial<WindRadiiKm>;
   deltaHours?: number;
+}
+
+function mergeObservedRadii(
+  derived: WindRadiiKm,
+  observed: Partial<WindRadiiKm> | undefined,
+): { radii: WindRadiiKm; usedObservation: boolean } {
+  let usedObservation = false;
+  const value = (quadrant: keyof WindRadiiKm): number => {
+    const candidate = observed?.[quadrant];
+    if (candidate !== undefined && Number.isFinite(candidate) && candidate >= 0) {
+      usedObservation = true;
+      return candidate;
+    }
+    return derived[quadrant];
+  };
+  return {
+    radii: {
+      ne: value('ne'),
+      se: value('se'),
+      sw: value('sw'),
+      nw: value('nw'),
+    },
+    usedObservation,
+  };
 }
 
 /**
@@ -630,11 +670,16 @@ export function deriveStormStructure(
   const shearVms = finite(input.shearVms);
   const motionUms = finite(input.motionUms);
   const motionVms = finite(input.motionVms);
+  const landExposureFraction = clamp(
+    finite(input.landExposureFraction, input.overLand ? 1 : 0),
+    0,
+    1,
+  );
   const targetRmw = targetRmwKm(
     maximumWindKt,
     input.lat,
     shearMs,
-    input.overLand,
+    landExposureFraction,
     parameters,
   );
   const previousRmw =
@@ -667,7 +712,7 @@ export function deriveStormStructure(
     input.lat,
     finite(input.lon, 60),
     shearMs,
-    input.overLand,
+    landExposureFraction,
     parameters,
   );
   const previousOuterSize =
@@ -693,23 +738,24 @@ export function deriveStormStructure(
     maximumWindKt - translationAsymmetryKt,
   );
   let outerWindScale = 1;
-  if (detail === 'full') {
-    const referenceOuterSize = referenceOuterRadiusKm(
-      34,
-      rmwKm,
-      hollandB,
-      symmetricPeakKt,
-    );
-    const calibratedOuterScale = clamp(
-      outerSizeKm / Math.max(rmwKm * 1.1, referenceOuterSize),
-      0.5,
-      2.3,
-    );
-    outerWindScale =
-      1 +
-      (calibratedOuterScale - 1) *
-        clamp(parameters.outerSizeWeight, 0, 1);
-  }
+  // Outer size participates in HF-2A ocean forcing, so it belongs to coupled
+  // dynamics. The lightweight detail mode skips only the three expensive wind-
+  // radius products below; it must not alter the wind profile itself.
+  const referenceOuterSize = referenceOuterRadiusKm(
+    34,
+    rmwKm,
+    hollandB,
+    symmetricPeakKt,
+  );
+  const calibratedOuterScale = clamp(
+    outerSizeKm / Math.max(rmwKm * 1.1, referenceOuterSize),
+    0.5,
+    2.3,
+  );
+  outerWindScale =
+    1 +
+    (calibratedOuterScale - 1) *
+      clamp(parameters.outerSizeWeight, 0, 1);
   const vectorMagnitude = Math.hypot(shearUms, shearVms);
   const shearAsymmetryFraction =
     vectorMagnitude < 1e-6
@@ -756,7 +802,10 @@ export function deriveStormStructure(
     centralPressureHpa,
     environmentalPressureHpa: parameters.environmentalPressureHpa,
     rmwKm,
+    rmwSource: input.rmwSource ?? 'climatological-prior',
     outerSizeKm,
+    outerSizeSource: input.outerSizeSource ?? 'climatological-prior',
+    windRadiiSource: 'model-derived',
     outerWindScale,
     outerBlendStartWindKt: parameters.outerBlendStartWindKt,
     outerBlendFullWindKt: parameters.outerBlendFullWindKt,
@@ -774,9 +823,25 @@ export function deriveStormStructure(
     r64Km: emptyRadii(),
   };
   if (detail === 'full') {
-    structure.r34Km = quadrantRadii(34, structure);
-    structure.r50Km = quadrantRadii(50, structure);
-    structure.r64Km = quadrantRadii(64, structure);
+    const r34 = mergeObservedRadii(
+      quadrantRadii(34, structure),
+      input.initialR34Km,
+    );
+    const r50 = mergeObservedRadii(
+      quadrantRadii(50, structure),
+      input.initialR50Km,
+    );
+    const r64 = mergeObservedRadii(
+      quadrantRadii(64, structure),
+      input.initialR64Km,
+    );
+    structure.r34Km = r34.radii;
+    structure.r50Km = r50.radii;
+    structure.r64Km = r64.radii;
+    structure.windRadiiSource =
+      r34.usedObservation || r50.usedObservation || r64.usedObservation
+        ? 'agency-observed'
+        : 'model-derived';
   }
   return structure;
 }

@@ -83,6 +83,21 @@ export interface ImpactSummary {
   live: CityImpact | null;
 }
 
+/**
+ * Instantaneous parametric surface wind at one geographic point. Point probes,
+ * city-marker glow, and accumulated city exposure all call this function so a
+ * given frame can never produce three different footprint answers.
+ */
+export function windAtPointKt(storm: StormState, point: LatLon): number {
+  const distanceKm = greatCircleKm(
+    { lat: storm.lat, lon: storm.lon },
+    point,
+  );
+  if (distanceKm > 600) return 0;
+  const bearingDeg = bearingFromStorm(storm, point);
+  return hollandWindSpeedKt(distanceKm, bearingDeg, storm.structure);
+}
+
 export class ImpactTracker {
   private readonly nx = GRID_NX;
   private readonly ny = GRID_NY;
@@ -213,8 +228,7 @@ export class ImpactTracker {
         this.cityClosestKm[i] = distanceKm;
       }
       if (distanceKm > 600) continue;
-      const bearingDeg = bearingFromStorm(storm, city);
-      const windKt = hollandWindSpeedKt(distanceKm, bearingDeg, s);
+      const windKt = windAtPointKt(storm, city);
       if (windKt > this.cityPeakKt[i]) this.cityPeakKt[i] = windKt;
     }
   }

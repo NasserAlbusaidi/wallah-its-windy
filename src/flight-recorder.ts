@@ -27,6 +27,10 @@ export interface FlightRunMeta {
   seed: number;
   isDemo: boolean;
   label: string;
+  /** Deterministic simulated identity; absent only for official-history hindcasts. */
+  stormName?: string;
+  stormNameCatalogueVersion?: string;
+  stormNameOfficial?: false;
   /** True only for the user-authored event-environment sandbox. */
   counterfactual: boolean;
   /** Observed initialization, free simulation, and post-run fix scoring. */
@@ -41,6 +45,11 @@ export interface FlightFrame extends TrackPoint {
   coldWakeC: number;
   diagnostics: StormDiagnostics;
   structure: StormStructure;
+}
+
+export interface FlightIntensityPoint {
+  ageH: number;
+  vKt: number;
 }
 
 export interface FlightLandfall extends LatLon {
@@ -115,10 +124,12 @@ export class FlightRecorder {
   private meta: FlightRunMeta | null = null;
   private landfall: FlightLandfall | null = null;
   private death: StormDeath | null = null;
+  private intensityCache: readonly FlightIntensityPoint[] = [];
 
   start(meta: FlightRunMeta, initial: StormState): void {
     this.meta = { ...meta, spawn: { ...meta.spawn } };
     this.frames = [frameOf(initial)];
+    this.intensityCache = [];
     this.landfall = null;
     this.death = null;
   }
@@ -222,6 +233,29 @@ export class FlightRecorder {
       diagnostics: { ...frame.diagnostics },
       structure: cloneStormStructure(frame.structure),
     }));
+  }
+
+  /** Detached geographic tape for similarity/verification consumers. */
+  trackSnapshot(): TrackPoint[] {
+    return this.frames.map(({ lat, lon, vKt, ageH }) => ({
+      lat,
+      lon,
+      vKt,
+      ageH,
+    }));
+  }
+
+  /**
+   * Stable immutable wind/age series. Reuses the same frozen array until a new
+   * physics frame lands, so per-animation-frame UI updates do not copy the tape.
+   */
+  intensitySeries(): readonly FlightIntensityPoint[] {
+    if (this.intensityCache.length !== this.frames.length) {
+      this.intensityCache = Object.freeze(
+        this.frames.map(({ ageH, vKt }) => Object.freeze({ ageH, vKt })),
+      );
+    }
+    return this.intensityCache;
   }
 
   milestones(): ReplayMilestones | null {

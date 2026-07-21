@@ -121,6 +121,23 @@ export interface EnvSampler {
   sample(lat: number, lon: number, monthIndex: number, tFrac: number): EnvSample;
 }
 
+/** Vortex-filtered pressure-level winds used by HF-3 steering. */
+export interface PressureLevelWinds {
+  u850: number;
+  v850: number;
+  u500: number;
+  v500: number;
+  u250: number;
+  v250: number;
+}
+
+export type PressureWindSampler = (
+  lat: number,
+  lon: number,
+  monthIndex: number,
+  tFrac: number,
+) => PressureLevelWinds | null;
+
 /**
  * How a multi-plane environment layer must interpret its `nt` axis.
  *
@@ -161,13 +178,64 @@ export interface StormDiagnostics {
   organizationTarget: number;
   /** Storm-induced centre cooling sampled from the persistent wake, Celsius. */
   coldWakeC: number;
+  /**
+   * HF-2A retained-column diagnostics. These are optional only so archived
+   * HF-1 fixtures remain readable; the live engine records every field.
+   */
+  oceanInitializationTier?:
+    | 'event-analysis'
+    | 'climatological-subsurface'
+    | 'analytic-fallback';
+  oceanSourceValidTime?: string | null;
+  oceanCoupledSstC?: number;
+  oceanMixedLayerDepthM?: number;
+  oceanIsotherm26DepthM?: number;
+  oceanTemperatureBelowMixedLayerC?: number;
+  oceanCurrentSpeedMs?: number;
+  oceanCurrentDirectionDeg?: number;
+  oceanInertialPeriodH?: number;
+  oceanWindStressPa?: number;
+  oceanBulkRichardson?: number | null;
+  oceanEntrainmentDepthM?: number;
+  oceanHeatMovedThisStepJm2?: number;
+  oceanCumulativeMixingHeatJm2?: number;
+  oceanCumulativeRecoveryHeatJm2?: number;
+  oceanActiveColumnCount?: number;
+  oceanHardBoundFlag?: boolean;
+  oceanMissingSourceFlag?: boolean;
   mpiKt: number;
   steerU: number;
   steerV: number;
+  /** HF-3 motion-budget diagnostics, all east/north m/s unless noted. */
+  steering850Weight?: number;
+  steering500Weight?: number;
+  steering250Weight?: number;
+  environmentalSteeringUms?: number;
+  environmentalSteeringVms?: number;
+  betaDriftUms?: number;
+  betaDriftVms?: number;
+  terrainDriftUms?: number;
+  terrainDriftVms?: number;
+  resolvedMotionUms?: number;
+  resolvedMotionVms?: number;
+  steeringAnnulusRadiusKm?: number;
+  steeringPressureLevelsAvailable?: boolean;
   shearMs: number;
   /** 200–850 hPa shear vector used by structure and rainfall. */
   shearUms: number;
   shearVms: number;
+  /** HF-2B annular environment; absent only on archived HF-1 frames. */
+  ventilationIndex?: number;
+  ventilationAnnulusRadiusKm?: number;
+  ventilationMeanRhPct?: number;
+  ventilationUpshearRhPct?: number;
+  ventilationShearUms?: number;
+  ventilationShearVms?: number;
+  ventilationShearCoherence?: number;
+  coastalCoreLandFraction?: number;
+  coastalOuterLandFraction?: number;
+  coastalMeanLandElevationM?: number;
+  coastalRoughnessExposure?: number;
   overLand: boolean;
   oceanKtPerH: number;
   shearKtPerH: number;
@@ -205,8 +273,13 @@ export interface StormStructure {
   environmentalPressureHpa: number;
   /** Radius of maximum surface wind—the eyewall scale. */
   rmwKm: number;
+  /** Source of the initial size state; carried for provenance. */
+  rmwSource?: 'agency-observed' | 'climatological-prior';
   /** Slowly evolving outer-core size state, independent of the instantaneous RMW. */
   outerSizeKm: number;
+  outerSizeSource?: 'agency-observed' | 'climatological-prior';
+  /** Provenance for threshold radii in this snapshot. */
+  windRadiiSource?: 'agency-observed' | 'model-derived';
   /** Radial stretch applied outside the inner core by the two-region profile. */
   outerWindScale: number;
   /** Wind-speed bounds over which the inner and outer profiles are blended. */
@@ -269,6 +342,16 @@ export interface SpawnParams {
   initialWindKt?: number;
   /** Optional observed/core-state initialization in [0,1]. */
   initialOrganization?: number;
+  /** Agency-consistent structure values at the same initialization fix. */
+  initialRmwKm?: number;
+  initialOuterSizeKm?: number;
+  /** Agency quadrant radii at the exact initialization fix, when reported. */
+  initialR34Km?: Partial<WindRadiiKm>;
+  initialR50Km?: Partial<WindRadiiKm>;
+  initialR64Km?: Partial<WindRadiiKm>;
+  /** Pre-initialization agency motion derived without future fixes. */
+  initialMotionUms?: number;
+  initialMotionVms?: number;
   /** Offset into an event timeline, hours from its first baked plane. */
   tFracOffsetH?: number;
   /** Hindcasts disable stochastic wander while sandbox runs retain it. */

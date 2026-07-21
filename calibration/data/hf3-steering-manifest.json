@@ -1,0 +1,783 @@
+{
+  "schemaVersion": 1,
+  "contract": "Temporally aligned ERA5 pressure-level winds, individually Gaussian vortex-filtered on the native 0.5 degree grid before regridding; separate bytes preserve HF-1/HF-2 forcing immutability.",
+  "grid": {
+    "nx": 40,
+    "ny": 24,
+    "bbox": [
+      50,
+      70,
+      15,
+      27
+    ]
+  },
+  "levelsHpa": [
+    850,
+    500,
+    250
+  ],
+  "stepHours": 3,
+  "vortexFilterSigmaNativeCells": 3.0,
+  "storms": [
+    {
+      "id": "as1980",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_as1980.bin",
+      "bytes": 461336,
+      "sha256": "dd88e3880ee81abc91e16cd2298e3c9388770e8c0a578f9f5b243a2681c61577",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1980_1980_11.nc",
+          "bytes": 2303184,
+          "sha256": "3d7e43aec5ceaf7f4b9305565d62d28452b12afe465b9d8cbf9821160aa0876e"
+        }
+      ],
+      "planes": 40,
+      "stepH": 3,
+      "windowH": 117,
+      "startIso": "1980-11-16T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1981",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_as1981.bin",
+      "bytes": 461336,
+      "sha256": "637a132899af36c828e226fdea345f08b909d49fe7e9f4197c144bc835694e6e",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1981_1981_10.nc",
+          "bytes": 966789,
+          "sha256": "b713323bd26f32fee4029ce78f6576b40e14304581269cdcafc1a03633113dd0"
+        },
+        {
+          "path": "data/raw/fidelity_era5_as1981_1981_11.nc",
+          "bytes": 1424252,
+          "sha256": "06398395043d49c8241abef20057789c5e9e55d07893c4a059047668df69aa8a"
+        }
+      ],
+      "planes": 40,
+      "stepH": 3,
+      "windowH": 117,
+      "startIso": "1981-10-30T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1982",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_as1982.bin",
+      "bytes": 369176,
+      "sha256": "3644b22c013eb70194bfc5a1fb28543b75273ac7b264eb3253ffe2ee5c464035",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1982_1982_11.nc",
+          "bytes": 1899111,
+          "sha256": "376865d15bf191d091d5d384d56c5216f76bff986a34baf5f95775ff901d043a"
+        }
+      ],
+      "planes": 32,
+      "stepH": 3,
+      "windowH": 93,
+      "startIso": "1982-11-06T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1983",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_as1983.bin",
+      "bytes": 369176,
+      "sha256": "48fcb8d4974c558e5b77e1e4626e03c2d9cf9ebe1b02261005d45bf2043ad95d",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1983_1983_08.nc",
+          "bytes": 1926982,
+          "sha256": "565db3e9c508815bd1750835980b74c986f1e6e171fffac5ae90a479055f0b9a"
+        }
+      ],
+      "planes": 32,
+      "stepH": 3,
+      "windowH": 93,
+      "startIso": "1983-08-08T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1985",
+      "partition": "test",
+      "path": "calibration/data/hf3/steering_as1985.bin",
+      "bytes": 645656,
+      "sha256": "90937d7ef114ec7303a84f1ba19df908b8b397d9f71ec322caef700e02ee0c56",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1985_1985_05.nc",
+          "bytes": 2413415,
+          "sha256": "a9d8f070c1751ed146acf5110ea481349c7c08a8b2af27e8f8c63d79a65a7eb1"
+        },
+        {
+          "path": "data/raw/fidelity_era5_as1985_1985_06.nc",
+          "bytes": 964077,
+          "sha256": "30145dcbe24b2d210448bb06965ab1c7b202067522c9598952d0bb3c372cf367"
+        }
+      ],
+      "planes": 56,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "1985-05-27T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1987",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_as1987.bin",
+      "bytes": 829976,
+      "sha256": "99042f0cee4977877d8a36f497c5f79c3b737d171b519984bcd7c53607ff8b02",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1987_1987_06.nc",
+          "bytes": 4327940,
+          "sha256": "f12395cfcdfcc72fa8a5eddc94ccec1cfb9e5459651f27d4602282f315ae3266"
+        }
+      ],
+      "planes": 72,
+      "stepH": 3,
+      "windowH": 213,
+      "startIso": "1987-06-05T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1992",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_as1992.bin",
+      "bytes": 553496,
+      "sha256": "6c4212fc4fa9b1c4890842e8e4cf29ab76846aa9a769a8611e63efdecefb2425",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1992_1992_09.nc",
+          "bytes": 506660,
+          "sha256": "3c9efbf1e1aa2539068bf029daef820562a6b0c64bebfcd22b388b13efb67b28"
+        },
+        {
+          "path": "data/raw/fidelity_era5_as1992_1992_10.nc",
+          "bytes": 2377434,
+          "sha256": "48209f146aa9df503edf89571271f55957b3aa111460ba2c031654540c4c7d3d"
+        }
+      ],
+      "planes": 48,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "1992-09-30T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1993",
+      "partition": "test",
+      "path": "calibration/data/hf3/steering_as1993.bin",
+      "bytes": 553496,
+      "sha256": "daa95a61480753af319ac7b6f5fe9970c0e85019661ceb664556c301feb70a01",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1993_1993_11.nc",
+          "bytes": 2768707,
+          "sha256": "ac50407a1057d124dbabc1115c55f94e2311066ea4654c8154038766896f9f69"
+        }
+      ],
+      "planes": 48,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "1993-11-12T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1994",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_as1994.bin",
+      "bytes": 461336,
+      "sha256": "e11180af54e619cc5a1d7f01c7d0469fa4cf158a86a7bf2654736f46208bc36d",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1994_1994_06.nc",
+          "bytes": 2404774,
+          "sha256": "3e8e56bb219c8872b417ae19154701b11c645605a8187c9445408ff348335089"
+        }
+      ],
+      "planes": 40,
+      "stepH": 3,
+      "windowH": 117,
+      "startIso": "1994-06-06T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1995",
+      "partition": "validation",
+      "path": "calibration/data/hf3/steering_as1995.bin",
+      "bytes": 737816,
+      "sha256": "beeaefd35a3782306715ccc1dc7b8bb2a084f8c153064153142d6e60162daa04",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1995_1995_10.nc",
+          "bytes": 3698578,
+          "sha256": "dd5bf2cb67473345d88932af68beabf6071fd25d99f645443551b0593d20fcf7"
+        }
+      ],
+      "planes": 64,
+      "stepH": 3,
+      "windowH": 189,
+      "startIso": "1995-10-12T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1998",
+      "partition": "validation",
+      "path": "calibration/data/hf3/steering_as1998.bin",
+      "bytes": 461336,
+      "sha256": "97cfb314959a75782fbce04f5338379020c8072ce612d157c549082249809224",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1998_1998_06.nc",
+          "bytes": 2418495,
+          "sha256": "16f34902625079210dd08b39c41505c073707f769a7ebc9b82070bb7fe180efc"
+        }
+      ],
+      "planes": 40,
+      "stepH": 3,
+      "windowH": 117,
+      "startIso": "1998-06-06T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1998dec",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_as1998dec.bin",
+      "bytes": 461336,
+      "sha256": "b5a69c68f89816a1b553e5b38f90c04e6f4e006902071e612fcf81db0019a4de",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1998dec_1998_12.nc",
+          "bytes": 2397997,
+          "sha256": "41c5ba93692ab2013d3bca156060d3822a51855c5da9bb094b67db5b58e22cc8"
+        }
+      ],
+      "planes": 40,
+      "stepH": 3,
+      "windowH": 117,
+      "startIso": "1998-12-14T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as1999",
+      "partition": "test",
+      "path": "calibration/data/hf3/steering_as1999.bin",
+      "bytes": 645656,
+      "sha256": "9cc249c21de67bd5754049befcaeab3791f2a4038807d32325cc4f122fc11326",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as1999_1999_05.nc",
+          "bytes": 3367253,
+          "sha256": "2c51bf099f5c8e5a915868f1866066c28d8e45a027ba1558f7f1357ac9dac508"
+        }
+      ],
+      "planes": 56,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "1999-05-16T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as2001",
+      "partition": "test",
+      "path": "calibration/data/hf3/steering_as2001.bin",
+      "bytes": 737816,
+      "sha256": "43b0f167e0ce4536b64467e1471a0a5d24bb6891bcf0affce767ed7c21aa44e1",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as2001_2001_05.nc",
+          "bytes": 3815666,
+          "sha256": "6ff497c377e8c7a3e0d6b2aa95f8fa9bdbace7b63c719310f48fe2243ddd23ee"
+        }
+      ],
+      "planes": 64,
+      "stepH": 3,
+      "windowH": 189,
+      "startIso": "2001-05-23T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "mukda2006",
+      "partition": "validation",
+      "path": "calibration/data/hf3/steering_mukda2006.bin",
+      "bytes": 737816,
+      "sha256": "fc996d5595e6497c6476d4fc112cb953999f5f5414f9054ecc56b6aa9b4a72f7",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_mukda2006_2006_09.nc",
+          "bytes": 3767291,
+          "sha256": "bea27041cfcff28c3d1dd9449516c700b00416e9fd046371604e1a38058b3c6a"
+        }
+      ],
+      "planes": 64,
+      "stepH": 3,
+      "windowH": 189,
+      "startIso": "2006-09-20T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "gonu2007",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_gonu2007.bin",
+      "bytes": 737816,
+      "sha256": "603207f916d307661121b8829dafe1a667705579b37173c4c57c85f42bb21c0c",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_gonu_2007.nc",
+          "bytes": 3813588,
+          "sha256": "0e67247c0e0a28e9b936438d5828b1c2cc16b150266b315c442dba245eb1eb85"
+        }
+      ],
+      "planes": 64,
+      "stepH": 3,
+      "windowH": 189,
+      "startIso": "2007-06-01T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "as2007",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_as2007.bin",
+      "bytes": 369176,
+      "sha256": "8760605539e9b99c41af2a6a0d687d41ea0c4791bc13924ef4cf8d8a2272403a",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_as2007_2007_06.nc",
+          "bytes": 1941581,
+          "sha256": "35817028e8eb09b409a8b2931f315941de8c76d1d817a553eb320a3288fa416e"
+        }
+      ],
+      "planes": 32,
+      "stepH": 3,
+      "windowH": 93,
+      "startIso": "2007-06-24T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "phet2010",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_phet2010.bin",
+      "bytes": 829976,
+      "sha256": "404611affcaa0df2cb548fc7c6e00f2ceb45927af1ec5f01513b0b7f5be4187d",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_phet_2010_05.nc",
+          "bytes": 966930,
+          "sha256": "842dce4576ea9758e269f3e509790606a9dfd43d399a1b90d721117cfd11fed9"
+        },
+        {
+          "path": "data/raw/era5_phet_2010_06.nc",
+          "bytes": 3359398,
+          "sha256": "f0d9d7df3763408daafc7219e815834d6552313e3067d27c95dddf951491e063"
+        }
+      ],
+      "planes": 72,
+      "stepH": 3,
+      "windowH": 213,
+      "startIso": "2010-05-30T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "keila2011",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_keila2011.bin",
+      "bytes": 553496,
+      "sha256": "e630b08e50522f573301dc04768deb515a00593c21c24fcad8ab9ff890d79a1e",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_keila2011_2011_11.nc",
+          "bytes": 2817115,
+          "sha256": "77909c6326f69ebe0690d6499194b83be1a92804046918eb082b485d6e73eaf6"
+        }
+      ],
+      "planes": 48,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "2011-11-01T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "nanauk2014",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_nanauk2014.bin",
+      "bytes": 645656,
+      "sha256": "623eeecc0576ac903495c2302fd5e20761aa10947d1675d5e98738fa7329773b",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_nanauk2014_2014_06.nc",
+          "bytes": 3321827,
+          "sha256": "b485c298af9ea52599aa581cfb17f1994448065a5f08906c963ea95e14ae6efe"
+        }
+      ],
+      "planes": 56,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "2014-06-09T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "nilofar2014",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_nilofar2014.bin",
+      "bytes": 737816,
+      "sha256": "5a2d942a268d31f4855cf971ca721bec8770c5b3b94a7f3c701682c02eb4777d",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_nilofar_2014_10.nc",
+          "bytes": 3285608,
+          "sha256": "fd06a1993a63140b26dd3f9139b3049d6a5bd182d4c1455721218a482faff7d0"
+        },
+        {
+          "path": "data/raw/era5_nilofar_2014_11.nc",
+          "bytes": 489323,
+          "sha256": "b21a7cb1001779cd2b7e5f7e71119a29688bc26eed012f57d4706515ff321ae3"
+        }
+      ],
+      "planes": 64,
+      "stepH": 3,
+      "windowH": 189,
+      "startIso": "2014-10-25T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "ashobaa2015",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_ashobaa2015.bin",
+      "bytes": 737816,
+      "sha256": "ae790caea954f35a18cc569d7b3782457f3c8bee0dc335694ffcdb377808801f",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_ashobaa_2015_06.nc",
+          "bytes": 3864475,
+          "sha256": "6703d26f9d20eda0aa063ef5b346f144776c6a3983a7bdfbe0e03b4a8f3e04d4"
+        }
+      ],
+      "planes": 64,
+      "stepH": 3,
+      "windowH": 189,
+      "startIso": "2015-06-06T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "mekunu2018",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_mekunu2018.bin",
+      "bytes": 553496,
+      "sha256": "42dce75de313fbce4190566aad35bf3556a32c9f1eebdf6900441e94a731f26f",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_mekunu_2018_05.nc",
+          "bytes": 2903057,
+          "sha256": "e3ed1f8e9ecf0ed9c01ef2eab3555635634caab95bede18421d9ccad6bc18bd3"
+        }
+      ],
+      "planes": 48,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "2018-05-23T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "vayu2019",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_vayu2019.bin",
+      "bytes": 829976,
+      "sha256": "377584d3af5debf4bd6b96ae07723b36801c842a3b9c7ab972ef3f19938f2ad4",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_vayu_2019_06.nc",
+          "bytes": 4301215,
+          "sha256": "06d6e2545afbce440c77b6fe25881bf3b5232c61c14d0d66e96f4cbf736a2df6"
+        }
+      ],
+      "planes": 72,
+      "stepH": 3,
+      "windowH": 213,
+      "startIso": "2019-06-10T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "hikaa2019",
+      "partition": "development",
+      "path": "calibration/data/hf3/steering_hikaa2019.bin",
+      "bytes": 553496,
+      "sha256": "be5d75f093837c5e33572ca58a4255979017158f13cf6f0dfaa0dd7f5417f8ee",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_hikaa_2019_09.nc",
+          "bytes": 2804266,
+          "sha256": "082b5e1da0689f968e6f67bc5feb6441dbe7538234022d576367e7b34079f491"
+        }
+      ],
+      "planes": 48,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "2019-09-21T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "kyarr2019",
+      "partition": "validation",
+      "path": "calibration/data/hf3/steering_kyarr2019.bin",
+      "bytes": 829976,
+      "sha256": "335ebe849306a16576fab346efd662f5ddfb177603cd65a3c18a2f4bd8bbeb40",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_kyarr_2019_10.nc",
+          "bytes": 3300749,
+          "sha256": "819609b6401f50a7dc1746113eb6b2b50f2bff15e94fdc58f164d05a05799dc8"
+        },
+        {
+          "path": "data/raw/era5_kyarr_2019_11.nc",
+          "bytes": 945800,
+          "sha256": "e47086f42b6cf21832f9bc8aa7fe036a463b9993c1fea0a8849a54ca670dbfd1"
+        }
+      ],
+      "planes": 72,
+      "stepH": 3,
+      "windowH": 213,
+      "startIso": "2019-10-25T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "maha2019",
+      "partition": "test",
+      "path": "calibration/data/hf3/steering_maha2019.bin",
+      "bytes": 737816,
+      "sha256": "4871feb12d3d89dbb42aa3d4f124b4943cd090ce9af27726fe7553aee6c086d0",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_maha2019_2019_11.nc",
+          "bytes": 3649518,
+          "sha256": "b633fb6c0847a25fc6862eec4bc77747bf879f7ab98ac721d8b5733c82131735"
+        }
+      ],
+      "planes": 64,
+      "stepH": 3,
+      "windowH": 189,
+      "startIso": "2019-11-01T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "shaheen2021",
+      "partition": "validation",
+      "path": "calibration/data/hf3/steering_shaheen2021.bin",
+      "bytes": 1935896,
+      "sha256": "bca42dc1dd774d6ecac60ebf86dd0b06e535eedf29335be2d55d8096f16c84ba",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_shaheen_2021_09.nc",
+          "bytes": 5100824,
+          "sha256": "ca62e71a7fe67a4dcbfd2ed912d2fa50595553ab647514922a20837981563c7c"
+        },
+        {
+          "path": "data/raw/era5_shaheen_2021_10.nc",
+          "bytes": 4659271,
+          "sha256": "22ef5b8d1695ac0f11444c898fd1f23d1035aafd0730f0f5eb16d6b151286a92"
+        }
+      ],
+      "planes": 168,
+      "stepH": 3,
+      "windowH": 501,
+      "startIso": "2021-09-20T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "biparjoy2023",
+      "partition": "validation",
+      "path": "calibration/data/hf3/steering_biparjoy2023.bin",
+      "bytes": 922136,
+      "sha256": "12068a0f8dad8fc94c1a9ae34f56e1983c9f15fdea749e91acdcd8e95a2ff9b5",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/era5_biparjoy_2023_06.nc",
+          "bytes": 4846010,
+          "sha256": "00b2c1fb6fb72c53d3bb8211c2a9219bf3f4536e2636af133b7fdcfa4a30a267"
+        }
+      ],
+      "planes": 80,
+      "stepH": 3,
+      "windowH": 237,
+      "startIso": "2023-06-08T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "asna2024",
+      "partition": "test",
+      "path": "calibration/data/hf3/steering_asna2024.bin",
+      "bytes": 737816,
+      "sha256": "ae532a6c6a2f09d4ae07539d6129f9e8cae71eeb40b4242e72bee4f1a112188e",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_asna2024_2024_08.nc",
+          "bytes": 1945753,
+          "sha256": "0e2d88fc6c7df55aaf59d6e0aa777112f81fd22951ab198029de017c53d5325a"
+        },
+        {
+          "path": "data/raw/fidelity_era5_asna2024_2024_09.nc",
+          "bytes": 1876410,
+          "sha256": "836d66145f33300cbec7ca30a8fbfb14c19879fde7cb5bce9d39f6db14b1a045"
+        }
+      ],
+      "planes": 64,
+      "stepH": 3,
+      "windowH": 189,
+      "startIso": "2024-08-28T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    }
+  ]
+}

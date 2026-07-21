@@ -1,0 +1,322 @@
+{
+  "schemaVersion": 2,
+  "contractId": "hf2a-dynamic-upper-ocean-v2",
+  "status": "candidate-selection-locked",
+  "lockedAt": "2026-07-21",
+  "specification": "docs/hf2a-dynamic-upper-ocean-spec.md",
+  "scope": {
+    "phase": "HF-2A",
+    "objective": "Replace the scalar OHC multiplier and empirical cold-wake patches with a deterministic, heat-conserving upper-ocean column coupled to the existing reduced-order cyclone.",
+    "notOperationalGuidance": true,
+    "permanentTestIsAcceptanceGate": false
+  },
+  "frozenInputs": {
+    "fidelityCatalog": {
+      "path": "calibration/fidelity-catalog.json",
+      "sha256": "cb3aa9bee125bef248c2eac4c3f9037f62c85a4619ddc5a8b8110501677eb7cc",
+      "partitions": {
+        "development": 18,
+        "validation": 6,
+        "test": 6
+      }
+    },
+    "fidelityReference": {
+      "path": "calibration/fidelity-reference.json",
+      "sha256": "90aa3f02baa294cb52b436f56ee687a56f1e5acaa4a8aabd8489b862fde99978"
+    },
+    "hf1OceanPhysics": {
+      "gitCommit": "ec83e03e5f65d4246f4123d4ec751a0ef898cb5e",
+      "simPath": "src/sim.ts",
+      "simSha256": "b7ee84bc97a92ee8ff3f5aab9f4e84bc5e73b1610deaf61837fc83ff97428528",
+      "structurePath": "src/structure.ts",
+      "structureSha256": "2e9c5f3cb9e86e951bf5416f5232a8e5f2c63a7b6f2d6754ee1faad580826638"
+    }
+  },
+  "hf1ValidationBaseline": {
+    "aggregate": {
+      "storms": 6,
+      "trackMaeKm": 60.104589024,
+      "intensityMaeKt": 27.341107707,
+      "intensityBiasKt": -23.880714032,
+      "pressureMaeHpa": 21.375661904,
+      "peakAbsBiasKt": 10.730826375
+    },
+    "leadTimes": [
+      {
+        "leadH": 24,
+        "samples": 5,
+        "intensitySamples": 5,
+        "pressureSamples": 4,
+        "trackMaeKm": 44.137810508,
+        "intensityMaeKt": 37.383861492,
+        "intensityBiasKt": -37.383861492,
+        "intensityMaeSkillFraction": -1.492257433,
+        "persistenceIntensityMaeKt": 15,
+        "persistenceIntensityBiasKt": -15,
+        "pressureMaeHpa": 27.316842909,
+        "pressureBiasHpa": 27.316842909,
+        "pressureMaeSkillFraction": -1.185347433,
+        "persistencePressureMaeHpa": 12.5,
+        "persistencePressureBiasHpa": 12.5
+      },
+      {
+        "leadH": 48,
+        "samples": 3,
+        "intensitySamples": 3,
+        "pressureSamples": 3,
+        "trackMaeKm": 40.177595983,
+        "intensityMaeKt": 27.873965841,
+        "intensityBiasKt": -27.542720635,
+        "intensityMaeSkillFraction": -0.520398137,
+        "persistenceIntensityMaeKt": 18.333333333,
+        "persistenceIntensityBiasKt": -11.666666667,
+        "pressureMaeHpa": 21.457392214,
+        "pressureBiasHpa": 21.457392214,
+        "pressureMaeSkillFraction": -0.839205047,
+        "persistencePressureMaeHpa": 11.666666667,
+        "persistencePressureBiasHpa": 6.333333333
+      }
+    ]
+  },
+  "oceanBenchmark": {
+    "referenceArtifact": "calibration/hf2a-ocean-reference.json",
+    "referenceSha256": "a2d09aa5bb674e6a5341c65f3b2cd512b3adf17d2793aba8a5068ef41a10c789",
+    "requiredBeforePhysicsImplementation": true,
+    "currentStatus": "development-candidate-frozen",
+    "surfaceSource": {
+      "name": "NOAA NESDIS GHRSST Geo-polar Blended Night-only Foundation SST v1.0",
+      "url": "https://coastwatch.noaa.gov/erddap/info/noaacwBLENDEDCsstDaily/index.html",
+      "coverageStart": "2002-09-01",
+      "nativeResolutionDegrees": 0.05,
+      "benchmarkResolutionDegrees": 0.1,
+      "maximumAcceptedAnalysisUncertaintyC": 0.5
+    },
+    "profileSource": {
+      "name": "Argo GDAC core temperature and salinity profiles",
+      "url": "https://argo.ucsd.edu/data/data-from-gdacs/",
+      "preferDelayedMode": true,
+      "acceptedQcFlags": [
+        "1",
+        "2"
+      ],
+      "acceptanceRole": "vertical-structure diagnostic; promote to a numerical gate only after coverage is frozen",
+      "currentStatus": "report-only selection pending"
+    },
+    "partitions": {
+      "development": [
+        "gonu2007",
+        "as2007",
+        "phet2010",
+        "keila2011",
+        "nanauk2014",
+        "nilofar2014",
+        "ashobaa2015",
+        "mekunu2018",
+        "vayu2019",
+        "hikaa2019"
+      ],
+      "validation": [
+        "mukda2006",
+        "kyarr2019",
+        "shaheen2021",
+        "biparjoy2023"
+      ],
+      "testReportOnly": [
+        "maha2019",
+        "asna2024"
+      ]
+    },
+    "sampling": {
+      "preStormLocalPassageWindowH": [
+        -120,
+        -48
+      ],
+      "evaluationLeadsAfterLocalPassageH": [
+        24,
+        48
+      ],
+      "maximumCrossTrackDistanceKm": 300,
+      "aggregateAtStormLevelBeforeScoring": true
+    },
+    "primaryMetrics": [
+      "deltaSstMaeC",
+      "deltaSstBiasC",
+      "peakCoolingMaeC",
+      "meanCoolingMaeC"
+    ],
+    "secondaryMetrics": [
+      "coldAreaFractionBelowMinus0_5C",
+      "rightMinusLeftCoolingC",
+      "recoveryEfoldingH",
+      "mixedLayerDepthMaeM",
+      "temperatureProfileRmseC",
+      "ohc26MaeKjCm2"
+    ],
+    "acceptance": {
+      "minimumValidationStorms": 3,
+      "requiredLeadsH": [
+        24,
+        48
+      ],
+      "pairedSkillFormula": "1 - candidate_mae / hf1_clean_background_wake_mae",
+      "minimumPairedSkillFraction": 0,
+      "strictlyGreaterThanMinimum": true,
+      "absoluteBiasMustImprove": true,
+      "requiredSampleRetentionFraction": 1
+    }
+  },
+  "physicsContract": {
+    "horizontalGridDegrees": 0.1,
+    "maximumActiveRadiusOuterSizeMultiples": 4,
+    "fixedConstants": {
+      "gravityMs2": 9.80665,
+      "earthRotationRateRadS": 0.000072921159,
+      "referenceWaterDensityKgM3": 1025,
+      "waterHeatCapacityJKgK": 3990,
+      "airDensityKgM3": 1.15,
+      "thermalExpansionPerC": 0.00033,
+      "halineContractionPerPsu": 0.00076,
+      "densityReferenceTemperatureC": 27,
+      "densityReferenceSalinityPsu": 36,
+      "gradientRichardsonCritical": 0.25,
+      "oceanSubstepMinutes": 5,
+      "oneMinuteToTenMinuteOpenOceanWindFactor": 0.93,
+      "dragLaw": "Cd=0.0012 for U10<=11 m/s; Cd=(0.49+0.065*U10)*0.001 for 11<U10<25 m/s; Cd=0.002115 for U10>=25 m/s"
+    },
+    "verticalLevelsM": [
+      0,
+      5,
+      10,
+      15,
+      20,
+      25,
+      30,
+      35,
+      40,
+      45,
+      50,
+      55,
+      60,
+      65,
+      70,
+      75,
+      80,
+      85,
+      90,
+      95,
+      100,
+      125,
+      150,
+      175,
+      200,
+      250,
+      300
+    ],
+    "prognosticState": [
+      "temperatureProfileC",
+      "salinityProfilePsu",
+      "currentProfileUms",
+      "currentProfileVms",
+      "mixedLayerDepthM",
+      "cumulativeEntrainmentHeatJm2",
+      "recoveryHeatJm2"
+    ],
+    "mixedLayerDefinition": {
+      "referenceDepthM": 10,
+      "densityThresholdKgM3": 0.03,
+      "temperatureFallbackThresholdC": 0.2
+    },
+    "tunableParameters": {
+      "bulkRichardsonCritical": {
+        "minimum": 0.55,
+        "maximum": 0.75,
+        "literatureAnchor": 0.65
+      },
+      "momentumDampingInertialPeriods": {
+        "minimum": 1,
+        "maximum": 5,
+        "literatureAnchor": 1.6
+      },
+      "thermalRecoveryHours": {
+        "minimum": 120,
+        "maximum": 720,
+        "initial": 240
+      }
+    },
+    "hardBounds": {
+      "temperatureC": [
+        -2,
+        36
+      ],
+      "salinityPsu": [
+        20,
+        45
+      ],
+      "mixedLayerDepthM": [
+        5,
+        300
+      ],
+      "dragCoefficient": [
+        0.0012,
+        0.002115
+      ],
+      "surfaceCoolingC": [
+        0,
+        8
+      ]
+    },
+    "forbiddenDirectIntensityTerms": [
+      "ohcMpiWeight",
+      "oceanDepthCoupling",
+      "empiricalColdWakeCoolingRate"
+    ],
+    "requiredProperties": [
+      "heat-conserving entrainment before explicit recovery flux",
+      "salt-conserving entrainment",
+      "fixed-step deterministic evolution",
+      "no post-initialization observed SST assimilation",
+      "no future ocean profile at initialization",
+      "no repeated extraction from an unchanged column",
+      "all non-conservative heat changes recorded in the diagnostic ledger"
+    ],
+    "selectedParameters": {
+      "bulkRichardsonCritical": 0.55,
+      "momentumDampingInertialPeriods": 1,
+      "thermalRecoveryHours": 120
+    },
+    "selectionArtifact": "calibration/hf2a-candidate-selection.json"
+  },
+  "gates": {
+    "hf2aCandidate": {
+      "requiredOceanBenchmark": true,
+      "requiredOceanPairedSkillFractionStrictlyGreaterThan": 0,
+      "requiredIntensitySkillChangeAt24And48HStrictlyGreaterThan": 0,
+      "requiredAbsoluteIntensityBiasReductionAt24And48H": true,
+      "maximumPressureMaeRegressionFraction": 0.05,
+      "maximumTrackMaeRegressionFraction": 0.05,
+      "requiredSampleRetentionFraction": 1,
+      "permanentTestUsedForAcceptance": false
+    },
+    "hf2Completion": {
+      "requiredValidationLeadsH": [
+        24,
+        48
+      ],
+      "minimumWindPairedSkillFractionStrictlyGreaterThan": 0,
+      "minimumPressurePairedSkillFractionStrictlyGreaterThan": 0,
+      "absoluteWindBiasMustBeatHf1AndPersistence": true,
+      "absolutePressureBiasMustBeatHf1AndPersistence": true,
+      "maximumTrackMaeRegressionFraction": 0.05,
+      "requiredSampleRetentionFraction": 1,
+      "permanentTestUsedForAcceptance": false
+    }
+  },
+  "workflow": {
+    "parameterSelectionPartition": "development",
+    "acceptancePartition": "validation",
+    "reportOnlyPartition": "test",
+    "candidateMustBeHashedBeforeValidation": true,
+    "validationAttemptsMustBeLogged": true,
+    "validationGuidedChangesInvalidateConfirmatoryUse": true
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-2",
+  "status": "rejected",
+  "claimClass": "legacy-validation-diagnostic",
+  "decision": "Rejected without changing thresholds; retain the implementation as experimental and retest only on a new sealed cohort.",
+  "manifests": {
+    "contractSha256": "86d98c02086c7640e57736fe47e789ee9df2c1ae2f7cb9fbd78210c7da682951",
+    "selectionSha256": "223cd347f888f4ad3f241e12bebb992b3571f7a10b7c61168faff2d9c6258f1b",
+    "validationSha256": "bf60a468e0f3287ea5534ec263f05c38c76fddaa60c214c9bd6d3deea0a7bd85",
+    "hf1ReferenceSha256": "90aa3f02baa294cb52b436f56ee687a56f1e5acaa4a8aabd8489b862fde99978"
+  },
+  "checks": [
+    {
+      "id": "development-candidate-hash",
+      "pass": true,
+      "expected": "1712c4dbe3fc7180042fc1b8fc74c50174186d154e4bf0c3db091ce929e0453a",
+      "actual": "1712c4dbe3fc7180042fc1b8fc74c50174186d154e4bf0c3db091ce929e0453a"
+    },
+    {
+      "id": "runtime-parameters-match-selection",
+      "pass": true,
+      "expected": {
+        "intensifyKPerH": 0.055,
+        "shearThresholdMs": 14,
+        "shearKtPerHPerMs": 0.65,
+        "dryAirK": 0.9,
+        "organizationRecoveryH": 30,
+        "organizationDisruptionH": 10,
+        "ohcMpiWeight": 0.28,
+        "organizationIntensification": 0.05
+      },
+      "actual": {
+        "intensifyKPerH": 0.055,
+        "shearThresholdMs": 14,
+        "shearKtPerHPerMs": 0.65,
+        "dryAirK": 0.9,
+        "organizationRecoveryH": 30,
+        "organizationDisruptionH": 10,
+        "ohcMpiWeight": 0.28,
+        "organizationIntensification": 0.05
+      }
+    },
+    {
+      "id": "ocean-component-accepted",
+      "pass": false,
+      "actual": "rejected"
+    },
+    {
+      "id": "structure-component-accepted",
+      "pass": true,
+      "actual": true
+    },
+    {
+      "id": "24h-sample-retention",
+      "pass": true,
+      "actual": 1.2
+    },
+    {
+      "id": "24h-positive-intensity-skill",
+      "pass": true,
+      "actual": 0.466256067
+    },
+    {
+      "id": "24h-positive-pressure-skill",
+      "pass": true,
+      "actual": 0.304426637
+    },
+    {
+      "id": "24h-intensity-absolute-bias-improved",
+      "pass": true,
+      "candidate": 4.926678453,
+      "persistence": 12.5
+    },
+    {
+      "id": "24h-pressure-absolute-bias-improved",
+      "pass": true,
+      "candidate": 8.694667044,
+      "persistence": 12.5
+    },
+    {
+      "id": "48h-sample-retention",
+      "pass": true,
+      "actual": 1.6666666666666667
+    },
+    {
+      "id": "48h-positive-intensity-skill",
+      "pass": false,
+      "actual": -0.02201377
+    },
+    {
+      "id": "48h-positive-pressure-skill",
+      "pass": true,
+      "actual": 0.169328483
+    },
+    {
+      "id": "48h-intensity-absolute-bias-improved",
+      "pass": true,
+      "candidate": 0.07331029,
+      "persistence": 9
+    },
+    {
+      "id": "48h-pressure-absolute-bias-improved",
+      "pass": true,
+      "candidate": 7.722915067,
+      "persistence": 9.75
+    }
+  ]
+}

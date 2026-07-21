@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-6",
+  "archivePolicy": "Register each immutable HF-5 issued-run hash before verifying observations exist; never replace a prior record.",
+  "issuedRuns": [],
+  "maturedRuns": [],
+  "counts": {
+    "issued": 0,
+    "matured": 0,
+    "distinctStorms": 0
+  },
+  "status": "awaiting-future-storms",
+  "claim": "Zero prospective cases have matured; no prospective skill claim is permitted."
+}

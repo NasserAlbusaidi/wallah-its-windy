@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-3",
+  "selectionRule": "Track parameters and the CLIPER fit use development storms only. Validation and permanent test storms are excluded from parameter fitting.",
+  "requiredLeadsH": [12, 24, 48],
+  "gates": {
+    "minimumTrackSkillAgainstLinearPersistence": 0,
+    "minimumTrackSkillAgainstClimatologyPersistence": 0,
+    "minimumSampleRetentionFraction": 0.9,
+    "maximumAggregateIntensityMaeRegressionFraction": 0.05,
+    "maximumAggregatePressureMaeRegressionFraction": 0.05,
+    "requireCombinedAlongCrossBiasMagnitudeImprovementAt12And24H": true,
+    "require48HourAdvantageRetained": true,
+    "finalTestIsAcceptanceGate": false
+  },
+  "forcing": {
+    "pressureLevelsHpa": [850, 500, 250],
+    "environmentalAnnulusKm": [275, 375],
+    "nativeVortexFilterSigmaDegrees": 1.5,
+    "sidecarRule": "HF-3 pressure winds are separate immutable sidecars; HF-1/HF-2 forcing bytes cannot be rewritten."
+  },
+  "motion": {
+    "initialization": "Most recent agency motion at or before initialization, maximum 24-hour lookback; no future fixes.",
+    "correction": "Cosine taper to zero over the selected development-only lifetime.",
+    "betaDrift": "Northwestward, bounded, and scaled by storm size, intensity, and latitude.",
+    "terrain": "Small separately diagnosed differential-friction correction, bounded in m/s.",
+    "wander": "Development-calibrated Ornstein-Uhlenbeck residual; disabled in deterministic hindcasts."
+  },
+  "claimRule": "Legacy validation can reject a candidate but cannot establish an independent confirmatory claim after the model-development history. HF-6 must seal a new cohort."
+}

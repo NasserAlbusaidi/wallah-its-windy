@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-2",
+  "status": "development-selected",
+  "candidate": {
+    "artifact": "calibration/fidelity-development-hf2-selected.json",
+    "sha256": "1712c4dbe3fc7180042fc1b8fc74c50174186d154e4bf0c3db091ce929e0453a",
+    "parameters": {
+      "intensifyKPerH": 0.055,
+      "shearThresholdMs": 14,
+      "shearKtPerHPerMs": 0.65,
+      "dryAirK": 0.9,
+      "organizationRecoveryH": 30,
+      "organizationDisruptionH": 10,
+      "ohcMpiWeight": 0.28,
+      "organizationIntensification": 0.05
+    },
+    "rationale": "Lowest balanced development objective among the final candidates, positive wind and pressure skill at 24/48 h, and near-zero 48 h wind bias without disabling organization memory."
+  },
+  "finalists": [
+    {
+      "artifact": "calibration/fidelity-development-hf2-selected.json",
+      "intensifyKPerH": 0.055,
+      "shearKtPerHPerMs": 0.65,
+      "organizationIntensification": 0.05,
+      "objective": 0.876277446,
+      "selected": true
+    },
+    {
+      "artifact": "calibration/fidelity-development-m2.json",
+      "intensifyKPerH": 0.05,
+      "shearKtPerHPerMs": 0.65,
+      "organizationIntensification": 0.05,
+      "objective": 0.890875585,
+      "selected": false
+    }
+  ],
+  "implementation": {
+    "sim": "2720b3a22e0c2fd448a21961cf1d79f306588fd14fe59947912011742466602d",
+    "ventilation": "fca43ddcb30b3cced597fcf8f55af3be7014c64f0f4b1d95ba2391352b6829ae",
+    "coastalExposure": "5ed8e0253a43bc8fc4252c9aa26b8617c50122f62fe8e48819c145115b2bd6ba",
+    "structure": "1bf0338000b1ff8243671da707cbbecc116f8bc90cddbcfdf3c39fa91885bcba",
+    "upperOcean": "e53550cfa0b7a00d7549282ec9b4b374b31cebe1f8168e7f7cc4f966129a52ae"
+  },
+  "data": {
+    "initialStructureSha256": "a2334bb9beb819f9e6aa4f1e1cbabfe13311ee244f5e4b77ec4c00ef7c1c171f",
+    "eventOceanSha256": "d1110713658d950b0f1ea54556c8ce4a31f501ab7a4672f129001ad432f24975"
+  },
+  "honestyNote": "Selection used development results. The subsequent legacy validation result is not confirmatory because earlier variants had already exposed that partition."
+}

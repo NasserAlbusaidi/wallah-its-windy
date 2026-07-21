@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "sourceTier": "climatological-subsurface",
+  "product": "NOAA World Ocean Atlas 2023 decadal monthly objective analysis",
+  "license": "United States public domain; cite NOAA NCEI WOA23",
+  "horizontalGrid": {
+    "nx": 40,
+    "ny": 24,
+    "bbox": [
+      50.0,
+      70.0,
+      15.0,
+      27.0
+    ]
+  },
+  "dynamicGridDegrees": 0.1,
+  "depthInterfacesM": [
+    0.0,
+    5.0,
+    10.0,
+    15.0,
+    20.0,
+    25.0,
+    30.0,
+    35.0,
+    40.0,
+    45.0,
+    50.0,
+    55.0,
+    60.0,
+    65.0,
+    70.0,
+    75.0,
+    80.0,
+    85.0,
+    90.0,
+    95.0,
+    100.0,
+    125.0,
+    150.0,
+    175.0,
+    200.0,
+    250.0,
+    300.0
+  ],
+  "depthMidpointsM": [
+    2.5,
+    7.5,
+    12.5,
+    17.5,
+    22.5,
+    27.5,
+    32.5,
+    37.5,
+    42.5,
+    47.5,
+    52.5,
+    57.5,
+    62.5,
+    67.5,
+    72.5,
+    77.5,
+    82.5,
+    87.5,
+    92.5,
+    97.5,
+    112.5,
+    137.5,
+    162.5,
+    187.5,
+    225.0,
+    275.0
+  ],
+  "temperatureUnits": "degree_Celsius",
+  "salinityUnits": "PSU",
+  "wakeFreeAfterInitialization": true,
+  "futureOceanAssimilation": false,
+  "missingDataPolicy": "per-level nearest-ocean fill before bilinear interpolation",
+  "inputs": [
+    {
+      "monthIndex": 4,
+      "temperature": {
+        "path": "data/raw/woa23_decav_t05_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/temperature/netcdf/decav/1.00/woa23_decav_t05_01.nc?var=t_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "d82916fbf7f1535ab9953d6838c5fffa8989444bb0ef31dce4eaeb636b8221fb"
+      },
+      "salinity": {
+        "path": "data/raw/woa23_decav_s05_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/salinity/netcdf/decav/1.00/woa23_decav_s05_01.nc?var=s_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "55a7ca7053a07b328276181b867c0e5578a7cd4b4b717a03d9bc920496ba8cc7"
+      }
+    },
+    {
+      "monthIndex": 5,
+      "temperature": {
+        "path": "data/raw/woa23_decav_t06_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/temperature/netcdf/decav/1.00/woa23_decav_t06_01.nc?var=t_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "67e0e5aa216a793b5595b243fe315bdc396c3128dd31e2c8dc612ed72e9a9b67"
+      },
+      "salinity": {
+        "path": "data/raw/woa23_decav_s06_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/salinity/netcdf/decav/1.00/woa23_decav_s06_01.nc?var=s_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "d801bacb138339fe408ee020f3338a250e8b0daa49ece7d0731ad4ce2fab0887"
+      }
+    },
+    {
+      "monthIndex": 6,
+      "temperature": {
+        "path": "data/raw/woa23_decav_t07_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/temperature/netcdf/decav/1.00/woa23_decav_t07_01.nc?var=t_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "c2884b567ac0f1cb061187f68e104e6cf05f6a50ff38417c2674cbe33db5fae0"
+      },
+      "salinity": {
+        "path": "data/raw/woa23_decav_s07_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/salinity/netcdf/decav/1.00/woa23_decav_s07_01.nc?var=s_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "d913f9cff5715d1b78b306ffe2460dd24571b7456bce32596d8c45ae55ee26bd"
+      }
+    },
+    {
+      "monthIndex": 7,
+      "temperature": {
+        "path": "data/raw/woa23_decav_t08_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/temperature/netcdf/decav/1.00/woa23_decav_t08_01.nc?var=t_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "f459dff538929911e410bc854d990e1264a66bfaa2f7f25a6f518e143610f57d"
+      },
+      "salinity": {
+        "path": "data/raw/woa23_decav_s08_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/salinity/netcdf/decav/1.00/woa23_decav_s08_01.nc?var=s_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "095775d215f9196f526e4ed1bff523e9f1024be50ae683bbdcf686716ffefad1"
+      }
+    },
+    {
+      "monthIndex": 8,
+      "temperature": {
+        "path": "data/raw/woa23_decav_t09_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/temperature/netcdf/decav/1.00/woa23_decav_t09_01.nc?var=t_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "000370add847af64190801ace360ae36ef319802aca680b840357bf5142c652f"
+      },
+      "salinity": {
+        "path": "data/raw/woa23_decav_s09_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/salinity/netcdf/decav/1.00/woa23_decav_s09_01.nc?var=s_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "22427b57c339e7048a053aba8d9622ab584d13f8ab16ba1cae626ea12649a2e1"
+      }
+    },
+    {
+      "monthIndex": 9,
+      "temperature": {
+        "path": "data/raw/woa23_decav_t10_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/temperature/netcdf/decav/1.00/woa23_decav_t10_01.nc?var=t_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "935db82b274f6cbaf20cf1f3b7dd1a64742896334108e3a9cf4645bb628e5355"
+      },
+      "salinity": {
+        "path": "data/raw/woa23_decav_s10_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/salinity/netcdf/decav/1.00/woa23_decav_s10_01.nc?var=s_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "e794134711515542c4e549745298fc1b1a5d9961baa592b3bc6145f9eb62682d"
+      }
+    },
+    {
+      "monthIndex": 10,
+      "temperature": {
+        "path": "data/raw/woa23_decav_t11_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/temperature/netcdf/decav/1.00/woa23_decav_t11_01.nc?var=t_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "35e4894e36d6c14aa1b03d91e3d3fa91455949f74f0ad3fd2b5ac9a336f6d110"
+      },
+      "salinity": {
+        "path": "data/raw/woa23_decav_s11_01_arabian.nc",
+        "url": "https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/salinity/netcdf/decav/1.00/woa23_decav_s11_01.nc?var=s_an&north=27.5&west=50.0&east=70.5&south=15.0&horizStride=1&accept=netcdf4ext",
+        "sha256": "94fed33a64789460cdda7cecb111b818643dcaa633fa7fa5e4f3cb84c1d3dd46"
+      }
+    }
+  ],
+  "binary": {
+    "path": "public/data/ocean.bin",
+    "bytes": 700120,
+    "sha256": "0811050864a24374e1cc7ed0e1d8519a85ec9e72505d1f9af28a6abca3498434"
+  }
+}

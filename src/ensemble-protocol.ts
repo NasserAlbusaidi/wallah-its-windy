@@ -12,6 +12,8 @@ interface WorkerBaseRequest {
   requestId: number;
   envUrl: string;
   terrainUrl: string;
+  steeringUrl?: string;
+  oceanUrl?: string;
   spawn: SpawnParams;
   samplingMode: EnvSamplingMode;
 }

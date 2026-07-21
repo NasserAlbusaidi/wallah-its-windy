@@ -16,7 +16,9 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > demo storm opens mid-life on first load. Compare June vs October at one click;
 > share any storm by its URL. User storms carry a live flight recorder that
 > explains each intensity change in numbers and plain language, then becomes a
-> debrief, controlled-comparison lab, export station, and replay timeline.
+> debrief, controlled-comparison lab, export station, and replay timeline. Each
+> user storm receives a deterministic, explicitly simulated WMO/ESCAP name; the
+> tape adds an exact intensity sparkline and a geometric historical analog.
 > Ten featured historical environments also have deterministic,
 > observed-initialization hindcasts with honest track/intensity/pressure
 > scoring and a separate counterfactual mode. A separate frozen 30-storm
@@ -24,13 +26,27 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > against a no-future-information persistence baseline. The map can switch
 > among terrain, simulated infrared,
 > SST, humidity, ocean heat, shear, and simulated rain-radar views. A worker-run
-> forecast laboratory adds deterministic ensembles, track-probability fields,
+> forecast laboratory adds deterministic ensembles, track member-frequency fields,
 > and same-storm sensitivity experiments without blocking the map.
 
 The current scientific and product sequence is maintained in
-**[ROADMAP.md](ROADMAP.md)**. HF-2 dynamic upper-ocean and intensity physics is
-the next milestone; live forecasting is planned as a provider-neutral forecast
-postprocessor, not as a replacement for official guidance.
+**[ROADMAP.md](ROADMAP.md)**. The
+**[locked HF-2A specification](docs/hf2a-dynamic-upper-ocean-spec.md)** and the
+phase artifacts under `calibration/` preserve every scientific gate. HF-2,
+HF-3, and HF-4 are implemented but rejected by their frozen acceptance rules;
+the app does not promote their ensemble output to calibrated probability. HF-5
+implements provider-neutral normalization and immutable forecast issuance, but
+no scheduled live feed is configured. HF-6 is implementation-complete: it
+expands the audit to 72 storms and 144 initializations, and the untouched
+eight-storm/16-initialization sealed first look has been scored. Track skill was
+positive against persistence at 12/24/48 hours, but the frozen intensity and
+pressure gates failed; the sealed result is therefore **rejected** and the
+prospective registry remains at zero matured forecasts. See the
+**[HF-6 model card](docs/model-card-hf6.md)** and generated
+**[HF-6 scorecard](docs/hf6-scorecard.md)**. The project remains an experimental
+simulator and retrospective forecast-companion prototype, not a replacement for
+official guidance. The consolidated **[HF-1–HF-6 findings](docs/findings-hf1-hf6.md)**
+explain what improved, what failed, and which claims the evidence supports.
 
 ## Stack
 
@@ -57,6 +73,13 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
 ## Controls
 
 - Click open water to spawn a storm.
+- Hover the chart for modeled surface wind, SST, humidity, shear, and OHC at the
+  cursor. Use **pin** to hold the reading; on touch, long-press the chart. The
+  card identifies analysis, climatology, or fallback fields and always labels
+  vortex wind as simulated.
+- Eight coastal-city markers open exact current/run impact readings. A marker
+  glows amber only while the same Holland profile used by the impact report
+  puts that city at or above 34 kt.
 - Pick a layer on the right-edge rail (or press 1–9): wind flow, simulated
   rain radar, simulated infrared, storm-total rainfall, SST, humidity, OHC,
   shear, and the terrain instrument. SST/RH/OHC/shear render the exact active
@@ -76,7 +99,9 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
 - Press Space or use the flight recorder's button to pause and resume.
 - After the storm ends, scrub its recorded track or jump to its peak, first
   landfall, and final frame. Replay reads immutable recorded frames; it never
-  rewinds the simulation engine.
+  rewinds the simulation engine. The wind-versus-time strip exposes every exact
+  frame to pointer and keyboard inspection, while the analog line reports the
+  closest shipped historical track under a labeled geometric score.
 - Choose a second month or event environment under the debrief to run the exact
   same genesis and seed again. The first track remains amber beneath the cyan
   candidate, and the paired debrief reports intensity, lifetime, approach, and
@@ -105,10 +130,11 @@ reflectivity palette; it follows the
 but is not a radar observation. The interface labels both proxy products
 “simulated” at all times.
 
-On touch screens, a short stable tap spawns; drag, long-press, and multi-touch
-gestures do not. Narrow layouts keep the causal sentence visible and place exact
-physics behind a **details** disclosure. Decorative resolution and particle
-count adapt to the device; physics and recorded results never do.
+On touch screens, a short stable tap spawns, a long-press pins the point probe,
+and drag/multi-touch gestures do neither. Narrow layouts keep the causal sentence
+visible and place exact physics behind a **details** disclosure. Decorative
+resolution and particle count adapt to the device; physics and recorded results
+never do.
 
 Deploys to GitHub Pages from `main` via `.github/workflows/deploy.yml`. The Vite
 `base` is `./` so it works from a project subpath.
@@ -130,6 +156,12 @@ npm run data:fidelity:catalog               # freeze the 30-storm HF-1 catalogue
 npm run data:fidelity:fetch                 # fetch the 20 additional ERA5 cases
 npm run data:fidelity:bake                  # bake offline-only forcing bins
 npm run fidelity                            # regenerate metrics, reference + report
+npm run data:hf6:catalog:check              # verify the frozen 72-storm catalogue
+npm run hf6:observation-audit               # audit truth/strata availability
+npm run data:hf6:fetch                      # acquire sealed ERA5 inputs (network)
+npm run data:hf6:bake                       # bake 16 sealed initialization packages
+npm run hf6:verify:check                    # reproduce the committed first look
+npm run hf6:gate:check                      # enforce implementation + honesty gates
 ```
 
 - Binary format + golden test vector: **`BINARY-FORMATS.md`**.

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-3",
+  "status": "development-selected-before-validation",
+  "candidate": {
+    "artifact": "calibration/fidelity-development-hf3-selected.json",
+    "sha256": "d13cde7ff79950620491352a5c330a3f146d782790f1f90b2f001151f60ad76e",
+    "trackParameters": {
+      "environmentalSteeringBlend": 0.05,
+      "motionResponseHours": 0,
+      "initialMotionBlendHours": 36,
+      "betaDriftScale": 0.5,
+      "terrainDriftMaxMs": 0.15,
+      "wanderStepMs": 0.6,
+      "wanderRevertFraction": 0.013192983
+    },
+    "developmentResult": {
+      "trackMaeKm": 83.120935287,
+      "12hSkillAgainstPersistence": 0.209154389,
+      "12hSkillAgainstCliper": 0.164518472,
+      "24hSkillAgainstPersistence": 0.431920835,
+      "24hSkillAgainstCliper": 0.355001471,
+      "48hSkillAgainstPersistence": 0.783649481,
+      "48hSkillAgainstCliper": 0.641365792
+    },
+    "rationale": "The candidate achieved positive development skill against both linear persistence and the dev-trained CLIPER reference at 12/24/48 h, sharply reduced early along/cross-track bias, retained 90.9% of the HF-2 48 h sample, and kept nonzero pressure-level and terrain physics."
+  },
+  "implementation": {
+    "steeringSha256": "1b663690cce411ccdef9c31221d12a4070d59070019e7fa3af5769d16ffe355d",
+    "simSha256": "ecab028c6a269b72590cb084524966d47a5129f35be2bd3bf29da0a549368322"
+  },
+  "data": {
+    "pressureSteeringManifestSha256": "6f35a2e577fc13de78f9a09efffc3c551e1fdbe006910f13740bacefdf5ba1c1",
+    "wanderCalibrationSha256": "36975b22954753c81c49bb751e3347d21d2b1ce6819a94c5e1bfeb327b432a06"
+  },
+  "validationStatus": "not-run-at-freeze"
+}

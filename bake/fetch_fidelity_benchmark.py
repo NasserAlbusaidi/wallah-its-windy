@@ -39,6 +39,15 @@ def _selected_ids(argv: list[str]) -> set[str] | None:
     return {value for value in argv[index + 1].split(",") if value}
 
 
+def _catalog_path(argv: list[str]) -> Path:
+    if "--catalog" not in argv:
+        return CATALOG_PATH
+    index = argv.index("--catalog")
+    if index + 1 >= len(argv):
+        raise ValueError("--catalog requires a path")
+    return Path(argv[index + 1])
+
+
 def _client() -> cdsapi.Client:
     client = getattr(_thread, "client", None)
     if client is None:
@@ -189,11 +198,12 @@ def _download_group(
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     wanted = _selected_ids(argv)
-    document = json.loads(CATALOG_PATH.read_text())
+    document = json.loads(_catalog_path(argv).read_text())
+    entries = document.get("storms", document.get("cases", []))
     storms = [
         storm
-        for storm in document["storms"]
-        if storm["publicEventId"] is None
+        for storm in entries
+        if storm.get("publicEventId") is None
         and (wanted is None or storm["id"] in wanted)
     ]
     if wanted is not None:
@@ -234,7 +244,7 @@ def main(argv: list[str] | None = None) -> int:
                 }
                 tasks.append(
                     (
-                        storm["label"],
+                        storm.get("label", storm.get("name", storm["id"])),
                         kind,
                         dataset,
                         request,

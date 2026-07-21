@@ -8,15 +8,52 @@ import { makeRng, type Rng } from './rng';
 import {
   createSimEngine,
   DEFAULT_INTENSITY_PARAMETERS,
+  DEFAULT_TRACK_PARAMETERS,
   type IntensityParameters,
+  type TrackParameters,
 } from './sim';
 import type {
   EnvSample,
   EnvSampler,
+  PressureWindSampler,
   SpawnParams,
   StormDeath,
   TrackPoint,
 } from './types';
+import type { OceanProfileSampler } from './ocean-profile-sampler';
+
+export type UncertaintySource =
+  | 'initialization'
+  | 'forcing'
+  | 'parameters'
+  | 'unresolved-physics';
+
+export const ALL_UNCERTAINTY_SOURCES: readonly UncertaintySource[] = [
+  'initialization',
+  'forcing',
+  'parameters',
+  'unresolved-physics',
+];
+
+export interface UncertaintyComponents {
+  enabled: UncertaintySource[];
+  initialization: {
+    latDeltaDeg: number;
+    lonDeltaDeg: number;
+    windDeltaKt: number;
+    organizationDelta: number;
+    timeDeltaH: number;
+  };
+  forcing: EnvironmentPerturbation;
+  parameters: {
+    intensifyScale: number;
+    shearScale: number;
+    organizationRecoveryScale: number;
+    betaScale: number;
+    steeringBlendDelta: number;
+  };
+  unresolvedPhysics: { enabled: boolean; seed: number };
+}
 
 export interface EnvironmentPerturbation {
   sstDeltaC: number;
@@ -39,6 +76,7 @@ export interface StormRun {
   durationH: number;
   closestApproachKm: number;
   landfall: boolean;
+  landfallEvents: Array<{ lat: number; lon: number; ageH: number }>;
   death: StormDeath | null;
 }
 
@@ -47,6 +85,13 @@ export interface EnsembleMember {
   spawn: SpawnParams;
   environment: EnvironmentPerturbation;
   intensityParameters: IntensityParameters;
+  trackParameters: TrackParameters;
+  uncertainty: UncertaintyComponents;
+}
+
+export interface EnsembleBaseline {
+  intensityParameters?: Partial<IntensityParameters>;
+  trackParameters?: Partial<TrackParameters>;
 }
 
 export interface EnsembleGrid {
@@ -61,8 +106,12 @@ export interface EnsembleResult {
   grid: EnsembleGrid;
   peakKt: { p10: number; median: number; p90: number };
   landfallProbability: number;
+  tropicalStormProbability: number;
   hurricaneProbability: number;
   majorProbability: number;
+  dissipationProbability: number;
+  /** Remains frequency until HF-4 passes its out-of-sample calibration gate. */
+  probabilityLabel: 'perturbation-frequency';
 }
 
 export interface RunStormOptions {
@@ -71,6 +120,11 @@ export interface RunStormOptions {
   isLand: (lat: number, lon: number) => boolean;
   spawn: SpawnParams;
   intensityParameters?: Partial<IntensityParameters>;
+  trackParameters?: Partial<TrackParameters>;
+  physicsProfile?: 'shipped' | 'hf2-experimental';
+  pressureWindSampler?: PressureWindSampler;
+  oceanProfileSampler?: OceanProfileSampler;
+  terrainHeightM?: (lat: number, lon: number) => number;
   maxHours?: number;
   trackStepHours?: number;
 }
@@ -117,6 +171,11 @@ export function runStorm(options: RunStormOptions): StormRun {
     env: options.env,
     isLand: options.isLand,
     intensityParameters: options.intensityParameters,
+    trackParameters: options.trackParameters,
+    physicsProfile: options.physicsProfile,
+    pressureWindSampler: options.pressureWindSampler,
+    oceanProfileSampler: options.oceanProfileSampler,
+    terrainHeightM: options.terrainHeightM,
     structureDetail: 'dynamics',
   });
   engine.spawn(options.spawn);
@@ -130,6 +189,7 @@ export function runStorm(options: RunStormOptions): StormRun {
   const track: TrackPoint[] = [];
   let peakKt = options.spawn.initialWindKt ?? 0;
   let landfall = false;
+  const landfallEvents: Array<{ lat: number; lon: number; ageH: number }> = [];
   let death: StormDeath | null = null;
 
   for (let tick = 0; tick < maxTicks; tick++) {
@@ -146,7 +206,10 @@ export function runStorm(options: RunStormOptions): StormRun {
       });
     }
     for (const event of events) {
-      if (event.type === 'landfall') landfall = true;
+      if (event.type === 'landfall') {
+        landfall = true;
+        landfallEvents.push({ lat: event.lat, lon: event.lon, ageH: state.ageH });
+      }
       if (event.type === 'died') death = event.death;
     }
     if (!state.alive) break;
@@ -163,6 +226,7 @@ export function runStorm(options: RunStormOptions): StormRun {
     durationH: death?.durationH ?? finalAge,
     closestApproachKm,
     landfall,
+    landfallEvents,
     death,
   };
 }
@@ -171,59 +235,152 @@ export function makeEnsembleMembers(
   spawn: SpawnParams,
   count: number,
   ensembleSeed = spawn.seed,
+  sources: readonly UncertaintySource[] = ALL_UNCERTAINTY_SOURCES,
+  baseline: EnsembleBaseline = {},
 ): EnsembleMember[] {
   const size = clamp(Math.floor(count), 1, 100);
   const out: EnsembleMember[] = [];
+  const enabled = new Set(sources);
+  const baseIntensityParameters: IntensityParameters = {
+    ...DEFAULT_INTENSITY_PARAMETERS,
+    ...baseline.intensityParameters,
+  };
+  const baseTrackParameters: TrackParameters = {
+    ...DEFAULT_TRACK_PARAMETERS,
+    ...baseline.trackParameters,
+  };
   for (let member = 0; member < size; member++) {
     if (member === 0) {
       out.push({
         member,
         spawn: { ...spawn },
         environment: { ...NO_ENVIRONMENT_PERTURBATION },
-        intensityParameters: { ...DEFAULT_INTENSITY_PARAMETERS },
+        intensityParameters: { ...baseIntensityParameters },
+        trackParameters: { ...baseTrackParameters },
+        uncertainty: {
+          enabled: [],
+          initialization: {
+            latDeltaDeg: 0,
+            lonDeltaDeg: 0,
+            windDeltaKt: 0,
+            organizationDelta: 0,
+            timeDeltaH: 0,
+          },
+          forcing: { ...NO_ENVIRONMENT_PERTURBATION },
+          parameters: {
+            intensifyScale: 1,
+            shearScale: 1,
+            organizationRecoveryScale: 1,
+            betaScale: 1,
+            steeringBlendDelta: 0,
+          },
+          unresolvedPhysics: { enabled: false, seed: spawn.seed },
+        },
       });
       continue;
     }
-    const rng = makeRng((ensembleSeed + Math.imul(member, 0x9e3779b1)) >>> 0);
+    const rngFor = (_source: UncertaintySource, salt: number) =>
+      makeRng(
+        (ensembleSeed + Math.imul(member, 0x9e3779b1) + Math.imul(salt, 0x85ebca6b)) >>> 0,
+      );
+    const initializationRng = rngFor('initialization', 1);
+    const forcingRng = rngFor('forcing', 2);
+    const parameterRng = rngFor('parameters', 3);
+    const initEnabled = enabled.has('initialization');
+    const forcingEnabled = enabled.has('forcing');
+    const parameterEnabled = enabled.has('parameters');
+    const unresolvedEnabled = enabled.has('unresolved-physics');
+    const latDeltaDeg = initEnabled ? gaussian(initializationRng) * 0.08 : 0;
+    const lonDeltaDeg = initEnabled ? gaussian(initializationRng) * 0.08 : 0;
+    const windDeltaKt = initEnabled ? gaussian(initializationRng) * 2.5 : 0;
+    const organizationDelta = initEnabled ? gaussian(initializationRng) * 0.04 : 0;
+    const timeDeltaH = initEnabled ? gaussian(initializationRng) * 1.5 : 0;
     const initialOrganization = clamp(
-      (spawn.initialOrganization ?? 0.45) + gaussian(rng) * 0.04,
+      (spawn.initialOrganization ?? 0.45) + organizationDelta,
       0.05,
       0.95,
     );
+    const environment: EnvironmentPerturbation = forcingEnabled
+      ? {
+          // Persistent member-wise biases are coherent across space and time.
+          sstDeltaC: gaussian(forcingRng) * 0.35,
+          rhDeltaPct: gaussian(forcingRng) * 4,
+          shearDeltaMs: gaussian(forcingRng) * 1.5,
+          ohcScale: clamp(1 + gaussian(forcingRng) * 0.1, 0.7, 1.3),
+        }
+      : { ...NO_ENVIRONMENT_PERTURBATION };
+    const intensifyScale = parameterEnabled
+      ? clamp(1 + gaussian(parameterRng) * 0.07, 0.82, 1.18)
+      : 1;
+    const shearScale = parameterEnabled
+      ? clamp(1 + gaussian(parameterRng) * 0.1, 0.75, 1.25)
+      : 1;
+    const organizationRecoveryScale = parameterEnabled
+      ? clamp(1 + gaussian(parameterRng) * 0.08, 0.8, 1.2)
+      : 1;
+    const betaScale = parameterEnabled
+      ? clamp(1 + gaussian(parameterRng) * 0.12, 0.7, 1.3)
+      : 1;
+    const steeringBlendDelta = parameterEnabled
+      ? gaussian(parameterRng) * 0.015
+      : 0;
+    const memberSeed = (spawn.seed + Math.imul(member, 2654435761)) >>> 0;
     out.push({
       member,
       spawn: {
         ...spawn,
-        lat: clamp(spawn.lat + gaussian(rng) * 0.08, DOMAIN.latMin, DOMAIN.latMax),
-        lon: clamp(spawn.lon + gaussian(rng) * 0.08, DOMAIN.lonMin, DOMAIN.lonMax),
-        seed: (spawn.seed + Math.imul(member, 2654435761)) >>> 0,
+        lat: clamp(spawn.lat + latDeltaDeg, DOMAIN.latMin, DOMAIN.latMax),
+        lon: clamp(spawn.lon + lonDeltaDeg, DOMAIN.lonMin, DOMAIN.lonMax),
+        seed: memberSeed,
+        disableWander: !unresolvedEnabled,
         initialWindKt: Math.max(
           20,
-          (spawn.initialWindKt ?? 30) + gaussian(rng) * 2.5,
+          (spawn.initialWindKt ?? 30) + windDeltaKt,
         ),
         initialOrganization,
         tFracOffsetH: Math.max(
           0,
-          (spawn.tFracOffsetH ?? 0) + gaussian(rng) * 1.5,
+          (spawn.tFracOffsetH ?? 0) + timeDeltaH,
         ),
       },
-      environment: {
-        sstDeltaC: gaussian(rng) * 0.35,
-        rhDeltaPct: gaussian(rng) * 4,
-        shearDeltaMs: gaussian(rng) * 1.5,
-        ohcScale: clamp(1 + gaussian(rng) * 0.1, 0.7, 1.3),
-      },
+      environment,
       intensityParameters: {
-        ...DEFAULT_INTENSITY_PARAMETERS,
+        ...baseIntensityParameters,
         intensifyKPerH:
-          DEFAULT_INTENSITY_PARAMETERS.intensifyKPerH *
-          clamp(1 + gaussian(rng) * 0.07, 0.82, 1.18),
+          baseIntensityParameters.intensifyKPerH * intensifyScale,
         shearKtPerHPerMs:
-          DEFAULT_INTENSITY_PARAMETERS.shearKtPerHPerMs *
-          clamp(1 + gaussian(rng) * 0.1, 0.75, 1.25),
+          baseIntensityParameters.shearKtPerHPerMs * shearScale,
         organizationRecoveryH:
-          DEFAULT_INTENSITY_PARAMETERS.organizationRecoveryH *
-          clamp(1 + gaussian(rng) * 0.08, 0.8, 1.2),
+          baseIntensityParameters.organizationRecoveryH *
+          organizationRecoveryScale,
+      },
+      trackParameters: {
+        ...baseTrackParameters,
+        betaDriftScale: baseTrackParameters.betaDriftScale * betaScale,
+        environmentalSteeringBlend: clamp(
+          baseTrackParameters.environmentalSteeringBlend + steeringBlendDelta,
+          0,
+          1,
+        ),
+      },
+      uncertainty: {
+        enabled: [...sources],
+        initialization: {
+          latDeltaDeg,
+          lonDeltaDeg,
+          windDeltaKt,
+          organizationDelta,
+          timeDeltaH,
+        },
+        forcing: { ...environment },
+        parameters: {
+          intensifyScale,
+          shearScale,
+          organizationRecoveryScale,
+          betaScale,
+          steeringBlendDelta,
+        },
+        unresolvedPhysics: { enabled: unresolvedEnabled, seed: memberSeed },
       },
     });
   }
@@ -305,10 +462,15 @@ export function summarizeEnsemble(
     },
     landfallProbability:
       members.filter((member) => member.landfall).length / denominator,
+    tropicalStormProbability:
+      members.filter((member) => member.peakKt >= 34).length / denominator,
     hurricaneProbability:
       members.filter((member) => member.peakKt >= 64).length / denominator,
     majorProbability:
       members.filter((member) => member.peakKt >= 96).length / denominator,
+    dissipationProbability:
+      members.filter((member) => member.death !== null).length / denominator,
+    probabilityLabel: 'perturbation-frequency',
   };
 }
 
@@ -325,6 +487,7 @@ export function runEnsemble(
       isLand,
       spawn: member.spawn,
       intensityParameters: member.intensityParameters,
+      trackParameters: member.trackParameters,
     }),
   );
   return summarizeEnsemble(members);

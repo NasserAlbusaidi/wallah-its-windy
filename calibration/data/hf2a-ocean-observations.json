@@ -1,0 +1,829 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "bake/hf2a_ocean_benchmark.py",
+  "source": {
+    "name": "NOAA NESDIS Geo-polar Blended Night-only Foundation SST",
+    "datasetId": "noaacwBLENDEDCsstDaily",
+    "infoUrl": "https://coastwatch.noaa.gov/erddap/info/noaacwBLENDEDCsstDaily/index.json",
+    "resolutionDegrees": 0.05,
+    "selectedStride": 2,
+    "selectedResolutionDegrees": 0.1,
+    "maximumAnalysisErrorC": 0.5,
+    "license": "GHRSST free and open data-use protocol"
+  },
+  "protocol": {
+    "catalogSha256": "cb3aa9bee125bef248c2eac4c3f9037f62c85a4619ddc5a8b8110501677eb7cc",
+    "tracksSha256": "6d0e10c88a436cf9e2777fe168eee8c6c163b1ec8934f921218ef67cafbacf30",
+    "maximumTrackDistanceKm": 300.0,
+    "baselineWindowBeforeLocalPassageH": [
+      -120.0,
+      -48.0
+    ],
+    "evaluationLeadsAfterLocalPassageH": [
+      24,
+      48
+    ],
+    "minimumBaselineDays": 2,
+    "minimumStormPixels": 100,
+    "selectionPolicy": "all frozen HF-1 storms within source coverage; pixels selected only by observed track distance, source validity, and source uncertainty",
+    "aggregationPolicy": "pixel errors aggregate to one metric per storm before partition scoring"
+  },
+  "binary": {
+    "path": "calibration/data/hf2a-ocean-observations.bin",
+    "magic": "HF2O",
+    "version": 1,
+    "headerBytes": 12,
+    "recordBytes": 56,
+    "recordLayout": "float32 lat,lon,distanceKm,backgroundSstC; int64 passageUnixS; per 24/48h: float32 deltaSstC,errorC,int64 validUnixS",
+    "bytes": 4832812,
+    "sha256": "afedaecda0ae849df100819bd0ce37a2997d75137b8ebd066310f766ef5f1648",
+    "storms": [
+      {
+        "id": "mukda2006",
+        "byteOffset": 12,
+        "byteLength": 210504,
+        "records": 3759
+      },
+      {
+        "id": "as2007",
+        "byteOffset": 210516,
+        "byteLength": 156296,
+        "records": 2791
+      },
+      {
+        "id": "gonu2007",
+        "byteOffset": 366812,
+        "byteLength": 423808,
+        "records": 7568
+      },
+      {
+        "id": "phet2010",
+        "byteOffset": 790620,
+        "byteLength": 474488,
+        "records": 8473
+      },
+      {
+        "id": "keila2011",
+        "byteOffset": 1265108,
+        "byteLength": 88256,
+        "records": 1576
+      },
+      {
+        "id": "nanauk2014",
+        "byteOffset": 1353364,
+        "byteLength": 357728,
+        "records": 6388
+      },
+      {
+        "id": "nilofar2014",
+        "byteOffset": 1711092,
+        "byteLength": 359128,
+        "records": 6413
+      },
+      {
+        "id": "ashobaa2015",
+        "byteOffset": 2070220,
+        "byteLength": 388976,
+        "records": 6946
+      },
+      {
+        "id": "mekunu2018",
+        "byteOffset": 2459196,
+        "byteLength": 62048,
+        "records": 1108
+      },
+      {
+        "id": "hikaa2019",
+        "byteOffset": 2521244,
+        "byteLength": 374752,
+        "records": 6692
+      },
+      {
+        "id": "kyarr2019",
+        "byteOffset": 2895996,
+        "byteLength": 446880,
+        "records": 7980
+      },
+      {
+        "id": "maha2019",
+        "byteOffset": 3342876,
+        "byteLength": 340032,
+        "records": 6072
+      },
+      {
+        "id": "vayu2019",
+        "byteOffset": 3682908,
+        "byteLength": 234080,
+        "records": 4180
+      },
+      {
+        "id": "shaheen2021",
+        "byteOffset": 3916988,
+        "byteLength": 276024,
+        "records": 4929
+      },
+      {
+        "id": "biparjoy2023",
+        "byteOffset": 4193012,
+        "byteLength": 297024,
+        "records": 5304
+      },
+      {
+        "id": "asna2024",
+        "byteOffset": 4490036,
+        "byteLength": 342776,
+        "records": 6121
+      }
+    ]
+  },
+  "storms": [
+    {
+      "id": "mukda2006",
+      "label": "mukda 2006",
+      "year": 2006,
+      "partition": "validation",
+      "raw": {
+        "startIso": "2006-09-16T12:00:00Z",
+        "stopIso": "2006-09-29T12:00:00Z",
+        "bbox": [
+          62.4,
+          70.0,
+          16.5,
+          23.5
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_mukda2006_dfeb020df1ca.nc",
+        "bytes": 620684,
+        "sha256": "5b8f598c161c90a5b9c8ce955616916bd7e0348ca46e42dd6ea502a03ddcb470"
+      },
+      "diagnostics": {
+        "commonPixels": 3759,
+        "observed": {
+          "24": {
+            "pixels": 3759,
+            "meanDeltaSstC": -0.228665,
+            "meanCoolingC": 0.357506,
+            "peakCoolingP95C": 1.01,
+            "coldAreaFractionBelowMinus0_5C": 0.302208
+          },
+          "48": {
+            "pixels": 3759,
+            "meanDeltaSstC": -0.376167,
+            "meanCoolingC": 0.458867,
+            "peakCoolingP95C": 1.320501,
+            "coldAreaFractionBelowMinus0_5C": 0.379888
+          }
+        },
+        "rawLeadCounts": {
+          "24": 3759,
+          "48": 3759
+        }
+      }
+    },
+    {
+      "id": "as2007",
+      "label": "arabian sea system jun 2007",
+      "year": 2007,
+      "partition": "development",
+      "raw": {
+        "startIso": "2007-06-19T12:00:00Z",
+        "stopIso": "2007-06-29T12:00:00Z",
+        "bbox": [
+          59.6,
+          70.0,
+          19.9,
+          27.0
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_as2007_cbe3cc47e668.nc",
+        "bytes": 673752,
+        "sha256": "5e32efde01e754eb435552bb53592ae945f23a8ef15319e21bafc7f2138b5125"
+      },
+      "diagnostics": {
+        "commonPixels": 2791,
+        "observed": {
+          "24": {
+            "pixels": 2791,
+            "meanDeltaSstC": -0.652347,
+            "meanCoolingC": 0.671052,
+            "peakCoolingP95C": 1.280001,
+            "coldAreaFractionBelowMinus0_5C": 0.66177
+          },
+          "48": {
+            "pixels": 2791,
+            "meanDeltaSstC": -0.740469,
+            "meanCoolingC": 0.756,
+            "peakCoolingP95C": 1.57,
+            "coldAreaFractionBelowMinus0_5C": 0.676102
+          }
+        },
+        "rawLeadCounts": {
+          "24": 2792,
+          "48": 2791
+        }
+      }
+    },
+    {
+      "id": "gonu2007",
+      "label": "gonu 2007",
+      "year": 2007,
+      "partition": "development",
+      "raw": {
+        "startIso": "2007-05-28T12:00:00Z",
+        "stopIso": "2007-06-10T12:00:00Z",
+        "bbox": [
+          54.8,
+          70.0,
+          15.0,
+          27.0
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_gonu2007_36d14d82f278.nc",
+        "bytes": 2082340,
+        "sha256": "d6c7a8cd26c183364a826c812ed8b34293c04fb67a02344cce0babd0fa8fbd9c"
+      },
+      "diagnostics": {
+        "commonPixels": 7568,
+        "observed": {
+          "24": {
+            "pixels": 7568,
+            "meanDeltaSstC": -0.78351,
+            "meanCoolingC": 0.799497,
+            "peakCoolingP95C": 1.756499,
+            "coldAreaFractionBelowMinus0_5C": 0.634382
+          },
+          "48": {
+            "pixels": 7568,
+            "meanDeltaSstC": -1.136178,
+            "meanCoolingC": 1.143284,
+            "peakCoolingP95C": 2.23,
+            "coldAreaFractionBelowMinus0_5C": 0.863636
+          }
+        },
+        "rawLeadCounts": {
+          "24": 7568,
+          "48": 7569
+        }
+      }
+    },
+    {
+      "id": "phet2010",
+      "label": "phet 2010",
+      "year": 2010,
+      "partition": "development",
+      "raw": {
+        "startIso": "2010-05-26T12:00:00Z",
+        "stopIso": "2010-06-09T12:00:00Z",
+        "bbox": [
+          56.1,
+          70.0,
+          15.0,
+          27.0
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_phet2010_33308505e1bf.nc",
+        "bytes": 2041640,
+        "sha256": "5c108c588fd0603d2ce971f02142a347ed1aa8c5ccecd2cb627413ddf9aab4fd"
+      },
+      "diagnostics": {
+        "commonPixels": 8473,
+        "observed": {
+          "24": {
+            "pixels": 8473,
+            "meanDeltaSstC": -1.295825,
+            "meanCoolingC": 1.302418,
+            "peakCoolingP95C": 2.56,
+            "coldAreaFractionBelowMinus0_5C": 0.907471
+          },
+          "48": {
+            "pixels": 8473,
+            "meanDeltaSstC": -1.591306,
+            "meanCoolingC": 1.606713,
+            "peakCoolingP95C": 3.109999,
+            "coldAreaFractionBelowMinus0_5C": 0.90334
+          }
+        },
+        "rawLeadCounts": {
+          "24": 8473,
+          "48": 8474
+        }
+      }
+    },
+    {
+      "id": "keila2011",
+      "label": "keila 2011",
+      "year": 2011,
+      "partition": "development",
+      "raw": {
+        "startIso": "2011-10-27T12:00:00Z",
+        "stopIso": "2011-11-08T12:00:00Z",
+        "bbox": [
+          50.0,
+          58.5,
+          15.0,
+          20.2
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_keila2011_752ef8e0b337.nc",
+        "bytes": 482368,
+        "sha256": "6c8e2419057a268caed37ef168aee4e3745f37237314cbacf900308654e0b6ab"
+      },
+      "diagnostics": {
+        "commonPixels": 1576,
+        "observed": {
+          "24": {
+            "pixels": 1576,
+            "meanDeltaSstC": -0.627294,
+            "meanCoolingC": 0.638861,
+            "peakCoolingP95C": 1.719999,
+            "coldAreaFractionBelowMinus0_5C": 0.535533
+          },
+          "48": {
+            "pixels": 1576,
+            "meanDeltaSstC": -0.696615,
+            "meanCoolingC": 0.70862,
+            "peakCoolingP95C": 1.8525,
+            "coldAreaFractionBelowMinus0_5C": 0.612944
+          }
+        },
+        "rawLeadCounts": {
+          "24": 1576,
+          "48": 1576
+        }
+      }
+    },
+    {
+      "id": "nanauk2014",
+      "label": "nanauk 2014",
+      "year": 2014,
+      "partition": "development",
+      "raw": {
+        "startIso": "2014-06-05T12:00:00Z",
+        "stopIso": "2014-06-17T12:00:00Z",
+        "bbox": [
+          60.9,
+          70.0,
+          15.0,
+          24.7
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_nanauk2014_5eb8ed8e2632.nc",
+        "bytes": 946204,
+        "sha256": "559c7adc5db3bd2858f964165e39a852cb2a1cf5f0574922ab657d9af3fd250c"
+      },
+      "diagnostics": {
+        "commonPixels": 6388,
+        "observed": {
+          "24": {
+            "pixels": 6388,
+            "meanDeltaSstC": -0.356782,
+            "meanCoolingC": 0.594716,
+            "peakCoolingP95C": 1.83,
+            "coldAreaFractionBelowMinus0_5C": 0.456168
+          },
+          "48": {
+            "pixels": 6388,
+            "meanDeltaSstC": -0.842238,
+            "meanCoolingC": 0.951112,
+            "peakCoolingP95C": 2.7,
+            "coldAreaFractionBelowMinus0_5C": 0.601127
+          }
+        },
+        "rawLeadCounts": {
+          "24": 6388,
+          "48": 6388
+        }
+      }
+    },
+    {
+      "id": "nilofar2014",
+      "label": "nilofar 2014",
+      "year": 2014,
+      "partition": "development",
+      "raw": {
+        "startIso": "2014-10-22T12:00:00Z",
+        "stopIso": "2014-11-04T12:00:00Z",
+        "bbox": [
+          58.6,
+          68.1,
+          15.0,
+          24.7
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_nilofar2014_9c14d569ada2.nc",
+        "bytes": 1062260,
+        "sha256": "a3cb7e6081f063433af8f6aa07b10c348bd31b6fedbd7db6722be98a1596cd1c"
+      },
+      "diagnostics": {
+        "commonPixels": 6413,
+        "observed": {
+          "24": {
+            "pixels": 6413,
+            "meanDeltaSstC": -0.888398,
+            "meanCoolingC": 0.88858,
+            "peakCoolingP95C": 1.860001,
+            "coldAreaFractionBelowMinus0_5C": 0.743022
+          },
+          "48": {
+            "pixels": 6413,
+            "meanDeltaSstC": -0.865476,
+            "meanCoolingC": 0.866757,
+            "peakCoolingP95C": 1.860001,
+            "coldAreaFractionBelowMinus0_5C": 0.709808
+          }
+        },
+        "rawLeadCounts": {
+          "24": 6413,
+          "48": 6413
+        }
+      }
+    },
+    {
+      "id": "ashobaa2015",
+      "label": "ashobaa 2015",
+      "year": 2015,
+      "partition": "development",
+      "raw": {
+        "startIso": "2015-06-02T12:00:00Z",
+        "stopIso": "2015-06-15T12:00:00Z",
+        "bbox": [
+          56.8,
+          70.0,
+          15.0,
+          24.0
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_ashobaa2015_400ec8ab6fd4.nc",
+        "bytes": 1364220,
+        "sha256": "589ae2a1eff70f23073197a32ebf62300d7adbc90b9250aad26fafb758c69172"
+      },
+      "diagnostics": {
+        "commonPixels": 6946,
+        "observed": {
+          "24": {
+            "pixels": 6946,
+            "meanDeltaSstC": -0.555613,
+            "meanCoolingC": 0.591725,
+            "peakCoolingP95C": 1.26,
+            "coldAreaFractionBelowMinus0_5C": 0.623812
+          },
+          "48": {
+            "pixels": 6946,
+            "meanDeltaSstC": -0.796048,
+            "meanCoolingC": 0.825789,
+            "peakCoolingP95C": 1.709999,
+            "coldAreaFractionBelowMinus0_5C": 0.718255
+          }
+        },
+        "rawLeadCounts": {
+          "24": 6946,
+          "48": 6946
+        }
+      }
+    },
+    {
+      "id": "mekunu2018",
+      "label": "mekunu 2018",
+      "year": 2018,
+      "partition": "development",
+      "raw": {
+        "startIso": "2018-05-20T12:00:00Z",
+        "stopIso": "2018-05-30T12:00:00Z",
+        "bbox": [
+          50.0,
+          57.4,
+          15.0,
+          22.0
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_mekunu2018_019c9a48b778.nc",
+        "bytes": 476948,
+        "sha256": "411b206ec188418d24948cefd6de06a50cba379445ba57605ca302f90bf599ee"
+      },
+      "diagnostics": {
+        "commonPixels": 1108,
+        "observed": {
+          "24": {
+            "pixels": 1108,
+            "meanDeltaSstC": -0.680569,
+            "meanCoolingC": 0.68718,
+            "peakCoolingP95C": 1.965001,
+            "coldAreaFractionBelowMinus0_5C": 0.509928
+          },
+          "48": {
+            "pixels": 1108,
+            "meanDeltaSstC": -1.194819,
+            "meanCoolingC": 1.201327,
+            "peakCoolingP95C": 2.88325,
+            "coldAreaFractionBelowMinus0_5C": 0.761733
+          }
+        },
+        "rawLeadCounts": {
+          "24": 1108,
+          "48": 1108
+        }
+      }
+    },
+    {
+      "id": "hikaa2019",
+      "label": "hikaa 2019",
+      "year": 2019,
+      "partition": "development",
+      "raw": {
+        "startIso": "2019-09-17T12:00:00Z",
+        "stopIso": "2019-09-29T12:00:00Z",
+        "bbox": [
+          50.0,
+          70.0,
+          15.8,
+          23.4
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_hikaa2019_cc43110a4d3b.nc",
+        "bytes": 1618500,
+        "sha256": "b5435431627f205aac2aa298eb48fc7d25a927d6be2bdeda22a1f574f635bff5"
+      },
+      "diagnostics": {
+        "commonPixels": 6692,
+        "observed": {
+          "24": {
+            "pixels": 6692,
+            "meanDeltaSstC": 0.119136,
+            "meanCoolingC": 0.086235,
+            "peakCoolingP95C": 0.530001,
+            "coldAreaFractionBelowMinus0_5C": 0.053198
+          },
+          "48": {
+            "pixels": 6692,
+            "meanDeltaSstC": 0.294352,
+            "meanCoolingC": 0.056659,
+            "peakCoolingP95C": 0.41,
+            "coldAreaFractionBelowMinus0_5C": 0.042887
+          }
+        },
+        "rawLeadCounts": {
+          "24": 6692,
+          "48": 6692
+        }
+      }
+    },
+    {
+      "id": "kyarr2019",
+      "label": "kyarr 2019",
+      "year": 2019,
+      "partition": "validation",
+      "raw": {
+        "startIso": "2019-10-21T12:00:00Z",
+        "stopIso": "2019-11-04T12:00:00Z",
+        "bbox": [
+          54.7,
+          70.0,
+          15.0,
+          22.6
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_kyarr2019_7cc34ecb3d0f.nc",
+        "bytes": 1413196,
+        "sha256": "aed10e283277042fc539b09b6014827f82223b0c2c31a5092eeaa7525522e2e0"
+      },
+      "diagnostics": {
+        "commonPixels": 7980,
+        "observed": {
+          "24": {
+            "pixels": 7980,
+            "meanDeltaSstC": -0.864219,
+            "meanCoolingC": 0.86982,
+            "peakCoolingP95C": 1.690001,
+            "coldAreaFractionBelowMinus0_5C": 0.725063
+          },
+          "48": {
+            "pixels": 7980,
+            "meanDeltaSstC": -1.016343,
+            "meanCoolingC": 1.022276,
+            "peakCoolingP95C": 2.34,
+            "coldAreaFractionBelowMinus0_5C": 0.706642
+          }
+        },
+        "rawLeadCounts": {
+          "24": 7980,
+          "48": 7980
+        }
+      }
+    },
+    {
+      "id": "maha2019",
+      "label": "maha 2019",
+      "year": 2019,
+      "partition": "test",
+      "raw": {
+        "startIso": "2019-10-27T12:00:00Z",
+        "stopIso": "2019-11-09T12:00:00Z",
+        "bbox": [
+          60.4,
+          70.0,
+          15.0,
+          22.7
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_maha2019_e5c9cdc50259.nc",
+        "bytes": 855880,
+        "sha256": "7f0c37a6db06d8695abc07cb3130191e155c9a10eb6e1feacf70d6c4945c0bbe"
+      },
+      "diagnostics": {
+        "commonPixels": 6072,
+        "observed": {
+          "24": {
+            "pixels": 6072,
+            "meanDeltaSstC": -0.173924,
+            "meanCoolingC": 0.241978,
+            "peakCoolingP95C": 0.7945,
+            "coldAreaFractionBelowMinus0_5C": 0.1833
+          },
+          "48": {
+            "pixels": 6072,
+            "meanDeltaSstC": -0.275235,
+            "meanCoolingC": 0.335678,
+            "peakCoolingP95C": 0.950001,
+            "coldAreaFractionBelowMinus0_5C": 0.294466
+          }
+        },
+        "rawLeadCounts": {
+          "24": 6072,
+          "48": 6072
+        }
+      }
+    },
+    {
+      "id": "vayu2019",
+      "label": "vayu 2019",
+      "year": 2019,
+      "partition": "development",
+      "raw": {
+        "startIso": "2019-06-08T12:00:00Z",
+        "stopIso": "2019-06-21T12:00:00Z",
+        "bbox": [
+          62.2,
+          70.0,
+          17.5,
+          26.2
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_vayu2019_e26f91183f1d.nc",
+        "bytes": 787080,
+        "sha256": "3d900267fb635cdd70043629a496592aa96d657c6832d1fd075de6479f6f9400"
+      },
+      "diagnostics": {
+        "commonPixels": 4180,
+        "observed": {
+          "24": {
+            "pixels": 4180,
+            "meanDeltaSstC": -0.732822,
+            "meanCoolingC": 0.820293,
+            "peakCoolingP95C": 2.041001,
+            "coldAreaFractionBelowMinus0_5C": 0.617703
+          },
+          "48": {
+            "pixels": 4180,
+            "meanDeltaSstC": -1.111697,
+            "meanCoolingC": 1.188006,
+            "peakCoolingP95C": 2.91,
+            "coldAreaFractionBelowMinus0_5C": 0.727512
+          }
+        },
+        "rawLeadCounts": {
+          "24": 4180,
+          "48": 4181
+        }
+      }
+    },
+    {
+      "id": "shaheen2021",
+      "label": "shaheen 2021",
+      "year": 2021,
+      "partition": "validation",
+      "raw": {
+        "startIso": "2021-09-25T12:00:00Z",
+        "stopIso": "2021-10-07T12:00:00Z",
+        "bbox": [
+          53.2,
+          69.0,
+          19.8,
+          27.0
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_shaheen2021_0535c0be0dc0.nc",
+        "bytes": 1215836,
+        "sha256": "769a316ff0a05883f00d4cf441c2c34523e606d7fb1eebcb8dd9c3c2385fe782"
+      },
+      "diagnostics": {
+        "commonPixels": 4929,
+        "observed": {
+          "24": {
+            "pixels": 4929,
+            "meanDeltaSstC": -0.359302,
+            "meanCoolingC": 0.389747,
+            "peakCoolingP95C": 1.15,
+            "coldAreaFractionBelowMinus0_5C": 0.341449
+          },
+          "48": {
+            "pixels": 4929,
+            "meanDeltaSstC": -0.654167,
+            "meanCoolingC": 0.678881,
+            "peakCoolingP95C": 1.84,
+            "coldAreaFractionBelowMinus0_5C": 0.535606
+          }
+        },
+        "rawLeadCounts": {
+          "24": 4929,
+          "48": 4933
+        }
+      }
+    },
+    {
+      "id": "biparjoy2023",
+      "label": "biparjoy 2023",
+      "year": 2023,
+      "partition": "validation",
+      "raw": {
+        "startIso": "2023-06-04T12:00:00Z",
+        "stopIso": "2023-06-19T12:00:00Z",
+        "bbox": [
+          63.3,
+          70.0,
+          15.0,
+          26.9
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_biparjoy2023_3b59f82d2e2d.nc",
+        "bytes": 1053036,
+        "sha256": "7b268838d2724125722e5363b618febf835de06a0e66f269b996487f472b6eb7"
+      },
+      "diagnostics": {
+        "commonPixels": 5304,
+        "observed": {
+          "24": {
+            "pixels": 5304,
+            "meanDeltaSstC": -0.933075,
+            "meanCoolingC": 0.934178,
+            "peakCoolingP95C": 1.59,
+            "coldAreaFractionBelowMinus0_5C": 0.854638
+          },
+          "48": {
+            "pixels": 5304,
+            "meanDeltaSstC": -1.280119,
+            "meanCoolingC": 1.281591,
+            "peakCoolingP95C": 2.130001,
+            "coldAreaFractionBelowMinus0_5C": 0.891591
+          }
+        },
+        "rawLeadCounts": {
+          "24": 5305,
+          "48": 5304
+        }
+      }
+    },
+    {
+      "id": "asna2024",
+      "label": "asna 2024",
+      "year": 2024,
+      "partition": "test",
+      "raw": {
+        "startIso": "2024-08-24T12:00:00Z",
+        "stopIso": "2024-09-06T12:00:00Z",
+        "bbox": [
+          57.7,
+          70.0,
+          16.7,
+          26.5
+        ],
+        "gridStride": 2,
+        "path": "data/raw/hf2a_sst_asna2024_5b977ac048cf.nc",
+        "bytes": 1383592,
+        "sha256": "40523df4966da49555ba9365267ca0a8d59604bc61bd1a8fc1c3dc5b28d5e32c"
+      },
+      "diagnostics": {
+        "commonPixels": 6121,
+        "observed": {
+          "24": {
+            "pixels": 6121,
+            "meanDeltaSstC": 0.03947,
+            "meanCoolingC": 0.219641,
+            "peakCoolingP95C": 0.84,
+            "coldAreaFractionBelowMinus0_5C": 0.213364
+          },
+          "48": {
+            "pixels": 6121,
+            "meanDeltaSstC": 0.005247,
+            "meanCoolingC": 0.297177,
+            "peakCoolingP95C": 1.110001,
+            "coldAreaFractionBelowMinus0_5C": 0.278386
+          }
+        },
+        "rawLeadCounts": {
+          "24": 6121,
+          "48": 6128
+        }
+      }
+    }
+  ]
+}

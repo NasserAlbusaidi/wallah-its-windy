@@ -85,6 +85,7 @@ describe('deterministic analysis ensemble', () => {
           durationH: 12,
           closestApproachKm: 500,
           landfall: false,
+          landfallEvents: [],
           death: null,
         },
       ],

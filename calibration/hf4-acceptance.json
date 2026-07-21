@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-4",
+  "status": "rejected",
+  "claimClass": "legacy-validation-diagnostic",
+  "decision": "Rejected without changing thresholds: the cone is overdispersed, 48 h mean Brier skill is negative, and the device matrix is incomplete. Keep perturbation-frequency labeling.",
+  "manifests": {
+    "contractSha256": "4ab3147410f2e6158ef597cf0608a45a05149fa528f6733a79d67c88eb74d58b",
+    "verificationSha256": "5f8c70ea8179daa8ff2f10cec33610e8d93b1d4d610bcc111b38351ac37998fd",
+    "performanceSha256": "f0408f71dfa71ca5f10504e6b32592f75cab0aadc1b97613f56c13b116d3a9a6"
+  },
+  "checks": [
+    {
+      "id": "preacceptance-label-is-perturbation-frequency",
+      "pass": true,
+      "actual": "perturbation-frequency"
+    },
+    {
+      "id": "24h-positive-spread-error-correlation",
+      "pass": true,
+      "actual": 0.329607353
+    },
+    {
+      "id": "24h-intensity-crps-beats-deterministic",
+      "pass": true,
+      "ensemble": 7.306127007,
+      "deterministic": 8.187113564
+    },
+    {
+      "id": "24h-mean-brier-skill-beats-development-climatology",
+      "pass": true,
+      "actual": 0.7490724176666667
+    },
+    {
+      "id": "24h-0.5-cone-coverage-within-tolerance",
+      "pass": false,
+      "nominal": 0.5,
+      "actual": 0.833333333,
+      "tolerance": 0.2
+    },
+    {
+      "id": "24h-0.67-cone-coverage-within-tolerance",
+      "pass": false,
+      "nominal": 0.67,
+      "actual": 1,
+      "tolerance": 0.2
+    },
+    {
+      "id": "24h-0.9-cone-coverage-within-tolerance",
+      "pass": true,
+      "nominal": 0.9,
+      "actual": 1,
+      "tolerance": 0.15
+    },
+    {
+      "id": "24h-member-position-retention",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "id": "48h-positive-spread-error-correlation",
+      "pass": true,
+      "actual": 0.79692161
+    },
+    {
+      "id": "48h-intensity-crps-beats-deterministic",
+      "pass": true,
+      "ensemble": 13.881062255,
+      "deterministic": 16.666121646
+    },
+    {
+      "id": "48h-mean-brier-skill-beats-development-climatology",
+      "pass": false,
+      "actual": -0.12421680199999996
+    },
+    {
+      "id": "48h-0.5-cone-coverage-within-tolerance",
+      "pass": false,
+      "nominal": 0.5,
+      "actual": 1,
+      "tolerance": 0.2
+    },
+    {
+      "id": "48h-0.67-cone-coverage-within-tolerance",
+      "pass": false,
+      "nominal": 0.67,
+      "actual": 1,
+      "tolerance": 0.2
+    },
+    {
+      "id": "48h-0.9-cone-coverage-within-tolerance",
+      "pass": true,
+      "nominal": 0.9,
+      "actual": 1,
+      "tolerance": 0.15
+    },
+    {
+      "id": "48h-member-position-retention",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "id": "initialization-produces-nonzero-spread",
+      "pass": true,
+      "actual": {
+        "12": 16.825968216,
+        "24": 23.860182716,
+        "48": 25.999428369,
+        "72": 20.074339588
+      }
+    },
+    {
+      "id": "forcing-produces-nonzero-spread",
+      "pass": true,
+      "actual": {
+        "12": 0.02854803,
+        "24": 2.537702058,
+        "48": 13.532431482,
+        "72": 8.67980538
+      }
+    },
+    {
+      "id": "parameters-produces-nonzero-spread",
+      "pass": true,
+      "actual": {
+        "12": 0.68733453,
+        "24": 2.13787476,
+        "48": 2.806882988,
+        "72": 4.469231827
+      }
+    },
+    {
+      "id": "unresolved-physics-produces-nonzero-spread",
+      "pass": true,
+      "actual": {
+        "12": 56.372481667,
+        "24": 101.117033082,
+        "48": 160.296909345,
+        "72": 203.54851147
+      }
+    },
+    {
+      "id": "darwin-arm64-reference-performance-budget",
+      "pass": true,
+      "measuredMs": {
+        "20": 3370.36,
+        "40": 6830.68,
+        "80": 13329.47
+      },
+      "budgetsMs": {
+        "20": 5000,
+        "40": 9000,
+        "80": 17000
+      }
+    },
+    {
+      "id": "representative-device-matrix-complete",
+      "pass": false,
+      "unmeasured": [
+        "mobile-webkit",
+        "low-power-chromium"
+      ]
+    }
+  ]
+}

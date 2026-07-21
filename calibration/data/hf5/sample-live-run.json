@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "product": "experimental-forecast-companion",
+  "cycle": {
+    "providerId": "rsmc-new-delhi",
+    "cycleId": "2026-06-01T00Z",
+    "analysisTime": "2026-06-01T00:00:00Z",
+    "issuedAt": "2026-06-01T03:00:00Z"
+  },
+  "advisory": {
+    "providerId": "rsmc-new-delhi",
+    "cycleId": "2026-06-01T00Z",
+    "advisoryId": "sample-001",
+    "stormId": "SAMPLE-ARB-01",
+    "stormName": null,
+    "analysisTime": "2026-06-01T00:00:00Z",
+    "issuedAt": "2026-06-01T03:00:00Z",
+    "lat": 17.5,
+    "lon": 65.25,
+    "motionDirectionDeg": 315,
+    "motionSpeedMs": 5,
+    "maximumWindOneMinuteKt": 51,
+    "originalMaximumWind": {
+      "value": 90,
+      "unit": "km/h",
+      "averagingMinutes": 3
+    },
+    "windConversion": {
+      "factorToOneMinute": 1.05,
+      "source": "sample pinned provider policy",
+      "version": "sample-1"
+    },
+    "centralPressureHpa": 985,
+    "rmwKm": 37.04,
+    "r34Km": 166.68,
+    "r50Km": null,
+    "r64Km": null,
+    "organization": 0.55
+  },
+  "inputs": [
+    {
+      "id": "advisory",
+      "kind": "agency-advisory",
+      "providerId": "rsmc-new-delhi",
+      "cycleId": "2026-06-01T00Z",
+      "sourceUrl": "https://example.invalid/advisory",
+      "validTime": "2026-06-01T00:00:00Z",
+      "fetchedAt": "2026-06-01T03:05:00Z",
+      "license": "synthetic contract fixture; not operational data",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedBytes": 100,
+      "receivedBytes": 100,
+      "maxAgeHours": 12,
+      "required": true,
+      "compatibility": "compatible"
+    },
+    {
+      "id": "atmosphere",
+      "kind": "atmospheric-grid",
+      "providerId": "ncep-gfs",
+      "cycleId": "2026-06-01T00Z",
+      "sourceUrl": "https://example.invalid/gfs",
+      "validTime": "2026-06-01T00:00:00Z",
+      "fetchedAt": "2026-06-01T03:10:00Z",
+      "license": "synthetic contract fixture; not operational data",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expectedBytes": 200,
+      "receivedBytes": 200,
+      "maxAgeHours": 12,
+      "required": true,
+      "compatibility": "compatible"
+    },
+    {
+      "id": "sst",
+      "kind": "sea-surface-temperature",
+      "providerId": "noaa-nesdis",
+      "cycleId": "2026-06-01T00Z",
+      "sourceUrl": "https://example.invalid/sst",
+      "validTime": "2026-06-01T00:00:00Z",
+      "fetchedAt": "2026-06-01T03:15:00Z",
+      "license": "synthetic contract fixture; not operational data",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "expectedBytes": 300,
+      "receivedBytes": 300,
+      "maxAgeHours": 12,
+      "required": true,
+      "compatibility": "compatible"
+    },
+    {
+      "id": "upper-ocean",
+      "kind": "upper-ocean",
+      "providerId": "noaa-nesdis",
+      "cycleId": "2026-06-01T00Z",
+      "sourceUrl": "https://example.invalid/ohc",
+      "validTime": "2026-06-01T00:00:00Z",
+      "fetchedAt": "2026-06-01T03:20:00Z",
+      "license": "synthetic contract fixture; not operational data",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "expectedBytes": 400,
+      "receivedBytes": 400,
+      "maxAgeHours": 12,
+      "required": true,
+      "compatibility": "compatible"
+    }
+  ],
+  "inputDecision": {
+    "status": "ready",
+    "currentForecastAllowed": true,
+    "failures": [],
+    "fallback": {
+      "mode": null,
+      "label": null
+    }
+  },
+  "guidance": {
+    "official": [
+      {
+        "validTime": "2026-06-01T00:00:00Z",
+        "leadH": 0,
+        "lat": 17.5,
+        "lon": 65.25,
+        "windOneMinuteKt": 51
+      }
+    ],
+    "persistence": [
+      {
+        "validTime": "2026-06-01T00:00:00Z",
+        "leadH": 0,
+        "lat": 17.5,
+        "lon": 65.25,
+        "windOneMinuteKt": 51
+      }
+    ],
+    "wallahModel": [
+      {
+        "validTime": "2026-06-01T00:00:00Z",
+        "leadH": 0,
+        "lat": 17.5,
+        "lon": 65.25,
+        "windOneMinuteKt": 51
+      }
+    ]
+  },
+  "labels": {
+    "official": "official agency guidance",
+    "persistence": "baseline",
+    "wallahModel": "experimental Wallah model",
+    "satellite": "observed imagery",
+    "simulatedImagery": "simulated proxy"
+  },
+  "modelVersion": "hf5-contract-1",
+  "createdAt": "2026-06-01T06:00:00Z"
+}

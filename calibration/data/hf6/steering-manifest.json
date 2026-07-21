@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-6",
+  "sealId": "hf6-arabian-v1-2026-07-21",
+  "storms": [
+    {
+      "id": "hf6_1975121n09072",
+      "path": "calibration/data/hf6/forcing/steering_hf6_1975121n09072.bin",
+      "bytes": 553496,
+      "sha256": "37de2fe0aa0691451044c015fc0b67cb58b7501a806026eaaef2beb4941da782",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_hf6_1975121n09072_1975_05.nc",
+          "bytes": 2782537,
+          "sha256": "7bc6ff85787fd9cb705e141b39f733b2d6e59e9bac6d3c4a3a3596a7ac8b0a2c"
+        }
+      ],
+      "planes": 48,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "1975-05-07T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "hf6_1978307n10082",
+      "path": "calibration/data/hf6/forcing/steering_hf6_1978307n10082.bin",
+      "bytes": 645656,
+      "sha256": "d0a1eecd9f96d4a067a04501ea22132334672118093876d8a4046dee37232a7c",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_hf6_1978307n10082_1978_11.nc",
+          "bytes": 3235763,
+          "sha256": "3011ee42c238fb87f7402760cd817f11fb98d0428ae90ee3dd32da3d51e4dc44"
+        }
+      ],
+      "planes": 56,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "1978-11-07T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "hf6_1996161n17063",
+      "path": "calibration/data/hf6/forcing/steering_hf6_1996161n17063.bin",
+      "bytes": 553496,
+      "sha256": "f61c16de2f6d472126292d0ca50b7a14fcfebe22ba2c05d20677fd78492b01ff",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_hf6_1996161n17063_1996_06.nc",
+          "bytes": 2883680,
+          "sha256": "8788380761228f85105f257d4b9698ba3f9db5514b5a184658411242b1c79466"
+        }
+      ],
+      "planes": 48,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "1996-06-08T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "hf6_2001267n17070",
+      "path": "calibration/data/hf6/forcing/steering_hf6_2001267n17070.bin",
+      "bytes": 645656,
+      "sha256": "6688aa548438c4d9a7551c78a5053104619839ef57fd7918af990bbcec4c2c7c",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_hf6_2001267n17070_2001_09.nc",
+          "bytes": 3221633,
+          "sha256": "71ecaedad2cdf0e27fc62640e678f7dc36ea62690fbef4d35cda8832192b49ef"
+        }
+      ],
+      "planes": 56,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "2001-09-23T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "hf6_2001281n18071",
+      "path": "calibration/data/hf6/forcing/steering_hf6_2001281n18071.bin",
+      "bytes": 645656,
+      "sha256": "9c0e2977e42e73277b6f6cd354df9b524d7c5539a8522ed210a38073931f8bb4",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_hf6_2001281n18071_2001_10.nc",
+          "bytes": 3281949,
+          "sha256": "ab5d05187db7b33ad5ae1ffdeb023e8ea004c8789501f790c66cbe843ffda7fe"
+        }
+      ],
+      "planes": 56,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "2001-10-08T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "hf6_2004274n16069",
+      "path": "calibration/data/hf6/forcing/steering_hf6_2004274n16069.bin",
+      "bytes": 1106456,
+      "sha256": "7b30631cbceb3d0d574afca1f946787b044f1ed90f36b9707783bdab7f232048",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_hf6_2004274n16069_2004_09.nc",
+          "bytes": 995018,
+          "sha256": "8ea2284cbf115c38c5cc89f6e9cb96c487d3aaddc6a9aa8be9c86dbad8129568"
+        },
+        {
+          "path": "data/raw/fidelity_era5_hf6_2004274n16069_2004_10.nc",
+          "bytes": 4618478,
+          "sha256": "84adb67a46f954331c5c00db0057d416d87a56ae84b4e3042eae94dd54ac3290"
+        }
+      ],
+      "planes": 96,
+      "stepH": 3,
+      "windowH": 285,
+      "startIso": "2004-09-29T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "hf6_2011330n06078",
+      "path": "calibration/data/hf6/forcing/steering_hf6_2011330n06078.bin",
+      "bytes": 553496,
+      "sha256": "9907c075972f7931f20968b36a81cf6ad43b943cde4297e31e5e7e4d3cc778fe",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_hf6_2011330n06078_2011_11.nc",
+          "bytes": 1887693,
+          "sha256": "7841eb4896a401232d0e751efb3a01844b8bc914280090174060135b468f50eb"
+        },
+        {
+          "path": "data/raw/fidelity_era5_hf6_2011330n06078_2011_12.nc",
+          "bytes": 950581,
+          "sha256": "9df1d89b3f96be71de158f0d72b5b5646e666b4c54358b7aa0388ab4a201c575"
+        }
+      ],
+      "planes": 48,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "2011-11-27T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    },
+    {
+      "id": "hf6_2022224n22067",
+      "path": "calibration/data/hf6/forcing/steering_hf6_2022224n22067.bin",
+      "bytes": 553496,
+      "sha256": "b6970099c926063cd6764a1f96b6a58755df20d388457078fcbd726a46ca4e40",
+      "sourceWindFiles": [
+        {
+          "path": "data/raw/fidelity_era5_hf6_2022224n22067_2022_08.nc",
+          "bytes": 2895625,
+          "sha256": "7ae153f83fc1fc4b37bfd171250878291696e9e6a1f7aee46149d4e06575b62f"
+        }
+      ],
+      "planes": 48,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "2022-08-10T00:00:00Z",
+      "levelsHpa": [
+        850,
+        500,
+        250
+      ],
+      "vortexFilterSigmaNativeCells": 3.0
+    }
+  ]
+}

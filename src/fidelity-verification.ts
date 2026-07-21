@@ -30,6 +30,16 @@ export interface LeadTimeVerification {
   observedIso: string;
   model: ForecastError;
   persistence: ForecastError;
+  /** HF-3 climatology-and-persistence reference, when a dev-trained model exists. */
+  cliper?: ForecastError;
+}
+
+export interface ClimatologyPersistenceLead {
+  leadH: FidelityLeadHour;
+  climatologyEastKm: number;
+  climatologyNorthKm: number;
+  persistenceWeight: number;
+  trainingCases: number;
 }
 
 export interface ConfidenceInterval {
@@ -61,12 +71,14 @@ export interface LeadTimeAggregate {
   leadH: FidelityLeadHour;
   model: ErrorAggregate;
   persistence: ErrorAggregate;
+  climatologyPersistence?: ErrorAggregate;
   /** Fraction of storms for which the model has smaller absolute track error. */
   trackFrequencySuperior: number | null;
   /** Fraction of comparable storms with smaller absolute intensity error. */
   intensityFrequencySuperior: number | null;
   pressureFrequencySuperior: number | null;
   trackMaeSkillFraction: number | null;
+  trackMaeSkillFractionAgainstCliper?: number | null;
   intensityMaeSkillFraction: number | null;
   pressureMaeSkillFraction: number | null;
   /** Paired model-minus-persistence error; negative is better. */
@@ -292,11 +304,87 @@ function persistencePosition(
   };
 }
 
+function localOffsetPosition(
+  start: PositionValue,
+  eastKm: number,
+  northKm: number,
+): PositionValue {
+  const latitude = start.lat + northKm / KM_PER_DEGREE;
+  const cosine = Math.max(0.2, Math.cos(((start.lat + latitude) * Math.PI) / 360));
+  return {
+    lat: latitude,
+    lon: start.lon + eastKm / (KM_PER_DEGREE * cosine),
+    windKt: start.windKt,
+    pressureHpa: start.pressureHpa,
+  };
+}
+
+/** Train a compact CLIPER-style displacement blend on development storms only. */
+export function trainClimatologyPersistence(
+  cases: readonly { track: StormTrack; startIso: string }[],
+): ClimatologyPersistenceLead[] {
+  return FIDELITY_LEAD_HOURS.map((leadH) => {
+    const samples: Array<{
+      observed: { east: number; north: number };
+      persistence: { east: number; north: number };
+    }> = [];
+    for (const item of cases) {
+      const startMs = Date.parse(item.startIso);
+      const points = timedTrack(item.track);
+      const start = interpolateTrack(points, startMs);
+      const observed = interpolateTrack(points, startMs + leadH * 3_600_000);
+      if (!start || !observed) continue;
+      const motion = persistenceMotion(points, startMs, start);
+      samples.push({
+        observed: localDeltaKm(start, observed),
+        persistence: localDeltaKm(
+          start,
+          persistencePosition(start, motion, leadH),
+        ),
+      });
+    }
+    if (samples.length === 0) {
+      return {
+        leadH,
+        climatologyEastKm: 0,
+        climatologyNorthKm: 0,
+        persistenceWeight: 1,
+        trainingCases: 0,
+      };
+    }
+    const climatologyEastKm =
+      samples.reduce((sum, sample) => sum + sample.observed.east, 0) /
+      samples.length;
+    const climatologyNorthKm =
+      samples.reduce((sum, sample) => sum + sample.observed.north, 0) /
+      samples.length;
+    let numerator = 0;
+    let denominator = 0;
+    for (const sample of samples) {
+      const px = sample.persistence.east - climatologyEastKm;
+      const py = sample.persistence.north - climatologyNorthKm;
+      const yx = sample.observed.east - climatologyEastKm;
+      const yy = sample.observed.north - climatologyNorthKm;
+      numerator += px * yx + py * yy;
+      denominator += px * px + py * py;
+    }
+    return {
+      leadH,
+      climatologyEastKm,
+      climatologyNorthKm,
+      persistenceWeight:
+        denominator <= 1e-9 ? 0 : clamp01(numerator / denominator),
+      trainingCases: samples.length,
+    };
+  });
+}
+
 export function verifyLeadTimes(
   frames: readonly FlightFrame[],
   track: StormTrack,
   startIso: string,
   leads: readonly FidelityLeadHour[] = FIDELITY_LEAD_HOURS,
+  cliperModel?: readonly ClimatologyPersistenceLead[],
 ): LeadTimeVerification[] {
   const startMs = Date.parse(startIso);
   if (!Number.isFinite(startMs) || frames.length === 0) return [];
@@ -332,15 +420,26 @@ export function verifyLeadTimes(
       startObserved,
       observed,
     );
+    const cliper = cliperModel?.find((item) => item.leadH === leadH);
+    const persistenceForecast = persistencePosition(startObserved, persistence, leadH);
+    const persistenceDelta = localDeltaKm(startObserved, persistenceForecast);
+    const cliperForecast = cliper
+      ? localOffsetPosition(
+          startObserved,
+          cliper.climatologyEastKm * (1 - cliper.persistenceWeight) +
+            persistenceDelta.east * cliper.persistenceWeight,
+          cliper.climatologyNorthKm * (1 - cliper.persistenceWeight) +
+            persistenceDelta.north * cliper.persistenceWeight,
+        )
+      : null;
     output.push({
       leadH,
       observedIso: new Date(verifyingMs).toISOString(),
       model: scoreForecast(model, observed, motion),
-      persistence: scoreForecast(
-        persistencePosition(startObserved, persistence, leadH),
-        observed,
-        motion,
-      ),
+      persistence: scoreForecast(persistenceForecast, observed, motion),
+      ...(cliperForecast
+        ? { cliper: scoreForecast(cliperForecast, observed, motion) }
+        : {}),
     });
   }
   return output;
@@ -469,6 +568,13 @@ export function aggregateLeadTimes(
       rows.map((row) => row.persistence),
       0x2000 + leadIndex,
     );
+    const cliperRows = rows
+      .map((row) => row.cliper ?? null)
+      .filter((row): row is ForecastError => row !== null);
+    const climatologyPersistence =
+      cliperRows.length > 0
+        ? aggregateErrors(cliperRows, 0x2500 + leadIndex)
+        : undefined;
     const trackPairs = rows.map((row) => ({
       model: row.model.trackKm,
       persistence: row.persistence.trackKm,
@@ -476,6 +582,12 @@ export function aggregateLeadTimes(
     const trackDifferences = trackPairs.map(
       (pair) => pair.model - pair.persistence,
     );
+    const cliperTrackPairs = rows
+      .filter((row) => row.cliper !== undefined)
+      .map((row) => ({
+        model: row.model.trackKm,
+        persistence: row.cliper!.trackKm,
+      }));
     const intensityPairs = rows.map((row) => ({
       model: row.model.intensityAbsKt,
       persistence: row.persistence.intensityAbsKt,
@@ -500,10 +612,17 @@ export function aggregateLeadTimes(
       leadH,
       model,
       persistence,
+      ...(climatologyPersistence ? { climatologyPersistence } : {}),
       trackFrequencySuperior: superiorFraction(trackPairs),
       intensityFrequencySuperior: superiorFraction(intensityPairs),
       pressureFrequencySuperior: superiorFraction(pressurePairs),
       trackMaeSkillFraction: pairedSkillFraction(trackPairs),
+      ...(cliperTrackPairs.length > 0
+        ? {
+            trackMaeSkillFractionAgainstCliper:
+              pairedSkillFraction(cliperTrackPairs),
+          }
+        : {}),
       intensityMaeSkillFraction: pairedSkillFraction(intensityPairs),
       pressureMaeSkillFraction: pairedSkillFraction(pressurePairs),
       trackDifferenceCi95: bootstrapMeanInterval(

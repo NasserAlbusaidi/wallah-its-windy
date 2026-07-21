@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-4",
+  "measuredAt": "2026-07-21T14:57:55+04:00",
+  "method": "vitest bench, one warm-up and one measured run, 360 h deterministic ensemble, worker-equivalent model path",
+  "budgetsMs": {
+    "20": 5000,
+    "40": 9000,
+    "80": 17000
+  },
+  "deviceMatrix": [
+    {
+      "id": "darwin-arm64-reference",
+      "platform": "Darwin 25.5.0 arm64",
+      "runtime": "Node.js v25.9.0",
+      "execution": "local main-thread benchmark; production app executes the same loop in a dedicated worker",
+      "measuredMs": {
+        "20": 3370.36,
+        "40": 6830.68,
+        "80": 13329.47
+      },
+      "withinBudget": true
+    },
+    {
+      "id": "mobile-webkit",
+      "status": "unmeasured"
+    },
+    {
+      "id": "low-power-chromium",
+      "status": "unmeasured"
+    }
+  ],
+  "automaticMode": "disabled until a representative browser/device matrix passes",
+  "claim": "Reference desktop timing only; this is not cross-device performance acceptance."
+}

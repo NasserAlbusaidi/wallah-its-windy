@@ -1,0 +1,565 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "hf6_1975121n09072__i00",
+      "caseId": "hf6_1975121n09072",
+      "initializationId": "i00",
+      "label": "Unnamed i00",
+      "bin": "calibration/data/hf6/forcing/env_hf6_1975121n09072.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_1975121n09072.bin",
+      "monthIndex": 4,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "1975-05-07T00:00:00Z",
+      "spawn": {
+        "lat": 15.3,
+        "lon": 64.9,
+        "seed": 1975029
+      },
+      "ghostId": "hf6_1975121n09072",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "1975-05-08T21:00:00Z",
+        "lat": 15.3,
+        "lon": 64.9,
+        "initialWindKt": 83,
+        "initialOrganization": 0.596,
+        "envOffsetH": 45.0
+      },
+      "structureInitialization": {
+        "rmwKm": null,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_1975121n09072__i06",
+      "caseId": "hf6_1975121n09072",
+      "initializationId": "i06",
+      "label": "Unnamed i06",
+      "bin": "calibration/data/hf6/forcing/env_hf6_1975121n09072.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_1975121n09072.bin",
+      "monthIndex": 4,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "1975-05-07T00:00:00Z",
+      "spawn": {
+        "lat": 15.5,
+        "lon": 64.7,
+        "seed": 1975035
+      },
+      "ghostId": "hf6_1975121n09072",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "1975-05-09T03:00:00Z",
+        "lat": 15.5,
+        "lon": 64.7,
+        "initialWindKt": 78,
+        "initialOrganization": 0.576,
+        "envOffsetH": 51.0
+      },
+      "structureInitialization": {
+        "rmwKm": null,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_1978307n10082__i00",
+      "caseId": "hf6_1978307n10082",
+      "initializationId": "i00",
+      "label": "Unnamed i00",
+      "bin": "calibration/data/hf6/forcing/env_hf6_1978307n10082.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_1978307n10082.bin",
+      "monthIndex": 10,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "1978-11-07T00:00:00Z",
+      "spawn": {
+        "lat": 15.3,
+        "lon": 64.9,
+        "seed": 1978030
+      },
+      "ghostId": "hf6_1978307n10082",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "1978-11-08T00:00:00Z",
+        "lat": 15.3,
+        "lon": 64.9,
+        "initialWindKt": 70,
+        "initialOrganization": 0.575,
+        "envOffsetH": 24.0
+      },
+      "structureInitialization": {
+        "rmwKm": null,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_1978307n10082__i06",
+      "caseId": "hf6_1978307n10082",
+      "initializationId": "i06",
+      "label": "Unnamed i06",
+      "bin": "calibration/data/hf6/forcing/env_hf6_1978307n10082.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_1978307n10082.bin",
+      "monthIndex": 10,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "1978-11-07T00:00:00Z",
+      "spawn": {
+        "lat": 16.2,
+        "lon": 63.8,
+        "seed": 1978036
+      },
+      "ghostId": "hf6_1978307n10082",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "1978-11-08T06:00:00Z",
+        "lat": 16.2,
+        "lon": 63.8,
+        "initialWindKt": 75,
+        "initialOrganization": 0.603,
+        "envOffsetH": 30.0
+      },
+      "structureInitialization": {
+        "rmwKm": null,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_1996161n17063__i00",
+      "caseId": "hf6_1996161n17063",
+      "initializationId": "i00",
+      "label": "Unnamed i00",
+      "bin": "calibration/data/hf6/forcing/env_hf6_1996161n17063.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_1996161n17063.bin",
+      "monthIndex": 5,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "1996-06-08T00:00:00Z",
+      "spawn": {
+        "lat": 17.3,
+        "lon": 61.6,
+        "seed": 1996031
+      },
+      "ghostId": "hf6_1996161n17063",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "1996-06-09T18:00:00Z",
+        "lat": 17.3,
+        "lon": 61.6,
+        "initialWindKt": 20,
+        "initialOrganization": 0.4,
+        "envOffsetH": 42.0
+      },
+      "structureInitialization": {
+        "rmwKm": null,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_1996161n17063__i06",
+      "caseId": "hf6_1996161n17063",
+      "initializationId": "i06",
+      "label": "Unnamed i06",
+      "bin": "calibration/data/hf6/forcing/env_hf6_1996161n17063.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_1996161n17063.bin",
+      "monthIndex": 5,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "1996-06-08T00:00:00Z",
+      "spawn": {
+        "lat": 17.5,
+        "lon": 61.1,
+        "seed": 1996037
+      },
+      "ghostId": "hf6_1996161n17063",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "1996-06-10T00:00:00Z",
+        "lat": 17.5,
+        "lon": 61.1,
+        "initialWindKt": 25,
+        "initialOrganization": 0.4,
+        "envOffsetH": 48.0
+      },
+      "structureInitialization": {
+        "rmwKm": null,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2001267n17070__i00",
+      "caseId": "hf6_2001267n17070",
+      "initializationId": "i00",
+      "label": "Unnamed i00",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2001267n17070.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2001267n17070.bin",
+      "monthIndex": 8,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "2001-09-23T00:00:00Z",
+      "spawn": {
+        "lat": 16.6,
+        "lon": 69.7,
+        "seed": 2001032
+      },
+      "ghostId": "hf6_2001267n17070",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2001-09-24T03:00:00Z",
+        "lat": 16.6,
+        "lon": 69.7,
+        "initialWindKt": 25,
+        "initialOrganization": 0.424,
+        "envOffsetH": 27.0
+      },
+      "structureInitialization": {
+        "rmwKm": null,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2001267n17070__i06",
+      "caseId": "hf6_2001267n17070",
+      "initializationId": "i06",
+      "label": "Unnamed i06",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2001267n17070.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2001267n17070.bin",
+      "monthIndex": 8,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "2001-09-23T00:00:00Z",
+      "spawn": {
+        "lat": 16.8,
+        "lon": 69.4,
+        "seed": 2001038
+      },
+      "ghostId": "hf6_2001267n17070",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2001-09-24T09:00:00Z",
+        "lat": 16.8,
+        "lon": 69.4,
+        "initialWindKt": 25,
+        "initialOrganization": 0.425,
+        "envOffsetH": 33.0
+      },
+      "structureInitialization": {
+        "rmwKm": 92.6,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2001281n18071__i00",
+      "caseId": "hf6_2001281n18071",
+      "initializationId": "i00",
+      "label": "Unnamed i00",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2001281n18071.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2001281n18071.bin",
+      "monthIndex": 9,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "2001-10-08T00:00:00Z",
+      "spawn": {
+        "lat": 18.5,
+        "lon": 69.7,
+        "seed": 2001033
+      },
+      "ghostId": "hf6_2001281n18071",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2001-10-09T03:00:00Z",
+        "lat": 18.5,
+        "lon": 69.7,
+        "initialWindKt": 28,
+        "initialOrganization": 0.408,
+        "envOffsetH": 27.0
+      },
+      "structureInitialization": {
+        "rmwKm": 111.12,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2001281n18071__i06",
+      "caseId": "hf6_2001281n18071",
+      "initializationId": "i06",
+      "label": "Unnamed i06",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2001281n18071.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2001281n18071.bin",
+      "monthIndex": 9,
+      "stepH": 3,
+      "windowH": 165,
+      "startIso": "2001-10-08T00:00:00Z",
+      "spawn": {
+        "lat": 18.8,
+        "lon": 68.8,
+        "seed": 2001039
+      },
+      "ghostId": "hf6_2001281n18071",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2001-10-09T09:00:00Z",
+        "lat": 18.8,
+        "lon": 68.8,
+        "initialWindKt": 33,
+        "initialOrganization": 0.41,
+        "envOffsetH": 33.0
+      },
+      "structureInitialization": {
+        "rmwKm": 98.156,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2004274n16069__i00",
+      "caseId": "hf6_2004274n16069",
+      "initializationId": "i00",
+      "label": "Unnamed i00",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2004274n16069.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2004274n16069.bin",
+      "monthIndex": 8,
+      "stepH": 3,
+      "windowH": 285,
+      "startIso": "2004-09-29T00:00:00Z",
+      "spawn": {
+        "lat": 16.3,
+        "lon": 69.0,
+        "seed": 2004034
+      },
+      "ghostId": "hf6_2004274n16069",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2004-09-30T06:00:00Z",
+        "lat": 16.3,
+        "lon": 69.0,
+        "initialWindKt": 20,
+        "initialOrganization": 0.423,
+        "envOffsetH": 30.0
+      },
+      "structureInitialization": {
+        "rmwKm": null,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2004274n16069__i06",
+      "caseId": "hf6_2004274n16069",
+      "initializationId": "i06",
+      "label": "Unnamed i06",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2004274n16069.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2004274n16069.bin",
+      "monthIndex": 8,
+      "stepH": 3,
+      "windowH": 285,
+      "startIso": "2004-09-29T00:00:00Z",
+      "spawn": {
+        "lat": 17.7,
+        "lon": 67.7,
+        "seed": 2004040
+      },
+      "ghostId": "hf6_2004274n16069",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2004-09-30T18:00:00Z",
+        "lat": 17.7,
+        "lon": 67.7,
+        "initialWindKt": 25,
+        "initialOrganization": 0.433,
+        "envOffsetH": 42.0
+      },
+      "structureInitialization": {
+        "rmwKm": 92.6,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2011330n06078__i00",
+      "caseId": "hf6_2011330n06078",
+      "initializationId": "i00",
+      "label": "Unnamed i00",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2011330n06078.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2011330n06078.bin",
+      "monthIndex": 10,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "2011-11-27T00:00:00Z",
+      "spawn": {
+        "lat": 15.3,
+        "lon": 67.8,
+        "seed": 2011035
+      },
+      "ghostId": "hf6_2011330n06078",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2011-11-28T15:00:00Z",
+        "lat": 15.3,
+        "lon": 67.8,
+        "initialWindKt": 35,
+        "initialOrganization": 0.415,
+        "envOffsetH": 39.0
+      },
+      "structureInitialization": {
+        "rmwKm": 74.08,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2011330n06078__i06",
+      "caseId": "hf6_2011330n06078",
+      "initializationId": "i06",
+      "label": "Unnamed i06",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2011330n06078.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2011330n06078.bin",
+      "monthIndex": 10,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "2011-11-27T00:00:00Z",
+      "spawn": {
+        "lat": 15.5,
+        "lon": 67.3,
+        "seed": 2011041
+      },
+      "ghostId": "hf6_2011330n06078",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2011-11-28T21:00:00Z",
+        "lat": 15.5,
+        "lon": 67.3,
+        "initialWindKt": 33,
+        "initialOrganization": 0.413,
+        "envOffsetH": 45.0
+      },
+      "structureInitialization": {
+        "rmwKm": 74.08,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2022224n22067__i00",
+      "caseId": "hf6_2022224n22067",
+      "initializationId": "i00",
+      "label": "Unnamed i00",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2022224n22067.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2022224n22067.bin",
+      "monthIndex": 7,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "2022-08-10T00:00:00Z",
+      "spawn": {
+        "lat": 22.1,
+        "lon": 67.2,
+        "seed": 2022036
+      },
+      "ghostId": "hf6_2022224n22067",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2022-08-11T18:00:00Z",
+        "lat": 22.1,
+        "lon": 67.2,
+        "initialWindKt": 20,
+        "initialOrganization": 0.447,
+        "envOffsetH": 42.0
+      },
+      "structureInitialization": {
+        "rmwKm": 101.86,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "id": "hf6_2022224n22067__i06",
+      "caseId": "hf6_2022224n22067",
+      "initializationId": "i06",
+      "label": "Unnamed i06",
+      "bin": "calibration/data/hf6/forcing/env_hf6_2022224n22067.bin",
+      "steeringBin": "calibration/data/hf6/forcing/steering_hf6_2022224n22067.bin",
+      "monthIndex": 7,
+      "stepH": 3,
+      "windowH": 141,
+      "startIso": "2022-08-10T00:00:00Z",
+      "spawn": {
+        "lat": 21.8,
+        "lon": 66.6,
+        "seed": 2022042
+      },
+      "ghostId": "hf6_2022224n22067",
+      "benchmarkPartition": "validation",
+      "hf6Partition": "sealed-confirmation",
+      "hindcast": {
+        "startIso": "2022-08-12T00:00:00Z",
+        "lat": 21.8,
+        "lon": 66.6,
+        "initialWindKt": 30,
+        "initialOrganization": 0.448,
+        "envOffsetH": 48.0
+      },
+      "structureInitialization": {
+        "rmwKm": 101.86,
+        "outerSizePriorKm": null,
+        "r34Km": null,
+        "r50Km": null,
+        "r64Km": null
+      }
+    }
+  ]
+}

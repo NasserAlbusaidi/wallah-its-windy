@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-3",
+  "status": "rejected",
+  "claimClass": "legacy-validation-diagnostic",
+  "decision": "Rejected without changing thresholds; preserve the implementation and evaluate revisions only on a newly sealed cohort.",
+  "manifests": {
+    "contractSha256": "5065fb3d307288abd474773afdee4d5d23ecd9103a08d19d5ab3e741e079d184",
+    "selectionSha256": "92572b617234aaf62d41d0b11a5cec2f679bbad873a1f7f10f4e9bd39190d467",
+    "validationSha256": "5212155c7ac2da6ff9797284e7b6cfdedd17ab96ff9d0d836df5affe91e70702",
+    "hf2BaselineSha256": "bf60a468e0f3287ea5534ec263f05c38c76fddaa60c214c9bd6d3deea0a7bd85"
+  },
+  "checks": [
+    {
+      "id": "development-candidate-hash",
+      "pass": true,
+      "expected": "d13cde7ff79950620491352a5c330a3f146d782790f1f90b2f001151f60ad76e",
+      "actual": "d13cde7ff79950620491352a5c330a3f146d782790f1f90b2f001151f60ad76e"
+    },
+    {
+      "id": "runtime-track-parameters-match-selection",
+      "pass": true,
+      "expected": {
+        "environmentalSteeringBlend": 0.05,
+        "motionResponseHours": 0,
+        "initialMotionBlendHours": 36,
+        "betaDriftScale": 0.5,
+        "terrainDriftMaxMs": 0.15,
+        "wanderStepMs": 0.6,
+        "wanderRevertFraction": 0.013192983
+      },
+      "actual": {
+        "environmentalSteeringBlend": 0.05,
+        "motionResponseHours": 0,
+        "initialMotionBlendHours": 36,
+        "betaDriftScale": 0.5,
+        "terrainDriftMaxMs": 0.15,
+        "wanderStepMs": 0.6,
+        "wanderRevertFraction": 0.013192983
+      }
+    },
+    {
+      "id": "12h-sample-retention",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "id": "12h-positive-skill-linear-persistence",
+      "pass": true,
+      "actual": 0.086934451
+    },
+    {
+      "id": "12h-positive-skill-climatology-persistence",
+      "pass": true,
+      "actual": 0.138070456
+    },
+    {
+      "id": "12h-combined-track-bias-improved",
+      "pass": true,
+      "candidate": 12.383414046647491,
+      "reference": 41.15115581076348
+    },
+    {
+      "id": "24h-sample-retention",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "id": "24h-positive-skill-linear-persistence",
+      "pass": true,
+      "actual": 0.232789088
+    },
+    {
+      "id": "24h-positive-skill-climatology-persistence",
+      "pass": true,
+      "actual": 0.287649093
+    },
+    {
+      "id": "24h-combined-track-bias-improved",
+      "pass": false,
+      "candidate": 24.88339254183371,
+      "reference": 14.598199002327899
+    },
+    {
+      "id": "48h-sample-retention",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "id": "48h-positive-skill-linear-persistence",
+      "pass": true,
+      "actual": 0.709915209
+    },
+    {
+      "id": "48h-positive-skill-climatology-persistence",
+      "pass": true,
+      "actual": 0.750003371
+    },
+    {
+      "id": "aggregate-intensity-mae-regression-within-limit",
+      "pass": false,
+      "candidate": 16.586959153,
+      "reference": 15.479411974,
+      "regressionFraction": 0.07154969328681804
+    },
+    {
+      "id": "aggregate-pressure-mae-regression-within-limit",
+      "pass": true,
+      "candidate": 11.180426309,
+      "reference": 10.67600908,
+      "regressionFraction": 0.0472477332325385
+    }
+  ]
+}

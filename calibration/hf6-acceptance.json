@@ -1,0 +1,385 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-6",
+  "implementationStatus": "complete",
+  "sealedRetrospectiveStatus": "rejected",
+  "prospectiveStatus": "awaiting-future-storms",
+  "productClaim": "experimental simulator and retrospective forecast-companion prototype; no prospective skill claim",
+  "decision": "HF-6 implementation is complete. The frozen sealed first look is reported without retuning; prospective acceptance remains open until future forecasts mature.",
+  "manifests": {
+    "contractSha256": "b7dd92e550d6b91ca7ad6d928e098a838239b68351a9b6082107f204fd3a9c09",
+    "catalogSha256": "c7e28d24c60351bb530d96d3846d10ab2ccc2ff95fd02b8911dafe8cd240f3c1",
+    "auditSha256": "f60e550d6e078c9e06601c2490822441eda63b9a72cd74cc460ed94eb52b541e",
+    "verificationSha256": "8396fc0dd37895b1c12cb1dfe816b4574c974e9588998b74524a9a2b722ac301",
+    "prospectiveSha256": "e035b9377ceed25c72ed40125b8d35e5dc2e902b7489b5394e4640cdfbdc4a17",
+    "hf2Sha256": "812714dbcb0033e1e1d36de172c7eae5f1e5ec678cc760343d5e795579d95a1a",
+    "hf3Sha256": "5984cc66cc455395cd8cb40b9c59f87c2a1a7f592be2cc52245051f842947932",
+    "hf4Sha256": "bbcbf02a0b2f44d5feace16d269a8c8ef4d591987c56e952a76d9fbbeed4edaa",
+    "modelCardSha256": "68a30bd2fcab1d5a775823687707d80f2963b31013a7ec87b4c98507fc63d1c2"
+  },
+  "checks": [
+    {
+      "scope": "implementation",
+      "id": "catalogue-size",
+      "pass": true,
+      "actual": 72
+    },
+    {
+      "scope": "implementation",
+      "id": "multiple-initializations",
+      "pass": true,
+      "actual": 2
+    },
+    {
+      "scope": "implementation",
+      "id": "sealed-independent-canonical-cohort",
+      "pass": true,
+      "actual": 8
+    },
+    {
+      "scope": "implementation",
+      "id": "selection-sealed-before-first-look",
+      "pass": true
+    },
+    {
+      "scope": "implementation",
+      "id": "observation-audit-bound-to-catalog",
+      "pass": true
+    },
+    {
+      "scope": "implementation",
+      "id": "outcome-landfallPositionTimeProxy-audited",
+      "pass": true,
+      "actual": 56
+    },
+    {
+      "scope": "implementation",
+      "id": "outcome-peakIntensityTime-audited",
+      "pass": true,
+      "actual": 88
+    },
+    {
+      "scope": "implementation",
+      "id": "outcome-rapidIntensification-audited",
+      "pass": true,
+      "actual": 80
+    },
+    {
+      "scope": "implementation",
+      "id": "outcome-dissipation-audited",
+      "pass": true,
+      "actual": 61
+    },
+    {
+      "scope": "implementation",
+      "id": "outcome-rmwSamples-audited",
+      "pass": true,
+      "actual": 1305
+    },
+    {
+      "scope": "implementation",
+      "id": "outcome-r34Samples-audited",
+      "pass": true,
+      "actual": 837
+    },
+    {
+      "scope": "implementation",
+      "id": "outcome-r50Samples-audited",
+      "pass": true,
+      "actual": 512
+    },
+    {
+      "scope": "implementation",
+      "id": "outcome-r64Samples-audited",
+      "pass": true,
+      "actual": 334
+    },
+    {
+      "scope": "implementation",
+      "id": "stratum-season",
+      "pass": true,
+      "actual": {
+        "monsoon": 30,
+        "post-monsoon": 48,
+        "pre-monsoon": 66
+      }
+    },
+    {
+      "scope": "implementation",
+      "id": "stratum-initial-intensity",
+      "pass": true,
+      "actual": {
+        "34-63-kt": 28,
+        "64-95-kt": 15,
+        "96-plus-kt": 3,
+        "below-34-kt": 36,
+        "missing-or-noncanonical": 62
+      }
+    },
+    {
+      "scope": "implementation",
+      "id": "stratum-motion",
+      "pass": true,
+      "actual": {
+        "fast": 19,
+        "missing": 1,
+        "moderate": 68,
+        "slow": 56
+      }
+    },
+    {
+      "scope": "implementation",
+      "id": "stratum-land-interaction",
+      "pass": true,
+      "actual": {
+        "near-land": 70,
+        "open-water": 74
+      }
+    },
+    {
+      "scope": "implementation",
+      "id": "stratum-data-era",
+      "pass": true,
+      "actual": {
+        "early-satellite": 60,
+        "modern": 54,
+        "pre-satellite": 30
+      }
+    },
+    {
+      "scope": "implementation",
+      "id": "stratum-forecast-difficulty",
+      "pass": true,
+      "actual": {
+        "easy": 43,
+        "hard": 42,
+        "medium": 42,
+        "missing": 17
+      }
+    },
+    {
+      "scope": "implementation",
+      "id": "stratum-observation-availability",
+      "pass": true,
+      "actual": {
+        "canonical-intensity": 42,
+        "canonical-intensity-and-structure": 46,
+        "track-only-or-noncanonical": 56
+      }
+    },
+    {
+      "scope": "implementation",
+      "id": "immutable-prospective-registry-present",
+      "pass": true
+    },
+    {
+      "scope": "implementation",
+      "id": "model-card-published",
+      "pass": true
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "sealed-storm-count",
+      "pass": true,
+      "expected": 8,
+      "actual": 8
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "sealed-initialization-count",
+      "pass": true,
+      "actual": 16
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf2-24h-positive-intensity-skill",
+      "pass": true,
+      "actual": 0.144055022
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf2-24h-positive-pressure-skill",
+      "pass": false,
+      "actual": -0.144511466
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf2-48h-positive-intensity-skill",
+      "pass": false,
+      "actual": -0.952293532
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf2-48h-positive-pressure-skill",
+      "pass": false,
+      "actual": -0.720719516
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf3-12h-positive-track-skill",
+      "pass": true,
+      "actual": 0.343508343
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf3-12h-sample-retention",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf3-24h-positive-track-skill",
+      "pass": true,
+      "actual": 0.386157585
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf3-24h-sample-retention",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf3-48h-positive-track-skill",
+      "pass": true,
+      "actual": 0.535021292
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "hf3-48h-sample-retention",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-landfallPositionMaeKm",
+      "pass": true,
+      "actual": 188.61219575
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-landfallTimeMaeH",
+      "pass": true,
+      "actual": 5.25
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-landfallEventAccuracy",
+      "pass": true,
+      "actual": 0.875
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-peakIntensityMaeKt",
+      "pass": true,
+      "actual": 13.280652726
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-peakTimeMaeH",
+      "pass": true,
+      "actual": 40.203125
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-rapidIntensificationEventAccuracy",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-dissipationEventAccuracy",
+      "pass": true,
+      "actual": 0.1875
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-structureMaeKm",
+      "pass": true,
+      "actual": {
+        "rmwKm": 18.772792638,
+        "r34Km": 75.886681053,
+        "r50Km": null,
+        "r64Km": null
+      }
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-thresholdEventAccuracy",
+      "pass": true,
+      "actual": {
+        "34": 0.9375,
+        "64": 0.875,
+        "96": 1
+      }
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-structure-rmwKm",
+      "pass": true,
+      "actual": 18.772792638
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-structure-r34Km",
+      "pass": true,
+      "actual": 75.886681053
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-structure-r50Km",
+      "pass": false,
+      "actual": null
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-structure-r64Km",
+      "pass": false,
+      "actual": null
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-threshold-34",
+      "pass": true,
+      "actual": 0.9375
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-threshold-64",
+      "pass": true,
+      "actual": 0.875
+    },
+    {
+      "scope": "sealed-evidence",
+      "id": "outcome-score-threshold-96",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "scope": "prospective-evidence",
+      "id": "minimum-matured-forecasts",
+      "pass": false,
+      "expected": 12,
+      "actual": 0
+    },
+    {
+      "scope": "prospective-evidence",
+      "id": "minimum-distinct-storms",
+      "pass": false,
+      "expected": 4,
+      "actual": 0
+    },
+    {
+      "scope": "honesty",
+      "id": "hf4-label-not-promoted",
+      "pass": true
+    },
+    {
+      "scope": "honesty",
+      "id": "prior-negative-results-preserved",
+      "pass": true,
+      "hf2": "rejected",
+      "hf3": "rejected"
+    }
+  ]
+}

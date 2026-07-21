@@ -1,0 +1,2066 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "calibration/fidelity.mjs",
+  "partitionFilter": "development",
+  "source": {
+    "tracks": "NOAA IBTrACS v04r01 North Indian basin USA/JTWC fields",
+    "environment": "ERA5 event fields and WOA23 monthly ocean heat content",
+    "ibtracsSha256": "02f6af3b7e12ee76e88866995b4451b85867a2b7f20ed2666f8561024d671b62"
+  },
+  "catalog": {
+    "sha256": "cb3aa9bee125bef248c2eac4c3f9037f62c85a4619ddc5a8b8110501677eb7cc",
+    "storms": 30,
+    "partitions": {
+      "development": 18,
+      "validation": 6,
+      "test": 6
+    },
+    "protocol": {
+      "domain": [
+        50,
+        70,
+        15,
+        27
+      ],
+      "interiorMarginDeg": 1.2,
+      "minimumWindKt": 34,
+      "initialNature": [
+        "TS",
+        "NR"
+      ],
+      "initialNatureCounts": {
+        "TS": 26,
+        "NR": 4
+      },
+      "eventPaddingHours": 24,
+      "partitions": {
+        "development": 18,
+        "test": 6,
+        "validation": 6
+      },
+      "selectionPolicy": "code-reviewed stratified coverage set: ten featured cases plus twenty additional systems spanning 1980-2024, seasons, and intensities; frozen before simulation; not random or exhaustive",
+      "testPolicy": "permanent; never used for parameter selection or acceptance"
+    }
+  },
+  "artifactManifest": {
+    "scenarios": {
+      "path": "calibration/data/fidelity-scenarios.json",
+      "bytes": 11969,
+      "sha256": "86e2aa4b35cd2d79ab6bdcacf4f202cc37b8cc8620d0775d959c4688f654a4e7"
+    },
+    "tracks": {
+      "path": "calibration/data/fidelity-tracks.json",
+      "bytes": 143814,
+      "sha256": "6d0e10c88a436cf9e2777fe168eee8c6c163b1ec8934f921218ef67cafbacf30"
+    },
+    "terrain": {
+      "path": "public/data/terrain.bin",
+      "bytes": 2084344,
+      "sha256": "a350399d3ce4960313f92e58f4f08d04b9c76ca6a7c35319d27443f3344ae262"
+    },
+    "oceanProfiles": {
+      "path": "public/data/ocean.bin",
+      "bytes": 700120,
+      "sha256": "0811050864a24374e1cc7ed0e1d8519a85ec9e72505d1f9af28a6abca3498434"
+    },
+    "eventOceanProfiles": {
+      "path": "calibration/data/hf2a-event-ocean.bin",
+      "bytes": 1600264,
+      "sha256": "d1110713658d950b0f1ea54556c8ce4a31f501ab7a4672f129001ad432f24975"
+    },
+    "eventOceanMetadata": {
+      "path": "calibration/data/hf2a-event-ocean.json",
+      "bytes": 14492,
+      "sha256": "32388d1b7586a0a83cd38c36d77739010a7a5ea0c65941abaada83a6a88defbf"
+    },
+    "initialStructure": {
+      "path": "calibration/data/hf2-initial-structure.json",
+      "bytes": 18982,
+      "sha256": "a2334bb9beb819f9e6aa4f1e1cbabfe13311ee244f5e4b77ec4c00ef7c1c171f"
+    },
+    "pressureLevelSteeringMetadata": {
+      "path": "calibration/data/hf3-steering-manifest.json",
+      "bytes": 22351,
+      "sha256": "6f35a2e577fc13de78f9a09efffc3c551e1fdbe006910f13740bacefdf5ba1c1"
+    },
+    "pressureLevelSteering": [
+      {
+        "id": "as1980",
+        "path": "calibration/data/hf3/steering_as1980.bin",
+        "bytes": 461336,
+        "sha256": "dd88e3880ee81abc91e16cd2298e3c9388770e8c0a578f9f5b243a2681c61577"
+      },
+      {
+        "id": "as1981",
+        "path": "calibration/data/hf3/steering_as1981.bin",
+        "bytes": 461336,
+        "sha256": "637a132899af36c828e226fdea345f08b909d49fe7e9f4197c144bc835694e6e"
+      },
+      {
+        "id": "as1982",
+        "path": "calibration/data/hf3/steering_as1982.bin",
+        "bytes": 369176,
+        "sha256": "3644b22c013eb70194bfc5a1fb28543b75273ac7b264eb3253ffe2ee5c464035"
+      },
+      {
+        "id": "as1983",
+        "path": "calibration/data/hf3/steering_as1983.bin",
+        "bytes": 369176,
+        "sha256": "48fcb8d4974c558e5b77e1e4626e03c2d9cf9ebe1b02261005d45bf2043ad95d"
+      },
+      {
+        "id": "as1987",
+        "path": "calibration/data/hf3/steering_as1987.bin",
+        "bytes": 829976,
+        "sha256": "99042f0cee4977877d8a36f497c5f79c3b737d171b519984bcd7c53607ff8b02"
+      },
+      {
+        "id": "as1992",
+        "path": "calibration/data/hf3/steering_as1992.bin",
+        "bytes": 553496,
+        "sha256": "6c4212fc4fa9b1c4890842e8e4cf29ab76846aa9a769a8611e63efdecefb2425"
+      },
+      {
+        "id": "as1994",
+        "path": "calibration/data/hf3/steering_as1994.bin",
+        "bytes": 461336,
+        "sha256": "e11180af54e619cc5a1d7f01c7d0469fa4cf158a86a7bf2654736f46208bc36d"
+      },
+      {
+        "id": "as1998dec",
+        "path": "calibration/data/hf3/steering_as1998dec.bin",
+        "bytes": 461336,
+        "sha256": "b5a69c68f89816a1b553e5b38f90c04e6f4e006902071e612fcf81db0019a4de"
+      },
+      {
+        "id": "gonu2007",
+        "path": "calibration/data/hf3/steering_gonu2007.bin",
+        "bytes": 737816,
+        "sha256": "603207f916d307661121b8829dafe1a667705579b37173c4c57c85f42bb21c0c"
+      },
+      {
+        "id": "as2007",
+        "path": "calibration/data/hf3/steering_as2007.bin",
+        "bytes": 369176,
+        "sha256": "8760605539e9b99c41af2a6a0d687d41ea0c4791bc13924ef4cf8d8a2272403a"
+      },
+      {
+        "id": "phet2010",
+        "path": "calibration/data/hf3/steering_phet2010.bin",
+        "bytes": 829976,
+        "sha256": "404611affcaa0df2cb548fc7c6e00f2ceb45927af1ec5f01513b0b7f5be4187d"
+      },
+      {
+        "id": "keila2011",
+        "path": "calibration/data/hf3/steering_keila2011.bin",
+        "bytes": 553496,
+        "sha256": "e630b08e50522f573301dc04768deb515a00593c21c24fcad8ab9ff890d79a1e"
+      },
+      {
+        "id": "nanauk2014",
+        "path": "calibration/data/hf3/steering_nanauk2014.bin",
+        "bytes": 645656,
+        "sha256": "623eeecc0576ac903495c2302fd5e20761aa10947d1675d5e98738fa7329773b"
+      },
+      {
+        "id": "nilofar2014",
+        "path": "calibration/data/hf3/steering_nilofar2014.bin",
+        "bytes": 737816,
+        "sha256": "5a2d942a268d31f4855cf971ca721bec8770c5b3b94a7f3c701682c02eb4777d"
+      },
+      {
+        "id": "ashobaa2015",
+        "path": "calibration/data/hf3/steering_ashobaa2015.bin",
+        "bytes": 737816,
+        "sha256": "ae790caea954f35a18cc569d7b3782457f3c8bee0dc335694ffcdb377808801f"
+      },
+      {
+        "id": "mekunu2018",
+        "path": "calibration/data/hf3/steering_mekunu2018.bin",
+        "bytes": 553496,
+        "sha256": "42dce75de313fbce4190566aad35bf3556a32c9f1eebdf6900441e94a731f26f"
+      },
+      {
+        "id": "vayu2019",
+        "path": "calibration/data/hf3/steering_vayu2019.bin",
+        "bytes": 829976,
+        "sha256": "377584d3af5debf4bd6b96ae07723b36801c842a3b9c7ab972ef3f19938f2ad4"
+      },
+      {
+        "id": "hikaa2019",
+        "path": "calibration/data/hf3/steering_hikaa2019.bin",
+        "bytes": 553496,
+        "sha256": "be5d75f093837c5e33572ca58a4255979017158f13cf6f0dfaa0dd7f5417f8ee"
+      }
+    ],
+    "environments": [
+      {
+        "id": "as1980",
+        "path": "calibration/data/fidelity/env_as1980.bin",
+        "bytes": 615112,
+        "sha256": "2b70d86f0bc8abdd98195658f5ce2af61bca5362b1c0494557dcc7405712cff5"
+      },
+      {
+        "id": "as1981",
+        "path": "calibration/data/fidelity/env_as1981.bin",
+        "bytes": 615112,
+        "sha256": "c30729e11a81876a4904032665e32233c9b56eb02a7413cb30577dadb11f50ff"
+      },
+      {
+        "id": "as1982",
+        "path": "calibration/data/fidelity/env_as1982.bin",
+        "bytes": 492232,
+        "sha256": "79e04dac35f80f78edabfd90dc6457e535ef8fedf787af9505be140ede696430"
+      },
+      {
+        "id": "as1983",
+        "path": "calibration/data/fidelity/env_as1983.bin",
+        "bytes": 492232,
+        "sha256": "6787832c607c3abfadb50af4afc82ec4739bfe0e89d1d62932475097e8bcd71a"
+      },
+      {
+        "id": "as1987",
+        "path": "calibration/data/fidelity/env_as1987.bin",
+        "bytes": 1106632,
+        "sha256": "90bb17d166534924d5f27c372fb4b24c4d3635c83ace7529ef65b9c39511f0ed"
+      },
+      {
+        "id": "as1992",
+        "path": "calibration/data/fidelity/env_as1992.bin",
+        "bytes": 737992,
+        "sha256": "845d4f1dc88738101c89bc60a8e07118300e81cdd53009fba7a59f18a2568b02"
+      },
+      {
+        "id": "as1994",
+        "path": "calibration/data/fidelity/env_as1994.bin",
+        "bytes": 615112,
+        "sha256": "d9d1fcd8338bbd31b2cc21b42dd94dfd3840d83960d3755682f2933bbe1cc6d8"
+      },
+      {
+        "id": "as1998dec",
+        "path": "calibration/data/fidelity/env_as1998dec.bin",
+        "bytes": 615112,
+        "sha256": "7e5d699c434b865acfc51525ab460dc866d610c5867e57f04e8942e4379b9775"
+      },
+      {
+        "id": "gonu2007",
+        "path": "public/data/env_gonu.bin",
+        "bytes": 983752,
+        "sha256": "31895447c0ebf783b49f8ff36721d73d5777a38056bbd0c190b1dc719ba311a1"
+      },
+      {
+        "id": "as2007",
+        "path": "calibration/data/fidelity/env_as2007.bin",
+        "bytes": 492232,
+        "sha256": "2bc892bda8de9a526109a8062d6f0bc72c38e559a29e9f13d3ca0b50cde9e021"
+      },
+      {
+        "id": "phet2010",
+        "path": "public/data/env_phet.bin",
+        "bytes": 1106632,
+        "sha256": "b28c3fdd8a028e3aa32b13c92b51a680808ac943eb3e2ad8fca350c1a24a473f"
+      },
+      {
+        "id": "keila2011",
+        "path": "calibration/data/fidelity/env_keila2011.bin",
+        "bytes": 737992,
+        "sha256": "fcf46edb30aa25a491df00c89d1d2631315c63f2bfff949b8fac2d82da449e54"
+      },
+      {
+        "id": "nanauk2014",
+        "path": "calibration/data/fidelity/env_nanauk2014.bin",
+        "bytes": 860872,
+        "sha256": "5d8e5e1a76e6a7700570cb5dbfde1d1a8762e1bf50c597bdafc5bb980d482e0e"
+      },
+      {
+        "id": "nilofar2014",
+        "path": "public/data/env_nilofar.bin",
+        "bytes": 983752,
+        "sha256": "112cc53475e3f6785b402bf16f354ed838f28c6d0b5b4b468f403ab9bb789125"
+      },
+      {
+        "id": "ashobaa2015",
+        "path": "public/data/env_ashobaa.bin",
+        "bytes": 983752,
+        "sha256": "31b488c1de438049ef55a49d82ff68ddd5138396ca2e3f2f854919297b72e4a8"
+      },
+      {
+        "id": "mekunu2018",
+        "path": "public/data/env_mekunu.bin",
+        "bytes": 737992,
+        "sha256": "2091f5e59d2d3bec1d7eac6adb34e72749349ac15f649a694af279ae123a6f31"
+      },
+      {
+        "id": "vayu2019",
+        "path": "public/data/env_vayu.bin",
+        "bytes": 1106632,
+        "sha256": "5097ed6b26568302008ecbf29d653db6109385c7bb8a503e4a4fce29571d3da1"
+      },
+      {
+        "id": "hikaa2019",
+        "path": "public/data/env_hikaa.bin",
+        "bytes": 737992,
+        "sha256": "1b8fd2e726f1f67d65a914ee70a3f421bb428e33f29cee000cf7e6a4f77e1c4a"
+      }
+    ]
+  },
+  "runtimeParameters": {
+    "intensifyKPerH": 0.055,
+    "shearThresholdMs": 14,
+    "shearKtPerHPerMs": 0.65,
+    "dryAirK": 0.9,
+    "organizationRecoveryH": 30,
+    "organizationDisruptionH": 10,
+    "ohcMpiWeight": 0.28,
+    "organizationIntensification": 0.05
+  },
+  "runtimeTrackParameters": {
+    "environmentalSteeringBlend": 0.05,
+    "motionResponseHours": 0,
+    "initialMotionBlendHours": 36,
+    "betaDriftScale": 0.5,
+    "terrainDriftMaxMs": 0.15,
+    "wanderStepMs": 0.28,
+    "wanderRevertFraction": 0.05
+  },
+  "verificationProtocol": {
+    "leadHours": [
+      12,
+      24,
+      48,
+      72
+    ],
+    "domain": {
+      "lonMin": 50,
+      "lonMax": 70,
+      "latMin": 15,
+      "latMax": 27
+    },
+    "initializationFixScored": false,
+    "requiresContinuousObservedDomain": true,
+    "persistence": {
+      "motion": "constant spherical speed/bearing from the most recent pre-initialization fix within 24 hours",
+      "missingMotionFallback": "stationary",
+      "wind": "held at initialization",
+      "pressure": "held at initialization when available",
+      "futureFixesAllowed": false
+    },
+    "bootstrap": {
+      "samplingUnit": "storm",
+      "replicates": 2000,
+      "deterministic": true
+    },
+    "numericPrecisionDecimalPlaces": 9
+  },
+  "cases": [
+    {
+      "id": "as1980",
+      "label": "arabian sea system 1980",
+      "partition": "development",
+      "score": {
+        "startIso": "1980-11-17T09:00:00Z",
+        "endIso": "1980-11-18T04:45:00.000Z",
+        "trackSamples": 8,
+        "intensitySamples": 8,
+        "pressureSamples": 0,
+        "trackMaeKm": 178.195371664,
+        "trackRmseKm": 211.983986276,
+        "intensityMaeKt": 4.133354836,
+        "intensityBiasKt": -0.649859621,
+        "pressureMaeHpa": null,
+        "peakBiasKt": 4.607486513
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "1980-11-17T21:00:00.000Z",
+          "model": {
+            "trackKm": 221.774027722,
+            "alongTrackKm": -68.65350603,
+            "crossTrackKm": 210.884308956,
+            "intensityAbsKt": 3.217300965,
+            "intensityBiasKt": 3.217300965,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 176.684715671,
+            "alongTrackKm": -34.562120164,
+            "crossTrackKm": 173.273478314,
+            "intensityAbsKt": 0,
+            "intensityBiasKt": 0,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "as1981",
+      "label": "arabian sea system 1981",
+      "partition": "development",
+      "score": {
+        "startIso": "1981-10-31T06:00:00Z",
+        "endIso": "1981-11-02T00:00:00.000Z",
+        "trackSamples": 17,
+        "intensitySamples": 17,
+        "pressureSamples": 0,
+        "trackMaeKm": 114.803394024,
+        "trackRmseKm": 133.42042536,
+        "intensityMaeKt": 15.692921682,
+        "intensityBiasKt": 15.692921682,
+        "pressureMaeHpa": null,
+        "peakBiasKt": 16.628576696
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "1981-10-31T18:00:00.000Z",
+          "model": {
+            "trackKm": 44.498606707,
+            "alongTrackKm": -43.11777186,
+            "crossTrackKm": 10.999473727,
+            "intensityAbsKt": 5.363359921,
+            "intensityBiasKt": 5.363359921,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 24.617448628,
+            "alongTrackKm": 18.493783527,
+            "crossTrackKm": 16.248067592,
+            "intensityAbsKt": 0,
+            "intensityBiasKt": 0,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "1981-11-01T06:00:00.000Z",
+          "model": {
+            "trackKm": 194.988337788,
+            "alongTrackKm": -187.011409243,
+            "crossTrackKm": -55.202588396,
+            "intensityAbsKt": 15.019129634,
+            "intensityBiasKt": 15.019129634,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 103.919086089,
+            "alongTrackKm": 0.316474976,
+            "crossTrackKm": 103.919019183,
+            "intensityAbsKt": 5,
+            "intensityBiasKt": 5,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "as1982",
+      "label": "arabian sea system 1982",
+      "partition": "development",
+      "score": {
+        "startIso": "1982-11-07T09:00:00Z",
+        "endIso": "1982-11-08T03:00:00.000Z",
+        "trackSamples": 8,
+        "intensitySamples": 8,
+        "pressureSamples": 0,
+        "trackMaeKm": 26.92580861,
+        "trackRmseKm": 27.453803626,
+        "intensityMaeKt": 5.595057286,
+        "intensityBiasKt": -5.595057286,
+        "pressureMaeHpa": null,
+        "peakBiasKt": -11.397773506
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "1982-11-07T21:00:00.000Z",
+          "model": {
+            "trackKm": 33.81427425,
+            "alongTrackKm": -14.240016538,
+            "crossTrackKm": 30.669674732,
+            "intensityAbsKt": 6.146096966,
+            "intensityBiasKt": -6.146096966,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 42.393752652,
+            "alongTrackKm": -32.097215841,
+            "crossTrackKm": 27.694811805,
+            "intensityAbsKt": 12,
+            "intensityBiasKt": -12,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "as1983",
+      "label": "arabian sea system 1983",
+      "partition": "development",
+      "score": {
+        "startIso": "1983-08-09T15:00:00Z",
+        "endIso": "1983-08-10T08:15:00.000Z",
+        "trackSamples": 5,
+        "intensitySamples": 5,
+        "pressureSamples": 0,
+        "trackMaeKm": 33.134130545,
+        "trackRmseKm": 38.947976004,
+        "intensityMaeKt": 10.73665592,
+        "intensityBiasKt": -10.73665592,
+        "pressureMaeHpa": null,
+        "peakBiasKt": -9.464042636
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "1983-08-10T03:00:00.000Z",
+          "model": {
+            "trackKm": 52.97185293,
+            "alongTrackKm": -52.696910295,
+            "crossTrackKm": -5.390685496,
+            "intensityAbsKt": 14.122827229,
+            "intensityBiasKt": -14.122827229,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 80.520852025,
+            "alongTrackKm": -37.264427924,
+            "crossTrackKm": 71.379300342,
+            "intensityAbsKt": 8,
+            "intensityBiasKt": -8,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "as1987",
+      "label": "arabian sea system 1987",
+      "partition": "development",
+      "score": {
+        "startIso": "1987-06-06T21:00:00Z",
+        "endIso": "1987-06-12T00:00:00.000Z",
+        "trackSamples": 41,
+        "intensitySamples": 41,
+        "pressureSamples": 0,
+        "trackMaeKm": 204.831732025,
+        "trackRmseKm": 248.564759095,
+        "intensityMaeKt": 25.023164343,
+        "intensityBiasKt": 25.023164343,
+        "pressureMaeHpa": null,
+        "peakBiasKt": 28.531151966
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "1987-06-07T09:00:00.000Z",
+          "model": {
+            "trackKm": 48.911517841,
+            "alongTrackKm": 45.378186394,
+            "crossTrackKm": -18.252701415,
+            "intensityAbsKt": 8.592685218,
+            "intensityBiasKt": 8.592685218,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 132.171085542,
+            "alongTrackKm": -45.583991764,
+            "crossTrackKm": -124.062196353,
+            "intensityAbsKt": 0,
+            "intensityBiasKt": 0,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "1987-06-07T21:00:00.000Z",
+          "model": {
+            "trackKm": 104.068144004,
+            "alongTrackKm": 46.380694298,
+            "crossTrackKm": 93.161455909,
+            "intensityAbsKt": 17.057623913,
+            "intensityBiasKt": 17.057623913,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 292.3191017,
+            "alongTrackKm": -173.444290274,
+            "crossTrackKm": -235.308821044,
+            "intensityAbsKt": 0,
+            "intensityBiasKt": 0,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "1987-06-08T21:00:00.000Z",
+          "model": {
+            "trackKm": 198.418700234,
+            "alongTrackKm": 197.792775336,
+            "crossTrackKm": -15.781073165,
+            "intensityAbsKt": 43.519752383,
+            "intensityBiasKt": 43.519752383,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 808.525057874,
+            "alongTrackKm": -585.806302404,
+            "crossTrackKm": 557.462337373,
+            "intensityAbsKt": 15,
+            "intensityBiasKt": 15,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        },
+        {
+          "leadH": 72,
+          "observedIso": "1987-06-09T21:00:00.000Z",
+          "model": {
+            "trackKm": 95.01775751,
+            "alongTrackKm": -48.156181148,
+            "crossTrackKm": -81.910762391,
+            "intensityAbsKt": 15.80263234,
+            "intensityBiasKt": 15.80263234,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 1082.504325679,
+            "alongTrackKm": 1082.064711659,
+            "crossTrackKm": -46.503829369,
+            "intensityAbsKt": 25,
+            "intensityBiasKt": 25,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "as1992",
+      "label": "arabian sea system 1992",
+      "partition": "development",
+      "score": {
+        "startIso": "1992-10-01T06:00:00Z",
+        "endIso": "1992-10-03T04:00:00.000Z",
+        "trackSamples": 15,
+        "intensitySamples": 15,
+        "pressureSamples": 0,
+        "trackMaeKm": 164.903423548,
+        "trackRmseKm": 185.167403292,
+        "intensityMaeKt": 5.505923468,
+        "intensityBiasKt": -3.747493344,
+        "pressureMaeHpa": null,
+        "peakBiasKt": 1.001768637
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "1992-10-01T18:00:00.000Z",
+          "model": {
+            "trackKm": 82.525306459,
+            "alongTrackKm": -81.092568739,
+            "crossTrackKm": -15.311555944,
+            "intensityAbsKt": 3.553291867,
+            "intensityBiasKt": -3.553291867,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 23.44543895,
+            "alongTrackKm": 11.231939479,
+            "crossTrackKm": -20.579917767,
+            "intensityAbsKt": 10,
+            "intensityBiasKt": -10,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "1992-10-02T06:00:00.000Z",
+          "model": {
+            "trackKm": 241.240808941,
+            "alongTrackKm": -100.462335236,
+            "crossTrackKm": -219.333242826,
+            "intensityAbsKt": 6.033203156,
+            "intensityBiasKt": -6.033203156,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 75.449713364,
+            "alongTrackKm": 74.99812409,
+            "crossTrackKm": -8.244277251,
+            "intensityAbsKt": 20,
+            "intensityBiasKt": -20,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "as1994",
+      "label": "arabian sea system 1994",
+      "partition": "development",
+      "score": {
+        "startIso": "1994-06-07T00:00:00Z",
+        "endIso": "1994-06-09T16:15:00.000Z",
+        "trackSamples": 21,
+        "intensitySamples": 21,
+        "pressureSamples": 0,
+        "trackMaeKm": 63.388391603,
+        "trackRmseKm": 69.365226565,
+        "intensityMaeKt": 13.647461055,
+        "intensityBiasKt": 13.214711411,
+        "pressureMaeHpa": null,
+        "peakBiasKt": 18.733017578
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "1994-06-07T12:00:00.000Z",
+          "model": {
+            "trackKm": 58.98664219,
+            "alongTrackKm": -43.578365429,
+            "crossTrackKm": -39.753790235,
+            "intensityAbsKt": 2.714108799,
+            "intensityBiasKt": 2.714108799,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 42.126771135,
+            "alongTrackKm": 42.090843476,
+            "crossTrackKm": 1.740357489,
+            "intensityAbsKt": 5,
+            "intensityBiasKt": -5,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "1994-06-08T00:00:00.000Z",
+          "model": {
+            "trackKm": 36.112557508,
+            "alongTrackKm": -34.416335513,
+            "crossTrackKm": -10.937769545,
+            "intensityAbsKt": 6.012015782,
+            "intensityBiasKt": 6.012015782,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 162.991511156,
+            "alongTrackKm": 134.852741923,
+            "crossTrackKm": 91.549293938,
+            "intensityAbsKt": 10,
+            "intensityBiasKt": -10,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "1994-06-09T00:00:00.000Z",
+          "model": {
+            "trackKm": 87.183115134,
+            "alongTrackKm": -22.594880598,
+            "crossTrackKm": -84.204603073,
+            "intensityAbsKt": 33.092734904,
+            "intensityBiasKt": 33.092734904,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 490.218558815,
+            "alongTrackKm": 377.815105024,
+            "crossTrackKm": 312.407373497,
+            "intensityAbsKt": 5,
+            "intensityBiasKt": 5,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "as1998dec",
+      "label": "arabian sea system dec 1998",
+      "partition": "development",
+      "score": {
+        "startIso": "1998-12-15T00:00:00Z",
+        "endIso": "1998-12-17T04:45:00.000Z",
+        "trackSamples": 17,
+        "intensitySamples": 17,
+        "pressureSamples": 0,
+        "trackMaeKm": 109.000844157,
+        "trackRmseKm": 120.889407921,
+        "intensityMaeKt": 6.383088211,
+        "intensityBiasKt": -6.383088211,
+        "pressureMaeHpa": null,
+        "peakBiasKt": -1.474127279
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "1998-12-15T12:00:00.000Z",
+          "model": {
+            "trackKm": 71.084577104,
+            "alongTrackKm": 63.868731744,
+            "crossTrackKm": -31.206168458,
+            "intensityAbsKt": 1.92214301,
+            "intensityBiasKt": -1.92214301,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 80.740024796,
+            "alongTrackKm": 55.458740197,
+            "crossTrackKm": -58.679605643,
+            "intensityAbsKt": 5,
+            "intensityBiasKt": -5,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "1998-12-16T00:00:00.000Z",
+          "model": {
+            "trackKm": 146.685538512,
+            "alongTrackKm": 146.579883674,
+            "crossTrackKm": 5.58066832,
+            "intensityAbsKt": 1.955271079,
+            "intensityBiasKt": -1.955271079,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 185.779586575,
+            "alongTrackKm": -68.292217442,
+            "crossTrackKm": -172.774402035,
+            "intensityAbsKt": 15,
+            "intensityBiasKt": 15,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "1998-12-17T00:00:00.000Z",
+          "model": {
+            "trackKm": 118.294411297,
+            "alongTrackKm": 94.69056981,
+            "crossTrackKm": -70.904301331,
+            "intensityAbsKt": 3.590478788,
+            "intensityBiasKt": -3.590478788,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          },
+          "persistence": {
+            "trackKm": 630.512651308,
+            "alongTrackKm": -290.571125811,
+            "crossTrackKm": -559.675326329,
+            "intensityAbsKt": 25,
+            "intensityBiasKt": 25,
+            "pressureAbsHpa": null,
+            "pressureBiasHpa": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "gonu2007",
+      "label": "gonu 2007",
+      "partition": "development",
+      "score": {
+        "startIso": "2007-06-03T03:00:00Z",
+        "endIso": "2007-06-08T00:00:00.000Z",
+        "trackSamples": 39,
+        "intensitySamples": 39,
+        "pressureSamples": 39,
+        "trackMaeKm": 61.900099136,
+        "trackRmseKm": 68.547385382,
+        "intensityMaeKt": 28.004688692,
+        "intensityBiasKt": -13.063835298,
+        "pressureMaeHpa": 27.094118334,
+        "peakBiasKt": -54.41518302
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2007-06-03T15:00:00.000Z",
+          "model": {
+            "trackKm": 105.289928527,
+            "alongTrackKm": 12.672930153,
+            "crossTrackKm": -104.524851484,
+            "intensityAbsKt": 12.602777386,
+            "intensityBiasKt": -12.602777386,
+            "pressureAbsHpa": 17.86971522,
+            "pressureBiasHpa": 17.86971522
+          },
+          "persistence": {
+            "trackKm": 172.950268884,
+            "alongTrackKm": -115.77411648,
+            "crossTrackKm": -128.485219566,
+            "intensityAbsKt": 20,
+            "intensityBiasKt": -20,
+            "pressureAbsHpa": 15,
+            "pressureBiasHpa": 15
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "2007-06-04T03:00:00.000Z",
+          "model": {
+            "trackKm": 89.872989093,
+            "alongTrackKm": 88.103849614,
+            "crossTrackKm": 17.74610223,
+            "intensityAbsKt": 50.818134003,
+            "intensityBiasKt": -50.818134003,
+            "pressureAbsHpa": 53.245026809,
+            "pressureBiasHpa": 53.245026809
+          },
+          "persistence": {
+            "trackKm": 346.242376056,
+            "alongTrackKm": -175.472081203,
+            "crossTrackKm": -298.493990755,
+            "intensityAbsKt": 65,
+            "intensityBiasKt": -65,
+            "pressureAbsHpa": 57,
+            "pressureBiasHpa": 57
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "2007-06-05T03:00:00.000Z",
+          "model": {
+            "trackKm": 96.78008956,
+            "alongTrackKm": 80.085345887,
+            "crossTrackKm": -54.339499756,
+            "intensityAbsKt": 41.999105194,
+            "intensityBiasKt": -41.999105194,
+            "pressureAbsHpa": 55.213157816,
+            "pressureBiasHpa": 55.213157816
+          },
+          "persistence": {
+            "trackKm": 765.201166733,
+            "alongTrackKm": -557.198248609,
+            "crossTrackKm": -524.622606544,
+            "intensityAbsKt": 67,
+            "intensityBiasKt": -67,
+            "pressureAbsHpa": 66,
+            "pressureBiasHpa": 66
+          }
+        },
+        {
+          "leadH": 72,
+          "observedIso": "2007-06-06T03:00:00.000Z",
+          "model": {
+            "trackKm": 42.02386125,
+            "alongTrackKm": 35.076101921,
+            "crossTrackKm": -23.144644456,
+            "intensityAbsKt": 11.26976764,
+            "intensityBiasKt": -11.26976764,
+            "pressureAbsHpa": 15.147254332,
+            "pressureBiasHpa": 15.147254332
+          },
+          "persistence": {
+            "trackKm": 1115.401341078,
+            "alongTrackKm": -456.813988365,
+            "crossTrackKm": -1018.056791202,
+            "intensityAbsKt": 27,
+            "intensityBiasKt": -27,
+            "pressureAbsHpa": 20,
+            "pressureBiasHpa": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": "as2007",
+      "label": "arabian sea system jun 2007",
+      "partition": "development",
+      "score": {
+        "startIso": "2007-06-25T06:00:00Z",
+        "endIso": "2007-06-26T12:15:00.000Z",
+        "trackSamples": 10,
+        "intensitySamples": 10,
+        "pressureSamples": 10,
+        "trackMaeKm": 42.928937319,
+        "trackRmseKm": 50.701175331,
+        "intensityMaeKt": 5.932804597,
+        "intensityBiasKt": -5.054205028,
+        "pressureMaeHpa": 8.687300472,
+        "peakBiasKt": -3.331117539
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2007-06-25T18:00:00.000Z",
+          "model": {
+            "trackKm": 16.38087816,
+            "alongTrackKm": -15.560419705,
+            "crossTrackKm": 5.119266209,
+            "intensityAbsKt": 3.267704896,
+            "intensityBiasKt": -3.267704896,
+            "pressureAbsHpa": 8.107907461,
+            "pressureBiasHpa": 8.107907461
+          },
+          "persistence": {
+            "trackKm": 34.936855167,
+            "alongTrackKm": -32.160269433,
+            "crossTrackKm": 13.64927981,
+            "intensityAbsKt": 10,
+            "intensityBiasKt": -10,
+            "pressureAbsHpa": 3,
+            "pressureBiasHpa": 3
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "2007-06-26T06:00:00.000Z",
+          "model": {
+            "trackKm": 53.256363726,
+            "alongTrackKm": -46.999425539,
+            "crossTrackKm": 25.046040196,
+            "intensityAbsKt": 7.651369153,
+            "intensityBiasKt": -7.651369153,
+            "pressureAbsHpa": 11.639667134,
+            "pressureBiasHpa": 11.639667134
+          },
+          "persistence": {
+            "trackKm": 80.473061195,
+            "alongTrackKm": -80.01305438,
+            "crossTrackKm": 8.595004036,
+            "intensityAbsKt": 15,
+            "intensityBiasKt": -15,
+            "pressureAbsHpa": 7,
+            "pressureBiasHpa": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "phet2010",
+      "label": "phet 2010",
+      "partition": "development",
+      "score": {
+        "startIso": "2010-06-01T06:00:00Z",
+        "endIso": "2010-06-05T05:45:00.000Z",
+        "trackSamples": 31,
+        "intensitySamples": 31,
+        "pressureSamples": 31,
+        "trackMaeKm": 104.120599553,
+        "trackRmseKm": 117.882159633,
+        "intensityMaeKt": 28.115849582,
+        "intensityBiasKt": -28.115849582,
+        "pressureMaeHpa": 27.037305459,
+        "peakBiasKt": -43.799569312
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2010-06-01T18:00:00.000Z",
+          "model": {
+            "trackKm": 68.779358007,
+            "alongTrackKm": 4.593333619,
+            "crossTrackKm": -68.625872734,
+            "intensityAbsKt": 11.469080647,
+            "intensityBiasKt": -11.469080647,
+            "pressureAbsHpa": 15.54462996,
+            "pressureBiasHpa": 15.54462996
+          },
+          "persistence": {
+            "trackKm": 54.287868959,
+            "alongTrackKm": -17.300529772,
+            "crossTrackKm": -51.457492913,
+            "intensityAbsKt": 20,
+            "intensityBiasKt": -20,
+            "pressureAbsHpa": 15,
+            "pressureBiasHpa": 15
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "2010-06-02T06:00:00.000Z",
+          "model": {
+            "trackKm": 77.209901207,
+            "alongTrackKm": 34.641525205,
+            "crossTrackKm": -69.00250975,
+            "intensityAbsKt": 43.886676766,
+            "intensityBiasKt": -43.886676766,
+            "pressureAbsHpa": 38.762844147,
+            "pressureBiasHpa": 38.762844147
+          },
+          "persistence": {
+            "trackKm": 116.753086277,
+            "alongTrackKm": 17.142241014,
+            "crossTrackKm": -115.488304962,
+            "intensityAbsKt": 60,
+            "intensityBiasKt": -60,
+            "pressureAbsHpa": 45,
+            "pressureBiasHpa": 45
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "2010-06-03T06:00:00.000Z",
+          "model": {
+            "trackKm": 141.407764325,
+            "alongTrackKm": 141.271101162,
+            "crossTrackKm": 6.217746114,
+            "intensityAbsKt": 34.021508203,
+            "intensityBiasKt": -34.021508203,
+            "pressureAbsHpa": 32.12246488,
+            "pressureBiasHpa": 32.12246488
+          },
+          "persistence": {
+            "trackKm": 220.417568345,
+            "alongTrackKm": 219.542430264,
+            "crossTrackKm": 19.625068051,
+            "intensityAbsKt": 60,
+            "intensityBiasKt": -60,
+            "pressureAbsHpa": 45,
+            "pressureBiasHpa": 45
+          }
+        },
+        {
+          "leadH": 72,
+          "observedIso": "2010-06-04T06:00:00.000Z",
+          "model": {
+            "trackKm": 68.723088757,
+            "alongTrackKm": 30.692978381,
+            "crossTrackKm": -61.488378852,
+            "intensityAbsKt": 31.840316972,
+            "intensityBiasKt": -31.840316972,
+            "pressureAbsHpa": 30.034361945,
+            "pressureBiasHpa": 30.034361945
+          },
+          "persistence": {
+            "trackKm": 199.768089812,
+            "alongTrackKm": 88.400441308,
+            "crossTrackKm": 179.148312016,
+            "intensityAbsKt": 20,
+            "intensityBiasKt": -20,
+            "pressureAbsHpa": 15,
+            "pressureBiasHpa": 15
+          }
+        }
+      ]
+    },
+    {
+      "id": "keila2011",
+      "label": "keila 2011",
+      "partition": "development",
+      "score": {
+        "startIso": "2011-11-02T00:00:00Z",
+        "endIso": "2011-11-03T02:15:00.000Z",
+        "trackSamples": 8,
+        "intensitySamples": 8,
+        "pressureSamples": 8,
+        "trackMaeKm": 30.340345743,
+        "trackRmseKm": 33.189425648,
+        "intensityMaeKt": 8.983771769,
+        "intensityBiasKt": -8.983771769,
+        "pressureMaeHpa": 9.246522682,
+        "peakBiasKt": -12.270631697
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2011-11-02T12:00:00.000Z",
+          "model": {
+            "trackKm": 36.601661365,
+            "alongTrackKm": -36.550436185,
+            "crossTrackKm": -1.936451094,
+            "intensityAbsKt": 2.390300895,
+            "intensityBiasKt": -2.390300895,
+            "pressureAbsHpa": 5.419941982,
+            "pressureBiasHpa": 5.419941982
+          },
+          "persistence": {
+            "trackKm": 39.649958151,
+            "alongTrackKm": -20.885826553,
+            "crossTrackKm": 33.7031879,
+            "intensityAbsKt": 5,
+            "intensityBiasKt": -5,
+            "pressureAbsHpa": 3,
+            "pressureBiasHpa": 3
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "2011-11-03T00:00:00.000Z",
+          "model": {
+            "trackKm": 50.75113464,
+            "alongTrackKm": 37.878732124,
+            "crossTrackKm": 33.776955753,
+            "intensityAbsKt": 26.332864267,
+            "intensityBiasKt": -26.332864267,
+            "pressureAbsHpa": 20.098885365,
+            "pressureBiasHpa": 20.098885365
+          },
+          "persistence": {
+            "trackKm": 57.925778247,
+            "alongTrackKm": -21.066196332,
+            "crossTrackKm": 53.959436719,
+            "intensityAbsKt": 15,
+            "intensityBiasKt": -15,
+            "pressureAbsHpa": 11,
+            "pressureBiasHpa": 11
+          }
+        }
+      ]
+    },
+    {
+      "id": "nanauk2014",
+      "label": "nanauk 2014",
+      "partition": "development",
+      "score": {
+        "startIso": "2014-06-10T15:00:00Z",
+        "endIso": "2014-06-14T05:00:00.000Z",
+        "trackSamples": 28,
+        "intensitySamples": 28,
+        "pressureSamples": 28,
+        "trackMaeKm": 118.686911173,
+        "trackRmseKm": 134.436935101,
+        "intensityMaeKt": 27.311708276,
+        "intensityBiasKt": 27.129246144,
+        "pressureMaeHpa": 16.834905193,
+        "peakBiasKt": 24.164731143
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2014-06-11T03:00:00.000Z",
+          "model": {
+            "trackKm": 43.83534927,
+            "alongTrackKm": 7.76165509,
+            "crossTrackKm": 43.142782209,
+            "intensityAbsKt": 1.140419318,
+            "intensityBiasKt": 1.140419318,
+            "pressureAbsHpa": 3.820456157,
+            "pressureBiasHpa": 3.820456157
+          },
+          "persistence": {
+            "trackKm": 54.305541301,
+            "alongTrackKm": 54.259066354,
+            "crossTrackKm": 2.248423572,
+            "intensityAbsKt": 7,
+            "intensityBiasKt": -7,
+            "pressureAbsHpa": 5,
+            "pressureBiasHpa": 5
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "2014-06-11T15:00:00.000Z",
+          "model": {
+            "trackKm": 86.485575786,
+            "alongTrackKm": -54.681287986,
+            "crossTrackKm": -67.005630048,
+            "intensityAbsKt": 8.201121455,
+            "intensityBiasKt": 8.201121455,
+            "pressureAbsHpa": 1.21979347,
+            "pressureBiasHpa": 1.21979347
+          },
+          "persistence": {
+            "trackKm": 63.708953271,
+            "alongTrackKm": 63.183627622,
+            "crossTrackKm": -8.165509979,
+            "intensityAbsKt": 7,
+            "intensityBiasKt": -7,
+            "pressureAbsHpa": 5,
+            "pressureBiasHpa": 5
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "2014-06-12T15:00:00.000Z",
+          "model": {
+            "trackKm": 90.550853038,
+            "alongTrackKm": 56.88461562,
+            "crossTrackKm": 70.453204797,
+            "intensityAbsKt": 38.274847335,
+            "intensityBiasKt": 38.274847335,
+            "pressureAbsHpa": 23.569101493,
+            "pressureBiasHpa": -23.569101493
+          },
+          "persistence": {
+            "trackKm": 138.306057319,
+            "alongTrackKm": 76.677704306,
+            "crossTrackKm": 115.105770553,
+            "intensityAbsKt": 10,
+            "intensityBiasKt": 10,
+            "pressureAbsHpa": 8,
+            "pressureBiasHpa": -8
+          }
+        },
+        {
+          "leadH": 72,
+          "observedIso": "2014-06-13T15:00:00.000Z",
+          "model": {
+            "trackKm": 188.808233797,
+            "alongTrackKm": -169.500425786,
+            "crossTrackKm": -83.181027861,
+            "intensityAbsKt": 54.542321593,
+            "intensityBiasKt": 54.542321593,
+            "pressureAbsHpa": 35.96285999,
+            "pressureBiasHpa": -35.96285999
+          },
+          "persistence": {
+            "trackKm": 387.460415591,
+            "alongTrackKm": -365.327413533,
+            "crossTrackKm": 129.111774516,
+            "intensityAbsKt": 28,
+            "intensityBiasKt": 28,
+            "pressureAbsHpa": 20,
+            "pressureBiasHpa": -20
+          }
+        }
+      ]
+    },
+    {
+      "id": "nilofar2014",
+      "label": "nilofar 2014",
+      "partition": "development",
+      "score": {
+        "startIso": "2014-10-28T09:00:00Z",
+        "endIso": "2014-10-30T14:00:00.000Z",
+        "trackSamples": 17,
+        "intensitySamples": 17,
+        "pressureSamples": 17,
+        "trackMaeKm": 40.065620752,
+        "trackRmseKm": 50.148078463,
+        "intensityMaeKt": 6.478619304,
+        "intensityBiasKt": -1.059431167,
+        "pressureMaeHpa": 6.907635676,
+        "peakBiasKt": -6.830707883
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2014-10-28T21:00:00.000Z",
+          "model": {
+            "trackKm": 19.469379058,
+            "alongTrackKm": 19.447466673,
+            "crossTrackKm": -0.923721758,
+            "intensityAbsKt": 6.66932483,
+            "intensityBiasKt": -6.66932483,
+            "pressureAbsHpa": 8.574298788,
+            "pressureBiasHpa": 8.574298788
+          },
+          "persistence": {
+            "trackKm": 64.787213554,
+            "alongTrackKm": 11.085975698,
+            "crossTrackKm": -63.831768343,
+            "intensityAbsKt": 2,
+            "intensityBiasKt": -2,
+            "pressureAbsHpa": 2,
+            "pressureBiasHpa": 2
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "2014-10-29T09:00:00.000Z",
+          "model": {
+            "trackKm": 70.424264236,
+            "alongTrackKm": -67.095758691,
+            "crossTrackKm": 21.395197139,
+            "intensityAbsKt": 0.686740454,
+            "intensityBiasKt": -0.686740454,
+            "pressureAbsHpa": 4.864701695,
+            "pressureBiasHpa": 4.864701695
+          },
+          "persistence": {
+            "trackKm": 118.934994994,
+            "alongTrackKm": 112.601417412,
+            "crossTrackKm": 38.296122112,
+            "intensityAbsKt": 20,
+            "intensityBiasKt": 20,
+            "pressureAbsHpa": 15,
+            "pressureBiasHpa": -15
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "2014-10-30T09:00:00.000Z",
+          "model": {
+            "trackKm": 89.713062078,
+            "alongTrackKm": 31.154444375,
+            "crossTrackKm": 84.129950466,
+            "intensityAbsKt": 2.240380689,
+            "intensityBiasKt": 2.240380689,
+            "pressureAbsHpa": 3.26473716,
+            "pressureBiasHpa": 3.26473716
+          },
+          "persistence": {
+            "trackKm": 333.229643368,
+            "alongTrackKm": -17.985883294,
+            "crossTrackKm": 332.74765905,
+            "intensityAbsKt": 60,
+            "intensityBiasKt": 60,
+            "pressureAbsHpa": 44,
+            "pressureBiasHpa": -44
+          }
+        }
+      ]
+    },
+    {
+      "id": "ashobaa2015",
+      "label": "ashobaa 2015",
+      "partition": "development",
+      "score": {
+        "startIso": "2015-06-07T12:00:00Z",
+        "endIso": "2015-06-12T06:00:00.000Z",
+        "trackSamples": 38,
+        "intensitySamples": 38,
+        "pressureSamples": 38,
+        "trackMaeKm": 53.987403213,
+        "trackRmseKm": 59.578525246,
+        "intensityMaeKt": 18.469842465,
+        "intensityBiasKt": 18.469842465,
+        "pressureMaeHpa": 7.903192285,
+        "peakBiasKt": 28.084334
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2015-06-08T00:00:00.000Z",
+          "model": {
+            "trackKm": 26.413668321,
+            "alongTrackKm": 7.538318481,
+            "crossTrackKm": -25.315145046,
+            "intensityAbsKt": 8.900997953,
+            "intensityBiasKt": 8.900997953,
+            "pressureAbsHpa": 0.041453145,
+            "pressureBiasHpa": 0.041453145
+          },
+          "persistence": {
+            "trackKm": 95.851380016,
+            "alongTrackKm": -82.765635138,
+            "crossTrackKm": -48.346349809,
+            "intensityAbsKt": 0,
+            "intensityBiasKt": 0,
+            "pressureAbsHpa": 0,
+            "pressureBiasHpa": 0
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "2015-06-08T12:00:00.000Z",
+          "model": {
+            "trackKm": 68.568456149,
+            "alongTrackKm": 68.276432797,
+            "crossTrackKm": -6.322924799,
+            "intensityAbsKt": 13.475069269,
+            "intensityBiasKt": 13.475069269,
+            "pressureAbsHpa": 2.838887889,
+            "pressureBiasHpa": -2.838887889
+          },
+          "persistence": {
+            "trackKm": 247.55251963,
+            "alongTrackKm": -55.747909346,
+            "crossTrackKm": -241.197830189,
+            "intensityAbsKt": 5,
+            "intensityBiasKt": -5,
+            "pressureAbsHpa": 4,
+            "pressureBiasHpa": 4
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "2015-06-09T12:00:00.000Z",
+          "model": {
+            "trackKm": 54.428603302,
+            "alongTrackKm": 24.175887667,
+            "crossTrackKm": -48.764781311,
+            "intensityAbsKt": 22.407541338,
+            "intensityBiasKt": 22.407541338,
+            "pressureAbsHpa": 8.726566887,
+            "pressureBiasHpa": -8.726566887
+          },
+          "persistence": {
+            "trackKm": 557.554173712,
+            "alongTrackKm": -431.682592466,
+            "crossTrackKm": -352.954402342,
+            "intensityAbsKt": 10,
+            "intensityBiasKt": -10,
+            "pressureAbsHpa": 8,
+            "pressureBiasHpa": 8
+          }
+        },
+        {
+          "leadH": 72,
+          "observedIso": "2015-06-10T12:00:00.000Z",
+          "model": {
+            "trackKm": 60.93765819,
+            "alongTrackKm": 55.801581618,
+            "crossTrackKm": -24.486685499,
+            "intensityAbsKt": 30.68585812,
+            "intensityBiasKt": 30.68585812,
+            "pressureAbsHpa": 17.294070896,
+            "pressureBiasHpa": -17.294070896
+          },
+          "persistence": {
+            "trackKm": 926.62688873,
+            "alongTrackKm": -830.622355992,
+            "crossTrackKm": 411.551050427,
+            "intensityAbsKt": 10,
+            "intensityBiasKt": -10,
+            "pressureAbsHpa": 8,
+            "pressureBiasHpa": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "mekunu2018",
+      "label": "mekunu 2018",
+      "partition": "development",
+      "score": {
+        "startIso": "2018-05-25T12:00:00Z",
+        "endIso": "2018-05-26T07:00:00.000Z",
+        "trackSamples": 6,
+        "intensitySamples": 6,
+        "pressureSamples": 6,
+        "trackMaeKm": 25.130649239,
+        "trackRmseKm": 32.791192831,
+        "intensityMaeKt": 22.479112506,
+        "intensityBiasKt": -22.479112506,
+        "pressureMaeHpa": 17.775290938,
+        "peakBiasKt": -0.057236041
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2018-05-26T00:00:00.000Z",
+          "model": {
+            "trackKm": 29.066045381,
+            "alongTrackKm": -29.054459514,
+            "crossTrackKm": 0.821433542,
+            "intensityAbsKt": 28.641534601,
+            "intensityBiasKt": -28.641534601,
+            "pressureAbsHpa": 23.295093547,
+            "pressureBiasHpa": 23.295093547
+          },
+          "persistence": {
+            "trackKm": 62.437263099,
+            "alongTrackKm": 7.314790756,
+            "crossTrackKm": -62.007423575,
+            "intensityAbsKt": 15,
+            "intensityBiasKt": 15,
+            "pressureAbsHpa": 15,
+            "pressureBiasHpa": -15
+          }
+        }
+      ]
+    },
+    {
+      "id": "vayu2019",
+      "label": "vayu 2019",
+      "partition": "development",
+      "score": {
+        "startIso": "2019-06-13T21:00:00Z",
+        "endIso": "2019-06-16T09:30:00.000Z",
+        "trackSamples": 20,
+        "intensitySamples": 20,
+        "pressureSamples": 20,
+        "trackMaeKm": 53.852377509,
+        "trackRmseKm": 63.984071636,
+        "intensityMaeKt": 18.62522836,
+        "intensityBiasKt": 9.975134974,
+        "pressureMaeHpa": 11.379929608,
+        "peakBiasKt": 7.886030326
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2019-06-14T09:00:00.000Z",
+          "model": {
+            "trackKm": 87.8317502,
+            "alongTrackKm": 65.118462817,
+            "crossTrackKm": -58.940909889,
+            "intensityAbsKt": 17.512154104,
+            "intensityBiasKt": 17.512154104,
+            "pressureAbsHpa": 9.606680706,
+            "pressureBiasHpa": -9.606680706
+          },
+          "persistence": {
+            "trackKm": 91.281490913,
+            "alongTrackKm": -5.9778318,
+            "crossTrackKm": -91.085910567,
+            "intensityAbsKt": 15,
+            "intensityBiasKt": 15,
+            "pressureAbsHpa": 11,
+            "pressureBiasHpa": -11
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "2019-06-14T21:00:00.000Z",
+          "model": {
+            "trackKm": 19.348202342,
+            "alongTrackKm": -19.159113729,
+            "crossTrackKm": 2.698487413,
+            "intensityAbsKt": 24.685129001,
+            "intensityBiasKt": 24.685129001,
+            "pressureAbsHpa": 14.88999438,
+            "pressureBiasHpa": -14.88999438
+          },
+          "persistence": {
+            "trackKm": 151.672960057,
+            "alongTrackKm": 36.731494246,
+            "crossTrackKm": -147.159120212,
+            "intensityAbsKt": 20,
+            "intensityBiasKt": 20,
+            "pressureAbsHpa": 15,
+            "pressureBiasHpa": -15
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "2019-06-15T21:00:00.000Z",
+          "model": {
+            "trackKm": 17.428086389,
+            "alongTrackKm": -2.920296603,
+            "crossTrackKm": 17.181689794,
+            "intensityAbsKt": 2.088999241,
+            "intensityBiasKt": 2.088999241,
+            "pressureAbsHpa": 0.001945877,
+            "pressureBiasHpa": 0.001945877
+          },
+          "persistence": {
+            "trackKm": 197.41014191,
+            "alongTrackKm": 54.83337133,
+            "crossTrackKm": -189.642136188,
+            "intensityAbsKt": 30,
+            "intensityBiasKt": 30,
+            "pressureAbsHpa": 23,
+            "pressureBiasHpa": -23
+          }
+        }
+      ]
+    },
+    {
+      "id": "hikaa2019",
+      "label": "hikaa 2019",
+      "partition": "development",
+      "score": {
+        "startIso": "2019-09-22T12:00:00Z",
+        "endIso": "2019-09-24T22:30:00.000Z",
+        "trackSamples": 19,
+        "intensitySamples": 19,
+        "pressureSamples": 19,
+        "trackMaeKm": 69.980795362,
+        "trackRmseKm": 77.722824419,
+        "intensityMaeKt": 19.671151263,
+        "intensityBiasKt": -19.206769128,
+        "pressureMaeHpa": 10.089572203,
+        "peakBiasKt": -35.306168122
+      },
+      "leadTimes": [
+        {
+          "leadH": 12,
+          "observedIso": "2019-09-23T00:00:00.000Z",
+          "model": {
+            "trackKm": 55.001742502,
+            "alongTrackKm": 32.444637098,
+            "crossTrackKm": -44.413378744,
+            "intensityAbsKt": 7.907297685,
+            "intensityBiasKt": -7.907297685,
+            "pressureAbsHpa": 2.430351877,
+            "pressureBiasHpa": 2.430351877
+          },
+          "persistence": {
+            "trackKm": 121.820844205,
+            "alongTrackKm": -60.715315338,
+            "crossTrackKm": -105.612896382,
+            "intensityAbsKt": 15,
+            "intensityBiasKt": -15,
+            "pressureAbsHpa": 4,
+            "pressureBiasHpa": 4
+          }
+        },
+        {
+          "leadH": 24,
+          "observedIso": "2019-09-23T12:00:00.000Z",
+          "model": {
+            "trackKm": 33.851819526,
+            "alongTrackKm": 24.197398455,
+            "crossTrackKm": 23.673490311,
+            "intensityAbsKt": 20.63721388,
+            "intensityBiasKt": -20.63721388,
+            "pressureAbsHpa": 8.305535677,
+            "pressureBiasHpa": 8.305535677
+          },
+          "persistence": {
+            "trackKm": 236.922893293,
+            "alongTrackKm": -131.339629761,
+            "crossTrackKm": -197.191570349,
+            "intensityAbsKt": 35,
+            "intensityBiasKt": -35,
+            "pressureAbsHpa": 15,
+            "pressureBiasHpa": 15
+          }
+        },
+        {
+          "leadH": 48,
+          "observedIso": "2019-09-24T12:00:00.000Z",
+          "model": {
+            "trackKm": 115.095931364,
+            "alongTrackKm": -110.510962734,
+            "crossTrackKm": -32.164046476,
+            "intensityAbsKt": 20.510755449,
+            "intensityBiasKt": -20.510755449,
+            "pressureAbsHpa": 10.530049488,
+            "pressureBiasHpa": 10.530049488
+          },
+          "persistence": {
+            "trackKm": 523.74259482,
+            "alongTrackKm": -388.49174912,
+            "crossTrackKm": -351.338304172,
+            "intensityAbsKt": 40,
+            "intensityBiasKt": -40,
+            "pressureAbsHpa": 20,
+            "pressureBiasHpa": 20
+          }
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "development": {
+      "storms": 18,
+      "trackMaeKm": 83.120935287,
+      "intensityMaeKt": 15.043911312,
+      "intensityBiasKt": -0.865005991,
+      "pressureMaeHpa": 14.295577285,
+      "peakAbsBiasKt": 17.110202994,
+      "objective": 0.833241862
+    }
+  },
+  "leadTimes": {
+    "development": [
+      {
+        "leadH": 12,
+        "model": {
+          "samples": 18,
+          "intensitySamples": 18,
+          "pressureSamples": 10,
+          "trackMaeKm": 61.290920333,
+          "trackMedianKm": 50.941685386,
+          "alongTrackMaeKm": 35.742676465,
+          "alongTrackBiasKm": -6.984485124,
+          "crossTrackMaeKm": 39.790676204,
+          "crossTrackBiasKm": -6.275460718,
+          "intensityMaeKt": 8.118522572,
+          "intensityBiasKt": -2.84729743,
+          "pressureMaeHpa": 9.471052884,
+          "pressureBiasHpa": 7.549716743,
+          "trackMaeCi95": {
+            "low": 43.689454644,
+            "high": 84.890548322
+          },
+          "intensityMaeCi95": {
+            "low": 5.248608262,
+            "high": 11.704117269
+          },
+          "pressureMaeCi95": {
+            "low": 5.502136602,
+            "high": 14.162425872
+          }
+        },
+        "persistence": {
+          "samples": 18,
+          "intensitySamples": 18,
+          "pressureSamples": 10,
+          "trackMaeKm": 77.500487425,
+          "trackMedianKm": 63.612238327,
+          "alongTrackMaeKm": 38.056801094,
+          "alongTrackBiasKm": -15.841785596,
+          "crossTrackMaeKm": 60.782538208,
+          "crossTrackBiasKm": -23.011770783,
+          "intensityMaeKt": 8.277777778,
+          "intensityBiasKt": -4.944444444,
+          "pressureMaeHpa": 7.3,
+          "pressureBiasHpa": 2.1,
+          "trackMaeCi95": {
+            "low": 58.109757163,
+            "high": 99.605592082
+          },
+          "intensityMaeCi95": {
+            "low": 5.388888889,
+            "high": 11.388888889
+          },
+          "pressureMaeCi95": {
+            "low": 3.9975,
+            "high": 11.0025
+          }
+        },
+        "trackFrequencySuperior": 0.722222222,
+        "intensityFrequencySuperior": 0.555555556,
+        "pressureFrequencySuperior": 0.3,
+        "trackMaeSkillFraction": 0.209154389,
+        "intensityMaeSkillFraction": 0.019238884,
+        "pressureMaeSkillFraction": -0.297404505,
+        "trackDifferenceCi95": {
+          "low": -33.714547623,
+          "high": 1.623941338
+        },
+        "intensityDifferenceCi95": {
+          "low": -3.122186527,
+          "high": 2.886076361
+        },
+        "pressureDifferenceCi95": {
+          "low": 0.212651566,
+          "high": 4.309464807
+        }
+      },
+      {
+        "leadH": 24,
+        "model": {
+          "samples": 14,
+          "intensitySamples": 14,
+          "pressureSamples": 9,
+          "trackMaeKm": 90.918863819,
+          "trackMedianKm": 73.817082722,
+          "alongTrackMaeKm": 68.277441579,
+          "alongTrackBiasKm": -4.554796412,
+          "crossTrackMaeKm": 46.491647331,
+          "crossTrackBiasKm": -14.623304864,
+          "intensityMaeKt": 17.317968701,
+          "intensityBiasKt": -5.253670265,
+          "pressureMaeHpa": 17.31837073,
+          "pressureBiasHpa": 13.378619114,
+          "trackMaeCi95": {
+            "low": 61.839833999,
+            "high": 126.16425179
+          },
+          "intensityMaeCi95": {
+            "low": 10.410101868,
+            "high": 25.349666685
+          },
+          "pressureMaeCi95": {
+            "low": 7.574581801,
+            "high": 29.053496362
+          }
+        },
+        "persistence": {
+          "samples": 14,
+          "intensitySamples": 14,
+          "pressureSamples": 9,
+          "trackMaeKm": 160.04611585,
+          "trackMedianKm": 135.303977525,
+          "alongTrackMaeKm": 81.800107144,
+          "alongTrackBiasKm": -18.967804104,
+          "crossTrackMaeKm": 122.881621626,
+          "crossTrackBiasKm": -80.550353628,
+          "intensityMaeKt": 20.857142857,
+          "intensityBiasKt": -12.285714286,
+          "pressureMaeHpa": 19.333333333,
+          "pressureBiasHpa": 12.666666667,
+          "trackMaeCi95": {
+            "low": 117.018052662,
+            "high": 208.116233793
+          },
+          "intensityMaeCi95": {
+            "low": 11.783928571,
+            "high": 31.428571429
+          },
+          "pressureMaeCi95": {
+            "low": 8.888888889,
+            "high": 31.116666667
+          }
+        },
+        "trackFrequencySuperior": 0.785714286,
+        "intensityFrequencySuperior": 0.571428571,
+        "pressureFrequencySuperior": 0.777777778,
+        "trackMaeSkillFraction": 0.431920835,
+        "intensityMaeSkillFraction": 0.169686432,
+        "pressureMaeSkillFraction": 0.104222204,
+        "trackDifferenceCi95": {
+          "low": -127.179604475,
+          "high": -8.605216937
+        },
+        "intensityDifferenceCi95": {
+          "low": -9.662026498,
+          "high": 2.811031128
+        },
+        "pressureDifferenceCi95": {
+          "low": -5.400228813,
+          "high": 1.906115266
+        }
+      },
+      {
+        "leadH": 48,
+        "model": {
+          "samples": 10,
+          "intensitySamples": 10,
+          "pressureSamples": 7,
+          "trackMaeKm": 100.930061672,
+          "trackMedianKm": 93.665471299,
+          "alongTrackMaeKm": 76.208087979,
+          "alongTrackBiasKm": 49.002859992,
+          "crossTrackMaeKm": 48.414089628,
+          "crossTrackBiasKm": -12.817571394,
+          "intensityMaeKt": 24.174610352,
+          "intensityBiasKt": 4.150240826,
+          "pressureMaeHpa": 19.061146228,
+          "pressureBiasHpa": 9.833812406,
+          "trackMaeCi95": {
+            "low": 72.188297444,
+            "high": 129.534151664
+          },
+          "intensityMaeCi95": {
+            "low": 13.804375879,
+            "high": 33.535660911
+          },
+          "pressureMaeCi95": {
+            "low": 7.051297706,
+            "high": 34.087559424
+          }
+        },
+        "persistence": {
+          "samples": 10,
+          "intensitySamples": 10,
+          "pressureSamples": 7,
+          "trackMaeKm": 466.51176142,
+          "trackMedianKm": 506.980576817,
+          "alongTrackMaeKm": 300.060451263,
+          "alongTrackBiasKm": -154.286729078,
+          "crossTrackMaeKm": 331.55809841,
+          "crossTrackBiasKm": -64.088456705,
+          "intensityMaeKt": 32.2,
+          "intensityBiasKt": -3.2,
+          "pressureMaeHpa": 30.571428571,
+          "pressureBiasHpa": 9.142857143,
+          "trackMaeCi95": {
+            "low": 331.597264181,
+            "high": 604.232010741
+          },
+          "intensityMaeCi95": {
+            "low": 18.5,
+            "high": 46.505
+          },
+          "pressureMaeCi95": {
+            "low": 16.282142857,
+            "high": 46.571428571
+          }
+        },
+        "trackFrequencySuperior": 1,
+        "intensityFrequencySuperior": 0.6,
+        "pressureFrequencySuperior": 0.714285714,
+        "trackMaeSkillFraction": 0.783649481,
+        "intensityMaeSkillFraction": 0.249235703,
+        "pressureMaeSkillFraction": 0.376504563,
+        "trackDifferenceCi95": {
+          "low": -492.015369048,
+          "high": -233.621618585
+        },
+        "intensityDifferenceCi95": {
+          "low": -25.249360127,
+          "high": 9.705908788
+        },
+        "pressureDifferenceCi95": {
+          "low": -24.020236152,
+          "high": 0.110205705
+        }
+      },
+      {
+        "leadH": 72,
+        "model": {
+          "samples": 5,
+          "intensitySamples": 5,
+          "pressureSamples": 4,
+          "trackMaeKm": 91.102119901,
+          "trackMedianKm": 68.723088757,
+          "alongTrackMaeKm": 67.845453771,
+          "alongTrackBiasKm": -19.217189003,
+          "crossTrackMaeKm": 54.842299812,
+          "crossTrackBiasKm": -54.842299812,
+          "intensityMaeKt": 28.828179333,
+          "intensityBiasKt": 11.584145488,
+          "pressureMaeHpa": 24.609636791,
+          "pressureBiasHpa": -2.018828652,
+          "trackMaeCi95": {
+            "low": 54.929225528,
+            "high": 144.476023418
+          },
+          "intensityMaeCi95": {
+            "low": 16.966131616,
+            "high": 42.253982818
+          },
+          "pressureMaeCi95": {
+            "low": 16.220662614,
+            "high": 32.998610968
+          }
+        },
+        "persistence": {
+          "samples": 5,
+          "intensitySamples": 5,
+          "pressureSamples": 4,
+          "trackMaeKm": 742.352212178,
+          "trackMedianKm": 926.62688873,
+          "alongTrackMaeKm": 564.645782171,
+          "alongTrackBiasKm": -96.459720985,
+          "crossTrackMaeKm": 356.874351506,
+          "crossTrackBiasKm": -68.949896722,
+          "intensityMaeKt": 22,
+          "intensityBiasKt": -0.8,
+          "pressureMaeHpa": 15.75,
+          "pressureBiasHpa": 5.75,
+          "trackMaeCi95": {
+            "low": 413.853802141,
+            "high": 1064.487644449
+          },
+          "intensityMaeCi95": {
+            "low": 15.6,
+            "high": 27
+          },
+          "pressureMaeCi95": {
+            "low": 11,
+            "high": 20
+          }
+        },
+        "trackFrequencySuperior": 1,
+        "intensityFrequencySuperior": 0.4,
+        "pressureFrequencySuperior": 0.25,
+        "trackMaeSkillFraction": 0.877279116,
+        "intensityMaeSkillFraction": -0.310371788,
+        "pressureMaeSkillFraction": -0.562516622,
+        "trackDifferenceCi95": {
+          "low": -997.483465306,
+          "high": -305.016719247
+        },
+        "intensityDifferenceCi95": {
+          "low": -7.602976614,
+          "high": 20.700195049
+        },
+        "pressureDifferenceCi95": {
+          "low": 0.119031235,
+          "high": 15.498610968
+        }
+      }
+    ]
+  }
+}

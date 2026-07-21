@@ -1,0 +1,276 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "calibration/hf2a-ocean-reference.mjs",
+  "candidateParameters": {
+    "bulkRichardsonCritical": 0.55,
+    "momentumDampingInertialPeriods": 1,
+    "thermalRecoveryHours": 120
+  },
+  "partitionFilter": "validation",
+  "protocol": {
+    "forcing": "observed IBTrACS/JTWC track and wind, 15-minute interpolation",
+    "purpose": "ocean-only validation; coupled forecast errors are scored separately",
+    "baseline": "HF-2A retained conservative upper-ocean columns on a wake-free satellite background",
+    "aggregation": "pixels to one score per storm, then equal-storm partition mean",
+    "evaluationLeadsAfterLocalPassageH": [
+      24,
+      48
+    ],
+    "parameterSelectionPartition": "development",
+    "acceptancePartition": "validation",
+    "reportOnlyPartition": "test"
+  },
+  "manifests": {
+    "catalog": {
+      "path": "calibration/fidelity-catalog.json",
+      "sha256": "cb3aa9bee125bef248c2eac4c3f9037f62c85a4619ddc5a8b8110501677eb7cc"
+    },
+    "tracks": {
+      "path": "calibration/data/fidelity-tracks.json",
+      "sha256": "6d0e10c88a436cf9e2777fe168eee8c6c163b1ec8934f921218ef67cafbacf30"
+    },
+    "scenarios": {
+      "path": "calibration/data/fidelity-scenarios.json",
+      "sha256": "86e2aa4b35cd2d79ab6bdcacf4f202cc37b8cc8620d0775d959c4688f654a4e7"
+    },
+    "observations": {
+      "path": "calibration/data/hf2a-ocean-observations.json",
+      "sha256": "1d2047aa2d6779b0e689bded14e7726dbbeda01c5fd3f8861f21ef8066f5221e"
+    },
+    "observationBinary": {
+      "path": "calibration/data/hf2a-ocean-observations.bin",
+      "sha256": "afedaecda0ae849df100819bd0ce37a2997d75137b8ebd066310f766ef5f1648"
+    },
+    "terrain": {
+      "path": "public/data/terrain.bin",
+      "sha256": "a350399d3ce4960313f92e58f4f08d04b9c76ca6a7c35319d27443f3344ae262"
+    },
+    "oceanProfiles": {
+      "path": "public/data/ocean.bin",
+      "sha256": "0811050864a24374e1cc7ed0e1d8519a85ec9e72505d1f9af28a6abca3498434"
+    },
+    "environments": [
+      {
+        "id": "mukda2006",
+        "path": "calibration/data/fidelity/env_mukda2006.bin",
+        "sha256": "09e7ef840309ab0b23a89b0e4c69a627142df0e444c2ac420363ec6b316e8788"
+      },
+      {
+        "id": "kyarr2019",
+        "path": "public/data/env_kyarr.bin",
+        "sha256": "eeb33d7896d9094068ca1686e550d2582ad9b82a48f686a6678516e0485c40d3"
+      },
+      {
+        "id": "shaheen2021",
+        "path": "public/data/env_shaheen.bin",
+        "sha256": "eb6784ea089f51f70113f51215a16c93d7dade11ea5692612e6cfd7d59c0e5ef"
+      },
+      {
+        "id": "biparjoy2023",
+        "path": "public/data/env_biparjoy.bin",
+        "sha256": "d82bb389381f6a5799fd67d86dda000c9222fa613cbede4ce320d48983043363"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "mukda2006",
+      "label": "mukda 2006",
+      "partition": "validation",
+      "pixels": 3759,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 3759,
+          "deltaSstMaeC": 0.428974,
+          "deltaSstBiasC": -0.11603,
+          "observedMeanCoolingC": 0.357506,
+          "predictedMeanCoolingC": 0.344695,
+          "meanCoolingAbsErrorC": 0.012811,
+          "observedPeakCoolingP95C": 1.01,
+          "predictedPeakCoolingP95C": 1.157996,
+          "peakCoolingAbsErrorC": 0.147996
+        },
+        {
+          "leadH": 48,
+          "pixels": 3759,
+          "deltaSstMaeC": 0.383024,
+          "deltaSstBiasC": 0.04732,
+          "observedMeanCoolingC": 0.458867,
+          "predictedMeanCoolingC": 0.328846,
+          "meanCoolingAbsErrorC": 0.13002,
+          "observedPeakCoolingP95C": 1.320501,
+          "predictedPeakCoolingP95C": 1.182185,
+          "peakCoolingAbsErrorC": 0.138317
+        }
+      ]
+    },
+    {
+      "id": "kyarr2019",
+      "label": "kyarr 2019",
+      "partition": "validation",
+      "pixels": 7980,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 7980,
+          "deltaSstMaeC": 0.433485,
+          "deltaSstBiasC": -0.067892,
+          "observedMeanCoolingC": 0.86982,
+          "predictedMeanCoolingC": 0.932111,
+          "meanCoolingAbsErrorC": 0.062291,
+          "observedPeakCoolingP95C": 1.690001,
+          "predictedPeakCoolingP95C": 2.591385,
+          "peakCoolingAbsErrorC": 0.901384
+        },
+        {
+          "leadH": 48,
+          "pixels": 7980,
+          "deltaSstMaeC": 0.422964,
+          "deltaSstBiasC": 0.109962,
+          "observedMeanCoolingC": 1.022276,
+          "predictedMeanCoolingC": 0.906381,
+          "meanCoolingAbsErrorC": 0.115895,
+          "observedPeakCoolingP95C": 2.34,
+          "predictedPeakCoolingP95C": 2.537843,
+          "peakCoolingAbsErrorC": 0.197843
+        }
+      ]
+    },
+    {
+      "id": "shaheen2021",
+      "label": "shaheen 2021",
+      "partition": "validation",
+      "pixels": 4929,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 4929,
+          "deltaSstMaeC": 1.219601,
+          "deltaSstBiasC": -1.125473,
+          "observedMeanCoolingC": 0.389747,
+          "predictedMeanCoolingC": 1.484775,
+          "meanCoolingAbsErrorC": 1.095028,
+          "observedPeakCoolingP95C": 1.15,
+          "predictedPeakCoolingP95C": 4.935962,
+          "peakCoolingAbsErrorC": 3.785963
+        },
+        {
+          "leadH": 48,
+          "pixels": 4929,
+          "deltaSstMaeC": 0.899678,
+          "deltaSstBiasC": -0.743342,
+          "observedMeanCoolingC": 0.678881,
+          "predictedMeanCoolingC": 1.39751,
+          "meanCoolingAbsErrorC": 0.718628,
+          "observedPeakCoolingP95C": 1.84,
+          "predictedPeakCoolingP95C": 4.558446,
+          "peakCoolingAbsErrorC": 2.718446
+        }
+      ]
+    },
+    {
+      "id": "biparjoy2023",
+      "label": "biparjoy 2023",
+      "partition": "validation",
+      "pixels": 5304,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 5304,
+          "deltaSstMaeC": 0.957174,
+          "deltaSstBiasC": -0.46192,
+          "observedMeanCoolingC": 0.934178,
+          "predictedMeanCoolingC": 1.394995,
+          "meanCoolingAbsErrorC": 0.460817,
+          "observedPeakCoolingP95C": 1.59,
+          "predictedPeakCoolingP95C": 3.896649,
+          "peakCoolingAbsErrorC": 2.306649
+        },
+        {
+          "leadH": 48,
+          "pixels": 5304,
+          "deltaSstMaeC": 0.917684,
+          "deltaSstBiasC": -0.130871,
+          "observedMeanCoolingC": 1.281591,
+          "predictedMeanCoolingC": 1.410989,
+          "meanCoolingAbsErrorC": 0.129398,
+          "observedPeakCoolingP95C": 2.130001,
+          "predictedPeakCoolingP95C": 3.965206,
+          "peakCoolingAbsErrorC": 1.835205
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "development": {
+      "storms": 0,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        },
+        {
+          "leadH": 48,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        }
+      ]
+    },
+    "validation": {
+      "storms": 4,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 4,
+          "pixels": 21972,
+          "deltaSstMaeC": 0.759809,
+          "deltaSstBiasC": -0.442829,
+          "meanCoolingAbsErrorC": 0.407737,
+          "peakCoolingAbsErrorC": 1.785498
+        },
+        {
+          "leadH": 48,
+          "storms": 4,
+          "pixels": 21972,
+          "deltaSstMaeC": 0.655837,
+          "deltaSstBiasC": -0.179233,
+          "meanCoolingAbsErrorC": 0.273485,
+          "peakCoolingAbsErrorC": 1.222453
+        }
+      ]
+    },
+    "testReportOnly": {
+      "storms": 0,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        },
+        {
+          "leadH": 48,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        }
+      ]
+    }
+  }
+}

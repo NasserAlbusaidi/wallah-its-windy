@@ -26,6 +26,7 @@
 import type {
   EnvSample,
   EnvSampler,
+  PressureWindSampler,
   SimEngine,
   SimEvent,
   SpawnParams,
@@ -40,6 +41,25 @@ import type { Rng } from './rng';
 import { DOMAIN, inBBox, greatCircleKm, offsetKm, windToDegPerHour } from './grid';
 import { cloneStormStructure, deriveStormStructure } from './structure';
 import type { StructureDetail } from './structure';
+import {
+  SparseUpperOcean,
+  type OceanColumnDiagnostics,
+  type UpperOceanParameters,
+} from './upper-ocean';
+import type { OceanProfileSampler } from './ocean-profile-sampler';
+import {
+  sampleVentilationEnvironment,
+  type VentilationDiagnostics,
+} from './ventilation';
+import {
+  sampleCoastalExposure,
+  type CoastalExposure,
+} from './coastal-exposure';
+import {
+  sampleEnvironmentalSteering,
+  sampleTerrainDrift,
+  type EnvironmentalSteering,
+} from './steering';
 
 // ---------------------------------------------------------------------------
 // Tunable constants — the ONE place to tune the model by eye (design: "tunable
@@ -60,9 +80,11 @@ export const SIM = {
 
   // -- Intensity ODE: dV/dt = k*(MPI(SST) - V) - shear - land - dryair --------
   /**
-   * Base relaxation rate toward thermodynamically adjusted MPI. Persistent
-   * organization and OHC multiply this rate nonlinearly, so 0.08 is not itself
-   * a storm-wide e-folding time.
+   * Base relaxation rate toward thermodynamically adjusted MPI. Dynamic ocean
+   * coupling and persistent organization modulate the realized tendency, so
+   * this coefficient is not itself a storm-wide e-folding time. The shipped
+   * sandbox retains its pre-HF-2 value; the rejected HF-2 candidate is exported
+   * separately below so verification can reproduce it without deploying it.
    */
   INTENSIFY_K_PER_H: 0.08,
   /**
@@ -88,7 +110,7 @@ export const SIM = {
    * pins a narrow, multi-plane Cat-1 tail rather than a broad artificial rescue.
    */
   SHEAR_THRESHOLD_MS: 14,
-  /** Weakening per m/s of shear above threshold, kt/h (same recalibration). */
+  /** Shipped weakening above threshold, kt/h per m/s. */
   SHEAR_K_KT_PER_H_PER_MS: 0.45,
   /**
    * Shear penalty ramps in linearly over a young storm's first hours (full
@@ -136,15 +158,6 @@ export const SIM = {
    * integrated over a multi-day life, worth ~2° of NW drift. Tune here.
    */
   BETA_DRIFT_KT: 1.5,
-  /**
-   * Per-tick stochastic steering wander (design step 4 remedy): a mean-reverting
-   * random walk in steering-velocity space (m/s), so identical clicks with
-   * different seeds diverge while same (spawn,month,seed) stays EXACT. Assumes
-   * the fixed 15-min tick cadence of the accumulator loop.
-   */
-  WANDER_STEP_MS: 0.28,
-  WANDER_REVERT: 0.05,
-
   // -- ERA5 humidity / ventilation -------------------------------------------
   /**
    * Nominal dry-air weakening coefficient, kt/h. The live engine multiplies it
@@ -190,13 +203,46 @@ export interface IntensityParameters {
   dryAirK: number;
   organizationRecoveryH: number;
   organizationDisruptionH: number;
-  /** Fraction of potential intensity controlled by upper-ocean support. */
+  /** @deprecated HF-1 replay metadata only; HF-2A never reads this value. */
   ohcMpiWeight: number;
   /** Strength of the organized-core multiplier during intensification. */
   organizationIntensification: number;
 }
 
-/** Deployed coefficients. Calibration compares candidates against this contract. */
+/** Bounded HF-3 motion parameters, calibrated independently of intensity. */
+export interface TrackParameters {
+  /** Blend from legacy centre deep-layer flow (0) to annular level flow (1). */
+  environmentalSteeringBlend: number;
+  /** First-order response time for curved/accelerating motion. */
+  motionResponseHours: number;
+  /** Cosine-tapered pre-advisory motion correction lifetime. */
+  initialMotionBlendHours: number;
+  /** Multiplier on the size/intensity-dependent beta drift. */
+  betaDriftScale: number;
+  /** Maximum explicitly diagnosed coastal terrain correction, m/s. */
+  terrainDriftMaxMs: number;
+  /** Unresolved-motion OU innovation and reversion; disabled in hindcasts. */
+  wanderStepMs: number;
+  wanderRevertFraction: number;
+}
+
+export type PhysicsProfile = 'shipped' | 'hf2-experimental';
+
+/**
+ * Shipped sandbox motion contract. A research phase only replaces this object
+ * after its frozen gate accepts the candidate.
+ */
+export const DEFAULT_TRACK_PARAMETERS: Readonly<TrackParameters> = {
+  environmentalSteeringBlend: 0,
+  motionResponseHours: 0,
+  initialMotionBlendHours: 0,
+  betaDriftScale: 1,
+  terrainDriftMaxMs: 0,
+  wanderStepMs: 0.28,
+  wanderRevertFraction: 0.05,
+};
+
+/** Shipped coefficients. Calibration compares candidates against this contract. */
 export const DEFAULT_INTENSITY_PARAMETERS: Readonly<IntensityParameters> = {
   intensifyKPerH: SIM.INTENSIFY_K_PER_H,
   shearThresholdMs: SIM.SHEAR_THRESHOLD_MS,
@@ -208,12 +254,41 @@ export const DEFAULT_INTENSITY_PARAMETERS: Readonly<IntensityParameters> = {
   organizationIntensification: 0.5,
 };
 
+/**
+ * Frozen HF-2 development candidate. It failed the subsequent validation gate,
+ * so only phase verification may opt into it explicitly.
+ */
+export const HF2_EXPERIMENTAL_INTENSITY_PARAMETERS: Readonly<IntensityParameters> = {
+  ...DEFAULT_INTENSITY_PARAMETERS,
+  intensifyKPerH: 0.055,
+  shearKtPerHPerMs: 0.65,
+  organizationIntensification: 0.05,
+};
+
+/**
+ * Frozen HF-3 development candidate. It failed validation and therefore is not
+ * the simulator default; sealed scientific runs name it explicitly.
+ */
+export const HF3_EXPERIMENTAL_TRACK_PARAMETERS: Readonly<TrackParameters> = {
+  ...DEFAULT_TRACK_PARAMETERS,
+  environmentalSteeringBlend: 0.05,
+  initialMotionBlendHours: 36,
+  betaDriftScale: 0.5,
+  terrainDriftMaxMs: 0.15,
+  wanderStepMs: 0.6,
+  wanderRevertFraction: 0.013192982509869888,
+};
+
 // ---------------------------------------------------------------------------
 // Small pure helpers
 // ---------------------------------------------------------------------------
 
 function clamp01(x: number): number {
   return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
+function clamp(x: number, low: number, high: number): number {
+  return Math.max(low, Math.min(high, x));
 }
 
 /**
@@ -255,8 +330,12 @@ export function shearPenaltyKtPerH(
 }
 
 /** Intensity loss rate over land — kt/h, proportional to current intensity. */
-export function landDecayKtPerH(vKt: number): number {
-  return SIM.LAND_DECAY_PER_H * Math.max(0, vKt);
+export function landDecayKtPerH(vKt: number, roughnessExposure = 1): number {
+  return (
+    SIM.LAND_DECAY_PER_H *
+    Math.max(0, vKt) *
+    clamp01(roughnessExposure)
+  );
 }
 
 /**
@@ -314,8 +393,21 @@ export function dryAirPenaltyKtPerH(
 }
 
 /** Beta-drift steering vector (m/s), directed NW: u west-negative, v north-positive. */
-export function betaDriftMs(): { u: number; v: number } {
-  const speed = SIM.BETA_DRIFT_KT * MS_PER_KT;
+export function betaDriftMs(
+  latitudeDeg = 20,
+  outerSizeKm = 180,
+  maximumWindKt = 70,
+  scale = 1,
+): { u: number; v: number } {
+  const baseSpeed = SIM.BETA_DRIFT_KT * MS_PER_KT;
+  const sizeFactor = clamp(outerSizeKm / 180, 0.65, 1.45);
+  const intensityFactor = 0.78 + 0.22 * clamp01((maximumWindKt - 25) / 80);
+  const latitudeFactor = clamp(Math.cos((latitudeDeg * Math.PI) / 180) / 0.94, 0.82, 1.06);
+  const speed = clamp(
+    baseSpeed * sizeFactor * intensityFactor * latitudeFactor * scale,
+    0,
+    1.45,
+  );
   return { u: -speed * SQRT1_2, v: speed * SQRT1_2 };
 }
 
@@ -335,8 +427,14 @@ export interface IntensityArgs {
   ohcKjCm2?: number;
   /** Persistent convective organization in [0,1]. */
   organization?: number;
+  /** HF-2B vector-aware annular ventilation. */
+  ventilation?: Readonly<VentilationDiagnostics>;
+  /** HF-2C continuous vortex land/terrain exposure. */
+  coastalExposure?: Readonly<CoastalExposure>;
   /** Optional candidate coefficients for calibration/sensitivity work. */
   parameters?: Readonly<IntensityParameters>;
+  /** Pure helpers default to the physical research formulation. */
+  physicsProfile?: PhysicsProfile;
 }
 
 /** The four ODE terms plus their net dV/dt (kt/h). Internal — drives attribution. */
@@ -351,14 +449,22 @@ interface IntensityTerms {
 
 function intensityTerms(a: IntensityArgs): IntensityTerms {
   const parameters = a.parameters ?? DEFAULT_INTENSITY_PARAMETERS;
+  const physical = (a.physicsProfile ?? 'hf2-experimental') === 'hf2-experimental';
   // Over land there is no ocean heat source, so MPI collapses to 0 regardless of
   // whatever SST the sampler returns there — the relaxation term then decays V.
   const organization = clamp01(a.organization ?? 1);
+  const landCoreExposure =
+    a.coastalExposure?.coreLandFraction ?? (a.overLand ? 1 : 0);
   const ohcSupport = clamp01(((a.ohcKjCm2 ?? 70) - 10) / 70);
-  const mpi = a.overLand
-    ? 0
-    : mpiKt(a.sstC) *
-      (1 - parameters.ohcMpiWeight + parameters.ohcMpiWeight * ohcSupport);
+  // HF-2A removes the legacy OHC multiplier because the dynamic column's
+  // surface temperature is already the ocean pathway. The shipped profile
+  // retains it until that candidate passes its scientific gate.
+  const mpi = physical
+    ? mpiKt(a.sstC) * (1 - landCoreExposure)
+    : a.overLand
+      ? 0
+      : mpiKt(a.sstC) *
+        (1 - parameters.ohcMpiWeight + parameters.ohcMpiWeight * ohcSupport);
   const potentialGap = mpi - a.vKt;
   const organizedExcess = clamp01((organization - 0.45) / 0.1);
   const organizationCoupling =
@@ -372,16 +478,27 @@ function intensityTerms(a: IntensityArgs): IntensityTerms {
     potentialGap >= 0
       ? 0.8 + 0.55 * clamp01(((a.ohcKjCm2 ?? 70) - 40) / 35)
       : 1;
-  const coreCoupling = organizationCoupling * oceanDepthCoupling;
+  const coreCoupling =
+    organizationCoupling * (physical ? 1 : oceanDepthCoupling);
   const relax = parameters.intensifyKPerH * potentialGap * coreCoupling;
   const graceRamp = a.ageH === undefined ? 1 : Math.min(1, a.ageH / SIM.SHEAR_GRACE_H);
+  const effectiveShearMs =
+    physical ? (a.ventilation?.shearMs ?? a.shearMs) : a.shearMs;
   const shearPen =
     graceRamp *
-    shearPenaltyKtPerH(a.shearMs, parameters) *
+    shearPenaltyKtPerH(effectiveShearMs, parameters) *
     (1.15 - 0.3 * organization);
-  const landPen = a.overLand ? landDecayKtPerH(a.vKt) : 0;
+  const landPen = physical
+    ? landDecayKtPerH(
+        a.vKt,
+        a.coastalExposure?.roughnessExposure ?? (a.overLand ? 1 : 0),
+      )
+    : a.overLand
+      ? landDecayKtPerH(a.vKt)
+      : 0;
   const dryFraction = clamp01(
-    (SIM.RH_DRY_THRESHOLD_PCT - (a.midlevelRhPct ?? 75)) /
+    (SIM.RH_DRY_THRESHOLD_PCT -
+      (a.ventilation?.meanRhPct ?? a.midlevelRhPct ?? 75)) /
       SIM.RH_DRY_RANGE_PCT,
   );
   // Ambient dry air only reaches the inner core efficiently when shear opens a
@@ -389,14 +506,16 @@ function intensityTerms(a: IntensityArgs): IntensityTerms {
   // monthly-mean free troposphere from unrealistically killing an otherwise
   // vertically aligned cyclone in calm flow.
   const coreExposure = Math.pow(1 - organization, 1.5);
-  const shearExposure = clamp01((a.shearMs - 12) / 8);
+  const shearExposure = clamp01((effectiveShearMs - 12) / 8);
+  const ventilationExposure = physical && a.ventilation
+    ? clamp01(a.ventilation.ventilationIndex / 0.18)
+    : dryFraction * shearExposure;
   const dryPen =
     a.overLand
       ? 0
       : parameters.dryAirK *
-        dryFraction *
-        (0.25 + 1.5 * coreExposure) *
-        shearExposure;
+        ventilationExposure *
+        (0.25 + 1.5 * coreExposure);
   const net = relax - shearPen - landPen - dryPen;
   return { mpi, relax, shearPen, landPen, dryPen, net };
 }
@@ -406,16 +525,36 @@ export function organizationTarget(
   sample: Pick<EnvSample, 'shear' | 'midlevelRhPct' | 'ohcKjCm2'>,
   effectiveSstC: number,
   overLand: boolean,
+  ventilation?: Readonly<VentilationDiagnostics>,
+  coastalExposure?: Readonly<CoastalExposure>,
+  physicsProfile: PhysicsProfile = 'hf2-experimental',
 ): number {
-  if (overLand) return 0.02;
+  if (physicsProfile === 'shipped') {
+    if (overLand) return 0.02;
+    const warmth = clamp01((effectiveSstC - 25.5) / 3.5);
+    const moisture = clamp01((sample.midlevelRhPct - 35) / 45);
+    const oceanDepth = clamp01((sample.ohcKjCm2 - 15) / 65);
+    const shearVentilation = 1 - clamp01((sample.shear - 7) / 23);
+    return clamp01(
+      (0.45 * warmth + 0.25 * moisture + 0.3 * oceanDepth) *
+        shearVentilation,
+    );
+  }
+  if (overLand && !coastalExposure) return 0.02;
   const warmth = clamp01((effectiveSstC - 25.5) / 3.5);
-  const moisture = clamp01((sample.midlevelRhPct - 35) / 45);
-  const oceanDepth = clamp01((sample.ohcKjCm2 - 15) / 65);
-  const shearVentilation = 1 - clamp01((sample.shear - 7) / 23);
-  return clamp01(
-    (0.45 * warmth + 0.25 * moisture + 0.3 * oceanDepth) *
+  const moisture = clamp01(
+    ((ventilation?.meanRhPct ?? sample.midlevelRhPct) - 35) / 45,
+  );
+  const shearVentilation = ventilation
+    ? 1 - clamp01(ventilation.ventilationIndex / 0.18)
+    : 1 - clamp01((sample.shear - 7) / 23);
+  const oceanTarget = clamp01(
+    (0.62 * warmth + 0.38 * moisture) *
       shearVentilation,
   );
+  const landFraction =
+    coastalExposure?.coreLandFraction ?? (overLand ? 1 : 0);
+  return clamp01(oceanTarget * (1 - landFraction) + 0.02 * landFraction);
 }
 
 /** Asymmetric relaxation: cores collapse quickly and rebuild slowly. */
@@ -485,8 +624,22 @@ export interface SimDeps {
   isLand: (lat: number, lon: number) => boolean;
   /** Optional deterministic coefficient override for calibration/ensembles. */
   intensityParameters?: Partial<IntensityParameters>;
+  /** Optional HF-3 motion override for calibration and ensembles. */
+  trackParameters?: Partial<TrackParameters>;
+  /** Rejected research physics must be selected explicitly. */
+  physicsProfile?: PhysicsProfile;
+  /** Vortex-filtered, temporally coherent 850/500/250 hPa sidecar sampler. */
+  pressureWindSampler?: PressureWindSampler;
   /** Skip non-coupled wind-radius inversions for non-rendered ensemble members. */
   structureDetail?: StructureDetail;
+  /** Optional bounded HF-2A ocean parameters for calibration. */
+  upperOceanParameters?: Partial<UpperOceanParameters>;
+  /** Analysis/test injection seam; normal runtime constructs its own model. */
+  upperOcean?: SparseUpperOcean;
+  /** Immutable WOA/analysis T/S profile initialization. */
+  oceanProfileSampler?: OceanProfileSampler;
+  /** Optional terrain elevation sampler used by continuous coastal decay. */
+  terrainHeightM?: (lat: number, lon: number) => number;
 }
 
 export function createSimEngine(deps: SimDeps): SimEngine {
@@ -495,9 +648,14 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     ...DEFAULT_INTENSITY_PARAMETERS,
     ...deps.intensityParameters,
   };
+  const trackParameters: TrackParameters = {
+    ...DEFAULT_TRACK_PARAMETERS,
+    ...deps.trackParameters,
+  };
+  const physicsProfile = deps.physicsProfile ?? 'shipped';
   const structureDetail = deps.structureDetail ?? 'full';
-  const beta = betaDriftMs();
-
+  const upperOcean =
+    deps.upperOcean ?? new SparseUpperOcean(deps.upperOceanParameters);
   // --- Mutable run state (all reset by spawn) ------------------------------
   let current: StormState | null = null;
   let track: TrackPoint[] = [];
@@ -508,6 +666,10 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   let tFracHorizonH: number = SIM.EVENT_TFRAC_HORIZON_H;
   let tFracOffsetH = 0;
   let stochasticWander = true;
+  let resolvedMotionUms = 0;
+  let resolvedMotionVms = 0;
+  let initialMotionCorrectionUms = 0;
+  let initialMotionCorrectionVms = 0;
 
   let lat = 0;
   let lon = 0;
@@ -517,6 +679,7 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   let organization = 0.3;
   let organizationTargetValue = 0.3;
   let coldWakeC = 0;
+  let oceanDiagnostics: OceanColumnDiagnostics | null = null;
   let diagnostics: StormDiagnostics = {
     sstC: 0,
     effectiveSstC: 0,
@@ -555,15 +718,6 @@ export function createSimEngine(deps: SimDeps): SimEngine {
   let pu = 0;
   let pv = 0;
 
-  interface WakePatch {
-    lat: number;
-    lon: number;
-    coolingC: number;
-    radiusKm: number;
-    ageH: number;
-  }
-  let wakePatches: WakePatch[] = [];
-
   // death attribution — EMAs of each decay channel's recent contribution
   let recentCold = 0;
   let recentShear = 0;
@@ -592,16 +746,77 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     return e;
   }
 
-  /** Instantaneous storm motion at a point (steering + beta + seeded wander). */
-  function motionAt(
+  interface MotionBudget {
+    u: number;
+    v: number;
+    steering: EnvironmentalSteering;
+    beta: { u: number; v: number };
+    terrain: { u: number; v: number };
+  }
+  let lastMotionBudget: MotionBudget | null = null;
+
+  /** Diagnosed motion target at one point before finite response-time smoothing. */
+  function motionTargetAt(
     atLat: number,
     atLon: number,
     tFrac: number,
-  ): { u: number; v: number; dLat: number; dLon: number } {
+  ): MotionBudget {
     const e = sampleEnv(atLat, atLon, tFrac);
-    const u = e.steerU + beta.u + pu; // m/s eastward
-    const v = e.steerV + beta.v + pv; // m/s northward
-    return { u, v, ...windToDegPerHour(u, v, atLat) };
+    const steering = sampleEnvironmentalSteering(
+      env,
+      deps.pressureWindSampler,
+      atLat,
+      atLon,
+      monthIndex,
+      tFrac,
+      vKt,
+      organization,
+      structure.outerSizeKm,
+    );
+    const blend = clamp(trackParameters.environmentalSteeringBlend, 0, 1);
+    const environmentalU = e.steerU + (steering.u - e.steerU) * blend;
+    const environmentalV = e.steerV + (steering.v - e.steerV) * blend;
+    const beta = physicsProfile === 'shipped'
+      ? {
+          u: -SIM.BETA_DRIFT_KT * MS_PER_KT * SQRT1_2,
+          v: SIM.BETA_DRIFT_KT * MS_PER_KT * SQRT1_2,
+        }
+      : betaDriftMs(
+          atLat,
+          structure.outerSizeKm,
+          vKt,
+          trackParameters.betaDriftScale,
+        );
+    const terrain = sampleTerrainDrift(
+      atLat,
+      atLon,
+      structure.outerSizeKm,
+      isLand,
+      deps.terrainHeightM,
+      trackParameters.terrainDriftMaxMs,
+    );
+    const correctionHours = Math.max(0, trackParameters.initialMotionBlendHours);
+    const correctionWeight =
+      correctionHours > 0 && ageH < correctionHours
+        ? 0.5 * (1 + Math.cos((Math.PI * ageH) / correctionHours))
+        : 0;
+    return {
+      u:
+        environmentalU +
+        beta.u +
+        terrain.u +
+        pu +
+        initialMotionCorrectionUms * correctionWeight,
+      v:
+        environmentalV +
+        beta.v +
+        terrain.v +
+        pv +
+        initialMotionCorrectionVms * correctionWeight,
+      steering,
+      beta,
+      terrain,
+    };
   }
 
   function snapshot(): StormState {
@@ -622,25 +837,71 @@ export function createSimEngine(deps: SimDeps): SimEngine {
 
   function updateDiagnostics(
     sample: EnvSample,
-    effectiveSstC: number,
+    ocean: OceanColumnDiagnostics,
+    ventilation: VentilationDiagnostics,
+    coastalExposure: CoastalExposure,
+    coupledSstC: number,
     overLand: boolean,
     terms: IntensityTerms,
   ): void {
     const rain = precipitationRates(vKt, organization, sample.midlevelRhPct);
     diagnostics = {
-      sstC: sample.sstC,
-      effectiveSstC,
+      sstC: ocean.backgroundSstC,
+      effectiveSstC: ocean.surfaceSstC,
       midlevelRhPct: sample.midlevelRhPct,
-      ohcKjCm2: sample.ohcKjCm2,
+      ohcKjCm2: ocean.ohcKjCm2,
       organization,
       organizationTarget: organizationTargetValue,
       coldWakeC,
+      oceanInitializationTier: ocean.initializationTier,
+      oceanSourceValidTime: ocean.sourceValidTime,
+      oceanCoupledSstC: coupledSstC,
+      oceanMixedLayerDepthM: ocean.mixedLayerDepthM,
+      oceanIsotherm26DepthM: ocean.isotherm26DepthM,
+      oceanTemperatureBelowMixedLayerC: ocean.temperatureBelowMixedLayerC,
+      oceanCurrentSpeedMs: ocean.mixedLayerCurrentSpeedMs,
+      oceanCurrentDirectionDeg: ocean.mixedLayerCurrentDirectionDeg,
+      oceanInertialPeriodH: ocean.inertialPeriodH,
+      oceanWindStressPa: ocean.windStressPa,
+      oceanBulkRichardson: ocean.bulkRichardson,
+      oceanEntrainmentDepthM: ocean.entrainmentDepthM,
+      oceanHeatMovedThisStepJm2: ocean.heatMovedThisStepJm2,
+      oceanCumulativeMixingHeatJm2: ocean.cumulativeMixingHeatJm2,
+      oceanCumulativeRecoveryHeatJm2: ocean.cumulativeRecoveryHeatJm2,
+      oceanActiveColumnCount: ocean.activeColumnCount,
+      oceanHardBoundFlag: ocean.hardBoundFlag,
+      oceanMissingSourceFlag: ocean.missingSourceFlag,
       mpiKt: terms.mpi,
       steerU: sample.steerU,
       steerV: sample.steerV,
+      steering850Weight: lastMotionBudget?.steering.weights.w850,
+      steering500Weight: lastMotionBudget?.steering.weights.w500,
+      steering250Weight: lastMotionBudget?.steering.weights.w250,
+      environmentalSteeringUms: lastMotionBudget?.steering.u,
+      environmentalSteeringVms: lastMotionBudget?.steering.v,
+      betaDriftUms: lastMotionBudget?.beta.u,
+      betaDriftVms: lastMotionBudget?.beta.v,
+      terrainDriftUms: lastMotionBudget?.terrain.u,
+      terrainDriftVms: lastMotionBudget?.terrain.v,
+      resolvedMotionUms,
+      resolvedMotionVms,
+      steeringAnnulusRadiusKm: lastMotionBudget?.steering.annulusRadiusKm,
+      steeringPressureLevelsAvailable:
+        lastMotionBudget?.steering.pressureLevelsAvailable,
       shearMs: sample.shear,
       shearUms: sample.shearU,
       shearVms: sample.shearV,
+      ventilationIndex: ventilation.ventilationIndex,
+      ventilationAnnulusRadiusKm: ventilation.annulusRadiusKm,
+      ventilationMeanRhPct: ventilation.meanRhPct,
+      ventilationUpshearRhPct: ventilation.upshearRhPct,
+      ventilationShearUms: ventilation.shearUms,
+      ventilationShearVms: ventilation.shearVms,
+      ventilationShearCoherence: ventilation.shearVectorCoherence,
+      coastalCoreLandFraction: coastalExposure.coreLandFraction,
+      coastalOuterLandFraction: coastalExposure.outerLandFraction,
+      coastalMeanLandElevationM: coastalExposure.meanLandElevationM,
+      coastalRoughnessExposure: coastalExposure.roughnessExposure,
       overLand,
       oceanKtPerH: terms.relax,
       shearKtPerH: terms.shearPen,
@@ -652,91 +913,6 @@ export function createSimEngine(deps: SimDeps): SimEngine {
       orographicRainMmH: rain.orographicMmH,
       totalRainMmH: rain.totalMmH,
     };
-  }
-
-  function decayWake(dtH: number): void {
-    const decay = Math.exp(-dtH / SIM.COLD_WAKE_RECOVERY_H);
-    for (const patch of wakePatches) {
-      patch.coolingC *= decay;
-      patch.ageH += dtH;
-    }
-    wakePatches = wakePatches.filter(
-      (patch) =>
-        patch.ageH <= SIM.COLD_WAKE_MAX_AGE_H && patch.coolingC >= 1e-9,
-    );
-  }
-
-  function sampleWake(atLat: number, atLon: number): number {
-    let cooling = 0;
-    for (const patch of wakePatches) {
-      const distance = greatCircleKm(
-        { lat: atLat, lon: atLon },
-        { lat: patch.lat, lon: patch.lon },
-      );
-      const sigma = Math.max(20, patch.radiusKm * 0.5);
-      cooling +=
-        patch.coolingC *
-        Math.exp(-(distance * distance) / (2 * sigma * sigma));
-    }
-    return Math.min(SIM.COLD_WAKE_MAX_C, Math.max(0, cooling));
-  }
-
-  function depositWake(
-    atLat: number,
-    atLon: number,
-    sample: EnvSample,
-    motionSpeedMs: number,
-    radiusKm: number,
-    dtH: number,
-  ): void {
-    if (isLand(atLat, atLon) || vKt < 25) return;
-    const intensity = clamp01((vKt - 20) / 90);
-    const shallowOcean = Math.max(
-      0.35,
-      Math.min(2, 50 / Math.max(10, sample.ohcKjCm2)),
-    );
-    const stagnation = Math.max(
-      0.35,
-      Math.min(2, 5 / Math.max(1, motionSpeedMs + 0.5)),
-    );
-    const added =
-      SIM.COLD_WAKE_K_C_PER_H *
-      intensity *
-      intensity *
-      shallowOcean *
-      stagnation *
-      dtH;
-    if (added <= 0) return;
-
-    let nearest: WakePatch | null = null;
-    let nearestKm = Infinity;
-    for (const patch of wakePatches) {
-      const distance = greatCircleKm(
-        { lat: atLat, lon: atLon },
-        { lat: patch.lat, lon: patch.lon },
-      );
-      if (distance < nearestKm) {
-        nearest = patch;
-        nearestKm = distance;
-      }
-    }
-    const mergeRadiusKm = Math.max(15, radiusKm * 0.2);
-    if (nearest && nearestKm <= mergeRadiusKm) {
-      nearest.coolingC = Math.min(
-        SIM.COLD_WAKE_MAX_C,
-        nearest.coolingC + added,
-      );
-      nearest.radiusKm = Math.max(nearest.radiusKm, radiusKm);
-      nearest.ageH = 0;
-    } else {
-      wakePatches.push({
-        lat: atLat,
-        lon: atLon,
-        coolingC: added,
-        radiusKm: Math.max(45, radiusKm),
-        ageH: 0,
-      });
-    }
   }
 
   function recordTrackPoint(): void {
@@ -801,7 +977,15 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     alive = true;
     pu = 0;
     pv = 0;
-    wakePatches = [];
+    resolvedMotionUms = 0;
+    resolvedMotionVms = 0;
+    initialMotionCorrectionUms = 0;
+    initialMotionCorrectionVms = 0;
+    organization =
+      params.initialOrganization !== undefined &&
+      Number.isFinite(params.initialOrganization)
+        ? clamp01(params.initialOrganization)
+        : clamp01(0.35 + 0.35 * clamp01((vKt - 20) / 80));
     coldWakeC = 0;
     recentCold = 0;
     recentShear = 0;
@@ -812,11 +996,130 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     rising = false;
     prevOverLand = isLand(lat, lon);
     const initialTFrac = clamp01(tFracOffsetH / tFracHorizonH);
+    const samplingMode = (
+      env as EnvSampler & { getSamplingMode?: () => { kind: string } }
+    ).getSamplingMode?.();
+    upperOcean.reset((oceanLat, oceanLon) => {
+      const sample = sampleEnv(oceanLat, oceanLon, initialTFrac);
+      return {
+        sstC: sample.sstC,
+        ohcKjCm2: sample.ohcKjCm2,
+        initializationTier:
+          samplingMode?.kind === 'event-timeline'
+            ? 'event-analysis'
+            : 'climatological-subsurface',
+        profile:
+          deps.oceanProfileSampler?.(oceanLat, oceanLon, monthIndex) ?? undefined,
+      };
+    });
     const initialEnv = sampleEnv(lat, lon, initialTFrac);
+    oceanDiagnostics = upperOcean.sample(lat, lon, ageH);
+    coldWakeC = oceanDiagnostics.coolingC;
+    const initialMotion = motionTargetAt(lat, lon, initialTFrac);
+    initialMotionCorrectionUms =
+      params.initialMotionUms !== undefined &&
+      Number.isFinite(params.initialMotionUms)
+        ? params.initialMotionUms - initialMotion.u
+        : 0;
+    initialMotionCorrectionVms =
+      params.initialMotionVms !== undefined &&
+      Number.isFinite(params.initialMotionVms)
+        ? params.initialMotionVms - initialMotion.v
+        : 0;
+    resolvedMotionUms =
+      params.initialMotionUms !== undefined &&
+      Number.isFinite(params.initialMotionUms)
+        ? params.initialMotionUms
+        : initialMotion.u;
+    resolvedMotionVms =
+      params.initialMotionVms !== undefined &&
+      Number.isFinite(params.initialMotionVms)
+        ? params.initialMotionVms
+        : initialMotion.v;
+    lastMotionBudget = initialMotion;
+    const preliminaryStructure = deriveStormStructure(
+      {
+        vKt,
+        lat,
+        lon,
+        shearMs: initialEnv.shear,
+        shearUms: initialEnv.shearU,
+        shearVms: initialEnv.shearV,
+        overLand: prevOverLand,
+        motionUms: resolvedMotionUms,
+        motionVms: resolvedMotionVms,
+        previousRmwKm: params.initialRmwKm,
+        previousOuterSizeKm: params.initialOuterSizeKm,
+        rmwSource:
+          params.initialRmwKm === undefined
+            ? 'climatological-prior'
+            : 'agency-observed',
+        outerSizeSource:
+          params.initialOuterSizeKm === undefined
+            ? 'climatological-prior'
+            : 'agency-observed',
+        initialR34Km: params.initialR34Km,
+        initialR50Km: params.initialR50Km,
+        initialR64Km: params.initialR64Km,
+        deltaHours: 0,
+      },
+      undefined,
+      structureDetail,
+    );
+    const initialCoastalExposure = sampleCoastalExposure(
+      lat,
+      lon,
+      preliminaryStructure.rmwKm,
+      preliminaryStructure.outerSizeKm,
+      isLand,
+      deps.terrainHeightM,
+    );
+    const initialVentilation = sampleVentilationEnvironment(
+      env,
+      lat,
+      lon,
+      monthIndex,
+      initialTFrac,
+      preliminaryStructure.outerSizeKm,
+      mpiKt(oceanDiagnostics.surfaceSstC),
+    );
+    structure = deriveStormStructure(
+      {
+        vKt,
+        lat,
+        lon,
+        shearMs: initialVentilation.shearMs,
+        shearUms: initialVentilation.shearUms,
+        shearVms: initialVentilation.shearVms,
+        overLand: prevOverLand,
+        landExposureFraction: initialCoastalExposure.roughnessExposure,
+        motionUms: resolvedMotionUms,
+        motionVms: resolvedMotionVms,
+        previousRmwKm: params.initialRmwKm,
+        previousOuterSizeKm: params.initialOuterSizeKm,
+        rmwSource:
+          params.initialRmwKm === undefined
+            ? 'climatological-prior'
+            : 'agency-observed',
+        outerSizeSource:
+          params.initialOuterSizeKm === undefined
+            ? 'climatological-prior'
+            : 'agency-observed',
+        initialR34Km: params.initialR34Km,
+        initialR50Km: params.initialR50Km,
+        initialR64Km: params.initialR64Km,
+        deltaHours: 0,
+      },
+      undefined,
+      structureDetail,
+    );
     organizationTargetValue = organizationTarget(
       initialEnv,
-      initialEnv.sstC,
+      oceanDiagnostics.surfaceSstC,
       prevOverLand,
+      initialVentilation,
+      initialCoastalExposure,
+      physicsProfile,
     );
     organization =
       params.initialOrganization !== undefined &&
@@ -829,34 +1132,29 @@ export function createSimEngine(deps: SimDeps): SimEngine {
           );
     const initialTerms = intensityTerms({
       vKt,
-      sstC: initialEnv.sstC,
+      sstC: oceanDiagnostics.surfaceSstC,
       shearMs: initialEnv.shear,
       midlevelRhPct: initialEnv.midlevelRhPct,
-      ohcKjCm2: initialEnv.ohcKjCm2,
+      ohcKjCm2: oceanDiagnostics.ohcKjCm2,
       organization,
+      ventilation: initialVentilation,
+      coastalExposure: initialCoastalExposure,
       parameters: intensityParameters,
+      physicsProfile,
       overLand: prevOverLand,
       lat,
       lon,
       monthIndex,
       ageH,
     });
-    updateDiagnostics(initialEnv, initialEnv.sstC, prevOverLand, initialTerms);
-    const initialMotion = motionAt(lat, lon, initialTFrac);
-    structure = deriveStormStructure(
-      {
-        vKt,
-        lat,
-        lon,
-        shearMs: initialEnv.shear,
-        shearUms: initialEnv.shearU,
-        shearVms: initialEnv.shearV,
-        overLand: prevOverLand,
-        motionUms: initialMotion.u,
-        motionVms: initialMotion.v,
-      },
-      undefined,
-      structureDetail,
+    updateDiagnostics(
+      initialEnv,
+      oceanDiagnostics,
+      initialVentilation,
+      initialCoastalExposure,
+      oceanDiagnostics.surfaceSstC,
+      prevOverLand,
+      initialTerms,
     );
     closestKm = greatCircleKm(MUSCAT, { lat, lon });
 
@@ -877,24 +1175,46 @@ export function createSimEngine(deps: SimDeps): SimEngine {
 
     const dtH = dtMin / 60;
     const tFrac = clamp01((ageH + tFracOffsetH) / tFracHorizonH);
+    const previousLat = lat;
+    const previousLon = lon;
+    const previousStructure = cloneStormStructure(structure);
+    const coupledOcean = upperOcean.sample(lat, lon, ageH);
+    const coupledSstC = coupledOcean.surfaceSstC;
 
     // 1) Advance the wander ONCE per tick (2 draws) — used for both RK2 stages.
     if (stochasticWander) {
       pu +=
-        (rng.next() * 2 - 1) * SIM.WANDER_STEP_MS -
-        pu * SIM.WANDER_REVERT;
+        (rng.next() * 2 - 1) * trackParameters.wanderStepMs -
+        pu * trackParameters.wanderRevertFraction;
       pv +=
-        (rng.next() * 2 - 1) * SIM.WANDER_STEP_MS -
-        pv * SIM.WANDER_REVERT;
+        (rng.next() * 2 - 1) * trackParameters.wanderStepMs -
+        pv * trackParameters.wanderRevertFraction;
     }
 
-    // 2) RK2 (midpoint) position integration, in lat/lon degrees.
-    const k1 = motionAt(lat, lon, tFrac);
-    const k2 = motionAt(
-      lat + (k1.dLat * dtH) / 2,
-      lon + (k1.dLon * dtH) / 2,
-      tFrac,
+    // 2) Curved motion with a finite response time. Environmental targets are
+    // sampled at the RK2 midpoint, while the resolved vortex motion accelerates
+    // smoothly toward that flow instead of changing discontinuously per cell.
+    const responseHours = Math.max(0, trackParameters.motionResponseHours);
+    const response = responseHours <= 1e-9 ? 1 : 1 - Math.exp(-dtH / responseHours);
+    const target1 = motionTargetAt(lat, lon, tFrac);
+    const provisionalU = resolvedMotionUms + (target1.u - resolvedMotionUms) * response;
+    const provisionalV = resolvedMotionVms + (target1.v - resolvedMotionVms) * response;
+    const provisionalDegrees = windToDegPerHour(
+      (resolvedMotionUms + provisionalU) / 2,
+      (resolvedMotionVms + provisionalV) / 2,
+      lat,
     );
+    const midpointLat = lat + (provisionalDegrees.dLat * dtH) / 2;
+    const midpointLon = lon + (provisionalDegrees.dLon * dtH) / 2;
+    const target2 = motionTargetAt(midpointLat, midpointLon, tFrac);
+    resolvedMotionUms += (target2.u - resolvedMotionUms) * response;
+    resolvedMotionVms += (target2.v - resolvedMotionVms) * response;
+    lastMotionBudget = target2;
+    const k2 = {
+      u: resolvedMotionUms,
+      v: resolvedMotionVms,
+      ...windToDegPerHour(resolvedMotionUms, resolvedMotionVms, midpointLat),
+    };
     lat = guardFinite(lat + k2.dLat * dtH, 'lat');
     lon = guardFinite(lon + k2.dLon * dtH, 'lon');
     ageH = guardFinite(ageH + dtH, 'ageH');
@@ -902,13 +1222,32 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     // 3) Intensity ODE at the new position.
     const e = sampleEnv(lat, lon, tFrac);
     const overLand = isLand(lat, lon);
-    decayWake(dtH);
-    coldWakeC = overLand ? 0 : sampleWake(lat, lon);
-    const effectiveSstC = e.sstC - coldWakeC;
+    const intensitySstC =
+      physicsProfile === 'hf2-experimental' ? coupledSstC : e.sstC;
+    const ventilation = sampleVentilationEnvironment(
+      env,
+      lat,
+      lon,
+      monthIndex,
+      tFrac,
+      structure.outerSizeKm,
+      mpiKt(coupledSstC),
+    );
+    const coastalExposure = sampleCoastalExposure(
+      lat,
+      lon,
+      structure.rmwKm,
+      structure.outerSizeKm,
+      isLand,
+      deps.terrainHeightM,
+    );
     organizationTargetValue = organizationTarget(
       e,
-      effectiveSstC,
+      intensitySstC,
       overLand,
+      ventilation,
+      coastalExposure,
+      physicsProfile,
     );
     organization = advanceOrganization(
       organization,
@@ -918,12 +1257,15 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     );
     const terms = intensityTerms({
       vKt,
-      sstC: effectiveSstC,
+      sstC: intensitySstC,
       shearMs: e.shear,
       midlevelRhPct: e.midlevelRhPct,
-      ohcKjCm2: e.ohcKjCm2,
+      ohcKjCm2: coupledOcean.ohcKjCm2,
       organization,
+      ventilation,
+      coastalExposure,
       parameters: intensityParameters,
+      physicsProfile,
       overLand,
       lat,
       lon,
@@ -936,28 +1278,43 @@ export function createSimEngine(deps: SimDeps): SimEngine {
         vKt,
         lat,
         lon,
-        shearMs: e.shear,
-        shearUms: e.shearU,
-        shearVms: e.shearV,
+        shearMs: ventilation.shearMs,
+        shearUms: ventilation.shearUms,
+        shearVms: ventilation.shearVms,
         overLand,
+        landExposureFraction: coastalExposure.roughnessExposure,
         motionUms: k2.u,
         motionVms: k2.v,
         previousRmwKm: structure.rmwKm,
         previousOuterSizeKm: structure.outerSizeKm,
+        rmwSource: structure.rmwSource,
+        outerSizeSource: structure.outerSizeSource,
         deltaHours: dtH,
       },
       undefined,
       structureDetail,
     );
-    depositWake(
-      lat,
-      lon,
-      e,
-      Math.hypot(k2.u, k2.v),
-      structure.outerSizeKm,
+    upperOcean.forceSegment(
+      { lat: previousLat, lon: previousLon, structure: previousStructure },
+      { lat, lon, structure },
       dtH,
+      ageH,
+      isLand,
     );
-    updateDiagnostics(e, effectiveSstC, overLand, terms);
+    oceanDiagnostics = upperOcean.sample(lat, lon, ageH);
+    coldWakeC = overLand ? 0 : oceanDiagnostics.coolingC;
+    // Keep the environment timeline's externally observable last sample on the
+    // actual physics time, not on the ocean's frozen initialization snapshot.
+    const currentEnvironment = sampleEnv(lat, lon, tFrac);
+    updateDiagnostics(
+      currentEnvironment,
+      oceanDiagnostics,
+      ventilation,
+      coastalExposure,
+      coupledSstC,
+      overLand,
+      terms,
+    );
 
     // 4) Attribute this tick's weakening to a channel (recent-weighted EMA).
     const coldHere = overLand ? 0 : Math.max(0, -terms.relax);

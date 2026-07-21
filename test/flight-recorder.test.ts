@@ -74,6 +74,24 @@ function meta(
 }
 
 describe('FlightRecorder replay snapshots', () => {
+  it('exposes a stable immutable wind/age series until a new frame lands', () => {
+    const recorder = new FlightRecorder();
+    recorder.start(meta('simulated cyclone'), state(0, 30));
+    const initial = recorder.intensitySeries();
+    expect(initial).toEqual([{ ageH: 0, vKt: 30 }]);
+    expect(recorder.intensitySeries()).toBe(initial);
+
+    recorder.record(state(1, 40), []);
+    const advanced = recorder.intensitySeries();
+    expect(advanced).not.toBe(initial);
+    expect(advanced).toEqual([
+      { ageH: 0, vKt: 30 },
+      { ageH: 1, vKt: 40 },
+    ]);
+    expect(initial).toEqual([{ ageH: 0, vKt: 30 }]);
+    expect(recorder.trackSnapshot().map((point) => point.vKt)).toEqual([30, 40]);
+  });
+
   it('rebuilds a scrubbed storm with only the track recorded up to that frame', () => {
     const recorder = new FlightRecorder();
     recorder.start(

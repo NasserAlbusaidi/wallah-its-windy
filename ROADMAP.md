@@ -22,7 +22,7 @@ Operational decision support remains out of scope until the project has
 institutional data agreements, domain-expert review, continuous prospective
 evaluation, reliability engineering, and formal governance.
 
-## Current baseline — HF-1 complete
+## Current scientific state — HF-1 through HF-6 executed
 
 HF-1 established the measurement system that every later fidelity claim must
 pass:
@@ -43,11 +43,13 @@ persistence on validation.
 | Phase | Status | Outcome |
 | --- | --- | --- |
 | HF-1 | Complete | Frozen observational benchmark and regression gate |
-| HF-2 | Next | Intensity and upper-ocean fidelity |
-| HF-3 | Planned | Stronger track dynamics and baselines |
-| HF-4 | Planned | Calibrated probabilistic forecasts |
-| HF-5 | Planned | Provider-neutral live forecast companion |
-| HF-6 | Planned | Broader, multi-initialization, prospective validation |
+| HF-2 | Complete, rejected | Physics implemented; frozen legacy intensity gates did not all pass |
+| HF-3 | Complete, rejected | Track skill improved; frozen bias/intensity-regression gates did not all pass |
+| HF-4 | Complete, rejected | Ensemble verified; cone overdispersed and 48 h mean Brier skill negative |
+| HF-5 | Infrastructure complete | Provider-neutral boundary and immutable archive pass; scheduled live feed disabled |
+| HF-6 | Implementation complete; sealed result rejected | 72 storms/144 starts audited; 8 storms/16 starts scored once; prospective evidence still open |
+| Product depth | Complete | Probe, cities, names, analog, and sparkline |
+| UX big bet | Selected | Shared-camera pan and zoom |
 
 ## Rules that apply to every phase
 
@@ -68,12 +70,129 @@ persistence on validation.
 - No phase may weaken the current validation gate merely to accept a candidate.
 - Keep the 20 HF-1-only forcing bins outside the browser bundle.
 
+## Near-term product depth
+
+These five features expose information the app already computes. The slice was
+completed on 2026-07-21 with pure calculation tests, full regression coverage,
+and desktop/mobile browser verification.
+
+### Point probe
+
+- Show total surface wind, SST, mid-level RH, shear, and OHC at the cursor.
+- Use hover on pointer devices and long-press on touch devices; pin the card on
+  click/tap so keyboard and touch users can inspect it.
+- Read environmental values through the same `sampleEnvBin` path as physics and
+  compute vortex wind through the same Holland profile as rendering and impact.
+- Include units, valid time, layer provenance, and observed/analysis/simulated
+  labels in the tooltip.
+- Clamp the probe to the active view and event time. Never present climatology
+  fallback as current observed weather.
+
+Acceptance: tooltip values must match direct CPU samples at fixed test points,
+and probing must neither advance nor mutate the simulation.
+
+### City markers
+
+- Draw the eight `IMPACT_CITIES` locations as overlay dots with collision-aware
+  labels.
+- Use the same geographic projection as tracks, ghost labels, and the point
+  probe.
+- Glow a city when the instantaneous parametric wind at that city reaches
+  34 kt; derive the state from the same Holland calculation as the impact
+  report.
+- Let a marker open the city's peak wind, closest approach, and accumulated-rain
+  row from the impact report.
+- Keep labels legible without obscuring the storm center, probe, or forecast
+  cone.
+
+Acceptance: marker exposure state and impact-report values must agree at every
+recorded frame.
+
+### Storm names
+
+- Pin a versioned official IMD naming-list snapshot with source, date, and
+  checksum.
+- Assign a deterministic simulated name from the storm seed so shared URLs keep
+  the same identity.
+- Carry the name through the recorder, comparison, exports, ensemble summary,
+  and shared URL.
+- Prefix or label user-created storms as simulated; a generated name must never
+  imply an official agency designation.
+- Preserve stable names when the upstream list changes by versioning the naming
+  catalogue rather than silently remapping old URLs.
+
+### Historical analog
+
+- Compare a completed simulated track with the historical ghost tracks already
+  shipped in the app.
+- Define and test a deterministic similarity score that normalizes for genesis,
+  duration, and sampling interval while retaining shape and direction.
+- Report the closest match, score, and the dimensions that drove it, such as
+  track shape, landfall sector, or intensity evolution.
+- Label the result as a geometric historical analog, not evidence that the
+  storms share causes, impacts, or future outcomes.
+- For an active storm, compare only the elapsed prefix; never use future
+  simulated points in a live analog claim.
+
+### Intensity sparkline
+
+- Plot wind against simulated age from the immutable flight tape.
+- Mark the current replay position, peak wind, landfall, and category
+  thresholds without resimulating the storm.
+- Keep the strip synchronized with pause, replay, comparison, and exported
+  debrief state.
+- Expose exact age/wind values to pointer, touch, and keyboard inspection.
+
+Acceptance: every plotted point must correspond to a recorded frame, and the
+displayed peak must match the debrief's peak exactly.
+
+## UX big-bet decision — pan and zoom
+
+The roadmap selects **pan/zoom camera** as the next major UX investment. It
+transforms every current layer and interaction without making a new scientific
+claim. Live mode remains in HF-5, where the project can build it on proper data
+ingestion and verification.
+
+### Shared camera contract
+
+- Add one view-bbox/camera state to `grid.ts`; keep the fixed 50–70 E,
+  15–27 N data domain separate from the visible viewport.
+- Route geographic-to-clip and clip-to-geographic conversion through that view
+  for every shader, canvas overlay, city marker, ghost label, track, probe, and
+  spawn gesture.
+- Pass one shared view transform to each shader instead of adding layer-specific
+  camera math.
+- Clamp the camera to the baked domain and define explicit minimum/maximum zoom.
+- Support wheel/trackpad zoom, drag pan, keyboard controls, and pinch gestures.
+- Keep line weights, particles, labels, hit targets, and storm structure
+  readable across the full zoom range.
+- Leave the simulation state and deterministic physics unchanged; the camera is
+  presentation state only.
+
+Acceptance: coordinate round trips remain within tolerance at every supported
+zoom, all layers stay registered during pan/zoom, and screenshots at fixed
+camera states remain deterministic.
+
+### Why live mode waits
+
+A small baker can eventually turn current GFS-style fields into an event bin,
+but a trustworthy live mode also needs source adapters, scheduled acquisition,
+atomic publication, freshness checks, licences, failure handling, forecast-cycle
+identity, and prospective verification. HF-5 owns that complete contract.
+
 ## HF-2 — intensity and upper-ocean fidelity
 
 This is the next priority because intensity, not track, is the present limiting
 factor.
 
 ### HF-2A — dynamic upper ocean
+
+**Specification locked:** the physical state, data tiers, no-double-counting
+rule, diagnostics, parameter bounds, and staged acceptance gates are frozen in
+the [HF-2A dynamic upper-ocean specification](docs/hf2a-dynamic-upper-ocean-spec.md)
+and its [machine-readable contract](calibration/hf2a-contract.json). The
+auth-free NOAA GHRSST surface-ocean observations and clean HF-1 wake reference
+are now generated and pinned; Argo remains a report-only vertical diagnostic.
 
 - Add explicit mixed-layer depth and subsurface thermal-profile state.
 - Replace the static monthly-ocean response with event-specific upper-ocean
@@ -123,6 +242,13 @@ factor.
   is not sufficient.
 - Permanent test remains outside the automated acceptance decision.
 
+**Outcome:** implemented and rejected without changing thresholds. The combined
+candidate improved several development and legacy-validation intensity metrics,
+but the independent ocean-component gate and every required 24/48-hour
+intensity condition did not pass. The exact decision is frozen in
+`calibration/hf2-acceptance.json`; the physical implementation remains available
+for the new HF-6 first look.
+
 ## HF-3 — track dynamics
 
 ### Environmental steering
@@ -156,6 +282,12 @@ factor.
 - Reject track candidates that materially degrade intensity or survival-time
   availability.
 
+**Outcome:** implemented and rejected without changing thresholds. The selected
+candidate beat linear persistence and the development-trained
+climatology/persistence reference at 12/24/48 hours on legacy validation, but
+24-hour combined track bias and the locked intensity-regression limit failed.
+See `calibration/hf3-acceptance.json`.
+
 ## HF-4 — calibrated probabilistic forecasting
 
 The current ensemble perturbation frequencies are useful experiments but are
@@ -182,6 +314,13 @@ not yet calibrated probabilities.
 - Probabilistic scores beat deterministic and climatological references.
 - Define a versioned device matrix and frame-time budget, then keep the
   20/40/80-member modes within it without blocking the main map.
+
+**Outcome:** implemented and rejected. Intensity CRPS beat the deterministic
+member at the required legacy-validation leads and every uncertainty source
+produced nonzero spread, but validation cone coverage was too high, 48-hour mean
+Brier skill was negative, and the representative browser/device matrix is not
+complete. The UI therefore retains **perturbation frequency** language. See
+`calibration/hf4-acceptance.json`.
 
 ## HF-5 — live forecast companion
 
@@ -216,7 +355,34 @@ not yet calibrated probabilities.
 - Describe the product as an experimental forecast companion until prospective
   validation supports a stronger claim.
 
+**Implementation outcome:** complete at the provider boundary, not operational.
+HF-5 now normalizes advisory/grid units and wind periods, rejects stale/partial
+or mixed-cycle inputs, provides provider descriptors and a side-by-side product
+view, and archives issued runs atomically without overwrite. No continuously
+scheduled lawful provider feed is configured, so live output remains disabled.
+See `docs/hf5-live-data-contract.md` and `calibration/hf5-acceptance.json`.
+
 ## HF-6 — broader and prospective validation
+
+**Outcome:** implementation complete; sealed retrospective result rejected;
+prospective evidence awaiting future storms. The outcome-blind catalogue is
+frozen at 72 Arabian Sea storms and 144 initializations. Eight previously
+unseen, USA/JTWC-compatible storms supplied 16 first-look initializations for
+the already frozen HF-2/HF-3 candidates. Observation availability,
+landfall/peak/RI/dissipation/structure outcomes, and all required strata are
+machine-audited.
+
+The first look was recorded without retuning. Track MAE beat linear persistence
+at 12/24/48 hours by 34.4%, 38.6%, and 53.5%, respectively. The intensity and
+pressure candidate did not generalize: 48-hour wind skill was -95.2% and
+48-hour pressure skill was -72.1%; even 24-hour pressure skill was negative.
+The sealed gate is therefore rejected. R50/R64 observations were unavailable in
+the sealed cohort and remain explicitly unscored rather than imputed. The
+prospective registry contains zero matured future forecasts, so this part can
+only accumulate with future storms and supports no prospective skill claim.
+
+Generated evidence lives in `calibration/hf6-acceptance.json` and
+`docs/hf6-scorecard.md`.
 
 - Expand to 60–100 Arabian Sea cases with documented inclusion rules.
 - Add multiple initialization times per storm so results do not depend on one
@@ -236,6 +402,33 @@ not yet calibrated probabilities.
 ## Product and communication roadmap
 
 These features should grow around verified science rather than compete with it.
+
+### Population exposure
+
+- Bake a versioned population raster through the same self-describing binary
+  pipeline as the environmental layers.
+- Compute unique residents intersected by the modeled >=34-kt footprint without
+  double-counting cells across time.
+- State the population source, census/model vintage, raster resolution, and
+  uncertainty beside every estimate.
+- Phrase the result as “estimated residents inside the modeled gale footprint.”
+  It is an exposure overlay, not a casualty, damage, evacuation, or vulnerability
+  model.
+- Validate reprojection, coastal cells, nodata handling, and exposure totals
+  against independent spot checks before showing the feature publicly.
+
+### Automatic ensemble envelope
+
+- Auto-run a 20-member ensemble after a spawn once the input settles; cancel a
+  stale job when the user respawns or changes the environment.
+- Derive a time-indexed percentile envelope from the ensemble worker output and
+  show member tracks only on demand.
+- Label the pre-HF-4 product as a perturbation-frequency envelope, not an
+  official forecast cone or calibrated probability.
+- Replace that label with a calibrated forecast cone only after HF-4 demonstrates
+  out-of-sample coverage and reliability.
+- Keep automatic execution within the versioned device and frame-time budget;
+  fall back to an explicit Run action on devices that miss it.
 
 ### Forecast experience
 
@@ -272,18 +465,46 @@ These features should grow around verified science rather than compete with it.
 - Treat surge and inundation as separate future models with their own data and
   verification; never infer them directly from wind category alone.
 
+## Named avoidances
+
+These boundaries prevent expensive work that weakens the project's focus or
+honesty.
+
+- **No 3D globe.** The fixed 20-by-12-degree Arabian Sea domain gains little
+  from a globe, while a second rendering and interaction stack would consume
+  months.
+- **No hand-wavy storm-surge proxy.** A credible surge model needs bathymetry,
+  tides, coastal geometry, hydrodynamics, boundary conditions, and independent
+  validation. Treat it as a separate future research program or omit it.
+- **No multi-storm simulation.** The engine and interface deliberately model
+  one cyclone. Reworking physics, impact bookkeeping, ensembles, UI, and
+  rendering for simultaneous vortices offers too little value.
+- **No unlabeled live or impact claims.** Population is exposure, ensemble
+  frequency is not calibrated probability, and simulated IR/rain is not an
+  observation.
+
 ## Recommended execution order
 
-1. Write the HF-2 scientific specification and lock its validation criteria.
-2. Implement dynamic upper-ocean state with independent ocean diagnostics.
-3. Add vector-aware ventilation and wind–pressure–size closure.
-4. Run the development search and accept or reject on validation.
-5. Improve steering depth, vortex filtering, and track baselines in HF-3.
-6. Calibrate uncertainty in HF-4.
-7. Add provider-neutral live forcing and prospective archiving in HF-5.
-8. Broaden and prospectively validate before strengthening product claims.
-9. Layer the richer forecast, export, mobile, and hazard experiences on top.
+1. **Complete:** product-depth slice (probe, cities, names, analog, sparkline).
+2. **Complete:** HF-2 through HF-4 physical, track, and ensemble experiments;
+   their rejected gates remain frozen and visible.
+3. **Complete:** HF-5 provider boundary, failure contract, and immutable issue
+   archive; operational live mode remains disabled without a scheduled feed.
+4. **Complete:** HF-6 catalogue, observation audit, sealed first look, model
+   card, and versioned scorecard. The negative intensity/pressure result is the
+   accepted scientific outcome, not a prompt to retune the sealed cohort.
+5. **Next product lane:** build the shared pan/zoom camera without changing
+   simulation state.
+6. **Next evidence lane:** archive future HF-5 runs before observations exist;
+   evaluate only after at least 12 forecasts across four storms mature.
+7. Add population exposure and automatic ensemble envelopes with the explicit
+   non-casualty and perturbation-frequency labels defined above.
+8. Start any revised intensity candidate as a new versioned phase with a new
+   development protocol and a newly sealed confirmation cohort.
+9. Add richer exports, mobile/accessibility hardening, and carefully validated
+   hazard models only after the relevant evidence and device gates exist.
 
-The immediate next deliverable is therefore **HF-2A: dynamic upper-ocean and
-cold-wake physics**, accompanied by tests, diagnostics, a frozen specification,
-and the existing HF-1 validation gate.
+HF-6 is finished as an implementation and evidence package. It does **not**
+finish prospective validation, turn the simulator into an operational model, or
+authorize stronger probability language. Pan/zoom remains the selected UX big
+bet; prospective archiving is the long-running scientific lane.

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-5",
+  "productLabel": "experimental forecast companion",
+  "canonicalUnits": {
+    "position": "decimal degrees",
+    "motion": "m/s",
+    "wind": "kt, one-minute sustained with original averaging period retained",
+    "pressure": "hPa",
+    "radii": "km",
+    "time": "UTC ISO-8601 Gregorian"
+  },
+  "requiredProducts": [
+    "agency-advisory",
+    "atmospheric-grid",
+    "sea-surface-temperature",
+    "upper-ocean"
+  ],
+  "optionalProducts": ["satellite"],
+  "failurePolicy": {
+    "requiredStaleMissingPartialIncompatible": "disable current forecast and expose exact failures",
+    "fallback": "climatology sandbox with explicit not-current-forecast label",
+    "mixedAdvisoryCycles": "reject",
+    "archiveMutation": "reject"
+  },
+  "archive": {
+    "write": "atomic non-overwriting hard-link publication",
+    "identity": "analysis date/provider/cycle/storm/model version",
+    "idempotentIdenticalReplay": true,
+    "overwriteAllowed": false
+  },
+  "guidanceLabels": {
+    "official": "official agency guidance",
+    "persistence": "baseline",
+    "model": "experimental Wallah model",
+    "satellite": "observed imagery",
+    "simulated": "simulated proxy"
+  },
+  "operationalStatus": "provider adapters and immutable boundary implemented; no continuously scheduled provider feed is configured",
+  "claimRule": "Infrastructure completion is not prospective forecast validation and must not be presented as operational readiness."
+}

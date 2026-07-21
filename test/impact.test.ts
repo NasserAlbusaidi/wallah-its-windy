@@ -4,6 +4,7 @@ import {
   floodRiskTier,
   IMPACT_CITIES,
   ImpactTracker,
+  windAtPointKt,
 } from '../src/impact';
 import type { StormDiagnostics, StormState } from '../src/types';
 import { deriveStormStructure } from '../src/structure';
@@ -77,6 +78,17 @@ describe('flood risk proxy tiers', () => {
 });
 
 describe('ImpactTracker', () => {
+  it('uses one instantaneous wind answer for city footprints and probes', () => {
+    const active = storm(23.2, 58.9, 90);
+    const muscat = IMPACT_CITIES.find((city) => city.id === 'muscat')!;
+    const tracker = new ImpactTracker();
+    tracker.record(active, 0.25);
+    const reported = tracker.summary(active).cities.find(
+      (entry) => entry.city.id === 'muscat',
+    )!;
+    expect(reported.peakWindKt).toBeCloseTo(windAtPointKt(active, muscat), 4);
+  });
+
   it('accumulates rain near the storm and reports it at the closest city', () => {
     const tracker = new ImpactTracker();
     const nearMuscat = storm(23.2, 58.9, 90);

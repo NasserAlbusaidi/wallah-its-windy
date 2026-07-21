@@ -1,0 +1,4993 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-6",
+  "sealedBeforeCandidateEvaluation": true,
+  "sealId": "hf6-arabian-v1-2026-07-21",
+  "sealedAt": "2026-07-21T15:10:00+04:00",
+  "source": {
+    "name": "NOAA IBTrACS v04r01 North Indian basin",
+    "path": "data/raw/ibtracs.NI.csv",
+    "sha256": "02f6af3b7e12ee76e88866995b4451b85867a2b7f20ed2666f8561024d671b62",
+    "positionColumns": "IBTrACS common LAT/LON",
+    "windColumns": "USA/JTWC when present, otherwise WMO with agency retained"
+  },
+  "protocol": {
+    "years": [
+      1940,
+      2024
+    ],
+    "domain": [
+      50.0,
+      70.0,
+      15.0,
+      27.0
+    ],
+    "interiorMarginDeg": 0.3,
+    "minimumInitialWindKt": 20,
+    "requiredStormWindKt": 34,
+    "initialNature": [
+      "TS",
+      "NR",
+      "DS"
+    ],
+    "requiredContinuousObservationH": 12,
+    "initializationOffsetsH": [
+      0,
+      6
+    ],
+    "maximumFixDelayAfterOffsetH": 6,
+    "selection": "all objectively eligible legacy storms, eight unseen storms with canonical USA/JTWC intensity and at least 48 h of observations chosen by a predeclared SHA-256 rank, then unseen broad-report storms by a separate SHA-256 rank; no simulated outcome enters selection",
+    "intensityComparisonPolicy": "one-minute model intensity is scored only against USA/JTWC fixes; other WMO wind periods remain report-only until an agency-specific conversion is pinned",
+    "targetStorms": 72,
+    "actualStorms": 72,
+    "actualInitializations": 144,
+    "partitions": {
+      "legacy": 29,
+      "sealed-confirmation": 8,
+      "broad-report": 35
+    }
+  },
+  "cases": [
+    {
+      "id": "as1980",
+      "sid": "1980317N11075",
+      "name": "Unnamed",
+      "year": 1980,
+      "partition": "legacy",
+      "legacyId": "as1980",
+      "selectionRank": "bef4172433416d00a7430785ef0439e8183f1efb36b45b26050fd2c794acee95",
+      "seed": 1980000,
+      "monthIndex": 10,
+      "eventStartIso": "1980-11-16T00:00:00Z",
+      "eventEndIso": "1980-11-20T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1980,
+          "month": 11,
+          "days": [
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "suffix": "_1980_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1980-11-17T00:00:00Z",
+          "lat": 15.3,
+          "lon": 67.3,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 51.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1980-11-17T06:00:00Z",
+          "lat": 15.8,
+          "lon": 66.9,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 45.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 35,
+      "firstFixIso": "1980-11-17T00:00:00Z",
+      "lastContinuousDomainFixIso": "1980-11-19T03:00:00Z"
+    },
+    {
+      "id": "as1981",
+      "sid": "1981298N07083",
+      "name": "Unnamed",
+      "year": 1981,
+      "partition": "legacy",
+      "legacyId": "as1981",
+      "selectionRank": "8d5c60b71ed2a30a665b13c9ac16e1b763d7e3d3fcdd496c2a67f43dc7ab5158",
+      "seed": 1981001,
+      "monthIndex": 9,
+      "eventStartIso": "1981-10-30T00:00:00Z",
+      "eventEndIso": "1981-11-03T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1981,
+          "month": 10,
+          "days": [
+            30,
+            31
+          ],
+          "suffix": "_1981_10"
+        },
+        {
+          "year": 1981,
+          "month": 11,
+          "days": [
+            1,
+            2,
+            3
+          ],
+          "suffix": "_1981_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1981-10-31T00:00:00Z",
+          "lat": 15.5,
+          "lon": 67.3,
+          "initialWindKt": 55,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 48.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1981-10-31T06:00:00Z",
+          "lat": 16.4,
+          "lon": 67.3,
+          "initialWindKt": 60,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 42.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 60,
+      "firstFixIso": "1981-10-31T00:00:00Z",
+      "lastContinuousDomainFixIso": "1981-11-02T00:00:00Z"
+    },
+    {
+      "id": "as1982",
+      "sid": "1982309N12066",
+      "name": "Unnamed",
+      "year": 1982,
+      "partition": "legacy",
+      "legacyId": "as1982",
+      "selectionRank": "eb719e63efe31f7ba3c81d30b40da775142cd732cf9d91b012a7f10a2eb6fce5",
+      "seed": 1982002,
+      "monthIndex": 10,
+      "eventStartIso": "1982-11-06T00:00:00Z",
+      "eventEndIso": "1982-11-09T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1982,
+          "month": 11,
+          "days": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "suffix": "_1982_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1982-11-07T02:00:00Z",
+          "lat": 15.3,
+          "lon": 66.7,
+          "initialWindKt": 57,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 25.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1982-11-07T09:00:00Z",
+          "lat": 16.3,
+          "lon": 67.5,
+          "initialWindKt": 63,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 18.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 83,
+      "firstFixIso": "1982-11-07T02:00:00Z",
+      "lastContinuousDomainFixIso": "1982-11-08T03:00:00Z"
+    },
+    {
+      "id": "as1983",
+      "sid": "1983216N23088",
+      "name": "Unnamed",
+      "year": 1983,
+      "partition": "legacy",
+      "legacyId": "as1983",
+      "selectionRank": "ffc41bb03fcd724f2356dcb9bfcbd1e145157eb159c3a312f1c475924888b2f9",
+      "seed": 1983003,
+      "monthIndex": 7,
+      "eventStartIso": "1983-08-07T00:00:00Z",
+      "eventEndIso": "1983-08-11T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1983,
+          "month": 8,
+          "days": [
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "suffix": "_1983_08"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1983-08-08T18:00:00Z",
+          "lat": 22.0,
+          "lon": 69.5,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 48.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1983-08-09T00:00:00Z",
+          "lat": 22.2,
+          "lon": 67.0,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 42.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 45,
+      "firstFixIso": "1983-08-08T18:00:00Z",
+      "lastContinuousDomainFixIso": "1983-08-10T18:00:00Z"
+    },
+    {
+      "id": "as1985",
+      "sid": "1985148N15067",
+      "name": "Unnamed",
+      "year": 1985,
+      "partition": "legacy",
+      "legacyId": "as1985",
+      "selectionRank": "e7872dcea438b7b56b8a402c847d1c249439f83919b708c871c4e36879131f97",
+      "seed": 1985004,
+      "monthIndex": 4,
+      "eventStartIso": "1985-05-27T00:00:00Z",
+      "eventEndIso": "1985-06-02T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1985,
+          "month": 5,
+          "days": [
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "suffix": "_1985_05"
+        },
+        {
+          "year": 1985,
+          "month": 6,
+          "days": [
+            1,
+            2
+          ],
+          "suffix": "_1985_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1985-05-28T06:00:00Z",
+          "lat": 15.3,
+          "lon": 67.2,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 90.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1985-05-28T12:00:00Z",
+          "lat": 16.1,
+          "lon": 67.3,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 84.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 50,
+      "firstFixIso": "1985-05-28T06:00:00Z",
+      "lastContinuousDomainFixIso": "1985-06-01T00:00:00Z"
+    },
+    {
+      "id": "as1987",
+      "sid": "1987155N16061",
+      "name": "Unnamed",
+      "year": 1987,
+      "partition": "legacy",
+      "legacyId": "as1987",
+      "selectionRank": "c41d63a6945a47a557c734377fdf09946abe63b353b3490bbb396860bd23b202",
+      "seed": 1987005,
+      "monthIndex": 5,
+      "eventStartIso": "1987-06-03T00:00:00Z",
+      "eventEndIso": "1987-06-13T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1987,
+          "month": 6,
+          "days": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "suffix": "_1987_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1987-06-04T06:00:00Z",
+          "lat": 16.1,
+          "lon": 60.9,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 186.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1987-06-04T12:00:00Z",
+          "lat": 16.1,
+          "lon": 61.2,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 180.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 50,
+      "firstFixIso": "1987-06-04T06:00:00Z",
+      "lastContinuousDomainFixIso": "1987-06-12T00:00:00Z"
+    },
+    {
+      "id": "as1992",
+      "sid": "1992273N12077",
+      "name": "Unnamed",
+      "year": 1992,
+      "partition": "legacy",
+      "legacyId": "as1992",
+      "selectionRank": "67a0708a983a8497b97689f3a0df81d6be27639ebddfb66d0c044f14787fe275",
+      "seed": 1992006,
+      "monthIndex": 8,
+      "eventStartIso": "1992-09-29T00:00:00Z",
+      "eventEndIso": "1992-10-05T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1992,
+          "month": 9,
+          "days": [
+            29,
+            30
+          ],
+          "suffix": "_1992_09"
+        },
+        {
+          "year": 1992,
+          "month": 10,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "suffix": "_1992_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1992-09-30T15:00:00Z",
+          "lat": 16.2,
+          "lon": 69.4,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 93.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1992-09-30T21:00:00Z",
+          "lat": 16.9,
+          "lon": 68.2,
+          "initialWindKt": 28,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 87.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 55,
+      "firstFixIso": "1992-09-30T15:00:00Z",
+      "lastContinuousDomainFixIso": "1992-10-04T12:00:00Z"
+    },
+    {
+      "id": "as1993",
+      "sid": "1993316N11070",
+      "name": "Unnamed",
+      "year": 1993,
+      "partition": "legacy",
+      "legacyId": "as1993",
+      "selectionRank": "c6072ca3252baf4489892290f7b70a8ac606a32a1b74e09e7961d62a1ae06645",
+      "seed": 1993007,
+      "monthIndex": 10,
+      "eventStartIso": "1993-11-12T00:00:00Z",
+      "eventEndIso": "1993-11-17T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1993,
+          "month": 11,
+          "days": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ],
+          "suffix": "_1993_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1993-11-13T03:00:00Z",
+          "lat": 16.0,
+          "lon": 65.0,
+          "initialWindKt": 45,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1000,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 69.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1993-11-13T09:00:00Z",
+          "lat": 17.0,
+          "lon": 64.2,
+          "initialWindKt": 58,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 63.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 80,
+      "firstFixIso": "1993-11-13T03:00:00Z",
+      "lastContinuousDomainFixIso": "1993-11-16T00:00:00Z"
+    },
+    {
+      "id": "as1994",
+      "sid": "1994157N17074",
+      "name": "Unnamed",
+      "year": 1994,
+      "partition": "legacy",
+      "legacyId": "as1994",
+      "selectionRank": "07d0aa3808b033918364f43c9e7b13e5714d9ff0e007cc0c6ce154abd924f005",
+      "seed": 1994008,
+      "monthIndex": 5,
+      "eventStartIso": "1994-06-05T00:00:00Z",
+      "eventEndIso": "1994-06-10T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1994,
+          "month": 6,
+          "days": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "suffix": "_1994_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1994-06-06T12:00:00Z",
+          "lat": 18.3,
+          "lon": 69.7,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 988,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 78.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1994-06-06T18:00:00Z",
+          "lat": 18.9,
+          "lon": 68.4,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 988,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 72.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 45,
+      "firstFixIso": "1994-06-06T12:00:00Z",
+      "lastContinuousDomainFixIso": "1994-06-09T18:00:00Z"
+    },
+    {
+      "id": "as1995",
+      "sid": "1995284N17074",
+      "name": "Unnamed",
+      "year": 1995,
+      "partition": "legacy",
+      "legacyId": "as1995",
+      "selectionRank": "835f5db2cd0ede55e85b014d8fd57caf7485acbbdcdb35837d9d2cb33f3e3e1d",
+      "seed": 1995009,
+      "monthIndex": 9,
+      "eventStartIso": "1995-10-11T00:00:00Z",
+      "eventEndIso": "1995-10-19T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1995,
+          "month": 10,
+          "days": [
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "suffix": "_1995_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1995-10-12T18:00:00Z",
+          "lat": 16.7,
+          "lon": 69.6,
+          "initialWindKt": 40,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1007,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 138.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1995-10-13T00:00:00Z",
+          "lat": 17.0,
+          "lon": 69.0,
+          "initialWindKt": 45,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1006,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 132.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 50,
+      "firstFixIso": "1995-10-12T18:00:00Z",
+      "lastContinuousDomainFixIso": "1995-10-18T12:00:00Z"
+    },
+    {
+      "id": "as1998",
+      "sid": "1998152N11075",
+      "name": "Unnamed",
+      "year": 1998,
+      "partition": "legacy",
+      "legacyId": "as1998",
+      "selectionRank": "7a8897e3ad776888347fb9f9bd935d24fbf0641e16ab63a7e67317917825a8e2",
+      "seed": 1998010,
+      "monthIndex": 5,
+      "eventStartIso": "1998-06-06T00:00:00Z",
+      "eventEndIso": "1998-06-10T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1998,
+          "month": 6,
+          "days": [
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "suffix": "_1998_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1998-06-07T09:00:00Z",
+          "lat": 15.4,
+          "lon": 67.9,
+          "initialWindKt": 78,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 979,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 45.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1998-06-07T15:00:00Z",
+          "lat": 16.2,
+          "lon": 67.8,
+          "initialWindKt": 85,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 39.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 105,
+      "firstFixIso": "1998-06-07T09:00:00Z",
+      "lastContinuousDomainFixIso": "1998-06-09T06:00:00Z"
+    },
+    {
+      "id": "as1998dec",
+      "sid": "1998346N10072",
+      "name": "Unnamed",
+      "year": 1998,
+      "partition": "legacy",
+      "legacyId": "as1998dec",
+      "selectionRank": "95e0c3d877dfb5d98ce3987c3c4f896f4d30e0880a26b1193c149ccac4b76692",
+      "seed": 1998011,
+      "monthIndex": 11,
+      "eventStartIso": "1998-12-14T00:00:00Z",
+      "eventEndIso": "1998-12-18T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1998,
+          "month": 12,
+          "days": [
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "suffix": "_1998_12"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1998-12-15T00:00:00Z",
+          "lat": 15.6,
+          "lon": 66.6,
+          "initialWindKt": 60,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 993,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 66.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1998-12-15T06:00:00Z",
+          "lat": 16.7,
+          "lon": 65.7,
+          "initialWindKt": 65,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 993,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 60.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 65,
+      "firstFixIso": "1998-12-15T00:00:00Z",
+      "lastContinuousDomainFixIso": "1998-12-17T18:00:00Z"
+    },
+    {
+      "id": "as1999",
+      "sid": "1999135N12073",
+      "name": "Unnamed",
+      "year": 1999,
+      "partition": "legacy",
+      "legacyId": "as1999",
+      "selectionRank": "17095083c8fb4c77fa45ec88a80ffb1184fe9cb0cdc151583011837e4112294b",
+      "seed": 1999012,
+      "monthIndex": 4,
+      "eventStartIso": "1999-05-16T00:00:00Z",
+      "eventEndIso": "1999-05-22T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1999,
+          "month": 5,
+          "days": [
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22
+          ],
+          "suffix": "_1999_05"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1999-05-17T12:00:00Z",
+          "lat": 15.4,
+          "lon": 69.3,
+          "initialWindKt": 70,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 984,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 93.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1999-05-17T18:00:00Z",
+          "lat": 16.2,
+          "lon": 68.6,
+          "initialWindKt": 90,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 984,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 87.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 110,
+      "firstFixIso": "1999-05-17T12:00:00Z",
+      "lastContinuousDomainFixIso": "1999-05-21T09:00:00Z"
+    },
+    {
+      "id": "as2001",
+      "sid": "2001141N14068",
+      "name": "Unnamed",
+      "year": 2001,
+      "partition": "legacy",
+      "legacyId": "as2001",
+      "selectionRank": "24f3dd496e5449de4634f79c9ad65e6a462769af131fbe61b64950b7c8625394",
+      "seed": 2001013,
+      "monthIndex": 4,
+      "eventStartIso": "2001-05-23T00:00:00Z",
+      "eventEndIso": "2001-05-30T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2001,
+          "month": 5,
+          "days": [
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30
+          ],
+          "suffix": "_2001_05"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2001-05-24T00:00:00Z",
+          "lat": 16.4,
+          "lon": 69.7,
+          "initialWindKt": 100,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 949,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 132.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2001-05-24T06:00:00Z",
+          "lat": 16.9,
+          "lon": 69.0,
+          "initialWindKt": 110,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 927,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 126.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 110,
+      "firstFixIso": "2001-05-24T00:00:00Z",
+      "lastContinuousDomainFixIso": "2001-05-29T12:00:00Z"
+    },
+    {
+      "id": "mukda2006",
+      "sid": "2006262N19069",
+      "name": "Mukda",
+      "year": 2006,
+      "partition": "legacy",
+      "legacyId": "mukda2006",
+      "selectionRank": "7d3e41845d7464f3d0bc2251d842f2ad2f40746b52ac1d04723bc46ac94a1d42",
+      "seed": 2006014,
+      "monthIndex": 8,
+      "eventStartIso": "2006-09-18T00:00:00Z",
+      "eventEndIso": "2006-09-27T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2006,
+          "month": 9,
+          "days": [
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27
+          ],
+          "suffix": "_2006_09"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2006-09-19T06:00:00Z",
+          "lat": 19.4,
+          "lon": 68.7,
+          "initialWindKt": 20,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1004,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 174.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2006-09-19T12:00:00Z",
+          "lat": 19.4,
+          "lon": 68.4,
+          "initialWindKt": 20,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 999,
+          "initialRmwKm": 55.56,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 168.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 55,
+      "firstFixIso": "2006-09-19T06:00:00Z",
+      "lastContinuousDomainFixIso": "2006-09-26T12:00:00Z"
+    },
+    {
+      "id": "gonu2007",
+      "sid": "2007151N14072",
+      "name": "Gonu",
+      "year": 2007,
+      "partition": "legacy",
+      "legacyId": "gonu2007",
+      "selectionRank": "c4c74739b56b1d403939f3dcf034284b148693ccb2c9fad1b031b0e24f510c09",
+      "seed": 2007015,
+      "monthIndex": 5,
+      "eventStartIso": "2007-06-01T00:00:00Z",
+      "eventEndIso": "2007-06-09T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2007,
+          "month": 6,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "suffix": "_2007_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2007-06-02T18:00:00Z",
+          "lat": 15.3,
+          "lon": 67.1,
+          "initialWindKt": 55,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 982,
+          "initialRmwKm": 46.3,
+          "initialR34Km": 115.75,
+          "initialR50Km": 55.56,
+          "initialR64Km": null,
+          "availableObservationH": 126.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2007-06-03T00:00:00Z",
+          "lat": 15.8,
+          "lon": 67.0,
+          "initialWindKt": 60,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 978,
+          "initialRmwKm": 37.04,
+          "initialR34Km": 115.75,
+          "initialR50Km": 60.19,
+          "initialR64Km": null,
+          "availableObservationH": 120.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 145,
+      "firstFixIso": "2007-06-02T18:00:00Z",
+      "lastContinuousDomainFixIso": "2007-06-08T00:00:00Z"
+    },
+    {
+      "id": "as2007",
+      "sid": "2007172N15088",
+      "name": "Unnamed",
+      "year": 2007,
+      "partition": "legacy",
+      "legacyId": "as2007",
+      "selectionRank": "8a1cdf50fd5120776aa2c595aade0c338cbad5d246ec9f65921fd888f09766a2",
+      "seed": 2007016,
+      "monthIndex": 5,
+      "eventStartIso": "2007-06-23T00:00:00Z",
+      "eventEndIso": "2007-06-27T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2007,
+          "month": 6,
+          "days": [
+            23,
+            24,
+            25,
+            26,
+            27
+          ],
+          "suffix": "_2007_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2007-06-24T18:00:00Z",
+          "lat": 22.1,
+          "lon": 69.2,
+          "initialWindKt": 20,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1007,
+          "initialRmwKm": 74.08,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 51.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2007-06-25T00:00:00Z",
+          "lat": 22.3,
+          "lon": 68.0,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1000,
+          "initialRmwKm": 74.08,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 45.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 50,
+      "firstFixIso": "2007-06-24T18:00:00Z",
+      "lastContinuousDomainFixIso": "2007-06-26T21:00:00Z"
+    },
+    {
+      "id": "phet2010",
+      "sid": "2010151N14065",
+      "name": "Phet",
+      "year": 2010,
+      "partition": "legacy",
+      "legacyId": "phet2010",
+      "selectionRank": "59f57cb01182392c2ac0abbf39128d08d86c087f4a621a43ecd494a0dc6d535e",
+      "seed": 2010017,
+      "monthIndex": 4,
+      "eventStartIso": "2010-05-30T00:00:00Z",
+      "eventEndIso": "2010-06-07T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2010,
+          "month": 5,
+          "days": [
+            30,
+            31
+          ],
+          "suffix": "_2010_05"
+        },
+        {
+          "year": 2010,
+          "month": 6,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "suffix": "_2010_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2010-05-31T15:00:00Z",
+          "lat": 15.4,
+          "lon": 63.7,
+          "initialWindKt": 33,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 998,
+          "initialRmwKm": 64.82,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 150.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2010-05-31T21:00:00Z",
+          "lat": 15.5,
+          "lon": 63.5,
+          "initialWindKt": 40,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 993,
+          "initialRmwKm": 64.82,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 144.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 125,
+      "firstFixIso": "2010-05-31T15:00:00Z",
+      "lastContinuousDomainFixIso": "2010-06-06T21:00:00Z"
+    },
+    {
+      "id": "keila2011",
+      "sid": "2011302N13062",
+      "name": "Keila",
+      "year": 2011,
+      "partition": "legacy",
+      "legacyId": "keila2011",
+      "selectionRank": "29224f15d9939f850d78e6adaf3ffd880977138734d0dc8e7e80f5145dc04aab",
+      "seed": 2011018,
+      "monthIndex": 9,
+      "eventStartIso": "2011-10-30T00:00:00Z",
+      "eventEndIso": "2011-11-06T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2011,
+          "month": 10,
+          "days": [
+            30,
+            31
+          ],
+          "suffix": "_2011_10"
+        },
+        {
+          "year": 2011,
+          "month": 11,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "suffix": "_2011_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2011-10-31T06:00:00Z",
+          "lat": 16.0,
+          "lon": 57.0,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1000,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 120.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2011-10-31T12:00:00Z",
+          "lat": 16.0,
+          "lon": 57.5,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1000,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 114.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": 55,
+      "firstFixIso": "2011-10-31T06:00:00Z",
+      "lastContinuousDomainFixIso": "2011-11-05T06:00:00Z"
+    },
+    {
+      "id": "nanauk2014",
+      "sid": "2014159N12068",
+      "name": "Nanauk",
+      "year": 2014,
+      "partition": "legacy",
+      "legacyId": "nanauk2014",
+      "selectionRank": "50816cc0c3bdf0fa909612e6727aaccb8318c835789ec2e1448d4b2c5c15cfce",
+      "seed": 2014019,
+      "monthIndex": 5,
+      "eventStartIso": "2014-06-09T00:00:00Z",
+      "eventEndIso": "2014-06-15T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2014,
+          "month": 6,
+          "days": [
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "suffix": "_2014_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2014-06-10T03:00:00Z",
+          "lat": 15.4,
+          "lon": 68.8,
+          "initialWindKt": 38,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 995,
+          "initialRmwKm": 88.896,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 105.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2014-06-10T09:00:00Z",
+          "lat": 15.8,
+          "lon": 68.4,
+          "initialWindKt": 43,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 991,
+          "initialRmwKm": 70.376,
+          "initialR34Km": 92.6,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 99.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 55,
+      "firstFixIso": "2014-06-10T03:00:00Z",
+      "lastContinuousDomainFixIso": "2014-06-14T12:00:00Z"
+    },
+    {
+      "id": "nilofar2014",
+      "sid": "2014297N11062",
+      "name": "Nilofar",
+      "year": 2014,
+      "partition": "legacy",
+      "legacyId": "nilofar2014",
+      "selectionRank": "31bb2ca654a80b99adfcf03c6fce0d952eb595720b6ae5a3a21471ca8535153c",
+      "seed": 2014020,
+      "monthIndex": 9,
+      "eventStartIso": "2014-10-26T00:00:00Z",
+      "eventEndIso": "2014-11-02T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2014,
+          "month": 10,
+          "days": [
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "suffix": "_2014_10"
+        },
+        {
+          "year": 2014,
+          "month": 11,
+          "days": [
+            1,
+            2
+          ],
+          "suffix": "_2014_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2014-10-27T21:00:00Z",
+          "lat": 15.4,
+          "lon": 61.8,
+          "initialWindKt": 93,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 954,
+          "initialRmwKm": 18.52,
+          "initialR34Km": 189.83,
+          "initialR50Km": 92.6,
+          "initialR64Km": 37.04,
+          "availableObservationH": 111.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2014-10-28T03:00:00Z",
+          "lat": 15.8,
+          "lon": 61.7,
+          "initialWindKt": 98,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 950,
+          "initialRmwKm": 18.52,
+          "initialR34Km": 192.608,
+          "initialR50Km": 92.6,
+          "initialR64Km": 37.04,
+          "availableObservationH": 105.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 115,
+      "firstFixIso": "2014-10-27T21:00:00Z",
+      "lastContinuousDomainFixIso": "2014-11-01T12:00:00Z"
+    },
+    {
+      "id": "ashobaa2015",
+      "sid": "2015157N13069",
+      "name": "Ashobaa",
+      "year": 2015,
+      "partition": "legacy",
+      "legacyId": "ashobaa2015",
+      "selectionRank": "d724935cfdb4562aaa61aad44a977f58e62aeefba136551c46d9f221f4078446",
+      "seed": 2015021,
+      "monthIndex": 5,
+      "eventStartIso": "2015-06-06T00:00:00Z",
+      "eventEndIso": "2015-06-13T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2015,
+          "month": 6,
+          "days": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "suffix": "_2015_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2015-06-07T03:00:00Z",
+          "lat": 15.3,
+          "lon": 68.5,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 997,
+          "initialRmwKm": 83.34,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 123.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2015-06-07T09:00:00Z",
+          "lat": 15.8,
+          "lon": 68.3,
+          "initialWindKt": 40,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 993,
+          "initialRmwKm": 83.34,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 117.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 55,
+      "firstFixIso": "2015-06-07T03:00:00Z",
+      "lastContinuousDomainFixIso": "2015-06-12T06:00:00Z"
+    },
+    {
+      "id": "mekunu2018",
+      "sid": "2018136N11054",
+      "name": "Mekunu:Sagar",
+      "year": 2018,
+      "partition": "legacy",
+      "legacyId": "mekunu2018",
+      "selectionRank": "4a4c695036e520aaf051e461cc9ee8086ec4983dbb6b7e37466850e9122f7591",
+      "seed": 2018022,
+      "monthIndex": 4,
+      "eventStartIso": "2018-05-24T00:00:00Z",
+      "eventEndIso": "2018-05-28T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2018,
+          "month": 5,
+          "days": [
+            24,
+            25,
+            26,
+            27,
+            28
+          ],
+          "suffix": "_2018_05"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2018-05-25T03:00:00Z",
+          "lat": 15.4,
+          "lon": 54.6,
+          "initialWindKt": 88,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 962,
+          "initialRmwKm": 42.596,
+          "initialR34Km": 289.375,
+          "initialR50Km": 137.974,
+          "initialR64Km": 75.469,
+          "availableObservationH": 51.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2018-05-25T09:00:00Z",
+          "lat": 16.1,
+          "lon": 54.4,
+          "initialWindKt": 95,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 954,
+          "initialRmwKm": 29.632,
+          "initialR34Km": 280.578,
+          "initialR50Km": 132.418,
+          "initialR64Km": 72.691,
+          "availableObservationH": 45.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 100,
+      "firstFixIso": "2018-05-25T03:00:00Z",
+      "lastContinuousDomainFixIso": "2018-05-27T06:00:00Z"
+    },
+    {
+      "id": "vayu2019",
+      "sid": "2019160N11073",
+      "name": "Vayu",
+      "year": 2019,
+      "partition": "legacy",
+      "legacyId": "vayu2019",
+      "selectionRank": "9c319172767fe40aa30729fc1b7f715ee2f1877246d915be94734343cad4e9bc",
+      "seed": 2019023,
+      "monthIndex": 5,
+      "eventStartIso": "2019-06-11T00:00:00Z",
+      "eventEndIso": "2019-06-19T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2019,
+          "month": 6,
+          "days": [
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "suffix": "_2019_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2019-06-12T18:00:00Z",
+          "lat": 19.7,
+          "lon": 69.7,
+          "initialWindKt": 85,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 963,
+          "initialRmwKm": 37.04,
+          "initialR34Km": 196.775,
+          "initialR50Km": 87.97,
+          "initialR64Km": 39.355,
+          "availableObservationH": 129.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2019-06-13T00:00:00Z",
+          "lat": 20.1,
+          "lon": 69.6,
+          "initialWindKt": 85,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 961,
+          "initialRmwKm": 37.04,
+          "initialR34Km": 185.2,
+          "initialR50Km": 92.6,
+          "initialR64Km": 46.3,
+          "availableObservationH": 123.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 100,
+      "firstFixIso": "2019-06-12T18:00:00Z",
+      "lastContinuousDomainFixIso": "2019-06-18T03:00:00Z"
+    },
+    {
+      "id": "hikaa2019",
+      "sid": "2019264N19071",
+      "name": "Hikaa:Hikka",
+      "year": 2019,
+      "partition": "legacy",
+      "legacyId": "hikaa2019",
+      "selectionRank": "b111a6b1511ddd834df8ef82f9566967af0b43afec156ce173469c41629242a3",
+      "seed": 2019024,
+      "monthIndex": 8,
+      "eventStartIso": "2019-09-20T00:00:00Z",
+      "eventEndIso": "2019-09-27T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2019,
+          "month": 9,
+          "days": [
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27
+          ],
+          "suffix": "_2019_09"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2019-09-21T21:00:00Z",
+          "lat": 19.4,
+          "lon": 69.7,
+          "initialWindKt": 23,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1003,
+          "initialRmwKm": 55.56,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 105.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2019-09-22T03:00:00Z",
+          "lat": 19.8,
+          "lon": 69.2,
+          "initialWindKt": 28,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1001,
+          "initialRmwKm": 55.56,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 99.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 90,
+      "firstFixIso": "2019-09-21T21:00:00Z",
+      "lastContinuousDomainFixIso": "2019-09-26T06:00:00Z"
+    },
+    {
+      "id": "maha2019",
+      "sid": "2019301N05081",
+      "name": "Maha",
+      "year": 2019,
+      "partition": "legacy",
+      "legacyId": "maha2019",
+      "selectionRank": "a871b8b3841d7d1f5be4718b8b4e009cccab4a7e1ea8794dd0a5149f4d6a449c",
+      "seed": 2019025,
+      "monthIndex": 10,
+      "eventStartIso": "2019-10-31T00:00:00Z",
+      "eventEndIso": "2019-11-08T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2019,
+          "month": 10,
+          "days": [
+            31
+          ],
+          "suffix": "_2019_10"
+        },
+        {
+          "year": 2019,
+          "month": 11,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "suffix": "_2019_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2019-11-01T12:00:00Z",
+          "lat": 15.5,
+          "lon": 69.7,
+          "initialWindKt": 45,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 998,
+          "initialRmwKm": 46.3,
+          "initialR34Km": 81.025,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 132.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2019-11-01T18:00:00Z",
+          "lat": 15.9,
+          "lon": 69.1,
+          "initialWindKt": 45,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 997,
+          "initialRmwKm": 46.3,
+          "initialR34Km": 78.71,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 126.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 105,
+      "firstFixIso": "2019-11-01T12:00:00Z",
+      "lastContinuousDomainFixIso": "2019-11-07T00:00:00Z"
+    },
+    {
+      "id": "shaheen2021",
+      "sid": "2021267N18094",
+      "name": "Gulab:Shaheen-Gu",
+      "year": 2021,
+      "partition": "legacy",
+      "legacyId": "shaheen2021",
+      "selectionRank": "c4829f84100968ee987d4bdfa21153ccc9b48b7bb6e30a9c5e734c7ebeb907ae",
+      "seed": 2021026,
+      "monthIndex": 8,
+      "eventStartIso": "2021-09-28T00:00:00Z",
+      "eventEndIso": "2021-10-05T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2021,
+          "month": 9,
+          "days": [
+            28,
+            29,
+            30
+          ],
+          "suffix": "_2021_09"
+        },
+        {
+          "year": 2021,
+          "month": 10,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "suffix": "_2021_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2021-09-29T21:00:00Z",
+          "lat": 22.7,
+          "lon": 69.6,
+          "initialWindKt": 28,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1000,
+          "initialRmwKm": 148.16,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 105.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2021-09-30T03:00:00Z",
+          "lat": 22.6,
+          "lon": 68.7,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 999,
+          "initialRmwKm": 148.16,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 99.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 70,
+      "firstFixIso": "2021-09-29T21:00:00Z",
+      "lastContinuousDomainFixIso": "2021-10-04T06:00:00Z"
+    },
+    {
+      "id": "biparjoy2023",
+      "sid": "2023156N10067",
+      "name": "Biparjoy",
+      "year": 2023,
+      "partition": "legacy",
+      "legacyId": "biparjoy2023",
+      "selectionRank": "042778221d860e6de470c6d8f2689a99d5e2a76c6d74a575d32eada88878d601",
+      "seed": 2023027,
+      "monthIndex": 5,
+      "eventStartIso": "2023-06-08T00:00:00Z",
+      "eventEndIso": "2023-06-17T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2023,
+          "month": 6,
+          "days": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ],
+          "suffix": "_2023_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2023-06-09T09:00:00Z",
+          "lat": 15.3,
+          "lon": 67.0,
+          "initialWindKt": 63,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 985,
+          "initialRmwKm": 24.076,
+          "initialR34Km": 169.458,
+          "initialR50Km": 59.264,
+          "initialR64Km": null,
+          "availableObservationH": 168.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2023-06-09T15:00:00Z",
+          "lat": 15.9,
+          "lon": 67.3,
+          "initialWindKt": 68,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 980,
+          "initialRmwKm": 27.78,
+          "initialR34Km": 186.589,
+          "initialR50Km": 77.784,
+          "initialR64Km": null,
+          "availableObservationH": 162.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 110,
+      "firstFixIso": "2023-06-09T09:00:00Z",
+      "lastContinuousDomainFixIso": "2023-06-16T09:00:00Z"
+    },
+    {
+      "id": "asna2024",
+      "sid": "2024238N25077",
+      "name": "Asna",
+      "year": 2024,
+      "partition": "legacy",
+      "legacyId": "asna2024",
+      "selectionRank": "c776eba867c1e189fb6e96a3f0aea16c0367389e60bdfb82575d1f06c5ff8e54",
+      "seed": 2024028,
+      "monthIndex": 7,
+      "eventStartIso": "2024-08-27T00:00:00Z",
+      "eventEndIso": "2024-09-04T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2024,
+          "month": 8,
+          "days": [
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "suffix": "_2024_08"
+        },
+        {
+          "year": 2024,
+          "month": 9,
+          "days": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "suffix": "_2024_09"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2024-08-28T18:00:00Z",
+          "lat": 23.8,
+          "lon": 69.7,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 997,
+          "initialRmwKm": 92.6,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 132.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2024-08-29T00:00:00Z",
+          "lat": 23.8,
+          "lon": 69.5,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 996,
+          "initialRmwKm": 92.6,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 126.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 40,
+      "firstFixIso": "2024-08-28T18:00:00Z",
+      "lastContinuousDomainFixIso": "2024-09-03T06:00:00Z"
+    },
+    {
+      "id": "hf6_1975121n09072",
+      "sid": "1975121N09072",
+      "name": "Unnamed",
+      "year": 1975,
+      "partition": "sealed-confirmation",
+      "legacyId": null,
+      "selectionRank": "730b6c559fe798924b99c79fb15eae29793cfe51cca79d28c840939f14d839ae",
+      "seed": 1975029,
+      "monthIndex": 4,
+      "eventStartIso": "1975-05-07T00:00:00Z",
+      "eventEndIso": "1975-05-12T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1975,
+          "month": 5,
+          "days": [
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+          ],
+          "suffix": "_1975_05"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1975-05-08T21:00:00Z",
+          "lat": 15.3,
+          "lon": 64.9,
+          "initialWindKt": 83,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 63.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1975-05-09T03:00:00Z",
+          "lat": 15.5,
+          "lon": 64.7,
+          "initialWindKt": 78,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 57.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 83,
+      "firstFixIso": "1975-05-08T21:00:00Z",
+      "lastContinuousDomainFixIso": "1975-05-11T12:00:00Z"
+    },
+    {
+      "id": "hf6_1978307n10082",
+      "sid": "1978307N10082",
+      "name": "Unnamed",
+      "year": 1978,
+      "partition": "sealed-confirmation",
+      "legacyId": null,
+      "selectionRank": "02e2c349c9f163896f7361d00afe9aa66433ff1a3bb4468c754dee10fbc23729",
+      "seed": 1978030,
+      "monthIndex": 10,
+      "eventStartIso": "1978-11-07T00:00:00Z",
+      "eventEndIso": "1978-11-13T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1978,
+          "month": 11,
+          "days": [
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "suffix": "_1978_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1978-11-08T00:00:00Z",
+          "lat": 15.3,
+          "lon": 64.9,
+          "initialWindKt": 70,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 108.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1978-11-08T06:00:00Z",
+          "lat": 16.2,
+          "lon": 63.8,
+          "initialWindKt": 75,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 102.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 80,
+      "firstFixIso": "1978-11-08T00:00:00Z",
+      "lastContinuousDomainFixIso": "1978-11-12T12:00:00Z"
+    },
+    {
+      "id": "hf6_1996161n17063",
+      "sid": "1996161N17063",
+      "name": "Unnamed",
+      "year": 1996,
+      "partition": "sealed-confirmation",
+      "legacyId": null,
+      "selectionRank": "f62cd44d0f37cd059fc5b580e75543050200d00043075e81c2fbd444874243ad",
+      "seed": 1996031,
+      "monthIndex": 5,
+      "eventStartIso": "1996-06-08T00:00:00Z",
+      "eventEndIso": "1996-06-13T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1996,
+          "month": 6,
+          "days": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "suffix": "_1996_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1996-06-09T18:00:00Z",
+          "lat": 17.3,
+          "lon": 61.6,
+          "initialWindKt": 20,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 66.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1996-06-10T00:00:00Z",
+          "lat": 17.5,
+          "lon": 61.1,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 60.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 40,
+      "firstFixIso": "1996-06-09T18:00:00Z",
+      "lastContinuousDomainFixIso": "1996-06-12T12:00:00Z"
+    },
+    {
+      "id": "hf6_2001267n17070",
+      "sid": "2001267N17070",
+      "name": "Unnamed",
+      "year": 2001,
+      "partition": "sealed-confirmation",
+      "legacyId": null,
+      "selectionRank": "3f529f177b3b36512ed9d2ee454c760dc49b22b84fb4089cab9608965e2745e6",
+      "seed": 2001032,
+      "monthIndex": 8,
+      "eventStartIso": "2001-09-23T00:00:00Z",
+      "eventEndIso": "2001-09-29T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2001,
+          "month": 9,
+          "days": [
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29
+          ],
+          "suffix": "_2001_09"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2001-09-24T03:00:00Z",
+          "lat": 16.6,
+          "lon": 69.7,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1002,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 105.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2001-09-24T09:00:00Z",
+          "lat": 16.8,
+          "lon": 69.4,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1002,
+          "initialRmwKm": 92.6,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 99.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 35,
+      "firstFixIso": "2001-09-24T03:00:00Z",
+      "lastContinuousDomainFixIso": "2001-09-28T12:00:00Z"
+    },
+    {
+      "id": "hf6_2001281n18071",
+      "sid": "2001281N18071",
+      "name": "Unnamed",
+      "year": 2001,
+      "partition": "sealed-confirmation",
+      "legacyId": null,
+      "selectionRank": "716e29d754a569c04f1f76f5a5360a117282c8e46b83e963ddb9462620c26277",
+      "seed": 2001033,
+      "monthIndex": 9,
+      "eventStartIso": "2001-10-08T00:00:00Z",
+      "eventEndIso": "2001-10-14T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2001,
+          "month": 10,
+          "days": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14
+          ],
+          "suffix": "_2001_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2001-10-09T03:00:00Z",
+          "lat": 18.5,
+          "lon": 69.7,
+          "initialWindKt": 28,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1001,
+          "initialRmwKm": 111.12,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 99.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2001-10-09T09:00:00Z",
+          "lat": 18.8,
+          "lon": 68.8,
+          "initialWindKt": 33,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 999,
+          "initialRmwKm": 98.156,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 93.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 35,
+      "firstFixIso": "2001-10-09T03:00:00Z",
+      "lastContinuousDomainFixIso": "2001-10-13T06:00:00Z"
+    },
+    {
+      "id": "hf6_2004274n16069",
+      "sid": "2004274N16069",
+      "name": "Unnamed",
+      "year": 2004,
+      "partition": "sealed-confirmation",
+      "legacyId": null,
+      "selectionRank": "480235e65fb0741b210b85515a6e11bc78c0ad3f57b902baa798a47cdb495d70",
+      "seed": 2004034,
+      "monthIndex": 8,
+      "eventStartIso": "2004-09-29T00:00:00Z",
+      "eventEndIso": "2004-10-10T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2004,
+          "month": 9,
+          "days": [
+            29,
+            30
+          ],
+          "suffix": "_2004_09"
+        },
+        {
+          "year": 2004,
+          "month": 10,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "suffix": "_2004_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2004-09-30T06:00:00Z",
+          "lat": 16.3,
+          "lon": 69.0,
+          "initialWindKt": 20,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1004,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 225.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2004-09-30T18:00:00Z",
+          "lat": 17.7,
+          "lon": 67.7,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1002,
+          "initialRmwKm": 92.6,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 213.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 35,
+      "firstFixIso": "2004-09-30T06:00:00Z",
+      "lastContinuousDomainFixIso": "2004-10-09T15:00:00Z"
+    },
+    {
+      "id": "hf6_2011330n06078",
+      "sid": "2011330N06078",
+      "name": "Unnamed",
+      "year": 2011,
+      "partition": "sealed-confirmation",
+      "legacyId": null,
+      "selectionRank": "2a088910fd685cab15fb09d0614860f13df850d0aa0d7c7fdf0a37369d9b721b",
+      "seed": 2011035,
+      "monthIndex": 10,
+      "eventStartIso": "2011-11-27T00:00:00Z",
+      "eventEndIso": "2011-12-02T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2011,
+          "month": 11,
+          "days": [
+            27,
+            28,
+            29,
+            30
+          ],
+          "suffix": "_2011_11"
+        },
+        {
+          "year": 2011,
+          "month": 12,
+          "days": [
+            1,
+            2
+          ],
+          "suffix": "_2011_12"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2011-11-28T15:00:00Z",
+          "lat": 15.3,
+          "lon": 67.8,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 996,
+          "initialRmwKm": 74.08,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 63.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2011-11-28T21:00:00Z",
+          "lat": 15.5,
+          "lon": 67.3,
+          "initialWindKt": 33,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 998,
+          "initialRmwKm": 74.08,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 57.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 35,
+      "firstFixIso": "2011-11-28T15:00:00Z",
+      "lastContinuousDomainFixIso": "2011-12-01T06:00:00Z"
+    },
+    {
+      "id": "hf6_2022224n22067",
+      "sid": "2022224N22067",
+      "name": "Unnamed",
+      "year": 2022,
+      "partition": "sealed-confirmation",
+      "legacyId": null,
+      "selectionRank": "5b92b7a50f980c77bfbdc26795293ed01b39bed96ed76156c6a141270baa8798",
+      "seed": 2022036,
+      "monthIndex": 7,
+      "eventStartIso": "2022-08-10T00:00:00Z",
+      "eventEndIso": "2022-08-15T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2022,
+          "month": 8,
+          "days": [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "suffix": "_2022_08"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2022-08-11T18:00:00Z",
+          "lat": 22.1,
+          "lon": 67.2,
+          "initialWindKt": 20,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1007,
+          "initialRmwKm": 101.86,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 57.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2022-08-12T00:00:00Z",
+          "lat": 21.8,
+          "lon": 66.6,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 989,
+          "initialRmwKm": 101.86,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 51.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 40,
+      "firstFixIso": "2022-08-11T18:00:00Z",
+      "lastContinuousDomainFixIso": "2022-08-14T03:00:00Z"
+    },
+    {
+      "id": "hf6_1973188n21071",
+      "sid": "1973188N21071",
+      "name": "Unnamed",
+      "year": 1973,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "eca591412c26a7d9d242a9132b38ae5a165ee1a7c2ad9c3f33c1e02bc47b8272",
+      "seed": 1973037,
+      "monthIndex": 6,
+      "eventStartIso": "1973-07-06T00:00:00Z",
+      "eventEndIso": "1973-07-09T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1973,
+          "month": 7,
+          "days": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "suffix": "_1973_07"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1973-07-07T15:00:00Z",
+          "lat": 21.3,
+          "lon": 69.7,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 21.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1973-07-07T21:00:00Z",
+          "lat": 21.8,
+          "lon": 69.5,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 15.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1973-07-07T15:00:00Z",
+      "lastContinuousDomainFixIso": "1973-07-08T12:00:00Z"
+    },
+    {
+      "id": "hf6_1988160n14074",
+      "sid": "1988160N14074",
+      "name": "Unnamed",
+      "year": 1988,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "4c8d57ad5ed3804c77ef91e3c48d223f7f11f39008cfa9d4758359dbdd346ad8",
+      "seed": 1988038,
+      "monthIndex": 5,
+      "eventStartIso": "1988-06-08T00:00:00Z",
+      "eventEndIso": "1988-06-12T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1988,
+          "month": 6,
+          "days": [
+            8,
+            9,
+            10,
+            11,
+            12
+          ],
+          "suffix": "_1988_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1988-06-09T21:00:00Z",
+          "lat": 17.0,
+          "lon": 69.7,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 39.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1988-06-10T03:00:00Z",
+          "lat": 17.1,
+          "lon": 69.5,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 33.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 35,
+      "firstFixIso": "1988-06-09T21:00:00Z",
+      "lastContinuousDomainFixIso": "1988-06-11T12:00:00Z"
+    },
+    {
+      "id": "hf6_2020150n17054",
+      "sid": "2020150N17054",
+      "name": "Unnamed",
+      "year": 2020,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "688c5f4de58a5e1391182c7ca5d512e9f8e7cbc88ec57a6a5e3812c47cc0b601",
+      "seed": 2020039,
+      "monthIndex": 4,
+      "eventStartIso": "2020-05-28T00:00:00Z",
+      "eventEndIso": "2020-06-01T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2020,
+          "month": 5,
+          "days": [
+            28,
+            29,
+            30,
+            31
+          ],
+          "suffix": "_2020_05"
+        },
+        {
+          "year": 2020,
+          "month": 6,
+          "days": [
+            1
+          ],
+          "suffix": "_2020_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2020-05-29T09:00:00Z",
+          "lat": 17.3,
+          "lon": 54.3,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1000,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 57.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2020-05-29T15:00:00Z",
+          "lat": 17.3,
+          "lon": 54.3,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 51.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": 25,
+      "firstFixIso": "2020-05-29T09:00:00Z",
+      "lastContinuousDomainFixIso": "2020-05-31T18:00:00Z"
+    },
+    {
+      "id": "hf6_1963138n08068",
+      "sid": "1963138N08068",
+      "name": "Unnamed",
+      "year": 1963,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "22542badf0d53835e767010c0c65abeb0774987e88672c995a7cc6d78c524591",
+      "seed": 1963040,
+      "monthIndex": 4,
+      "eventStartIso": "1963-05-23T00:00:00Z",
+      "eventEndIso": "1963-05-27T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1963,
+          "month": 5,
+          "days": [
+            23,
+            24,
+            25,
+            26,
+            27
+          ],
+          "suffix": "_1963_05"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1963-05-24T12:00:00Z",
+          "lat": 15.3,
+          "lon": 60.5,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 51.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1963-05-24T18:00:00Z",
+          "lat": 15.6,
+          "lon": 60.0,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 45.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1963-05-24T12:00:00Z",
+      "lastContinuousDomainFixIso": "1963-05-26T15:00:00Z"
+    },
+    {
+      "id": "hf6_1984158n18068",
+      "sid": "1984158N18068",
+      "name": "Unnamed",
+      "year": 1984,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "8573a1fedbb42e4f1b03f6d0dd49817021cd2481986747ec4b1951a4309b7e31",
+      "seed": 1984041,
+      "monthIndex": 5,
+      "eventStartIso": "1984-06-04T00:00:00Z",
+      "eventEndIso": "1984-06-07T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1984,
+          "month": 6,
+          "days": [
+            4,
+            5,
+            6,
+            7
+          ],
+          "suffix": "_1984_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1984-06-05T12:00:00Z",
+          "lat": 18.5,
+          "lon": 67.5,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 24.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1984-06-05T18:00:00Z",
+          "lat": 19.1,
+          "lon": 67.5,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 18.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": 25,
+      "firstFixIso": "1984-06-05T12:00:00Z",
+      "lastContinuousDomainFixIso": "1984-06-06T12:00:00Z"
+    },
+    {
+      "id": "hf6_1962134n10082",
+      "sid": "1962134N10082",
+      "name": "Unnamed",
+      "year": 1962,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "c17dbe03a6b8cad7bdfeef65a6dc50ad7cf35cffc4d63ef4581c45c7986de7dd",
+      "seed": 1962042,
+      "monthIndex": 4,
+      "eventStartIso": "1962-05-20T00:00:00Z",
+      "eventEndIso": "1962-05-23T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1962,
+          "month": 5,
+          "days": [
+            20,
+            21,
+            22,
+            23
+          ],
+          "suffix": "_1962_05"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1962-05-21T00:00:00Z",
+          "lat": 15.4,
+          "lon": 69.5,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 39.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1962-05-21T06:00:00Z",
+          "lat": 15.8,
+          "lon": 68.5,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 33.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1962-05-21T00:00:00Z",
+      "lastContinuousDomainFixIso": "1962-05-22T15:00:00Z"
+    },
+    {
+      "id": "hf6_1973158n16068",
+      "sid": "1973158N16068",
+      "name": "Unnamed",
+      "year": 1973,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "205c728995f305219bf3ead94b615c273e9f7961a71cc65d535d2b4b0975bce9",
+      "seed": 1973043,
+      "monthIndex": 5,
+      "eventStartIso": "1973-06-05T00:00:00Z",
+      "eventEndIso": "1973-06-13T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1973,
+          "month": 6,
+          "days": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "suffix": "_1973_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1973-06-06T12:00:00Z",
+          "lat": 16.0,
+          "lon": 68.4,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 144.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1973-06-06T18:00:00Z",
+          "lat": 16.8,
+          "lon": 68.3,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 138.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1973-06-06T12:00:00Z",
+      "lastContinuousDomainFixIso": "1973-06-12T12:00:00Z"
+    },
+    {
+      "id": "hf6_2022197n22069",
+      "sid": "2022197N22069",
+      "name": "Unnamed",
+      "year": 2022,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "361787f51ebcd792799bf92c0a502ee702d3103f3b610802ab0c6f1534cc6a20",
+      "seed": 2022044,
+      "monthIndex": 6,
+      "eventStartIso": "2022-07-15T00:00:00Z",
+      "eventEndIso": "2022-07-18T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2022,
+          "month": 7,
+          "days": [
+            15,
+            16,
+            17,
+            18
+          ],
+          "suffix": "_2022_07"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2022-07-16T03:00:00Z",
+          "lat": 21.6,
+          "lon": 69.0,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 992,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 39.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2022-07-16T09:00:00Z",
+          "lat": 22.0,
+          "lon": 68.8,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 33.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": 25,
+      "firstFixIso": "2022-07-16T03:00:00Z",
+      "lastContinuousDomainFixIso": "2022-07-17T18:00:00Z"
+    },
+    {
+      "id": "hf6_1962251n17086",
+      "sid": "1962251N17086",
+      "name": "Unnamed",
+      "year": 1962,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "6832c4512a51894e39bf4cac0e7b3f8646e2588d4d75617a160c48527d46ae7d",
+      "seed": 1962045,
+      "monthIndex": 8,
+      "eventStartIso": "1962-09-09T00:00:00Z",
+      "eventEndIso": "1962-09-15T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1962,
+          "month": 9,
+          "days": [
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "suffix": "_1962_09"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1962-09-10T21:00:00Z",
+          "lat": 21.7,
+          "lon": 69.5,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 90.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1962-09-11T03:00:00Z",
+          "lat": 22.1,
+          "lon": 68.7,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 84.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1962-09-10T21:00:00Z",
+      "lastContinuousDomainFixIso": "1962-09-14T15:00:00Z"
+    },
+    {
+      "id": "hf6_2020291n18069",
+      "sid": "2020291N18069",
+      "name": "Unnamed",
+      "year": 2020,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "f502c5174c4fc7903405cce0d2e75e86761fdf74226804e5857abffaa2fc347b",
+      "seed": 2020046,
+      "monthIndex": 9,
+      "eventStartIso": "2020-10-16T00:00:00Z",
+      "eventEndIso": "2020-10-19T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2020,
+          "month": 10,
+          "days": [
+            16,
+            17,
+            18,
+            19
+          ],
+          "suffix": "_2020_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2020-10-17T03:00:00Z",
+          "lat": 17.8,
+          "lon": 69.0,
+          "initialWindKt": 20,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1004,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 39.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2020-10-17T09:00:00Z",
+          "lat": 17.8,
+          "lon": 67.8,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 33.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": 25,
+      "firstFixIso": "2020-10-17T03:00:00Z",
+      "lastContinuousDomainFixIso": "2020-10-18T18:00:00Z"
+    },
+    {
+      "id": "hf6_1960185n21070",
+      "sid": "1960185N21070",
+      "name": "Unnamed",
+      "year": 1960,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "c7307c1de09c8f8f86e2476c07821483e17f17659e193512dc0b4cd64c022d93",
+      "seed": 1960047,
+      "monthIndex": 6,
+      "eventStartIso": "1960-07-02T00:00:00Z",
+      "eventEndIso": "1960-07-05T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1960,
+          "month": 7,
+          "days": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "suffix": "_1960_07"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1960-07-03T03:00:00Z",
+          "lat": 20.7,
+          "lon": 69.7,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 24.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1960-07-03T09:00:00Z",
+          "lat": 20.8,
+          "lon": 69.3,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 18.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1960-07-03T03:00:00Z",
+      "lastContinuousDomainFixIso": "1960-07-04T03:00:00Z"
+    },
+    {
+      "id": "hf6_1996167n16072",
+      "sid": "1996167N16072",
+      "name": "Unnamed",
+      "year": 1996,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "df5389f356dc783198210e2ee8aa78be059aac7df9b2be4ff42bbd3b96de98d2",
+      "seed": 1996048,
+      "monthIndex": 5,
+      "eventStartIso": "1996-06-16T00:00:00Z",
+      "eventEndIso": "1996-06-18T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1996,
+          "month": 6,
+          "days": [
+            16,
+            17,
+            18
+          ],
+          "suffix": "_1996_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1996-06-17T00:00:00Z",
+          "lat": 17.5,
+          "lon": 69.6,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 21.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1996-06-17T06:00:00Z",
+          "lat": 17.6,
+          "lon": 69.1,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 15.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 38,
+      "firstFixIso": "1996-06-17T00:00:00Z",
+      "lastContinuousDomainFixIso": "1996-06-17T21:00:00Z"
+    },
+    {
+      "id": "hf6_1966305n09096",
+      "sid": "1966305N09096",
+      "name": "Unnamed",
+      "year": 1966,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "aa2e4b96375ece04720f74ca88bec2504b2bf4234e6da7415c287a1efcfff5dc",
+      "seed": 1966049,
+      "monthIndex": 10,
+      "eventStartIso": "1966-11-09T00:00:00Z",
+      "eventEndIso": "1966-11-12T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1966,
+          "month": 11,
+          "days": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "suffix": "_1966_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1966-11-10T03:00:00Z",
+          "lat": 15.3,
+          "lon": 61.0,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 36.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1966-11-10T09:00:00Z",
+          "lat": 15.5,
+          "lon": 60.2,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 30.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1966-11-10T03:00:00Z",
+      "lastContinuousDomainFixIso": "1966-11-11T15:00:00Z"
+    },
+    {
+      "id": "hf6_1949150n17070",
+      "sid": "1949150N17070",
+      "name": "Unnamed",
+      "year": 1949,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "cd956ca9878d7bf8f1035732beff6feb6b895b0656f5f883495342bace660eee",
+      "seed": 1949050,
+      "monthIndex": 4,
+      "eventStartIso": "1949-05-29T00:00:00Z",
+      "eventEndIso": "1949-06-01T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1949,
+          "month": 5,
+          "days": [
+            29,
+            30,
+            31
+          ],
+          "suffix": "_1949_05"
+        },
+        {
+          "year": 1949,
+          "month": 6,
+          "days": [
+            1
+          ],
+          "suffix": "_1949_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1949-05-30T03:00:00Z",
+          "lat": 17.7,
+          "lon": 69.7,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 24.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1949-05-30T09:00:00Z",
+          "lat": 18.0,
+          "lon": 69.5,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 18.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1949-05-30T03:00:00Z",
+      "lastContinuousDomainFixIso": "1949-05-31T03:00:00Z"
+    },
+    {
+      "id": "hf6_2004162n18068",
+      "sid": "2004162N18068",
+      "name": "Unnamed",
+      "year": 2004,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "9e295ba87d39b191cdb90e675f4d9dc68f34a465d0a7957e8c99aecbdb16f9eb",
+      "seed": 2004051,
+      "monthIndex": 5,
+      "eventStartIso": "2004-06-09T00:00:00Z",
+      "eventEndIso": "2004-06-14T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2004,
+          "month": 6,
+          "days": [
+            9,
+            10,
+            11,
+            12,
+            13,
+            14
+          ],
+          "suffix": "_2004_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2004-06-10T03:00:00Z",
+          "lat": 17.5,
+          "lon": 67.5,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 996,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 72.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2004-06-10T09:00:00Z",
+          "lat": 17.5,
+          "lon": 66.5,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 996,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 66.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": 30,
+      "firstFixIso": "2004-06-10T03:00:00Z",
+      "lastContinuousDomainFixIso": "2004-06-13T03:00:00Z"
+    },
+    {
+      "id": "hf6_1998285n14068",
+      "sid": "1998285N14068",
+      "name": "Unnamed",
+      "year": 1998,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "165d84b20ad77aed5b291b1e076c1b5937855049426c85752e09145641d52756",
+      "seed": 1998052,
+      "monthIndex": 9,
+      "eventStartIso": "1998-10-12T00:00:00Z",
+      "eventEndIso": "1998-10-18T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1998,
+          "month": 10,
+          "days": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "suffix": "_1998_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1998-10-13T03:00:00Z",
+          "lat": 15.5,
+          "lon": 65.0,
+          "initialWindKt": 30,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 998,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 93.0,
+          "windAgency": "newdelhi",
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1998-10-13T09:00:00Z",
+          "lat": 15.7,
+          "lon": 64.2,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 87.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": 35,
+      "firstFixIso": "1998-10-13T03:00:00Z",
+      "lastContinuousDomainFixIso": "1998-10-17T00:00:00Z"
+    },
+    {
+      "id": "hf6_1966272n13072",
+      "sid": "1966272N13072",
+      "name": "Unnamed",
+      "year": 1966,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "d2082f974d5e89f76d556577c9a7b001c690fc9e16aa8f639db3c4adb46b245d",
+      "seed": 1966053,
+      "monthIndex": 9,
+      "eventStartIso": "1966-10-03T00:00:00Z",
+      "eventEndIso": "1966-10-06T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1966,
+          "month": 10,
+          "days": [
+            3,
+            4,
+            5,
+            6
+          ],
+          "suffix": "_1966_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1966-10-04T06:00:00Z",
+          "lat": 16.2,
+          "lon": 69.7,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 21.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1966-10-04T12:00:00Z",
+          "lat": 16.3,
+          "lon": 68.9,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 15.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1966-10-04T06:00:00Z",
+      "lastContinuousDomainFixIso": "1966-10-05T03:00:00Z"
+    },
+    {
+      "id": "hf6_1958322n08093",
+      "sid": "1958322N08093",
+      "name": "Unnamed",
+      "year": 1958,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "b5fb3a55eedd902cc294d612cf2211a21b4269518d50fc80d9577c90d3d99e81",
+      "seed": 1958054,
+      "monthIndex": 10,
+      "eventStartIso": "1958-11-25T00:00:00Z",
+      "eventEndIso": "1958-11-30T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1958,
+          "month": 11,
+          "days": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30
+          ],
+          "suffix": "_1958_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1958-11-26T09:00:00Z",
+          "lat": 15.4,
+          "lon": 65.9,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 66.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1958-11-26T15:00:00Z",
+          "lat": 16.1,
+          "lon": 65.2,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 60.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1958-11-26T09:00:00Z",
+      "lastContinuousDomainFixIso": "1958-11-29T03:00:00Z"
+    },
+    {
+      "id": "hf6_1977300n13092",
+      "sid": "1977300N13092",
+      "name": "Unnamed",
+      "year": 1977,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "31163e5604fcf5fe334ba9061ea74d97fff23422f0ccd2ff494371dd7f21498a",
+      "seed": 1977055,
+      "monthIndex": 10,
+      "eventStartIso": "1977-11-01T00:00:00Z",
+      "eventEndIso": "1977-11-05T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1977,
+          "month": 11,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "suffix": "_1977_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1977-11-02T06:00:00Z",
+          "lat": 17.2,
+          "lon": 69.4,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 54.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1977-11-02T12:00:00Z",
+          "lat": 17.3,
+          "lon": 68.0,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 48.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1977-11-02T06:00:00Z",
+      "lastContinuousDomainFixIso": "1977-11-04T12:00:00Z"
+    },
+    {
+      "id": "hf6_1962148n17065",
+      "sid": "1962148N17065",
+      "name": "Unnamed",
+      "year": 1962,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "fae3c19242f15dac1bef6d7c191ec93045acccbf9bfd403a24e2b76f35c9fff5",
+      "seed": 1962056,
+      "monthIndex": 4,
+      "eventStartIso": "1962-05-26T00:00:00Z",
+      "eventEndIso": "1962-05-31T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1962,
+          "month": 5,
+          "days": [
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "suffix": "_1962_05"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1962-05-27T18:00:00Z",
+          "lat": 16.9,
+          "lon": 64.5,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 57.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1962-05-28T00:00:00Z",
+          "lat": 16.9,
+          "lon": 64.3,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 51.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1962-05-27T18:00:00Z",
+      "lastContinuousDomainFixIso": "1962-05-30T03:00:00Z"
+    },
+    {
+      "id": "hf6_1951162n18068",
+      "sid": "1951162N18068",
+      "name": "Unnamed",
+      "year": 1951,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "8b76feb8c5a562661d56ae79e634542d87c1055ce7b744bf59f68d81c09a7a85",
+      "seed": 1951057,
+      "monthIndex": 5,
+      "eventStartIso": "1951-06-09T00:00:00Z",
+      "eventEndIso": "1951-06-13T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1951,
+          "month": 6,
+          "days": [
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "suffix": "_1951_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1951-06-10T18:00:00Z",
+          "lat": 18.2,
+          "lon": 68.2,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 33.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1951-06-11T00:00:00Z",
+          "lat": 18.7,
+          "lon": 68.1,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 27.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1951-06-10T18:00:00Z",
+      "lastContinuousDomainFixIso": "1951-06-12T03:00:00Z"
+    },
+    {
+      "id": "hf6_1971348n07073",
+      "sid": "1971348N07073",
+      "name": "Unnamed",
+      "year": 1971,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "25f8cd53ba27a1df9577f87051719ef1d78fa400cd29718b1734de643e625694",
+      "seed": 1971058,
+      "monthIndex": 11,
+      "eventStartIso": "1971-12-17T00:00:00Z",
+      "eventEndIso": "1971-12-22T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1971,
+          "month": 12,
+          "days": [
+            17,
+            18,
+            19,
+            20,
+            21,
+            22
+          ],
+          "suffix": "_1971_12"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1971-12-18T06:00:00Z",
+          "lat": 15.4,
+          "lon": 60.0,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 69.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1971-12-18T12:00:00Z",
+          "lat": 16.1,
+          "lon": 58.9,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 63.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1971-12-18T06:00:00Z",
+      "lastContinuousDomainFixIso": "1971-12-21T03:00:00Z"
+    },
+    {
+      "id": "hf6_1974137n11069",
+      "sid": "1974137N11069",
+      "name": "Unnamed",
+      "year": 1974,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "4c9a74cafc1959ca72b2e4f55bc915a75c3ee24ebb41ce4b473f2a31982742cb",
+      "seed": 1974059,
+      "monthIndex": 4,
+      "eventStartIso": "1974-05-18T00:00:00Z",
+      "eventEndIso": "1974-05-21T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1974,
+          "month": 5,
+          "days": [
+            18,
+            19,
+            20,
+            21
+          ],
+          "suffix": "_1974_05"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1974-05-19T00:00:00Z",
+          "lat": 15.4,
+          "lon": 61.8,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 30.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1974-05-19T06:00:00Z",
+          "lat": 15.6,
+          "lon": 60.6,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 24.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1974-05-19T00:00:00Z",
+      "lastContinuousDomainFixIso": "1974-05-20T06:00:00Z"
+    },
+    {
+      "id": "hf6_1959179n18089",
+      "sid": "1959179N18089",
+      "name": "Unnamed",
+      "year": 1959,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "5bb623c20f6cd037f911b8e2eae26273eb17bf0154099a0e062746038fa1e195",
+      "seed": 1959060,
+      "monthIndex": 6,
+      "eventStartIso": "1959-06-30T00:00:00Z",
+      "eventEndIso": "1959-07-04T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1959,
+          "month": 6,
+          "days": [
+            30
+          ],
+          "suffix": "_1959_06"
+        },
+        {
+          "year": 1959,
+          "month": 7,
+          "days": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "suffix": "_1959_07"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1959-07-01T21:00:00Z",
+          "lat": 23.6,
+          "lon": 69.1,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 30.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1959-07-02T03:00:00Z",
+          "lat": 23.6,
+          "lon": 68.2,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 24.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1959-07-01T21:00:00Z",
+      "lastContinuousDomainFixIso": "1959-07-03T03:00:00Z"
+    },
+    {
+      "id": "hf6_1959176n18071",
+      "sid": "1959176N18071",
+      "name": "Unnamed",
+      "year": 1959,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "4f1848674690ae8161522f2d05c387773f9ccb17376cf4fa4d6aa454233107a8",
+      "seed": 1959061,
+      "monthIndex": 5,
+      "eventStartIso": "1959-06-24T00:00:00Z",
+      "eventEndIso": "1959-06-30T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1959,
+          "month": 6,
+          "days": [
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30
+          ],
+          "suffix": "_1959_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1959-06-25T15:00:00Z",
+          "lat": 19.5,
+          "lon": 69.6,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 84.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1959-06-25T21:00:00Z",
+          "lat": 20.0,
+          "lon": 69.3,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 78.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1959-06-25T15:00:00Z",
+      "lastContinuousDomainFixIso": "1959-06-29T03:00:00Z"
+    },
+    {
+      "id": "hf6_1972177n22068",
+      "sid": "1972177N22068",
+      "name": "Unnamed",
+      "year": 1972,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "8689af16f4d8cc2c7b521f1737877d1ce30f95f9f21e5c7bed550fdf7912116e",
+      "seed": 1972062,
+      "monthIndex": 5,
+      "eventStartIso": "1972-06-24T00:00:00Z",
+      "eventEndIso": "1972-06-28T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1972,
+          "month": 6,
+          "days": [
+            24,
+            25,
+            26,
+            27,
+            28
+          ],
+          "suffix": "_1972_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1972-06-25T03:00:00Z",
+          "lat": 21.5,
+          "lon": 67.5,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 48.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1972-06-25T09:00:00Z",
+          "lat": 21.9,
+          "lon": 66.4,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 42.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1972-06-25T03:00:00Z",
+      "lastContinuousDomainFixIso": "1972-06-27T03:00:00Z"
+    },
+    {
+      "id": "hf6_2019337n11072",
+      "sid": "2019337N11072",
+      "name": "Unnamed",
+      "year": 2019,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "56d09ddfc08ad487448bfabb1bd12c4acd8d8c992349d58cf2be0d7d3b3a3534",
+      "seed": 2019063,
+      "monthIndex": 11,
+      "eventStartIso": "2019-12-04T00:00:00Z",
+      "eventEndIso": "2019-12-07T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2019,
+          "month": 12,
+          "days": [
+            4,
+            5,
+            6,
+            7
+          ],
+          "suffix": "_2019_12"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2019-12-05T03:00:00Z",
+          "lat": 15.4,
+          "lon": 67.6,
+          "initialWindKt": 25,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1009,
+          "initialRmwKm": 64.82,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 27.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2019-12-05T09:00:00Z",
+          "lat": 15.9,
+          "lon": 66.7,
+          "initialWindKt": 23,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1010,
+          "initialRmwKm": 74.08,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 21.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 25,
+      "firstFixIso": "2019-12-05T03:00:00Z",
+      "lastContinuousDomainFixIso": "2019-12-06T06:00:00Z"
+    },
+    {
+      "id": "hf6_1961200n24069",
+      "sid": "1961200N24069",
+      "name": "Unnamed",
+      "year": 1961,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "a7fcc4311c9d30d1beceb36cbe210817681655a428c69d35329b252d7542f25f",
+      "seed": 1961064,
+      "monthIndex": 6,
+      "eventStartIso": "1961-07-17T00:00:00Z",
+      "eventEndIso": "1961-07-20T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1961,
+          "month": 7,
+          "days": [
+            17,
+            18,
+            19,
+            20
+          ],
+          "suffix": "_1961_07"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1961-07-18T18:00:00Z",
+          "lat": 23.9,
+          "lon": 69.3,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 21.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1961-07-19T00:00:00Z",
+          "lat": 24.0,
+          "lon": 69.2,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 15.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1961-07-18T18:00:00Z",
+      "lastContinuousDomainFixIso": "1961-07-19T15:00:00Z"
+    },
+    {
+      "id": "hf6_1948323n10071",
+      "sid": "1948323N10071",
+      "name": "Unnamed",
+      "year": 1948,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "a31881502236b566ea9848db837c74a59159331ff43f153616aea03b23b7ba0e",
+      "seed": 1948065,
+      "monthIndex": 10,
+      "eventStartIso": "1948-11-18T00:00:00Z",
+      "eventEndIso": "1948-11-22T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1948,
+          "month": 11,
+          "days": [
+            18,
+            19,
+            20,
+            21,
+            22
+          ],
+          "suffix": "_1948_11"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1948-11-19T00:00:00Z",
+          "lat": 15.3,
+          "lon": 66.4,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 54.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1948-11-19T06:00:00Z",
+          "lat": 16.1,
+          "lon": 66.0,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 48.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1948-11-19T00:00:00Z",
+      "lastContinuousDomainFixIso": "1948-11-21T06:00:00Z"
+    },
+    {
+      "id": "hf6_2018279n11069",
+      "sid": "2018279N11069",
+      "name": "Luban",
+      "year": 2018,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "0a9edfbcf084833ecff7fdca0e841712b841e9f83cb96462b57b7dff58c933b7",
+      "seed": 2018066,
+      "monthIndex": 9,
+      "eventStartIso": "2018-10-13T00:00:00Z",
+      "eventEndIso": "2018-10-15T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 2018,
+          "month": 10,
+          "days": [
+            13,
+            14,
+            15
+          ],
+          "suffix": "_2018_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "2018-10-14T00:00:00Z",
+          "lat": 15.4,
+          "lon": 52.8,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1002,
+          "initialRmwKm": 74.08,
+          "initialR34Km": 111.12,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 21.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "2018-10-14T06:00:00Z",
+          "lat": 15.9,
+          "lon": 52.2,
+          "initialWindKt": 35,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 996,
+          "initialRmwKm": 55.56,
+          "initialR34Km": 120.38,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 15.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 35,
+      "firstFixIso": "2018-10-14T00:00:00Z",
+      "lastContinuousDomainFixIso": "2018-10-14T21:00:00Z"
+    },
+    {
+      "id": "hf6_1971153n19062",
+      "sid": "1971153N19062",
+      "name": "Unnamed",
+      "year": 1971,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "93a32ecb9cb6125e89654afe044e7c4b0d63faf14aeed2043c04d39114126cda",
+      "seed": 1971067,
+      "monthIndex": 5,
+      "eventStartIso": "1971-05-31T00:00:00Z",
+      "eventEndIso": "1971-06-05T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1971,
+          "month": 5,
+          "days": [
+            31
+          ],
+          "suffix": "_1971_05"
+        },
+        {
+          "year": 1971,
+          "month": 6,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "suffix": "_1971_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1971-06-01T15:00:00Z",
+          "lat": 19.2,
+          "lon": 62.3,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 72.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1971-06-01T21:00:00Z",
+          "lat": 19.8,
+          "lon": 62.9,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 66.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1971-06-01T15:00:00Z",
+      "lastContinuousDomainFixIso": "1971-06-04T15:00:00Z"
+    },
+    {
+      "id": "hf6_1989159n17072",
+      "sid": "1989159N17072",
+      "name": "Unnamed",
+      "year": 1989,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "55a41a7b102522ad9822534a1d286bf4d0ed449f059705676ab5a9bdc72e3597",
+      "seed": 1989068,
+      "monthIndex": 5,
+      "eventStartIso": "1989-06-07T00:00:00Z",
+      "eventEndIso": "1989-06-10T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1989,
+          "month": 6,
+          "days": [
+            7,
+            8,
+            9,
+            10
+          ],
+          "suffix": "_1989_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1989-06-08T18:00:00Z",
+          "lat": 18.9,
+          "lon": 68.8,
+          "initialWindKt": 20,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 15.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1989-06-09T00:00:00Z",
+          "lat": 19.7,
+          "lon": 69.3,
+          "initialWindKt": 20,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 9.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 25,
+      "firstFixIso": "1989-06-08T18:00:00Z",
+      "lastContinuousDomainFixIso": "1989-06-09T09:00:00Z"
+    },
+    {
+      "id": "hf6_1946153n11071",
+      "sid": "1946153N11071",
+      "name": "Unnamed",
+      "year": 1946,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "6035690202f97268c8438d64061639a607e946aea5d0e5f6cf766395a411a27c",
+      "seed": 1946069,
+      "monthIndex": 5,
+      "eventStartIso": "1946-06-02T00:00:00Z",
+      "eventEndIso": "1946-06-07T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1946,
+          "month": 6,
+          "days": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "suffix": "_1946_06"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1946-06-03T09:00:00Z",
+          "lat": 15.3,
+          "lon": 67.9,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 66.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1946-06-03T15:00:00Z",
+          "lat": 15.8,
+          "lon": 67.3,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 60.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1946-06-03T09:00:00Z",
+      "lastContinuousDomainFixIso": "1946-06-06T03:00:00Z"
+    },
+    {
+      "id": "hf6_1975275n21067",
+      "sid": "1975275N21067",
+      "name": "Unnamed",
+      "year": 1975,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "a0792c460cb1f511402e71538841b267b62eb3a79406ce3644a2ecc44c59dfc7",
+      "seed": 1975070,
+      "monthIndex": 9,
+      "eventStartIso": "1975-10-01T00:00:00Z",
+      "eventEndIso": "1975-10-06T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1975,
+          "month": 10,
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "suffix": "_1975_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1975-10-02T00:00:00Z",
+          "lat": 20.7,
+          "lon": 67.4,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 84.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1975-10-02T06:00:00Z",
+          "lat": 21.2,
+          "lon": 67.4,
+          "initialWindKt": null,
+          "initialWindPriorKt": 25,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 78.0,
+          "windAgency": null,
+          "windCanonicalOneMinute": false
+        }
+      ],
+      "maxObservedWindKt": null,
+      "firstFixIso": "1975-10-02T00:00:00Z",
+      "lastContinuousDomainFixIso": "1975-10-05T12:00:00Z"
+    },
+    {
+      "id": "hf6_1996288n09092",
+      "sid": "1996288N09092",
+      "name": "Unnamed",
+      "year": 1996,
+      "partition": "broad-report",
+      "legacyId": null,
+      "selectionRank": "9ca536fb11170c80eab58ef704d298ca2f0500c326529f0c66eea054a852cfad",
+      "seed": 1996071,
+      "monthIndex": 9,
+      "eventStartIso": "1996-10-25T00:00:00Z",
+      "eventEndIso": "1996-10-29T23:00:00Z",
+      "requestParts": [
+        {
+          "year": 1996,
+          "month": 10,
+          "days": [
+            25,
+            26,
+            27,
+            28,
+            29
+          ],
+          "suffix": "_1996_10"
+        }
+      ],
+      "initializations": [
+        {
+          "id": "i00",
+          "offsetFromFirstH": 0,
+          "startIso": "1996-10-26T21:00:00Z",
+          "lat": 19.4,
+          "lon": 69.7,
+          "initialWindKt": 33,
+          "initialWindPriorKt": null,
+          "initialPressureMb": null,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 33.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        },
+        {
+          "id": "i06",
+          "offsetFromFirstH": 6,
+          "startIso": "1996-10-27T03:00:00Z",
+          "lat": 18.8,
+          "lon": 69.6,
+          "initialWindKt": 38,
+          "initialWindPriorKt": null,
+          "initialPressureMb": 1002,
+          "initialRmwKm": null,
+          "initialR34Km": null,
+          "initialR50Km": null,
+          "initialR64Km": null,
+          "availableObservationH": 27.0,
+          "windAgency": "USA/JTWC",
+          "windCanonicalOneMinute": true
+        }
+      ],
+      "maxObservedWindKt": 45,
+      "firstFixIso": "1996-10-26T21:00:00Z",
+      "lastContinuousDomainFixIso": "1996-10-28T06:00:00Z"
+    }
+  ]
+}

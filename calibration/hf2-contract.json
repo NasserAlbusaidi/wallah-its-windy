@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-2",
+  "scope": [
+    "dynamic upper-ocean coupling",
+    "annular vector ventilation and organization memory",
+    "coherent pressure-size-wind structure",
+    "continuous coastal and terrain exposure"
+  ],
+  "selectionRule": "All parameter selection uses development storms only.",
+  "validationUse": "The legacy validation partition is diagnostic because model-design work saw earlier validation results. A new sealed cohort is required for a confirmatory acceptance claim.",
+  "requiredLeadsH": [24, 48],
+  "gates": {
+    "oceanComponentAccepted": true,
+    "structureComponentAccepted": true,
+    "minimumSampleRetentionFraction": 1,
+    "minimumIntensitySkillFractionAgainstPersistence": 0,
+    "minimumPressureSkillFractionAgainstPersistence": 0,
+    "requireAbsoluteIntensityBiasImprovementAgainstPersistence": true,
+    "requireAbsolutePressureBiasImprovementAgainstPersistence": true,
+    "allowThresholdRelaxationAfterViewingValidation": false
+  },
+  "decisionRule": "Every gate must pass at both required leads. A failed component gate rejects HF-2 even when the combined forecast improves.",
+  "retestRule": "Any revised candidate must be frozen before evaluation on a newly sealed HF-6 cohort. The viewed legacy validation storms cannot regain confirmatory status."
+}

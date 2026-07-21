@@ -13,8 +13,16 @@ import { eventSpawn, type BenchmarkPartition, type Scenario } from './scenarios'
 import {
   createSimEngine,
   type IntensityParameters,
+  type TrackParameters,
 } from './sim';
-import type { ParsedBin, SimEvent } from './types';
+import type {
+  ParsedBin,
+  PressureWindSampler,
+  SimEvent,
+  StormDeath,
+  WindRadiiKm,
+} from './types';
+import type { OceanProfileSampler } from './ocean-profile-sampler';
 import type { StormTrack } from './tracks';
 
 export interface HindcastCase {
@@ -33,6 +41,8 @@ export interface HindcastCaseResult {
 export interface DetailedHindcastCaseResult {
   result: HindcastCaseResult;
   frames: FlightFrame[];
+  firstLandfall: { lat: number; lon: number; ageH: number } | null;
+  death: StormDeath | null;
 }
 
 export interface HindcastAggregate {
@@ -98,6 +108,17 @@ export function runDetailedHindcastCase(
   benchmarkCase: HindcastCase,
   terrain: ParsedBin,
   intensityParameters?: Partial<IntensityParameters>,
+  oceanProfileSampler?: OceanProfileSampler,
+  structureInitialization?: {
+    rmwKm?: number;
+    outerSizePriorKm?: number;
+    r34Km?: Partial<WindRadiiKm>;
+    r50Km?: Partial<WindRadiiKm>;
+    r64Km?: Partial<WindRadiiKm>;
+  },
+  motionInitialization?: { u: number; v: number },
+  pressureWindSampler?: PressureWindSampler,
+  trackParameters?: Partial<TrackParameters>,
 ): DetailedHindcastCaseResult {
   const { scenario, environment, track } = benchmarkCase;
   if (!scenario.hindcast || !scenario.benchmarkPartition) {
@@ -105,6 +126,7 @@ export function runDetailedHindcastCase(
   }
   const land = terrain.layers.get('landmask');
   if (!land) throw new Error('terrain.bin is missing landmask');
+  const elevation = terrain.layers.get('elev');
   const isLand = (lat: number, lon: number): boolean =>
     sampleLayerBilinear(land, 0, lat, lon) > 0.5;
   const sampler = makeEnvSampler(() => environment);
@@ -112,9 +134,24 @@ export function runDetailedHindcastCase(
   const engine = createSimEngine({
     env: sampler,
     isLand,
+    physicsProfile: 'hf2-experimental',
+    terrainHeightM: (lat, lon) =>
+      elevation ? sampleLayerBilinear(elevation, 0, lat, lon) : 0,
     intensityParameters,
+    trackParameters,
+    pressureWindSampler,
+    oceanProfileSampler,
   });
-  const spawn = eventSpawn(scenario, null, 'hindcast');
+  const spawn = {
+    ...eventSpawn(scenario, null, 'hindcast'),
+    initialRmwKm: structureInitialization?.rmwKm,
+    initialOuterSizeKm: structureInitialization?.outerSizePriorKm,
+    initialR34Km: structureInitialization?.r34Km,
+    initialR50Km: structureInitialization?.r50Km,
+    initialR64Km: structureInitialization?.r64Km,
+    initialMotionUms: motionInitialization?.u,
+    initialMotionVms: motionInitialization?.v,
+  };
   engine.spawn(spawn);
   const recorder = new FlightRecorder();
   recorder.start(
@@ -137,9 +174,18 @@ export function runDetailedHindcastCase(
     scenario.windowH - scenario.hindcast.envOffsetH,
   );
   const maxTicks = Math.ceil((durationH * 60) / 15);
+  let firstLandfall: { lat: number; lon: number; ageH: number } | null = null;
+  let death: StormDeath | null = null;
   for (let tick = 0; tick < maxTicks; tick += 1) {
     const events: SimEvent[] = engine.tick(15);
-    recorder.record(engine.getState()!, events);
+    const state = engine.getState()!;
+    recorder.record(state, events);
+    for (const event of events) {
+      if (event.type === 'landfall' && !firstLandfall) {
+        firstLandfall = { lat: event.lat, lon: event.lon, ageH: state.ageH };
+      }
+      if (event.type === 'died') death = { ...event.death };
+    }
     if (events.some((event) => event.type === 'died')) break;
   }
 
@@ -158,6 +204,8 @@ export function runDetailedHindcastCase(
       score,
     },
     frames,
+    firstLandfall,
+    death,
   };
 }
 

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-4",
+  "selectionRule": "Uncertainty distributions and cone corrections use development storms only. Validation is evaluated once after the calibration artifact is frozen.",
+  "ensemble": {
+    "verificationMembers": 40,
+    "sourceAblationMembers": 12,
+    "sources": ["initialization", "forcing", "parameters", "unresolved-physics"],
+    "memberZero": "unperturbed deterministic model",
+    "seeds": "deterministic function of forecast seed, member index, and uncertainty source"
+  },
+  "cone": {
+    "method": "split-conformal additive radius by lead and nominal coverage",
+    "nominalCoverage": [0.5, 0.67, 0.9],
+    "validationTolerance": {"0.5": 0.2, "0.67": 0.2, "0.9": 0.15},
+    "minimum90PercentCoverage": 0.8
+  },
+  "gates": {
+    "requiredLeadsH": [24, 48],
+    "minimumSpreadErrorCorrelation": 0,
+    "requireIntensityCrpsBetterThanDeterministic": true,
+    "minimumMeanBrierSkillAgainstDevelopmentClimatology": 0,
+    "minimumMemberPositionRetentionFraction": 0.9,
+    "requireAllUncertaintySourcesProduceNonzeroSpread": true,
+    "finalTestIsAcceptanceGate": false
+  },
+  "labelPolicy": {
+    "beforeAcceptance": "perturbation frequency",
+    "afterAcceptance": "calibrated experimental probability",
+    "officialForecastConeAllowed": false
+  },
+  "claimRule": "Legacy validation is diagnostic. HF-6 independent and prospective evaluation is required before probability language is strengthened."
+}

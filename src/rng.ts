@@ -91,6 +91,21 @@ export interface HashState {
    * Legacy shared URLs lack it entirely and must keep replaying as climatology.
    */
   env?: EnvHashKey;
+  /** Versioned display identity; optional so every legacy URL remains valid. */
+  stormName?: string;
+  stormNameCatalogueVersion?: string;
+}
+
+function safeStormName(value: string | null): string | undefined {
+  return value && /^[A-Za-z][A-Za-z-]{1,15}$/.test(value)
+    ? value
+    : undefined;
+}
+
+function safeCatalogueVersion(value: string | null): string | undefined {
+  return value && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value)
+    ? value
+    : undefined;
 }
 
 /**
@@ -107,6 +122,8 @@ export function readHash(hash: string = location.hash): HashState | null {
   const monthS = p.get('month');
   const seedS = p.get('seed');
   const envS = p.get('env');
+  const stormName = safeStormName(p.get('storm'));
+  const stormNameCatalogueVersion = safeCatalogueVersion(p.get('namev'));
   // Every field must be present — Number(null) is 0, so absent keys would
   // otherwise slip through as a bogus (0,0,Jan,0) storm.
   if (latS === null || lonS === null || monthS === null || seedS === null) return null;
@@ -127,6 +144,10 @@ export function readHash(hash: string = location.hash): HashState | null {
   // unknown/garbage value is ignored (validated against the known set).
   const env = isEnvHashKey(envS) ? envS : undefined;
   const state: HashState = { lat, lon, monthIndex, seed: seed >>> 0 };
+  if (stormName && stormNameCatalogueVersion) {
+    state.stormName = stormName;
+    state.stormNameCatalogueVersion = stormNameCatalogueVersion;
+  }
   if (env) state.env = env;
   return state;
 }
@@ -139,6 +160,14 @@ export function encodeHash(state: HashState): string {
     month: String(state.monthIndex),
     seed: String(state.seed >>> 0),
   });
+  const stormName = safeStormName(state.stormName ?? null);
+  const catalogueVersion = safeCatalogueVersion(
+    state.stormNameCatalogueVersion ?? null,
+  );
+  if (stormName && catalogueVersion) {
+    p.set('storm', stormName);
+    p.set('namev', catalogueVersion);
+  }
   // The scenario key is appended LAST and ONLY for a recognised non-climatology
   // value, so a plain storm serialises to the exact legacy string — existing
   // shared URLs stay byte-identical and no climatology storm churns its hash.

@@ -1,0 +1,862 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "name": "NOAA IBTrACS v04r01 North Indian basin USA/JTWC fields",
+    "path": "data/raw/ibtracs.NI.csv",
+    "sha256": "02f6af3b7e12ee76e88866995b4451b85867a2b7f20ed2666f8561024d671b62"
+  },
+  "catalog": {
+    "path": "calibration/fidelity-catalog.json",
+    "sha256": "cb3aa9bee125bef248c2eac4c3f9037f62c85a4619ddc5a8b8110501677eb7cc"
+  },
+  "contract": "RMW and radii are used only when present at the exact agency-consistent initialization fix; blanks remain an explicit climatological prior.",
+  "counts": {
+    "storms": 30,
+    "rmw": 16,
+    "r34": 12,
+    "r50": 6,
+    "r64": 5
+  },
+  "storms": [
+    {
+      "id": "as1980",
+      "sid": "1980317N11075",
+      "initializationTime": "1980-11-17T09:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1981",
+      "sid": "1981298N07083",
+      "initializationTime": "1981-10-31T06:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1982",
+      "sid": "1982309N12066",
+      "initializationTime": "1982-11-07T09:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1983",
+      "sid": "1983216N23088",
+      "initializationTime": "1983-08-09T15:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1985",
+      "sid": "1985148N15067",
+      "initializationTime": "1985-05-28T18:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1987",
+      "sid": "1987155N16061",
+      "initializationTime": "1987-06-06T21:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1992",
+      "sid": "1992273N12077",
+      "initializationTime": "1992-10-01T06:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1993",
+      "sid": "1993316N11070",
+      "initializationTime": "1993-11-13T06:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1994",
+      "sid": "1994157N17074",
+      "initializationTime": "1994-06-07T00:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1995",
+      "sid": "1995284N17074",
+      "initializationTime": "1995-10-13T03:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1998",
+      "sid": "1998152N11075",
+      "initializationTime": "1998-06-07T15:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1998dec",
+      "sid": "1998346N10072",
+      "initializationTime": "1998-12-15T00:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as1999",
+      "sid": "1999135N12073",
+      "initializationTime": "1999-05-17T18:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "as2001",
+      "sid": "2001141N14068",
+      "initializationTime": "2001-05-24T09:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": null,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": "live climatological relationship"
+    },
+    {
+      "id": "mukda2006",
+      "sid": "2006262N19069",
+      "initializationTime": "2006-09-21T12:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 74.08,
+      "outerSizePriorKm": 92.6,
+      "r34Km": {
+        "ne": 92.6,
+        "se": 92.6,
+        "sw": 92.6,
+        "nw": 92.6
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "gonu2007",
+      "sid": "2007151N14072",
+      "initializationTime": "2007-06-03T03:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 37.04,
+      "outerSizePriorKm": 125.01,
+      "r34Km": {
+        "ne": 129.64,
+        "se": 120.38,
+        "sw": 120.38,
+        "nw": 129.64
+      },
+      "r50Km": {
+        "ne": 70.376,
+        "se": 61.116,
+        "sw": 61.116,
+        "nw": 70.376
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "as2007",
+      "sid": "2007172N15088",
+      "initializationTime": "2007-06-25T06:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 74.08,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "phet2010",
+      "sid": "2010151N14065",
+      "initializationTime": "2010-06-01T06:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 64.82,
+      "outerSizePriorKm": 99.545,
+      "r34Km": {
+        "ne": 101.86,
+        "se": 101.86,
+        "sw": 101.86,
+        "nw": 92.6
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "keila2011",
+      "sid": "2011302N13062",
+      "initializationTime": "2011-11-02T00:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 74.08,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "nanauk2014",
+      "sid": "2014159N12068",
+      "initializationTime": "2014-06-10T15:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 70.376,
+      "outerSizePriorKm": 98.156,
+      "r34Km": {
+        "ne": 98.156,
+        "se": 98.156,
+        "sw": 98.156,
+        "nw": 98.156
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "nilofar2014",
+      "sid": "2014297N11062",
+      "initializationTime": "2014-10-28T09:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 18.52,
+      "outerSizePriorKm": 194.46,
+      "r34Km": {
+        "ne": 194.46,
+        "se": 194.46,
+        "sw": 194.46,
+        "nw": 194.46
+      },
+      "r50Km": {
+        "ne": 92.6,
+        "se": 92.6,
+        "sw": 92.6,
+        "nw": 92.6
+      },
+      "r64Km": {
+        "ne": 37.04,
+        "se": 37.04,
+        "sw": 37.04,
+        "nw": 37.04
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "ashobaa2015",
+      "sid": "2015157N13069",
+      "initializationTime": "2015-06-07T12:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 83.34,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "mekunu2018",
+      "sid": "2018136N11054",
+      "initializationTime": "2018-05-25T12:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 22.224,
+      "outerSizePriorKm": 268.54,
+      "r34Km": {
+        "ne": 240.76,
+        "se": 324.1,
+        "sw": 305.58,
+        "nw": 203.72
+      },
+      "r50Km": {
+        "ne": 129.64,
+        "se": 175.94,
+        "sw": 166.68,
+        "nw": 101.86
+      },
+      "r64Km": {
+        "ne": 64.82,
+        "se": 92.6,
+        "sw": 92.6,
+        "nw": 55.56
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "vayu2019",
+      "sid": "2019160N11073",
+      "initializationTime": "2019-06-13T21:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 9.26,
+      "outerSizePriorKm": 188.904,
+      "r34Km": {
+        "ne": 190.756,
+        "se": 212.98,
+        "sw": 194.46,
+        "nw": 157.42
+      },
+      "r50Km": {
+        "ne": 107.416,
+        "se": 116.676,
+        "sw": 101.86,
+        "nw": 88.896
+      },
+      "r64Km": {
+        "ne": 61.116,
+        "se": 64.82,
+        "sw": 51.856,
+        "nw": 46.3
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "hikaa2019",
+      "sid": "2019264N19071",
+      "initializationTime": "2019-09-22T12:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 55.56,
+      "outerSizePriorKm": null,
+      "r34Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "kyarr2019",
+      "sid": "2019296N15066",
+      "initializationTime": "2019-10-26T21:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 18.52,
+      "outerSizePriorKm": 203.257,
+      "r34Km": {
+        "ne": 227.796,
+        "se": 203.72,
+        "sw": 172.236,
+        "nw": 209.276
+      },
+      "r50Km": {
+        "ne": 116.676,
+        "se": 101.86,
+        "sw": 83.34,
+        "nw": 111.12
+      },
+      "r64Km": {
+        "ne": 61.116,
+        "se": 55.56,
+        "sw": 42.596,
+        "nw": 61.116
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "maha2019",
+      "sid": "2019301N05081",
+      "initializationTime": "2019-11-02T03:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 27.78,
+      "outerSizePriorKm": 92.6,
+      "r34Km": {
+        "ne": 101.86,
+        "se": 120.38,
+        "sw": 74.08,
+        "nw": 74.08
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "shaheen2021",
+      "sid": "2021267N18094",
+      "initializationTime": "2021-09-30T18:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 129.64,
+      "outerSizePriorKm": 178.255,
+      "r34Km": {
+        "ne": 185.2,
+        "se": 231.5,
+        "sw": 111.12,
+        "nw": 185.2
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "biparjoy2023",
+      "sid": "2023156N10067",
+      "initializationTime": "2023-06-09T18:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 27.78,
+      "outerSizePriorKm": 192.145,
+      "r34Km": {
+        "ne": 148.16,
+        "se": 250.02,
+        "sw": 250.02,
+        "nw": 120.38
+      },
+      "r50Km": {
+        "ne": 74.08,
+        "se": 111.12,
+        "sw": 111.12,
+        "nw": 64.82
+      },
+      "r64Km": {
+        "ne": 37.04,
+        "se": 55.56,
+        "sw": 55.56,
+        "nw": 27.78
+      },
+      "missingDataPrior": null
+    },
+    {
+      "id": "asna2024",
+      "sid": "2024238N25077",
+      "initializationTime": "2024-08-29T21:00:00Z",
+      "sourceAgency": "USA/JTWC",
+      "windAveragingPeriodMinutes": 1,
+      "rmwKm": 92.6,
+      "outerSizePriorKm": 62.968,
+      "r34Km": {
+        "ne": 55.56,
+        "se": 70.376,
+        "sw": 70.376,
+        "nw": 55.56
+      },
+      "r50Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "r64Km": {
+        "ne": null,
+        "se": null,
+        "sw": null,
+        "nw": null
+      },
+      "missingDataPrior": null
+    }
+  ]
+}

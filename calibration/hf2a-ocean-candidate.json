@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "calibration/hf2a-ocean-reference.mjs",
+  "candidateParameters": {
+    "bulkRichardsonCritical": 0.55,
+    "momentumDampingInertialPeriods": 1,
+    "thermalRecoveryHours": 120
+  },
+  "partitionFilter": "development",
+  "protocol": {
+    "forcing": "observed IBTrACS/JTWC track and wind, 15-minute interpolation",
+    "purpose": "ocean-only validation; coupled forecast errors are scored separately",
+    "baseline": "HF-2A retained conservative upper-ocean columns on a wake-free satellite background",
+    "aggregation": "pixels to one score per storm, then equal-storm partition mean",
+    "evaluationLeadsAfterLocalPassageH": [
+      24,
+      48
+    ],
+    "parameterSelectionPartition": "development",
+    "acceptancePartition": "validation",
+    "reportOnlyPartition": "test"
+  },
+  "manifests": {
+    "catalog": {
+      "path": "calibration/fidelity-catalog.json",
+      "sha256": "cb3aa9bee125bef248c2eac4c3f9037f62c85a4619ddc5a8b8110501677eb7cc"
+    },
+    "tracks": {
+      "path": "calibration/data/fidelity-tracks.json",
+      "sha256": "6d0e10c88a436cf9e2777fe168eee8c6c163b1ec8934f921218ef67cafbacf30"
+    },
+    "scenarios": {
+      "path": "calibration/data/fidelity-scenarios.json",
+      "sha256": "86e2aa4b35cd2d79ab6bdcacf4f202cc37b8cc8620d0775d959c4688f654a4e7"
+    },
+    "observations": {
+      "path": "calibration/data/hf2a-ocean-observations.json",
+      "sha256": "1d2047aa2d6779b0e689bded14e7726dbbeda01c5fd3f8861f21ef8066f5221e"
+    },
+    "observationBinary": {
+      "path": "calibration/data/hf2a-ocean-observations.bin",
+      "sha256": "afedaecda0ae849df100819bd0ce37a2997d75137b8ebd066310f766ef5f1648"
+    },
+    "terrain": {
+      "path": "public/data/terrain.bin",
+      "sha256": "a350399d3ce4960313f92e58f4f08d04b9c76ca6a7c35319d27443f3344ae262"
+    },
+    "oceanProfiles": {
+      "path": "public/data/ocean.bin",
+      "sha256": "0811050864a24374e1cc7ed0e1d8519a85ec9e72505d1f9af28a6abca3498434"
+    },
+    "environments": [
+      {
+        "id": "as2007",
+        "path": "calibration/data/fidelity/env_as2007.bin",
+        "sha256": "2bc892bda8de9a526109a8062d6f0bc72c38e559a29e9f13d3ca0b50cde9e021"
+      },
+      {
+        "id": "gonu2007",
+        "path": "public/data/env_gonu.bin",
+        "sha256": "31895447c0ebf783b49f8ff36721d73d5777a38056bbd0c190b1dc719ba311a1"
+      },
+      {
+        "id": "phet2010",
+        "path": "public/data/env_phet.bin",
+        "sha256": "b28c3fdd8a028e3aa32b13c92b51a680808ac943eb3e2ad8fca350c1a24a473f"
+      },
+      {
+        "id": "keila2011",
+        "path": "calibration/data/fidelity/env_keila2011.bin",
+        "sha256": "fcf46edb30aa25a491df00c89d1d2631315c63f2bfff949b8fac2d82da449e54"
+      },
+      {
+        "id": "nanauk2014",
+        "path": "calibration/data/fidelity/env_nanauk2014.bin",
+        "sha256": "5d8e5e1a76e6a7700570cb5dbfde1d1a8762e1bf50c597bdafc5bb980d482e0e"
+      },
+      {
+        "id": "nilofar2014",
+        "path": "public/data/env_nilofar.bin",
+        "sha256": "112cc53475e3f6785b402bf16f354ed838f28c6d0b5b4b468f403ab9bb789125"
+      },
+      {
+        "id": "ashobaa2015",
+        "path": "public/data/env_ashobaa.bin",
+        "sha256": "31b488c1de438049ef55a49d82ff68ddd5138396ca2e3f2f854919297b72e4a8"
+      },
+      {
+        "id": "mekunu2018",
+        "path": "public/data/env_mekunu.bin",
+        "sha256": "2091f5e59d2d3bec1d7eac6adb34e72749349ac15f649a694af279ae123a6f31"
+      },
+      {
+        "id": "hikaa2019",
+        "path": "public/data/env_hikaa.bin",
+        "sha256": "1b8fd2e726f1f67d65a914ee70a3f421bb428e33f29cee000cf7e6a4f77e1c4a"
+      },
+      {
+        "id": "vayu2019",
+        "path": "public/data/env_vayu.bin",
+        "sha256": "5097ed6b26568302008ecbf29d653db6109385c7bb8a503e4a4fce29571d3da1"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "as2007",
+      "label": "arabian sea system jun 2007",
+      "partition": "development",
+      "pixels": 2791,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 2791,
+          "deltaSstMaeC": 0.555557,
+          "deltaSstBiasC": 0.387663,
+          "observedMeanCoolingC": 0.671052,
+          "predictedMeanCoolingC": 0.264684,
+          "meanCoolingAbsErrorC": 0.406368,
+          "observedPeakCoolingP95C": 1.280001,
+          "predictedPeakCoolingP95C": 1.167524,
+          "peakCoolingAbsErrorC": 0.112476
+        },
+        {
+          "leadH": 48,
+          "pixels": 2791,
+          "deltaSstMaeC": 0.605943,
+          "deltaSstBiasC": 0.502001,
+          "observedMeanCoolingC": 0.756,
+          "predictedMeanCoolingC": 0.238469,
+          "meanCoolingAbsErrorC": 0.517531,
+          "observedPeakCoolingP95C": 1.57,
+          "predictedPeakCoolingP95C": 1.067689,
+          "peakCoolingAbsErrorC": 0.50231
+        }
+      ]
+    },
+    {
+      "id": "gonu2007",
+      "label": "gonu 2007",
+      "partition": "development",
+      "pixels": 7568,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 7568,
+          "deltaSstMaeC": 1.127257,
+          "deltaSstBiasC": -0.482913,
+          "observedMeanCoolingC": 0.799497,
+          "predictedMeanCoolingC": 1.266423,
+          "meanCoolingAbsErrorC": 0.466925,
+          "observedPeakCoolingP95C": 1.756499,
+          "predictedPeakCoolingP95C": 3.998545,
+          "peakCoolingAbsErrorC": 2.242046
+        },
+        {
+          "leadH": 48,
+          "pixels": 7568,
+          "deltaSstMaeC": 0.894988,
+          "deltaSstBiasC": -0.096301,
+          "observedMeanCoolingC": 1.143284,
+          "predictedMeanCoolingC": 1.232479,
+          "meanCoolingAbsErrorC": 0.089195,
+          "observedPeakCoolingP95C": 2.23,
+          "predictedPeakCoolingP95C": 3.859728,
+          "peakCoolingAbsErrorC": 1.629729
+        }
+      ]
+    },
+    {
+      "id": "phet2010",
+      "label": "phet 2010",
+      "partition": "development",
+      "pixels": 8473,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 8473,
+          "deltaSstMaeC": 0.940053,
+          "deltaSstBiasC": 0.24377,
+          "observedMeanCoolingC": 1.302418,
+          "predictedMeanCoolingC": 1.052055,
+          "meanCoolingAbsErrorC": 0.250364,
+          "observedPeakCoolingP95C": 2.56,
+          "predictedPeakCoolingP95C": 3.710298,
+          "peakCoolingAbsErrorC": 1.150298
+        },
+        {
+          "leadH": 48,
+          "pixels": 8473,
+          "deltaSstMaeC": 0.975908,
+          "deltaSstBiasC": 0.568701,
+          "observedMeanCoolingC": 1.606713,
+          "predictedMeanCoolingC": 1.022605,
+          "meanCoolingAbsErrorC": 0.584108,
+          "observedPeakCoolingP95C": 3.109999,
+          "predictedPeakCoolingP95C": 3.685654,
+          "peakCoolingAbsErrorC": 0.575656
+        }
+      ]
+    },
+    {
+      "id": "keila2011",
+      "label": "keila 2011",
+      "partition": "development",
+      "pixels": 1576,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 1576,
+          "deltaSstMaeC": 0.264517,
+          "deltaSstBiasC": 0.056067,
+          "observedMeanCoolingC": 0.638861,
+          "predictedMeanCoolingC": 0.571227,
+          "meanCoolingAbsErrorC": 0.067634,
+          "observedPeakCoolingP95C": 1.719999,
+          "predictedPeakCoolingP95C": 1.957893,
+          "peakCoolingAbsErrorC": 0.237894
+        },
+        {
+          "leadH": 48,
+          "pixels": 1576,
+          "deltaSstMaeC": 0.324857,
+          "deltaSstBiasC": 0.117992,
+          "observedMeanCoolingC": 0.70862,
+          "predictedMeanCoolingC": 0.578623,
+          "meanCoolingAbsErrorC": 0.129997,
+          "observedPeakCoolingP95C": 1.8525,
+          "predictedPeakCoolingP95C": 1.915273,
+          "peakCoolingAbsErrorC": 0.062773
+        }
+      ]
+    },
+    {
+      "id": "nanauk2014",
+      "label": "nanauk 2014",
+      "partition": "development",
+      "pixels": 6388,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6388,
+          "deltaSstMaeC": 0.738341,
+          "deltaSstBiasC": 0.118296,
+          "observedMeanCoolingC": 0.594716,
+          "predictedMeanCoolingC": 0.238486,
+          "meanCoolingAbsErrorC": 0.35623,
+          "observedPeakCoolingP95C": 1.83,
+          "predictedPeakCoolingP95C": 0.979781,
+          "peakCoolingAbsErrorC": 0.850219
+        },
+        {
+          "leadH": 48,
+          "pixels": 6388,
+          "deltaSstMaeC": 0.89365,
+          "deltaSstBiasC": 0.614354,
+          "observedMeanCoolingC": 0.951112,
+          "predictedMeanCoolingC": 0.227883,
+          "meanCoolingAbsErrorC": 0.723229,
+          "observedPeakCoolingP95C": 2.7,
+          "predictedPeakCoolingP95C": 0.9645,
+          "peakCoolingAbsErrorC": 1.7355
+        }
+      ]
+    },
+    {
+      "id": "nilofar2014",
+      "label": "nilofar 2014",
+      "partition": "development",
+      "pixels": 6413,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6413,
+          "deltaSstMaeC": 0.443185,
+          "deltaSstBiasC": 0.263512,
+          "observedMeanCoolingC": 0.88858,
+          "predictedMeanCoolingC": 0.624886,
+          "meanCoolingAbsErrorC": 0.263695,
+          "observedPeakCoolingP95C": 1.860001,
+          "predictedPeakCoolingP95C": 1.98828,
+          "peakCoolingAbsErrorC": 0.128279
+        },
+        {
+          "leadH": 48,
+          "pixels": 6413,
+          "deltaSstMaeC": 0.488938,
+          "deltaSstBiasC": 0.255583,
+          "observedMeanCoolingC": 0.866757,
+          "predictedMeanCoolingC": 0.609892,
+          "meanCoolingAbsErrorC": 0.256865,
+          "observedPeakCoolingP95C": 1.860001,
+          "predictedPeakCoolingP95C": 1.990502,
+          "peakCoolingAbsErrorC": 0.130501
+        }
+      ]
+    },
+    {
+      "id": "ashobaa2015",
+      "label": "ashobaa 2015",
+      "partition": "development",
+      "pixels": 6946,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6946,
+          "deltaSstMaeC": 0.458485,
+          "deltaSstBiasC": 0.123901,
+          "observedMeanCoolingC": 0.591725,
+          "predictedMeanCoolingC": 0.431712,
+          "meanCoolingAbsErrorC": 0.160013,
+          "observedPeakCoolingP95C": 1.26,
+          "predictedPeakCoolingP95C": 1.452084,
+          "peakCoolingAbsErrorC": 0.192084
+        },
+        {
+          "leadH": 48,
+          "pixels": 6946,
+          "deltaSstMaeC": 0.577846,
+          "deltaSstBiasC": 0.371495,
+          "observedMeanCoolingC": 0.825789,
+          "predictedMeanCoolingC": 0.424553,
+          "meanCoolingAbsErrorC": 0.401236,
+          "observedPeakCoolingP95C": 1.709999,
+          "predictedPeakCoolingP95C": 1.422939,
+          "peakCoolingAbsErrorC": 0.28706
+        }
+      ]
+    },
+    {
+      "id": "mekunu2018",
+      "label": "mekunu 2018",
+      "partition": "development",
+      "pixels": 1108,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 1108,
+          "deltaSstMaeC": 0.978753,
+          "deltaSstBiasC": -0.314466,
+          "observedMeanCoolingC": 0.68718,
+          "predictedMeanCoolingC": 0.995034,
+          "meanCoolingAbsErrorC": 0.307855,
+          "observedPeakCoolingP95C": 1.965001,
+          "predictedPeakCoolingP95C": 2.776315,
+          "peakCoolingAbsErrorC": 0.811314
+        },
+        {
+          "leadH": 48,
+          "pixels": 1108,
+          "deltaSstMaeC": 1.198527,
+          "deltaSstBiasC": 0.197371,
+          "observedMeanCoolingC": 1.201327,
+          "predictedMeanCoolingC": 0.997448,
+          "meanCoolingAbsErrorC": 0.203878,
+          "observedPeakCoolingP95C": 2.88325,
+          "predictedPeakCoolingP95C": 2.785979,
+          "peakCoolingAbsErrorC": 0.097271
+        }
+      ]
+    },
+    {
+      "id": "hikaa2019",
+      "label": "hikaa 2019",
+      "partition": "development",
+      "pixels": 6692,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6692,
+          "deltaSstMaeC": 0.751916,
+          "deltaSstBiasC": -0.741907,
+          "observedMeanCoolingC": 0.086235,
+          "predictedMeanCoolingC": 0.622771,
+          "meanCoolingAbsErrorC": 0.536536,
+          "observedPeakCoolingP95C": 0.530001,
+          "predictedPeakCoolingP95C": 2.358719,
+          "peakCoolingAbsErrorC": 1.828718
+        },
+        {
+          "leadH": 48,
+          "pixels": 6692,
+          "deltaSstMaeC": 0.867611,
+          "deltaSstBiasC": -0.860302,
+          "observedMeanCoolingC": 0.056659,
+          "predictedMeanCoolingC": 0.56595,
+          "meanCoolingAbsErrorC": 0.50929,
+          "observedPeakCoolingP95C": 0.41,
+          "predictedPeakCoolingP95C": 2.112345,
+          "peakCoolingAbsErrorC": 1.702345
+        }
+      ]
+    },
+    {
+      "id": "vayu2019",
+      "label": "vayu 2019",
+      "partition": "development",
+      "pixels": 4180,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 4180,
+          "deltaSstMaeC": 0.806501,
+          "deltaSstBiasC": -0.139765,
+          "observedMeanCoolingC": 0.820293,
+          "predictedMeanCoolingC": 0.872586,
+          "meanCoolingAbsErrorC": 0.052293,
+          "observedPeakCoolingP95C": 2.041001,
+          "predictedPeakCoolingP95C": 2.941985,
+          "peakCoolingAbsErrorC": 0.900985
+        },
+        {
+          "leadH": 48,
+          "pixels": 4180,
+          "deltaSstMaeC": 0.912195,
+          "deltaSstBiasC": 0.296515,
+          "observedMeanCoolingC": 1.188006,
+          "predictedMeanCoolingC": 0.815182,
+          "meanCoolingAbsErrorC": 0.372824,
+          "observedPeakCoolingP95C": 2.91,
+          "predictedPeakCoolingP95C": 2.945694,
+          "peakCoolingAbsErrorC": 0.035695
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "development": {
+      "storms": 10,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 10,
+          "pixels": 52135,
+          "deltaSstMaeC": 0.706457,
+          "deltaSstBiasC": -0.048584,
+          "meanCoolingAbsErrorC": 0.286791,
+          "peakCoolingAbsErrorC": 0.845431
+        },
+        {
+          "leadH": 48,
+          "storms": 10,
+          "pixels": 52135,
+          "deltaSstMaeC": 0.774046,
+          "deltaSstBiasC": 0.196741,
+          "meanCoolingAbsErrorC": 0.378815,
+          "peakCoolingAbsErrorC": 0.675884
+        }
+      ]
+    },
+    "validation": {
+      "storms": 0,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        },
+        {
+          "leadH": 48,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        }
+      ]
+    },
+    "testReportOnly": {
+      "storms": 0,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        },
+        {
+          "leadH": 48,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        }
+      ]
+    }
+  }
+}

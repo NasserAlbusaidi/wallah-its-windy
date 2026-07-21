@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-2A",
+  "evaluatedAt": "2026-07-21",
+  "status": "rejected",
+  "decision": "Rejected without changing thresholds; a revised candidate requires a new sealed acceptance cohort.",
+  "manifests": {
+    "contract": {
+      "path": "calibration/hf2a-contract.json",
+      "sha256": "347263d9b5ead17f0059fec9f4df21ec38f909b8396740af8b2917c53d61b5d8"
+    },
+    "selection": {
+      "path": "calibration/hf2a-candidate-selection.json",
+      "sha256": "731df36938ba2f142357e16fa42980f31ae4673a6af4eb0b58c2358143719b73"
+    },
+    "reference": {
+      "path": "calibration/hf2a-ocean-reference.json",
+      "sha256": "a2d09aa5bb674e6a5341c65f3b2cd512b3adf17d2793aba8a5068ef41a10c789"
+    },
+    "validation": {
+      "path": "calibration/hf2a-ocean-candidate-validation.json",
+      "sha256": "d3a6c1b8529a1751336c78ba143e0bd2b8a59c55d1f2918b165d03cbc931e8b9"
+    }
+  },
+  "leads": [
+    {
+      "leadH": 24,
+      "candidateMaeC": 0.759809,
+      "referenceMaeC": 0.507522,
+      "skillFraction": -0.49709569240348195,
+      "candidateBiasC": -0.442829,
+      "referenceBiasC": 0.368283,
+      "absoluteBiasImprovementC": -0.07454599999999995,
+      "sampleRetentionFraction": 1,
+      "gates": {
+        "positivePairedSkill": false,
+        "absoluteBiasImproved": false,
+        "allSamplesRetained": true
+      }
+    },
+    {
+      "leadH": 48,
+      "candidateMaeC": 0.655837,
+      "referenceMaeC": 0.70277,
+      "skillFraction": 0.06678287348634693,
+      "candidateBiasC": -0.179233,
+      "referenceBiasC": 0.620695,
+      "absoluteBiasImprovementC": 0.441462,
+      "sampleRetentionFraction": 1,
+      "gates": {
+        "positivePairedSkill": true,
+        "absoluteBiasImproved": true,
+        "allSamplesRetained": true
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "candidate-frozen-before-validation",
+      "pass": true,
+      "expectedSha256": "843ceabc3fd141c5297dcc59c03fb17c1813d45a6afdad61b1a81cc9868a01ed",
+      "actualSha256": "843ceabc3fd141c5297dcc59c03fb17c1813d45a6afdad61b1a81cc9868a01ed"
+    },
+    {
+      "id": "minimum-validation-storms",
+      "pass": true,
+      "actual": 4
+    },
+    {
+      "id": "24h-positive-paired-skill",
+      "pass": false,
+      "actual": -0.49709569240348195
+    },
+    {
+      "id": "24h-absolute-bias-improved",
+      "pass": false,
+      "actual": -0.07454599999999995
+    },
+    {
+      "id": "24h-sample-retention",
+      "pass": true,
+      "actual": 1
+    },
+    {
+      "id": "48h-positive-paired-skill",
+      "pass": true,
+      "actual": 0.06678287348634693
+    },
+    {
+      "id": "48h-absolute-bias-improved",
+      "pass": true,
+      "actual": 0.441462
+    },
+    {
+      "id": "48h-sample-retention",
+      "pass": true,
+      "actual": 1
+    }
+  ]
+}

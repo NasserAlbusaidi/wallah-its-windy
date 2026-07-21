@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "phase": "HF-2A",
+  "frozenAt": "2026-07-21",
+  "status": "frozen-before-acceptance-evaluation",
+  "parameters": {
+    "bulkRichardsonCritical": 0.55,
+    "momentumDampingInertialPeriods": 1,
+    "thermalRecoveryHours": 120
+  },
+  "fixedClosures": {
+    "gradientRichardsonCritical": 0.25,
+    "oceanSubstepMinutes": 5,
+    "oneMinuteToTenMinuteOpenOceanWindFactor": 0.93
+  },
+  "developmentArtifact": {
+    "path": "calibration/hf2a-ocean-candidate.json",
+    "sha256": "843ceabc3fd141c5297dcc59c03fb17c1813d45a6afdad61b1a81cc9868a01ed",
+    "storms": 10,
+    "pixels": 52135,
+    "leads": [
+      {
+        "leadH": 24,
+        "candidateMaeC": 0.706457,
+        "referenceMaeC": 0.707263,
+        "skillFraction": 0.0011395902,
+        "candidateBiasC": -0.048584,
+        "referenceBiasC": 0.543546
+      },
+      {
+        "leadH": 48,
+        "candidateMaeC": 0.774046,
+        "referenceMaeC": 0.921044,
+        "skillFraction": 0.1595993249,
+        "candidateBiasC": 0.196741,
+        "referenceBiasC": 0.781355
+      }
+    ]
+  },
+  "implementation": {
+    "upperOceanPath": "src/upper-ocean.ts",
+    "upperOceanSha256": "970dfb060f4dc949c2d7bd4e3621d3ef7d08ae54428a93ec60b562116d61a36a",
+    "profileSamplerPath": "src/ocean-profile-sampler.ts",
+    "profileSamplerSha256": "b4e79c9fc470d2271661ba3e7174a5590274b77f5145950ca3ec1d8c84f0fc98",
+    "benchmarkRunnerPath": "calibration/hf2a-ocean-reference.mjs",
+    "benchmarkRunnerSha256": "be76f866f73c82b218115028d7b9bebd51dbc7b4a42aed2ace3ae39a4f1e5148",
+    "oceanProfilesPath": "public/data/ocean.bin",
+    "oceanProfilesSha256": "0811050864a24374e1cc7ed0e1d8519a85ec9e72505d1f9af28a6abca3498434"
+  },
+  "protocolAmendmentsBeforeFreeze": [
+    {
+      "id": "gradient-richardson-closure",
+      "reason": "The bulk-only prototype omitted the published PWP gradient-shear closure and over-deepened strong-storm wakes.",
+      "decision": "Fix the gradient Richardson threshold at the published PWP value 0.25; it is not tunable."
+    },
+    {
+      "id": "momentum-damping-range",
+      "reason": "Contract v1's 3-7 inertial-period range excluded the published PWP decay ucon=0.1|f|, equivalent to about 1.6 inertial periods.",
+      "decision": "Correct the admissible range to 1-5 inertial periods and retain 1.6 as the literature anchor."
+    },
+    {
+      "id": "wind-averaging-boundary",
+      "reason": "JTWC best-track wind is a one-minute maximum while the ocean stress forcing represents a ten-minute open-ocean mean.",
+      "decision": "Apply the fixed WMO open-ocean 0.93 conversion factor at the forcing boundary; it is not tunable."
+    }
+  ],
+  "validationHistoryBeforeFreeze": [
+    {
+      "candidate": "exploratory-pre-freeze",
+      "parameters": {
+        "bulkRichardsonCritical": 0.65,
+        "momentumDampingInertialPeriods": 1.6,
+        "thermalRecoveryHours": 240
+      },
+      "fixedClosures": {
+        "oneMinuteToTenMinuteOpenOceanWindFactor": 1
+      },
+      "metrics": {
+        "24hMaeC": 0.916841,
+        "24hBiasC": -0.708635,
+        "48hMaeC": 0.780583,
+        "48hBiasC": -0.46375
+      },
+      "handling": "Logged as an exploratory protocol breach. Subsequent parameter selection used development metrics and published physical constraints only. The four-storm validation cohort is treated as seen and cannot support an HF-6 independent confirmatory claim."
+    }
+  ],
+  "selectionRule": "No parameter or fixed closure may change after this manifest in response to acceptance-partition results. Any such change requires a new sealed cohort and contract version."
+}

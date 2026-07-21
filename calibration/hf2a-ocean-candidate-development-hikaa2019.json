@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "calibration/hf2a-ocean-reference.mjs",
+  "candidateParameters": {
+    "bulkRichardsonCritical": 0.55,
+    "momentumDampingInertialPeriods": 1,
+    "thermalRecoveryHours": 120
+  },
+  "partitionFilter": "development",
+  "protocol": {
+    "forcing": "observed IBTrACS/JTWC track and wind, 15-minute interpolation",
+    "purpose": "ocean-only validation; coupled forecast errors are scored separately",
+    "baseline": "HF-2A retained conservative upper-ocean columns on a wake-free satellite background",
+    "aggregation": "pixels to one score per storm, then equal-storm partition mean",
+    "evaluationLeadsAfterLocalPassageH": [
+      24,
+      48
+    ],
+    "parameterSelectionPartition": "development",
+    "acceptancePartition": "validation",
+    "reportOnlyPartition": "test"
+  },
+  "manifests": {
+    "catalog": {
+      "path": "calibration/fidelity-catalog.json",
+      "sha256": "cb3aa9bee125bef248c2eac4c3f9037f62c85a4619ddc5a8b8110501677eb7cc"
+    },
+    "tracks": {
+      "path": "calibration/data/fidelity-tracks.json",
+      "sha256": "6d0e10c88a436cf9e2777fe168eee8c6c163b1ec8934f921218ef67cafbacf30"
+    },
+    "scenarios": {
+      "path": "calibration/data/fidelity-scenarios.json",
+      "sha256": "86e2aa4b35cd2d79ab6bdcacf4f202cc37b8cc8620d0775d959c4688f654a4e7"
+    },
+    "observations": {
+      "path": "calibration/data/hf2a-ocean-observations.json",
+      "sha256": "1d2047aa2d6779b0e689bded14e7726dbbeda01c5fd3f8861f21ef8066f5221e"
+    },
+    "observationBinary": {
+      "path": "calibration/data/hf2a-ocean-observations.bin",
+      "sha256": "afedaecda0ae849df100819bd0ce37a2997d75137b8ebd066310f766ef5f1648"
+    },
+    "terrain": {
+      "path": "public/data/terrain.bin",
+      "sha256": "a350399d3ce4960313f92e58f4f08d04b9c76ca6a7c35319d27443f3344ae262"
+    },
+    "oceanProfiles": {
+      "path": "public/data/ocean.bin",
+      "sha256": "0811050864a24374e1cc7ed0e1d8519a85ec9e72505d1f9af28a6abca3498434"
+    },
+    "eventOceanProfiles": {
+      "path": "calibration/data/hf2a-event-ocean.bin",
+      "sha256": "d1110713658d950b0f1ea54556c8ce4a31f501ab7a4672f129001ad432f24975"
+    },
+    "eventOceanMetadata": {
+      "path": "calibration/data/hf2a-event-ocean.json",
+      "sha256": "32388d1b7586a0a83cd38c36d77739010a7a5ea0c65941abaada83a6a88defbf"
+    },
+    "environments": [
+      {
+        "id": "hikaa2019",
+        "path": "public/data/env_hikaa.bin",
+        "sha256": "1b8fd2e726f1f67d65a914ee70a3f421bb428e33f29cee000cf7e6a4f77e1c4a"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "hikaa2019",
+      "label": "hikaa 2019",
+      "partition": "development",
+      "pixels": 6692,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6692,
+          "deltaSstMaeC": 0.584864,
+          "deltaSstBiasC": -0.577648,
+          "observedMeanCoolingC": 0.086235,
+          "predictedMeanCoolingC": 0.458513,
+          "meanCoolingAbsErrorC": 0.372278,
+          "observedPeakCoolingP95C": 0.530001,
+          "predictedPeakCoolingP95C": 1.982656,
+          "peakCoolingAbsErrorC": 1.452655
+        },
+        {
+          "leadH": 48,
+          "pixels": 6692,
+          "deltaSstMaeC": 0.710701,
+          "deltaSstBiasC": -0.70414,
+          "observedMeanCoolingC": 0.056659,
+          "predictedMeanCoolingC": 0.409788,
+          "meanCoolingAbsErrorC": 0.353128,
+          "observedPeakCoolingP95C": 0.41,
+          "predictedPeakCoolingP95C": 1.694854,
+          "peakCoolingAbsErrorC": 1.284854
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "development": {
+      "storms": 1,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 1,
+          "pixels": 6692,
+          "deltaSstMaeC": 0.584864,
+          "deltaSstBiasC": -0.577648,
+          "meanCoolingAbsErrorC": 0.372278,
+          "peakCoolingAbsErrorC": 1.452655
+        },
+        {
+          "leadH": 48,
+          "storms": 1,
+          "pixels": 6692,
+          "deltaSstMaeC": 0.710701,
+          "deltaSstBiasC": -0.70414,
+          "meanCoolingAbsErrorC": 0.353128,
+          "peakCoolingAbsErrorC": 1.284854
+        }
+      ]
+    },
+    "validation": {
+      "storms": 0,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        },
+        {
+          "leadH": 48,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        }
+      ]
+    },
+    "testReportOnly": {
+      "storms": 0,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        },
+        {
+          "leadH": 48,
+          "storms": 0,
+          "pixels": 0,
+          "deltaSstMaeC": null,
+          "deltaSstBiasC": null,
+          "meanCoolingAbsErrorC": null,
+          "peakCoolingAbsErrorC": null
+        }
+      ]
+    }
+  }
+}

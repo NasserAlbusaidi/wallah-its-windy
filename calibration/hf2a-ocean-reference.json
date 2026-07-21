@@ -1,0 +1,710 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "calibration/hf2a-ocean-reference.mjs",
+  "protocol": {
+    "forcing": "observed IBTrACS/JTWC track and wind, 15-minute interpolation",
+    "purpose": "ocean-only validation; coupled forecast errors are scored separately",
+    "baseline": "HF-1 empirical Gaussian wake on a wake-free satellite background",
+    "aggregation": "pixels to one score per storm, then equal-storm partition mean",
+    "evaluationLeadsAfterLocalPassageH": [
+      24,
+      48
+    ],
+    "parameterSelectionPartition": "development",
+    "acceptancePartition": "validation",
+    "reportOnlyPartition": "test"
+  },
+  "manifests": {
+    "catalog": {
+      "path": "calibration/fidelity-catalog.json",
+      "sha256": "cb3aa9bee125bef248c2eac4c3f9037f62c85a4619ddc5a8b8110501677eb7cc"
+    },
+    "tracks": {
+      "path": "calibration/data/fidelity-tracks.json",
+      "sha256": "6d0e10c88a436cf9e2777fe168eee8c6c163b1ec8934f921218ef67cafbacf30"
+    },
+    "scenarios": {
+      "path": "calibration/data/fidelity-scenarios.json",
+      "sha256": "86e2aa4b35cd2d79ab6bdcacf4f202cc37b8cc8620d0775d959c4688f654a4e7"
+    },
+    "observations": {
+      "path": "calibration/data/hf2a-ocean-observations.json",
+      "sha256": "1d2047aa2d6779b0e689bded14e7726dbbeda01c5fd3f8861f21ef8066f5221e"
+    },
+    "observationBinary": {
+      "path": "calibration/data/hf2a-ocean-observations.bin",
+      "sha256": "afedaecda0ae849df100819bd0ce37a2997d75137b8ebd066310f766ef5f1648"
+    },
+    "terrain": {
+      "path": "public/data/terrain.bin",
+      "sha256": "a350399d3ce4960313f92e58f4f08d04b9c76ca6a7c35319d27443f3344ae262"
+    },
+    "environments": [
+      {
+        "id": "mukda2006",
+        "path": "calibration/data/fidelity/env_mukda2006.bin",
+        "sha256": "09e7ef840309ab0b23a89b0e4c69a627142df0e444c2ac420363ec6b316e8788"
+      },
+      {
+        "id": "as2007",
+        "path": "calibration/data/fidelity/env_as2007.bin",
+        "sha256": "2bc892bda8de9a526109a8062d6f0bc72c38e559a29e9f13d3ca0b50cde9e021"
+      },
+      {
+        "id": "gonu2007",
+        "path": "public/data/env_gonu.bin",
+        "sha256": "31895447c0ebf783b49f8ff36721d73d5777a38056bbd0c190b1dc719ba311a1"
+      },
+      {
+        "id": "phet2010",
+        "path": "public/data/env_phet.bin",
+        "sha256": "b28c3fdd8a028e3aa32b13c92b51a680808ac943eb3e2ad8fca350c1a24a473f"
+      },
+      {
+        "id": "keila2011",
+        "path": "calibration/data/fidelity/env_keila2011.bin",
+        "sha256": "fcf46edb30aa25a491df00c89d1d2631315c63f2bfff949b8fac2d82da449e54"
+      },
+      {
+        "id": "nanauk2014",
+        "path": "calibration/data/fidelity/env_nanauk2014.bin",
+        "sha256": "5d8e5e1a76e6a7700570cb5dbfde1d1a8762e1bf50c597bdafc5bb980d482e0e"
+      },
+      {
+        "id": "nilofar2014",
+        "path": "public/data/env_nilofar.bin",
+        "sha256": "112cc53475e3f6785b402bf16f354ed838f28c6d0b5b4b468f403ab9bb789125"
+      },
+      {
+        "id": "ashobaa2015",
+        "path": "public/data/env_ashobaa.bin",
+        "sha256": "31b488c1de438049ef55a49d82ff68ddd5138396ca2e3f2f854919297b72e4a8"
+      },
+      {
+        "id": "mekunu2018",
+        "path": "public/data/env_mekunu.bin",
+        "sha256": "2091f5e59d2d3bec1d7eac6adb34e72749349ac15f649a694af279ae123a6f31"
+      },
+      {
+        "id": "hikaa2019",
+        "path": "public/data/env_hikaa.bin",
+        "sha256": "1b8fd2e726f1f67d65a914ee70a3f421bb428e33f29cee000cf7e6a4f77e1c4a"
+      },
+      {
+        "id": "kyarr2019",
+        "path": "public/data/env_kyarr.bin",
+        "sha256": "eeb33d7896d9094068ca1686e550d2582ad9b82a48f686a6678516e0485c40d3"
+      },
+      {
+        "id": "maha2019",
+        "path": "calibration/data/fidelity/env_maha2019.bin",
+        "sha256": "4d91865ac8518c4198039b83ab7ebc5a318fd02a946766a4bf23197b8a544ac4"
+      },
+      {
+        "id": "vayu2019",
+        "path": "public/data/env_vayu.bin",
+        "sha256": "5097ed6b26568302008ecbf29d653db6109385c7bb8a503e4a4fce29571d3da1"
+      },
+      {
+        "id": "shaheen2021",
+        "path": "public/data/env_shaheen.bin",
+        "sha256": "eb6784ea089f51f70113f51215a16c93d7dade11ea5692612e6cfd7d59c0e5ef"
+      },
+      {
+        "id": "biparjoy2023",
+        "path": "public/data/env_biparjoy.bin",
+        "sha256": "d82bb389381f6a5799fd67d86dda000c9222fa613cbede4ce320d48983043363"
+      },
+      {
+        "id": "asna2024",
+        "path": "calibration/data/fidelity/env_asna2024.bin",
+        "sha256": "0e89ecb1f64634ea1c10229cbce3ea8b81031e2600acb7262e65f187b3337291"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "mukda2006",
+      "label": "mukda 2006",
+      "partition": "validation",
+      "pixels": 3759,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 3759,
+          "deltaSstMaeC": 0.482456,
+          "deltaSstBiasC": 0.203483,
+          "observedMeanCoolingC": 0.357506,
+          "predictedMeanCoolingC": 0.025182,
+          "meanCoolingAbsErrorC": 0.332324,
+          "observedPeakCoolingP95C": 1.01,
+          "predictedPeakCoolingP95C": 0.173716,
+          "peakCoolingAbsErrorC": 0.836284
+        },
+        {
+          "leadH": 48,
+          "pixels": 3759,
+          "deltaSstMaeC": 0.531894,
+          "deltaSstBiasC": 0.354134,
+          "observedMeanCoolingC": 0.458867,
+          "predictedMeanCoolingC": 0.022032,
+          "meanCoolingAbsErrorC": 0.436834,
+          "observedPeakCoolingP95C": 1.320501,
+          "predictedPeakCoolingP95C": 0.150433,
+          "peakCoolingAbsErrorC": 1.170069
+        }
+      ]
+    },
+    {
+      "id": "as2007",
+      "label": "arabian sea system jun 2007",
+      "partition": "development",
+      "pixels": 2791,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 2791,
+          "deltaSstMaeC": 0.686805,
+          "deltaSstBiasC": 0.649368,
+          "observedMeanCoolingC": 0.671052,
+          "predictedMeanCoolingC": 0.002979,
+          "meanCoolingAbsErrorC": 0.668073,
+          "observedPeakCoolingP95C": 1.280001,
+          "predictedPeakCoolingP95C": 0.018941,
+          "peakCoolingAbsErrorC": 1.26106
+        },
+        {
+          "leadH": 48,
+          "pixels": 2791,
+          "deltaSstMaeC": 0.769109,
+          "deltaSstBiasC": 0.73803,
+          "observedMeanCoolingC": 0.756,
+          "predictedMeanCoolingC": 0.002439,
+          "meanCoolingAbsErrorC": 0.753561,
+          "observedPeakCoolingP95C": 1.57,
+          "predictedPeakCoolingP95C": 0.015507,
+          "peakCoolingAbsErrorC": 1.554492
+        }
+      ]
+    },
+    {
+      "id": "gonu2007",
+      "label": "gonu 2007",
+      "partition": "development",
+      "pixels": 7568,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 7568,
+          "deltaSstMaeC": 0.696444,
+          "deltaSstBiasC": 0.526564,
+          "observedMeanCoolingC": 0.799497,
+          "predictedMeanCoolingC": 0.256946,
+          "meanCoolingAbsErrorC": 0.542551,
+          "observedPeakCoolingP95C": 1.756499,
+          "predictedPeakCoolingP95C": 0.968618,
+          "peakCoolingAbsErrorC": 0.787881
+        },
+        {
+          "leadH": 48,
+          "pixels": 7568,
+          "deltaSstMaeC": 0.949769,
+          "deltaSstBiasC": 0.9199,
+          "observedMeanCoolingC": 1.143284,
+          "predictedMeanCoolingC": 0.216278,
+          "meanCoolingAbsErrorC": 0.927006,
+          "observedPeakCoolingP95C": 2.23,
+          "predictedPeakCoolingP95C": 0.808143,
+          "peakCoolingAbsErrorC": 1.421856
+        }
+      ]
+    },
+    {
+      "id": "phet2010",
+      "label": "phet 2010",
+      "partition": "development",
+      "pixels": 8473,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 8473,
+          "deltaSstMaeC": 1.129232,
+          "deltaSstBiasC": 1.098171,
+          "observedMeanCoolingC": 1.302418,
+          "predictedMeanCoolingC": 0.197654,
+          "meanCoolingAbsErrorC": 1.104765,
+          "observedPeakCoolingP95C": 2.56,
+          "predictedPeakCoolingP95C": 1.130363,
+          "peakCoolingAbsErrorC": 1.429637
+        },
+        {
+          "leadH": 48,
+          "pixels": 8473,
+          "deltaSstMaeC": 1.448987,
+          "deltaSstBiasC": 1.417605,
+          "observedMeanCoolingC": 1.606713,
+          "predictedMeanCoolingC": 0.173701,
+          "meanCoolingAbsErrorC": 1.433012,
+          "observedPeakCoolingP95C": 3.109999,
+          "predictedPeakCoolingP95C": 0.944519,
+          "peakCoolingAbsErrorC": 2.16548
+        }
+      ]
+    },
+    {
+      "id": "keila2011",
+      "label": "keila 2011",
+      "partition": "development",
+      "pixels": 1576,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 1576,
+          "deltaSstMaeC": 0.62478,
+          "deltaSstBiasC": 0.601611,
+          "observedMeanCoolingC": 0.638861,
+          "predictedMeanCoolingC": 0.025683,
+          "meanCoolingAbsErrorC": 0.613179,
+          "observedPeakCoolingP95C": 1.719999,
+          "predictedPeakCoolingP95C": 0.156092,
+          "peakCoolingAbsErrorC": 1.563908
+        },
+        {
+          "leadH": 48,
+          "pixels": 1576,
+          "deltaSstMaeC": 0.696727,
+          "deltaSstBiasC": 0.672401,
+          "observedMeanCoolingC": 0.70862,
+          "predictedMeanCoolingC": 0.024214,
+          "meanCoolingAbsErrorC": 0.684406,
+          "observedPeakCoolingP95C": 1.8525,
+          "predictedPeakCoolingP95C": 0.137173,
+          "peakCoolingAbsErrorC": 1.715328
+        }
+      ]
+    },
+    {
+      "id": "nanauk2014",
+      "label": "nanauk 2014",
+      "partition": "development",
+      "pixels": 6388,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6388,
+          "deltaSstMaeC": 0.824054,
+          "deltaSstBiasC": 0.347662,
+          "observedMeanCoolingC": 0.594716,
+          "predictedMeanCoolingC": 0.00912,
+          "meanCoolingAbsErrorC": 0.585596,
+          "observedPeakCoolingP95C": 1.83,
+          "predictedPeakCoolingP95C": 0.057596,
+          "peakCoolingAbsErrorC": 1.772404
+        },
+        {
+          "leadH": 48,
+          "pixels": 6388,
+          "deltaSstMaeC": 1.052597,
+          "deltaSstBiasC": 0.834719,
+          "observedMeanCoolingC": 0.951112,
+          "predictedMeanCoolingC": 0.007518,
+          "meanCoolingAbsErrorC": 0.943594,
+          "observedPeakCoolingP95C": 2.7,
+          "predictedPeakCoolingP95C": 0.047637,
+          "peakCoolingAbsErrorC": 2.652363
+        }
+      ]
+    },
+    {
+      "id": "nilofar2014",
+      "label": "nilofar 2014",
+      "partition": "development",
+      "pixels": 6413,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6413,
+          "deltaSstMaeC": 0.698703,
+          "deltaSstBiasC": 0.663035,
+          "observedMeanCoolingC": 0.88858,
+          "predictedMeanCoolingC": 0.225362,
+          "meanCoolingAbsErrorC": 0.663218,
+          "observedPeakCoolingP95C": 1.860001,
+          "predictedPeakCoolingP95C": 1.149385,
+          "peakCoolingAbsErrorC": 0.710616
+        },
+        {
+          "leadH": 48,
+          "pixels": 6413,
+          "deltaSstMaeC": 0.715127,
+          "deltaSstBiasC": 0.67775,
+          "observedMeanCoolingC": 0.866757,
+          "predictedMeanCoolingC": 0.187726,
+          "meanCoolingAbsErrorC": 0.679031,
+          "observedPeakCoolingP95C": 1.860001,
+          "predictedPeakCoolingP95C": 0.957681,
+          "peakCoolingAbsErrorC": 0.90232
+        }
+      ]
+    },
+    {
+      "id": "ashobaa2015",
+      "label": "ashobaa 2015",
+      "partition": "development",
+      "pixels": 6946,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6946,
+          "deltaSstMaeC": 0.608031,
+          "deltaSstBiasC": 0.535535,
+          "observedMeanCoolingC": 0.591725,
+          "predictedMeanCoolingC": 0.020078,
+          "meanCoolingAbsErrorC": 0.571647,
+          "observedPeakCoolingP95C": 1.26,
+          "predictedPeakCoolingP95C": 0.120789,
+          "peakCoolingAbsErrorC": 1.139212
+        },
+        {
+          "leadH": 48,
+          "pixels": 6946,
+          "deltaSstMaeC": 0.838268,
+          "deltaSstBiasC": 0.778541,
+          "observedMeanCoolingC": 0.825789,
+          "predictedMeanCoolingC": 0.017507,
+          "meanCoolingAbsErrorC": 0.808282,
+          "observedPeakCoolingP95C": 1.709999,
+          "predictedPeakCoolingP95C": 0.107697,
+          "peakCoolingAbsErrorC": 1.602302
+        }
+      ]
+    },
+    {
+      "id": "mekunu2018",
+      "label": "mekunu 2018",
+      "partition": "development",
+      "pixels": 1108,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 1108,
+          "deltaSstMaeC": 0.671626,
+          "deltaSstBiasC": 0.558884,
+          "observedMeanCoolingC": 0.68718,
+          "predictedMeanCoolingC": 0.121685,
+          "meanCoolingAbsErrorC": 0.565495,
+          "observedPeakCoolingP95C": 1.965001,
+          "predictedPeakCoolingP95C": 0.33312,
+          "peakCoolingAbsErrorC": 1.631881
+        },
+        {
+          "leadH": 48,
+          "pixels": 1108,
+          "deltaSstMaeC": 1.147214,
+          "deltaSstBiasC": 1.095192,
+          "observedMeanCoolingC": 1.201327,
+          "predictedMeanCoolingC": 0.099627,
+          "meanCoolingAbsErrorC": 1.1017,
+          "observedPeakCoolingP95C": 2.88325,
+          "predictedPeakCoolingP95C": 0.272736,
+          "peakCoolingAbsErrorC": 2.610514
+        }
+      ]
+    },
+    {
+      "id": "hikaa2019",
+      "label": "hikaa 2019",
+      "partition": "development",
+      "pixels": 6692,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6692,
+          "deltaSstMaeC": 0.284283,
+          "deltaSstBiasC": -0.145454,
+          "observedMeanCoolingC": 0.086235,
+          "predictedMeanCoolingC": 0.026319,
+          "meanCoolingAbsErrorC": 0.059916,
+          "observedPeakCoolingP95C": 0.530001,
+          "predictedPeakCoolingP95C": 0.143224,
+          "peakCoolingAbsErrorC": 0.386776
+        },
+        {
+          "leadH": 48,
+          "pixels": 6692,
+          "deltaSstMaeC": 0.40947,
+          "deltaSstBiasC": -0.315901,
+          "observedMeanCoolingC": 0.056659,
+          "predictedMeanCoolingC": 0.021548,
+          "meanCoolingAbsErrorC": 0.035111,
+          "observedPeakCoolingP95C": 0.41,
+          "predictedPeakCoolingP95C": 0.117262,
+          "peakCoolingAbsErrorC": 0.292738
+        }
+      ]
+    },
+    {
+      "id": "kyarr2019",
+      "label": "kyarr 2019",
+      "partition": "validation",
+      "pixels": 7980,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 7980,
+          "deltaSstMaeC": 0.515719,
+          "deltaSstBiasC": 0.342602,
+          "observedMeanCoolingC": 0.86982,
+          "predictedMeanCoolingC": 0.521617,
+          "meanCoolingAbsErrorC": 0.348203,
+          "observedPeakCoolingP95C": 1.690001,
+          "predictedPeakCoolingP95C": 2.181771,
+          "peakCoolingAbsErrorC": 0.491771
+        },
+        {
+          "leadH": 48,
+          "pixels": 7980,
+          "deltaSstMaeC": 0.63739,
+          "deltaSstBiasC": 0.544693,
+          "observedMeanCoolingC": 1.022276,
+          "predictedMeanCoolingC": 0.47165,
+          "meanCoolingAbsErrorC": 0.550626,
+          "observedPeakCoolingP95C": 2.34,
+          "predictedPeakCoolingP95C": 1.924385,
+          "peakCoolingAbsErrorC": 0.415615
+        }
+      ]
+    },
+    {
+      "id": "maha2019",
+      "label": "maha 2019",
+      "partition": "test",
+      "pixels": 6072,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6072,
+          "deltaSstMaeC": 0.452278,
+          "deltaSstBiasC": -0.102371,
+          "observedMeanCoolingC": 0.241978,
+          "predictedMeanCoolingC": 0.276295,
+          "meanCoolingAbsErrorC": 0.034317,
+          "observedPeakCoolingP95C": 0.7945,
+          "predictedPeakCoolingP95C": 1.416186,
+          "peakCoolingAbsErrorC": 0.621685
+        },
+        {
+          "leadH": 48,
+          "pixels": 6072,
+          "deltaSstMaeC": 0.444307,
+          "deltaSstBiasC": 0.036123,
+          "observedMeanCoolingC": 0.335678,
+          "predictedMeanCoolingC": 0.239112,
+          "meanCoolingAbsErrorC": 0.096566,
+          "observedPeakCoolingP95C": 0.950001,
+          "predictedPeakCoolingP95C": 1.230388,
+          "peakCoolingAbsErrorC": 0.280387
+        }
+      ]
+    },
+    {
+      "id": "vayu2019",
+      "label": "vayu 2019",
+      "partition": "development",
+      "pixels": 4180,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 4180,
+          "deltaSstMaeC": 0.848669,
+          "deltaSstBiasC": 0.600085,
+          "observedMeanCoolingC": 0.820293,
+          "predictedMeanCoolingC": 0.132736,
+          "meanCoolingAbsErrorC": 0.687557,
+          "observedPeakCoolingP95C": 2.041001,
+          "predictedPeakCoolingP95C": 0.5141,
+          "peakCoolingAbsErrorC": 1.526901
+        },
+        {
+          "leadH": 48,
+          "pixels": 4180,
+          "deltaSstMaeC": 1.183175,
+          "deltaSstBiasC": 0.995314,
+          "observedMeanCoolingC": 1.188006,
+          "predictedMeanCoolingC": 0.116383,
+          "meanCoolingAbsErrorC": 1.071623,
+          "observedPeakCoolingP95C": 2.91,
+          "predictedPeakCoolingP95C": 0.481235,
+          "peakCoolingAbsErrorC": 2.428764
+        }
+      ]
+    },
+    {
+      "id": "shaheen2021",
+      "label": "shaheen 2021",
+      "partition": "validation",
+      "pixels": 4929,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 4929,
+          "deltaSstMaeC": 0.37297,
+          "deltaSstBiasC": 0.305021,
+          "observedMeanCoolingC": 0.389747,
+          "predictedMeanCoolingC": 0.054281,
+          "meanCoolingAbsErrorC": 0.335467,
+          "observedPeakCoolingP95C": 1.15,
+          "predictedPeakCoolingP95C": 0.257574,
+          "peakCoolingAbsErrorC": 0.892425
+        },
+        {
+          "leadH": 48,
+          "pixels": 4929,
+          "deltaSstMaeC": 0.659772,
+          "deltaSstBiasC": 0.609324,
+          "observedMeanCoolingC": 0.678881,
+          "predictedMeanCoolingC": 0.044844,
+          "meanCoolingAbsErrorC": 0.634037,
+          "observedPeakCoolingP95C": 1.84,
+          "predictedPeakCoolingP95C": 0.21277,
+          "peakCoolingAbsErrorC": 1.62723
+        }
+      ]
+    },
+    {
+      "id": "biparjoy2023",
+      "label": "biparjoy 2023",
+      "partition": "validation",
+      "pixels": 5304,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 5304,
+          "deltaSstMaeC": 0.658941,
+          "deltaSstBiasC": 0.622026,
+          "observedMeanCoolingC": 0.934178,
+          "predictedMeanCoolingC": 0.311049,
+          "meanCoolingAbsErrorC": 0.623129,
+          "observedPeakCoolingP95C": 1.59,
+          "predictedPeakCoolingP95C": 0.909398,
+          "peakCoolingAbsErrorC": 0.680602
+        },
+        {
+          "leadH": 48,
+          "pixels": 5304,
+          "deltaSstMaeC": 0.982025,
+          "deltaSstBiasC": 0.974627,
+          "observedMeanCoolingC": 1.281591,
+          "predictedMeanCoolingC": 0.305491,
+          "meanCoolingAbsErrorC": 0.9761,
+          "observedPeakCoolingP95C": 2.130001,
+          "predictedPeakCoolingP95C": 0.900204,
+          "peakCoolingAbsErrorC": 1.229797
+        }
+      ]
+    },
+    {
+      "id": "asna2024",
+      "label": "asna 2024",
+      "partition": "test",
+      "pixels": 6121,
+      "leads": [
+        {
+          "leadH": 24,
+          "pixels": 6121,
+          "deltaSstMaeC": 0.476249,
+          "deltaSstBiasC": -0.045363,
+          "observedMeanCoolingC": 0.219641,
+          "predictedMeanCoolingC": 0.005894,
+          "meanCoolingAbsErrorC": 0.213748,
+          "observedPeakCoolingP95C": 0.84,
+          "predictedPeakCoolingP95C": 0.033036,
+          "peakCoolingAbsErrorC": 0.806964
+        },
+        {
+          "leadH": 48,
+          "pixels": 6121,
+          "deltaSstMaeC": 0.596185,
+          "deltaSstBiasC": -0.010075,
+          "observedMeanCoolingC": 0.297177,
+          "predictedMeanCoolingC": 0.004828,
+          "meanCoolingAbsErrorC": 0.292349,
+          "observedPeakCoolingP95C": 1.110001,
+          "predictedPeakCoolingP95C": 0.027056,
+          "peakCoolingAbsErrorC": 1.082945
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "development": {
+      "storms": 10,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 10,
+          "pixels": 52135,
+          "deltaSstMaeC": 0.707263,
+          "deltaSstBiasC": 0.543546,
+          "meanCoolingAbsErrorC": 0.6062,
+          "peakCoolingAbsErrorC": 1.221028
+        },
+        {
+          "leadH": 48,
+          "storms": 10,
+          "pixels": 52135,
+          "deltaSstMaeC": 0.921044,
+          "deltaSstBiasC": 0.781355,
+          "meanCoolingAbsErrorC": 0.843732,
+          "peakCoolingAbsErrorC": 1.734616
+        }
+      ]
+    },
+    "validation": {
+      "storms": 4,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 4,
+          "pixels": 21972,
+          "deltaSstMaeC": 0.507522,
+          "deltaSstBiasC": 0.368283,
+          "meanCoolingAbsErrorC": 0.409781,
+          "peakCoolingAbsErrorC": 0.72527
+        },
+        {
+          "leadH": 48,
+          "storms": 4,
+          "pixels": 21972,
+          "deltaSstMaeC": 0.70277,
+          "deltaSstBiasC": 0.620695,
+          "meanCoolingAbsErrorC": 0.649399,
+          "peakCoolingAbsErrorC": 1.110678
+        }
+      ]
+    },
+    "testReportOnly": {
+      "storms": 2,
+      "leads": [
+        {
+          "leadH": 24,
+          "storms": 2,
+          "pixels": 12193,
+          "deltaSstMaeC": 0.464264,
+          "deltaSstBiasC": -0.073867,
+          "meanCoolingAbsErrorC": 0.124032,
+          "peakCoolingAbsErrorC": 0.714325
+        },
+        {
+          "leadH": 48,
+          "storms": 2,
+          "pixels": 12193,
+          "deltaSstMaeC": 0.520246,
+          "deltaSstBiasC": 0.013024,
+          "meanCoolingAbsErrorC": 0.194457,
+          "peakCoolingAbsErrorC": 0.681666
+        }
+      ]
+    }
+  }
+}

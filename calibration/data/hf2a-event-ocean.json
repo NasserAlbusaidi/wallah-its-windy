@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "sourceTier": "event-analysis-tier-a2",
+  "product": "NOAA NCEP Global Ocean Data Assimilation System monthly analysis",
+  "source": "NOAA Physical Sciences Laboratory THREDDS NCSS",
+  "license": "United States public data; acknowledge NOAA PSL",
+  "selection": "last fully completed calendar month before initialization",
+  "futureOceanAssimilation": false,
+  "horizontalGrid": {
+    "nx": 40,
+    "ny": 24,
+    "bbox": [
+      50.0,
+      70.0,
+      15.0,
+      27.0
+    ]
+  },
+  "depthMidpointsM": [
+    2.5,
+    7.5,
+    12.5,
+    17.5,
+    22.5,
+    27.5,
+    32.5,
+    37.5,
+    42.5,
+    47.5,
+    52.5,
+    57.5,
+    62.5,
+    67.5,
+    72.5,
+    77.5,
+    82.5,
+    87.5,
+    92.5,
+    97.5,
+    112.5,
+    137.5,
+    162.5,
+    187.5,
+    225.0,
+    275.0
+  ],
+  "events": [
+    {
+      "id": "gonu2007",
+      "layerIndex": 0,
+      "initializationTime": "2007-06-03T03:00:00Z",
+      "sourceMonth": "2007-05",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2007.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2007-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "5c75e6074b37f8ce08d8fd234c0475eca1f7e541e29f5d1bd88cc88cb3bb8fc9"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2007.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2007-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "311b56495d916694327e03910251e2b68ebfda4c9b156820d5eb7e9d5162c9d5"
+      }
+    },
+    {
+      "id": "as2007",
+      "layerIndex": 1,
+      "initializationTime": "2007-06-25T06:00:00Z",
+      "sourceMonth": "2007-05",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2007.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2007-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "5c75e6074b37f8ce08d8fd234c0475eca1f7e541e29f5d1bd88cc88cb3bb8fc9"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2007.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2007-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "311b56495d916694327e03910251e2b68ebfda4c9b156820d5eb7e9d5162c9d5"
+      }
+    },
+    {
+      "id": "phet2010",
+      "layerIndex": 2,
+      "initializationTime": "2010-06-01T06:00:00Z",
+      "sourceMonth": "2010-05",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2010.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2010-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "51b3b400dc746ae27ee9d0761febc1bd5d8a78bf862b4cdc9943fae3e5461932"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2010.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2010-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "4926994b9131c482d00db4ed0095152284f8d16d14f100c7220ddc3e2433f926"
+      }
+    },
+    {
+      "id": "keila2011",
+      "layerIndex": 3,
+      "initializationTime": "2011-11-02T00:00:00Z",
+      "sourceMonth": "2011-10",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2011.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2011-10-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "543057b75db161da7b10cbd82e1c86ac506abf60955cc0a52a4a3c4e82f7ea36"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2011.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2011-10-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "5242bbe56f94e65e91739fc6573a52a10e7777a647c25178f44730a917da1b70"
+      }
+    },
+    {
+      "id": "nanauk2014",
+      "layerIndex": 4,
+      "initializationTime": "2014-06-10T15:00:00Z",
+      "sourceMonth": "2014-05",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2014.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2014-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "1ad1b503b2228921893f596cc0c6d33a3fe3fb4e90da109248bce16efd285a54"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2014.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2014-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "e2e41b00113d7885c4e4ed2d4ba68c15baecfd69cc6219a511451605cf70289d"
+      }
+    },
+    {
+      "id": "nilofar2014",
+      "layerIndex": 5,
+      "initializationTime": "2014-10-28T09:00:00Z",
+      "sourceMonth": "2014-09",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2014.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2014-09-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "2c422992bce7676479425c47fc262072ed76b02d66bf1724368af0b50e55d789"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2014.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2014-09-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "ac864084a39628800b3a16bd77bb305133ca831d5fecffd075698a2169160c72"
+      }
+    },
+    {
+      "id": "ashobaa2015",
+      "layerIndex": 6,
+      "initializationTime": "2015-06-07T12:00:00Z",
+      "sourceMonth": "2015-05",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2015.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2015-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "fb01d4a27d22410e95cd584672e09673eb0731dcd23ca99989080dc27ecca401"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2015.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2015-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "558a1d001c44170b33cf0632ef247dc70ea01e79412f77223482e1bcac5fec79"
+      }
+    },
+    {
+      "id": "mekunu2018",
+      "layerIndex": 7,
+      "initializationTime": "2018-05-25T12:00:00Z",
+      "sourceMonth": "2018-04",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2018.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2018-04-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "01f0531cab563e70ebf2ba0c4cb2a1f0807878ec7cee7c962f862d3262e3da7c"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2018.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2018-04-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "a35c1a59ea663d7cf41fe4ec7ceb2f094ef05252e6a8c453b2bac91d86f22439"
+      }
+    },
+    {
+      "id": "vayu2019",
+      "layerIndex": 8,
+      "initializationTime": "2019-06-13T21:00:00Z",
+      "sourceMonth": "2019-05",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2019.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2019-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "24660f81d18aad5c41dc36488bbbe2fc223c7ea54f15cc2a93b5b85ee871375a"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2019.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2019-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "d0d1cabdbf39eaa872f7638e8148a9b4876f088a8be32bdf9a07ff7663db57c7"
+      }
+    },
+    {
+      "id": "hikaa2019",
+      "layerIndex": 9,
+      "initializationTime": "2019-09-22T12:00:00Z",
+      "sourceMonth": "2019-08",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2019.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2019-08-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "3c9a43b279a9d97be5b7b6ee0497cd4ca48ecf8c0c2df02f48472a2c4ffdaea5"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2019.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2019-08-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "0b97df585a8e324b63e72a1c3b7f304c94e43d62e65bb093ee86aed28e12e00a"
+      }
+    },
+    {
+      "id": "mukda2006",
+      "layerIndex": 10,
+      "initializationTime": "2006-09-21T12:00:00Z",
+      "sourceMonth": "2006-08",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2006.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2006-08-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "4c2b0916813e8cd65f416ea94cc6f884033b55844f82f6d53a59a5926e9d1005"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2006.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2006-08-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "95c9037cba90519723cd83a476edc98f7ed4ae7a7dfdfb854ca86deb4228f8f4"
+      }
+    },
+    {
+      "id": "kyarr2019",
+      "layerIndex": 11,
+      "initializationTime": "2019-10-26T21:00:00Z",
+      "sourceMonth": "2019-09",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2019.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2019-09-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "06f6897197e15dec478e3ca0a65827bcc64053845ac8b0c170207d83d8ffe0bc"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2019.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2019-09-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "d4ac4cdc3e2f2dc89b7f7f89846e0784acf5901406f689540cb239131956214d"
+      }
+    },
+    {
+      "id": "shaheen2021",
+      "layerIndex": 12,
+      "initializationTime": "2021-09-30T18:00:00Z",
+      "sourceMonth": "2021-08",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2021.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2021-08-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "8a76967466d2db66977020066f609c22ac9b15c400f783b53da81d9b3e1d45c0"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2021.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2021-08-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "5bbc65c9950c6988f2f396a0fc961074ed56ebd3410ede8cda2d7d4b39a52f58"
+      }
+    },
+    {
+      "id": "biparjoy2023",
+      "layerIndex": 13,
+      "initializationTime": "2023-06-09T18:00:00Z",
+      "sourceMonth": "2023-05",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2023.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2023-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "dff0c4a95fd8dbda5219e830df0ae8127514d281dc77ccff0e2cf967691db382"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2023.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2023-05-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "c03df344d0db0867a398ce0f98febb664c3efe42eeb21402bb744a3eac073a9f"
+      }
+    },
+    {
+      "id": "maha2019",
+      "layerIndex": 14,
+      "initializationTime": "2019-11-02T03:00:00Z",
+      "sourceMonth": "2019-10",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2019.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2019-10-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "adf6e1c770e117bfbd693149498f980a11f0cc04c89114376c833096543ab996"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2019.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2019-10-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "1d7d3fea2f8c641a8cbe1cdfd9b0b3576cd8bd08d38e4a1c9934f804b109d869"
+      }
+    },
+    {
+      "id": "asna2024",
+      "layerIndex": 15,
+      "initializationTime": "2024-08-29T21:00:00Z",
+      "sourceMonth": "2024-07",
+      "validityEndsBeforeInitialization": true,
+      "temperature": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/pottmp.2024.nc?var=pottmp&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2024-07-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "b7748c006a74f59c74857149a7df8e6795c55ff468b7b846319bb48b32f089b5"
+      },
+      "salinity": {
+        "url": "https://psl.noaa.gov/thredds/ncss/grid/Datasets/godas/salt.2024.nc?var=salt&north=27.5&west=49.5&east=70.5&south=14.5&horizStride=1&time=2024-07-01T00%3A00%3A00Z&accept=netcdf4",
+        "rawSha256": "f65cd8e966700deec5e55e28935d7f205900d83c948e053074a8285975554bb3"
+      }
+    }
+  ],
+  "binary": {
+    "path": "calibration/data/hf2a-event-ocean.bin",
+    "bytes": 1600264,
+    "sha256": "d1110713658d950b0f1ea54556c8ce4a31f501ab7a4672f129001ad432f24975"
+  },
+  "limitations": [
+    "GODAS native horizontal grid is 1 degree longitude by about 1/3 degree latitude.",
+    "The previous completed monthly mean cannot resolve event-scale mesoscale eddies.",
+    "GLORYS12V1 remains the preferred higher-resolution Tier-A source when credentials and archival access are available."
+  ]
+}

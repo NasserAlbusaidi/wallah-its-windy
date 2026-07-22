@@ -241,6 +241,48 @@ stores a frozen complete-storm benchmark split:
 - calibration: Gonu, Phet, Nilofar, Ashobaa, Mekunu, Hikaa, Vayu;
 - validation holdout: Kyarr, Shaheen, Biparjoy.
 
+### Observed satellite frames — `bake/satellite_frames.py`
+
+The browser can request public Meteosat IODC WMS frames directly, but reviewed
+historical frames may be frozen into `public/data/satellite/manifest.json` for
+reproducible runs:
+
+```bash
+bake/.venv/bin/python bake/satellite_frames.py meteosat \
+  --observed-at 2021-10-01T02:30:00Z \
+  --channel infrared
+```
+
+This downloads a same-domain 1000×600 crop of EUMETView
+`msg_iodc:ir108` or `msg_iodc:vis006`, saves the provider/product/acquisition
+metadata, and never changes a model input.
+
+MOSDAC allows public catalogue search but requires a registered user for pixel
+downloads. Download and render the authorized granule outside the repository,
+then ingest that raster without passing credentials to the script:
+
+```bash
+bake/.venv/bin/python bake/satellite_frames.py insat \
+  --observed-at 2023-06-12T23:00:00Z \
+  --channel infrared \
+  --input-image /secure/path/to/rendered-granule.png \
+  --granule-id 11789154 \
+  --satellite INSAT-3D \
+  --product 'IMAGER TIR1'
+```
+
+The default source extent is the documented Asia Mercator L1C box
+(44.5°E–105.5°E, 10°S–45°N); `--source-bbox` and `--projection` make the crop
+contract explicit for other exports. Browser-ready files contain no credentials.
+Every manifest entry retains the source URL, attribution, usage label, domain,
+channel, and acquisition time.
+
+The companion `bake/validate_satellite_structure.py` compares same-domain
+grayscale captures using cold-cloud coverage, centroid displacement, core
+coverage, and quadrant balance. Its result is deliberately labelled a
+qualitative morphology screen, never forecast or radiometric skill. See
+`docs/satellite-cloud-validation.md`.
+
 ### Ghost tracks — `public/data/tracks.json`
 
 `sources.load_event_tracks()` extracts the **full** IBTrACS polyline (every fix,

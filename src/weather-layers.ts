@@ -17,6 +17,45 @@ export type WeatherLayerId =
   | 'shear'
   | 'terrain';
 
+/** Rendering choices for both the simulated and observed satellite workspace. */
+export type SatellitePaletteId = 'enhanced' | 'grayscale' | 'visible';
+
+export interface SatellitePaletteDefinition {
+  id: SatellitePaletteId;
+  label: string;
+  legend: string;
+  unit: string;
+}
+
+export const SATELLITE_PALETTES: readonly SatellitePaletteDefinition[] = [
+  {
+    id: 'enhanced',
+    label: 'enhanced IR',
+    legend: 'warm surface · cold cloud · overshooting top',
+    unit: 'brightness-temperature colour enhancement',
+  },
+  {
+    id: 'grayscale',
+    label: 'grayscale IR',
+    legend: 'warm dark · cold bright',
+    unit: 'brightness-temperature grayscale',
+  },
+  {
+    id: 'visible',
+    label: 'daytime visible',
+    legend: 'surface · thin cloud · deep convection',
+    unit: '0.6 μm observed or simulated reflectance style',
+  },
+] as const;
+
+export const DEFAULT_SATELLITE_PALETTE: SatellitePaletteId = 'enhanced';
+
+export function satellitePaletteDefinition(
+  id: SatellitePaletteId,
+): SatellitePaletteDefinition {
+  return SATELLITE_PALETTES.find((palette) => palette.id === id)!;
+}
+
 export interface WeatherLayerDefinition {
   id: WeatherLayerId;
   label: string;
@@ -45,10 +84,10 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
   },
   {
     id: 'infrared',
-    label: 'simulated infrared',
-    shortLabel: 'clouds',
-    legend: 'warm surface → cold convective cloud tops',
-    unit: '°C brightness temperature proxy',
+    label: 'simulated satellite infrared',
+    shortLabel: 'satellite IR',
+    legend: 'warm surface · cold cloud · overshooting top',
+    unit: 'simulated brightness temperature · °C',
     simulated: true,
   },
   {

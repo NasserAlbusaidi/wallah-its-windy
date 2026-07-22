@@ -362,6 +362,16 @@ view, and archives issued runs atomically without overwrite. No continuously
 scheduled lawful provider feed is configured, so live output remains disabled.
 See `docs/hf5-live-data-contract.md` and `calibration/hf5-acceptance.json`.
 
+**Satellite visualization outcome (2026-07-22):** the map now distinguishes
+simulated cloud fields from timestamp-labelled observed pixels; supplies
+enhanced IR, grayscale, and daytime visible-style palettes; resolves public
+Meteosat IODC IR/VIS frames at the paused model time; and supports provenance-
+preserving INSAT manifest ingestion after a registered MOSDAC download. A
+six-model-hour observed-to-simulated crossfade supplies visual initialization,
+but does not assimilate pixels into model state. Automated live acquisition,
+radiometric decoding, and physical observed initialization remain future work.
+See `docs/satellite-cloud-validation.md`.
+
 ## HF-6 — broader and prospective validation
 
 **Outcome:** implementation complete; sealed retrospective result rejected;

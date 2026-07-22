@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "kind": "qualitative-morphology-screen-not-forecast-skill",
+  "scenario": "shaheen-2021-hindcast",
+  "observedAt": "2021-10-01T02:30:00Z",
+  "domain": {
+    "west": 50.0,
+    "south": 15.0,
+    "east": 70.0,
+    "north": 27.0
+  },
+  "stormCenter": {
+    "lat": 23.191736897213236,
+    "lon": 65.09515530527648
+  },
+  "observed": {
+    "threshold": 0.7725,
+    "coverage_fraction": 0.3208,
+    "centroid_offset_deg": {
+      "east": -0.0468,
+      "north": -1.0575
+    },
+    "centroid_distance_deg": 1.0586,
+    "core_fraction": 0.9919,
+    "quadrant_fraction": {
+      "ne": 0.1519,
+      "nw": 0.1106,
+      "sw": 0.3905,
+      "se": 0.3471
+    },
+    "quadrant_asymmetry": 0.2799
+  },
+  "simulated": {
+    "threshold": 0.42,
+    "coverage_fraction": 0.1573,
+    "centroid_offset_deg": {
+      "east": -0.5327,
+      "north": 0.2267
+    },
+    "centroid_distance_deg": 0.5789,
+    "core_fraction": 0.7826,
+    "quadrant_fraction": {
+      "ne": 0.2972,
+      "nw": 0.3128,
+      "sw": 0.2612,
+      "se": 0.1288
+    },
+    "quadrant_asymmetry": 0.184
+  },
+  "comparison": {
+    "coverage_ratio": 0.4903,
+    "centroid_distance_delta_deg": 0.4797,
+    "centroid_vector_delta_deg": 1.3731,
+    "quadrant_fraction_mae": 0.1738
+  },
+  "checks": {
+    "coverage_same_order": true,
+    "centroid_displacement_magnitude_plausible": true,
+    "centroid_vector_within_1_5deg": true,
+    "quadrant_distribution_plausible": true,
+    "organized_core_present": true
+  },
+  "passed": true
+}

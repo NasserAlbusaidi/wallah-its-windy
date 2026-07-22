@@ -24,8 +24,8 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > scoring and a separate counterfactual mode. A separate frozen 30-storm
 > observational benchmark measures the exact runtime at 12/24/48/72 hours
 > against a no-future-information persistence baseline. The map can switch
-> among terrain, simulated infrared,
-> SST, humidity, ocean heat, shear, and simulated rain-radar views. A worker-run
+> among terrain, wind, simulated rain products, environmental fields, and a
+> satellite desk with simulated or timestamp-matched observed imagery. A worker-run
 > forecast laboratory adds deterministic ensembles, track member-frequency fields,
 > and same-storm sensitivity experiments without blocking the map.
 
@@ -85,6 +85,13 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
   shear, and the terrain instrument. SST/RH/OHC/shear render the exact active
   baked plane; wind superposes ERA5 steering with the parametric vortex; IR,
   radar, and storm-total rainfall are explicitly simulated proxies.
+- On the infrared layer, choose enhanced IR, operational grayscale, or a
+  daytime visible-style rendering. Source controls switch among the simulated
+  cloud field, timestamp-matched observed imagery, and a six-model-hour visual
+  handoff from observed pixels to simulated evolution. Meteosat IR/VIS frames
+  come from EUMETView; INSAT frames can be loaded from the provenance manifest
+  after a registered MOSDAC download. The handoff is visual initialization,
+  not data assimilation.
 - The storm panel shows the live Saffir–Simpson category chip, an intensity
   bar with the model's MPI "potential" marker, and — near or after landfall —
   a coastal-impact report (parametric city winds, storm-total rain, and a
@@ -122,13 +129,33 @@ The four environmental products are data views, not decoration: their GPU
 textures use the same temporally interpolated SST/RH/OHC/shear fields sampled by
 physics. The enhanced-IR view follows the visual language of
 [NOAA cloud-top-temperature products](https://www.goes-r.gov/products/baseline-cloud-top-temp.html),
-but derives a bounded brightness-temperature proxy from the simulated vortex,
-organization, and intensity. The rain view maps the separated simulated rain
-rates through a Marshall–Palmer-style `Z = 200 R^1.6` transform and a
+but derives a bounded brightness-temperature proxy from the simulated vortex.
+Its shader combines multiscale storm-relative turbulence, an organization- and
+intensity-dependent eye and central overcast, convective cells tied to the
+separated rain rates, humidity-limited spiral bands, and a canopy displaced and
+eroded by the sampled deep-layer shear vector. The same generated cloud field
+adds restrained context to terrain, wind, rain-radar, and storm-total rainfall;
+it deliberately stays off SST, RH, OHC, and shear so those diagnostic fields
+remain readable. The field evolves with simulated storm time and never feeds
+back into the physics.
+
+The satellite desk can instead display real, timestamp-labelled Meteosat IODC
+IR10.8 or VIS0.6 pixels from EUMETSAT's public EUMETView WMS. Paused historical
+runs match the 15-minute acquisition cadence; accelerated playback coarsens
+refreshes to the event environment's three-hour cadence. The MOSDAC catalogue
+is public but not browser-CORS-enabled, while INSAT pixels require registered
+ingestion into the local provenance manifest. Observed imagery is always labelled with provider,
+product, and acquisition time. The `obs to sim` mode crossfades pixels over six
+model hours but does not change model state. The frozen
+**[Shaheen morphology screen](docs/satellite-cloud-validation.md)** is a broad
+visual-structure check, not radiometric or forecast validation.
+
+The rain view maps the separated simulated rain rates through a
+Marshall–Palmer-style `Z = 200 R^1.6` transform and a
 reflectivity palette; it follows the
 [NWS reflectivity concept](https://training.weather.gov/nwstc/NEXRAD/RADAR/3-1.htm)
 but is not a radar observation. The interface labels both proxy products
-“simulated” at all times.
+as simulated and keeps observed satellite pixels source- and time-labelled.
 
 On touch screens, a short stable tap spawns, a long-press pins the point probe,
 and drag/multi-touch gestures do neither. Narrow layouts keep the causal sentence
@@ -152,6 +179,8 @@ bake/.venv/bin/python -m pip install -r bake/requirements.txt
 bake/.venv/bin/python bake/bake.py          # ~15s; writes public/data/*
 bake/.venv/bin/python bake/fetch_event_benchmark.py # CDS-cached 10-storm inputs
 bake/.venv/bin/python bake/bake.py events   # event bins + frozen catalogue
+bake/.venv/bin/python bake/satellite_frames.py meteosat \
+  --observed-at 2021-10-01T02:30:00Z --channel infrared # optional frame cache
 npm run data:fidelity:catalog               # freeze the 30-storm HF-1 catalogue
 npm run data:fidelity:fetch                 # fetch the 20 additional ERA5 cases
 npm run data:fidelity:bake                  # bake offline-only forcing bins
@@ -170,7 +199,9 @@ npm run hf6:gate:check                      # enforce implementation + honesty g
   **NOAA OISST** SST climatology (`env.bin` SST — real), **IBTrACS** North-Indian
   tracks (`genesis.json`), and official **HydroSHEDS v1.1** ACC+DIR hydrography
   with per-cell travel time (`flowacc.bin`). ERA5 supplies steering, shear, and
-  600/700-hPa relative humidity; NOAA WOA23 supplies OHC26.
+  600/700-hPa relative humidity; NOAA WOA23 supplies OHC26. Optional observed
+  satellite frames use EUMETSAT EUMETView or registered MOSDAC/INSAT inputs,
+  each recorded in `public/data/satellite/manifest.json`.
 - GMRT, NOAA, and HydroSHEDS downloads are public and auth-free. ERA5
   reproduction requires a configured CDS API token and accepted Copernicus
   licence.

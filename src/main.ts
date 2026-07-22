@@ -72,11 +72,28 @@ import { TapGesture } from './tap-gesture';
 import { cloneStormStructure } from './structure';
 import { scoreHindcast, type HindcastScore } from './hindcast';
 import {
+  DEFAULT_SATELLITE_PALETTE,
   DEFAULT_WEATHER_LAYER,
+  SATELLITE_PALETTES,
+  satellitePaletteDefinition,
   weatherLayerDefinition,
   WEATHER_LAYERS,
+  type SatellitePaletteId,
   type WeatherLayerId,
 } from './weather-layers';
+import {
+  acquisitionSlotIso,
+  channelForPalette,
+  loadObservedFrameImage,
+  matchObservedFrame,
+  meteosatWmsFrame,
+  parseSatelliteManifest,
+  type ObservedSatelliteFrame,
+  type SatelliteChannel,
+  type SatelliteFrameManifest,
+  type SatelliteProviderId,
+  type SatelliteSourceMode,
+} from './satellite-observations';
 import { ImpactTracker } from './impact';
 import { createPointProbeReading } from './point-probe';
 import { simulatedStormName } from './storm-names';
@@ -155,6 +172,31 @@ const weatherLegendUnit = must(
 const weatherLegendScale = must(
   document.getElementById('weather-legend-scale'),
   '#weather-legend-scale',
+);
+const satelliteWorkbench = must(
+  document.getElementById('satellite-workbench'),
+  '#satellite-workbench',
+);
+const satelliteKind = must(document.getElementById('satellite-kind'), '#satellite-kind');
+const satelliteSourceControls = must(
+  document.getElementById('satellite-source'),
+  '#satellite-source',
+);
+const satelliteProviderControls = must(
+  document.getElementById('satellite-provider'),
+  '#satellite-provider',
+);
+const satellitePaletteControls = must(
+  document.getElementById('satellite-palette'),
+  '#satellite-palette',
+);
+const satelliteStatus = must(
+  document.getElementById('satellite-status') as HTMLOutputElement | null,
+  '#satellite-status',
+);
+const satelliteAttribution = must(
+  document.getElementById('satellite-attribution') as HTMLAnchorElement | null,
+  '#satellite-attribution',
 );
 const ensembleSize = must(
   document.getElementById('ensemble-size') as HTMLSelectElement | null,
@@ -299,6 +341,17 @@ let preEventMonth: number | null = null;
 let scenarioReqSeq = 0;
 let currentSpawn: SpawnParams | null = null;
 let activeWeatherLayer: WeatherLayerId = 'terrain';
+let activeSatellitePalette: SatellitePaletteId = DEFAULT_SATELLITE_PALETTE;
+let activeSatelliteSource: SatelliteSourceMode = 'simulated';
+let activeSatelliteProvider: SatelliteProviderId = 'meteosat';
+let satelliteManifest: SatelliteFrameManifest = { version: 1, frames: [] };
+let satelliteFrame: ObservedSatelliteFrame | null = null;
+let satelliteRequestKey = '';
+let satelliteRequestSeq = 0;
+let satelliteRequestAbort: AbortController | null = null;
+let satelliteHandoffStartAgeH = 0;
+let satelliteHandoffStarted = false;
+let satelliteHandoffSettled = false;
 let activeEnsemble: EnsembleResult | null = null;
 let analysisRequestSeq = 0;
 
@@ -342,6 +395,8 @@ try {
       console.warn('[boot] a render layer failed to init:', err);
     }
   }
+  renderCtrl?.setSatellitePalette?.(activeSatellitePalette);
+  renderCtrl?.setSatelliteSource?.(activeSatelliteSource, satelliteHandoffStartAgeH);
 } catch (err) {
   console.warn('[boot] render layers unavailable — map will not composite:', err);
   layers = [];
@@ -422,6 +477,17 @@ interface LoadItem {
 
 function asset(path: string): string {
   return `${import.meta.env.BASE_URL}${path}`;
+}
+
+async function loadSatelliteManifest(): Promise<void> {
+  try {
+    const response = await fetch(asset('data/satellite/manifest.json'));
+    if (!response.ok) return;
+    const parsed = parseSatelliteManifest((await response.json()) as unknown);
+    if (parsed) satelliteManifest = parsed;
+  } catch {
+    // Optional local observed-frame cache. Remote Meteosat remains available.
+  }
 }
 
 // terrain/env/flowacc are listed now even though bake.py may not emit them yet:
@@ -1281,16 +1347,256 @@ function layerIconSvg(id: WeatherLayerId): string {
   );
 }
 
+function setSatelliteStatus(
+  message: string,
+  tone: 'simulated' | 'loading' | 'observed' | 'unavailable',
+): void {
+  satelliteStatus.value = message;
+  satelliteStatus.textContent = message;
+  satelliteStatus.dataset.tone = tone;
+  satelliteAttribution.hidden = true;
+  satelliteAttribution.removeAttribute('href');
+}
+
+function updateSatelliteButtons(): void {
+  for (const button of satelliteSourceControls.querySelectorAll<HTMLButtonElement>('button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.source === activeSatelliteSource));
+  }
+  for (const button of satelliteProviderControls.querySelectorAll<HTMLButtonElement>('button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.provider === activeSatelliteProvider));
+  }
+  for (const button of satellitePaletteControls.querySelectorAll<HTMLButtonElement>('button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.palette === activeSatellitePalette));
+  }
+  satelliteKind.textContent = activeSatelliteSource === 'handoff'
+    ? 'observed → simulated'
+    : activeSatelliteSource;
+}
+
+function updateWeatherLegend(): void {
+  const definition = weatherLayerDefinition(activeWeatherLayer);
+  weatherLegend.dataset.layer = activeWeatherLayer;
+  if (activeWeatherLayer === 'infrared') {
+    const palette = satellitePaletteDefinition(activeSatellitePalette);
+    weatherLegendName.textContent = palette.label;
+    weatherLegendUnit.textContent = activeSatelliteSource === 'simulated'
+      ? `simulated · ${palette.unit}`
+      : `${activeSatelliteProvider} · ${palette.unit}`;
+    weatherLegendScale.textContent = palette.legend;
+  } else {
+    weatherLegendName.textContent = definition.shortLabel;
+    weatherLegendUnit.textContent = definition.unit;
+    weatherLegendScale.textContent = definition.legend;
+  }
+}
+
+function satelliteTargetTime(storm: StormState | null): Date {
+  if (activeScenario && storm) {
+    const startIso = activeRunMode === 'hindcast'
+      ? activeScenario.hindcast?.startIso ?? activeScenario.startIso
+      : activeScenario.startIso;
+    return new Date(Date.parse(startIso) + storm.ageH * 3_600_000);
+  }
+  // NRT imagery generally trails wall clock. A 30-minute latency target stays
+  // within the latest complete 15-minute slot without labelling it as "now".
+  return new Date(Date.now() - 30 * 60_000);
+}
+
+function satelliteTargetSlot(storm: StormState | null): string {
+  const target = satelliteTargetTime(storm);
+  // Accelerated historical playback uses the event environment's three-hour
+  // cadence so it does not stampede a public WMS. As soon as playback pauses,
+  // resolve the actual model timestamp to the satellite's 15-minute cadence;
+  // inspection and validation are therefore timestamp-matched, not merely
+  // "same day" approximations.
+  return acquisitionSlotIso(target, activeScenario && !session.paused ? 180 : 15);
+}
+
+function formatObservedTime(iso: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  }).format(new Date(iso));
+}
+
+async function showObservedFrame(
+  frame: ObservedSatelliteFrame,
+  requestSeq: number,
+  signal: AbortSignal,
+): Promise<void> {
+  const bitmap = await loadObservedFrameImage(frame, signal);
+  if (requestSeq !== satelliteRequestSeq || signal.aborted) {
+    bitmap.close();
+    return;
+  }
+  satelliteFrame = frame;
+  renderCtrl?.setObservedSatelliteFrame?.(bitmap, frame.channel);
+  if (activeSatelliteSource === 'handoff' && !satelliteHandoffStarted) {
+    // The six-hour clock begins only after the initial pixels have arrived.
+    // On a fast simulation, network latency must not consume the handoff before
+    // the first observed frame is ever visible.
+    satelliteHandoffStartAgeH = displayedStorm()?.ageH ?? 0;
+    satelliteHandoffStarted = true;
+    renderCtrl?.setSatelliteSource?.('handoff', satelliteHandoffStartAgeH);
+  }
+  const transition = activeSatelliteSource === 'handoff'
+    ? ' · crossfades to simulation over 6 model hours'
+    : '';
+  setSatelliteStatus(
+    `${frame.satellite} · ${frame.product} · ${formatObservedTime(frame.observedAt)}${transition}`,
+    'observed',
+  );
+  satelliteAttribution.href = frame.sourceUrl;
+  satelliteAttribution.textContent = `${frame.attribution} source ↗`;
+  satelliteAttribution.hidden = false;
+}
+
+async function refreshSatelliteObservation(force = false): Promise<void> {
+  if (
+    activeWeatherLayer !== 'infrared' ||
+    activeSatelliteSource === 'simulated' ||
+    (activeSatelliteSource === 'handoff' && (satelliteHandoffStarted || satelliteHandoffSettled))
+  ) {
+    return;
+  }
+  const targetIso = satelliteTargetSlot(displayedStorm());
+  const channel = channelForPalette(activeSatellitePalette);
+  const key = `${activeSatelliteProvider}|${channel}|${targetIso}`;
+  if (!force && key === satelliteRequestKey) return;
+  satelliteRequestKey = key;
+  const requestSeq = ++satelliteRequestSeq;
+  satelliteRequestAbort?.abort();
+  const abort = new AbortController();
+  satelliteRequestAbort = abort;
+  satelliteFrame = null;
+  renderCtrl?.setObservedSatelliteFrame?.(null);
+  setSatelliteStatus(
+    `${activeSatelliteProvider} · matching ${formatObservedTime(targetIso)}…`,
+    'loading',
+  );
+
+  const cached = matchObservedFrame(
+    satelliteManifest.frames,
+    targetIso,
+    activeSatelliteProvider,
+    channel,
+    activeSatelliteProvider === 'insat' ? 40 : 20,
+  );
+  if (cached) {
+    try {
+      await showObservedFrame(cached, requestSeq, abort.signal);
+    } catch (error) {
+      if (!abort.signal.aborted && requestSeq === satelliteRequestSeq) {
+        setSatelliteStatus(`cached frame failed · ${String(error)}`, 'unavailable');
+      }
+    }
+    return;
+  }
+
+  if (activeSatelliteProvider === 'meteosat') {
+    const frame = meteosatWmsFrame(targetIso, activeSatellitePalette);
+    if (!frame) {
+      setSatelliteStatus(
+        'outside EUMETView archive (starts 01 Aug 2020) · showing simulated fallback',
+        'unavailable',
+      );
+      return;
+    }
+    try {
+      await showObservedFrame(frame, requestSeq, abort.signal);
+    } catch (error) {
+      if (!abort.signal.aborted && requestSeq === satelliteRequestSeq) {
+        setSatelliteStatus(`Meteosat request failed · simulated fallback · ${String(error)}`, 'unavailable');
+      }
+    }
+    return;
+  }
+
+  // MOSDAC's catalogue is public but is not CORS-enabled, and pixel downloads
+  // require a registered account. Static clients therefore consume only
+  // reviewed INSAT frames from the provenance manifest rather than generating
+  // noisy browser failures or routing credentials through an untrusted proxy.
+  setSatelliteStatus(
+    `no cached INSAT frame at ${formatObservedTime(targetIso)} · registered MOSDAC ingest required · simulated fallback`,
+    'unavailable',
+  );
+}
+
+function setSatellitePalette(palette: SatellitePaletteId): void {
+  activeSatellitePalette = palette;
+  renderCtrl?.setSatellitePalette?.(palette);
+  if (activeSatelliteSource === 'handoff') {
+    satelliteHandoffStarted = false;
+    satelliteHandoffSettled = false;
+    satelliteFrame = null;
+    renderCtrl?.setObservedSatelliteFrame?.(null);
+  }
+  updateSatelliteButtons();
+  updateWeatherLegend();
+  satelliteRequestKey = '';
+  if (activeSatelliteSource === 'simulated') {
+    const definition = satellitePaletteDefinition(palette);
+    setSatelliteStatus(
+      `${definition.label} generated from storm structure · no observed pixels`,
+      'simulated',
+    );
+  } else {
+    void refreshSatelliteObservation(true);
+  }
+}
+
+function setSatelliteSource(source: SatelliteSourceMode): void {
+  activeSatelliteSource = source;
+  satelliteHandoffStartAgeH = displayedStorm()?.ageH ?? 0;
+  satelliteHandoffStarted = false;
+  satelliteHandoffSettled = false;
+  renderCtrl?.setSatelliteSource?.(source, satelliteHandoffStartAgeH);
+  updateSatelliteButtons();
+  updateWeatherLegend();
+  satelliteRequestKey = '';
+  if (source === 'simulated') {
+    satelliteRequestAbort?.abort();
+    setSatelliteStatus(
+      `${satellitePaletteDefinition(activeSatellitePalette).label} generated from storm structure · no observed pixels`,
+      'simulated',
+    );
+  } else {
+    void refreshSatelliteObservation(true);
+  }
+}
+
+function setSatelliteProvider(provider: SatelliteProviderId): void {
+  activeSatelliteProvider = provider;
+  if (activeSatelliteSource === 'handoff') {
+    satelliteHandoffStartAgeH = displayedStorm()?.ageH ?? 0;
+    satelliteHandoffStarted = false;
+    satelliteHandoffSettled = false;
+    satelliteFrame = null;
+    renderCtrl?.setObservedSatelliteFrame?.(null);
+    renderCtrl?.setSatelliteSource?.('handoff', satelliteHandoffStartAgeH);
+  }
+  updateSatelliteButtons();
+  updateWeatherLegend();
+  satelliteRequestKey = '';
+  if (activeSatelliteSource !== 'simulated') void refreshSatelliteObservation(true);
+}
+
 function setWeatherLayer(layer: WeatherLayerId): void {
   activeWeatherLayer = layer;
   renderCtrl?.setWeatherLayer?.(layer);
-  const definition = weatherLayerDefinition(layer);
-  weatherLegend.dataset.layer = layer;
-  weatherLegendName.textContent = definition.shortLabel;
-  weatherLegendUnit.textContent = definition.unit;
-  weatherLegendScale.textContent = definition.legend;
+  satelliteWorkbench.hidden = layer !== 'infrared';
+  updateWeatherLegend();
   for (const button of layerButtons.querySelectorAll<HTMLButtonElement>('.layer-button')) {
     button.setAttribute('aria-pressed', String(button.dataset.layer === layer));
+  }
+  if (layer === 'infrared' && activeSatelliteSource !== 'simulated') {
+    void refreshSatelliteObservation();
   }
 }
 
@@ -1324,6 +1630,32 @@ layerButtons.replaceChildren(
     return button;
   }),
 );
+for (const button of satelliteSourceControls.querySelectorAll<HTMLButtonElement>('button[data-source]')) {
+  button.addEventListener('click', () => {
+    const source = button.dataset.source;
+    if (source === 'simulated' || source === 'observed' || source === 'handoff') {
+      setSatelliteSource(source);
+    }
+  });
+}
+for (const button of satelliteProviderControls.querySelectorAll<HTMLButtonElement>('button[data-provider]')) {
+  button.addEventListener('click', () => {
+    const provider = button.dataset.provider;
+    if (provider === 'meteosat' || provider === 'insat') {
+      setSatelliteProvider(provider);
+    }
+  });
+}
+for (const button of satellitePaletteControls.querySelectorAll<HTMLButtonElement>('button[data-palette]')) {
+  button.addEventListener('click', () => {
+    const palette = button.dataset.palette;
+    if (SATELLITE_PALETTES.some((candidate) => candidate.id === palette)) {
+      setSatellitePalette(palette as SatellitePaletteId);
+    }
+  });
+}
+setSatellitePalette(DEFAULT_SATELLITE_PALETTE);
+setSatelliteSource('simulated');
 setWeatherLayer(DEFAULT_WEATHER_LAYER);
 
 function currentAnalysisUrls(): {
@@ -1866,6 +2198,21 @@ function drawEnsembleOverlay(result: EnsembleResult | null): void {
 
 function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
   const { storm, prev } = buildStorm();
+  const handoffComplete = activeSatelliteSource === 'handoff' &&
+    satelliteHandoffStarted &&
+    storm !== null &&
+    storm.ageH - satelliteHandoffStartAgeH >= 6;
+  if (handoffComplete && !satelliteHandoffSettled) {
+    satelliteHandoffSettled = true;
+    satelliteRequestAbort?.abort();
+    renderCtrl?.setObservedSatelliteFrame?.(null);
+    const initialization = satelliteFrame
+      ? ` · initialized from ${satelliteFrame.satellite} ${formatObservedTime(satelliteFrame.observedAt)}`
+      : '';
+    setSatelliteStatus(`simulated evolution${initialization}`, 'simulated');
+  } else if (activeWeatherLayer === 'infrared' && activeSatelliteSource !== 'simulated') {
+    void refreshSatelliteObservation();
+  }
   const frame: FrameState = {
     storm,
     prevStorm: prev ?? prevFrameStorm,
@@ -2002,6 +2349,9 @@ type RenderController = RenderLayer & {
   setResources?(resources: RenderResourcesLike): void;
   setMonth?(monthIndex: number): void;
   setWeatherLayer?(layer: WeatherLayerId): void;
+  setSatellitePalette?(palette: SatellitePaletteId): void;
+  setSatelliteSource?(source: SatelliteSourceMode, handoffStartAgeH?: number): void;
+  setObservedSatelliteFrame?(image: ImageBitmap | null, channel?: SatelliteChannel): void;
   setParticleBudget?(count: number): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;
@@ -2060,6 +2410,13 @@ Object.defineProperty(window, '__cyc', {
       hoursPerSec: ui.timescaleHoursPerSec(storm),
       activeScenario: activeScenario?.id ?? null,
       weatherLayer: activeWeatherLayer,
+      satellite: {
+        source: activeSatelliteSource,
+        provider: activeSatelliteProvider,
+        palette: activeSatellitePalette,
+        frame: satelliteFrame?.id ?? null,
+        observedAt: satelliteFrame?.observedAt ?? null,
+      },
       envSamplingMode: envSampler.getSamplingMode(),
       envTFrac:
         activeScenario && storm
@@ -2070,4 +2427,10 @@ Object.defineProperty(window, '__cyc', {
   },
 });
 requestAnimationFrame(frame);
+void loadSatelliteManifest().then(() => {
+  if (activeWeatherLayer === 'infrared' && activeSatelliteSource !== 'simulated') {
+    satelliteRequestKey = '';
+    void refreshSatelliteObservation(true);
+  }
+});
 void loadAll();

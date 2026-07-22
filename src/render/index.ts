@@ -79,6 +79,12 @@ import {
   interpolateStormStructure,
 } from '../structure';
 import type { WeatherLayerId } from '../weather-layers';
+import type { SatellitePaletteId } from '../weather-layers';
+import type {
+  SatelliteChannel,
+  SatelliteSourceMode,
+} from '../satellite-observations';
+import { ObservedSatelliteLayer } from './satellite';
 
 /** Baked data handed to the renderer (mode A); any field may arrive progressively. */
 export interface RenderResources {
@@ -183,6 +189,9 @@ export class RenderPipeline implements RenderLayer {
   private gpu: GpuTextures = emptyGpu();
   private monthIndex = 5;
   private weatherLayer: WeatherLayerId = 'terrain';
+  private satellitePalette: SatellitePaletteId = 'enhanced';
+  private satelliteSource: SatelliteSourceMode = 'simulated';
+  private satelliteHandoffStartAgeH = 0;
   private envPlane = -1;
   private envNextPlane = -1;
   private envPlaneMode = '';
@@ -195,6 +204,7 @@ export class RenderPipeline implements RenderLayer {
 
   private terrain = new TerrainLayer();
   private env = new EnvLayer();
+  private satellite = new ObservedSatelliteLayer();
   private particles = new ParticleLayer();
   private wind = new WindLayer();
   private rain = new RainLayer();
@@ -242,6 +252,7 @@ export class RenderPipeline implements RenderLayer {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
     this.env.resize(this.width, this.height);
+    this.satellite.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.wind.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
@@ -270,15 +281,35 @@ export class RenderPipeline implements RenderLayer {
 
     // Luminance order (back to front). Rain updates offscreen, then composites.
     this.terrain.draw(ctx, this.gpu, terrainFade);
-    this.env.draw(ctx, this.gpu, glowFade);
+    let observedWeight = 0;
+    let simulatedWeight = 1;
+    if (ctx.weatherLayer === 'infrared' && this.satellite.hasFrame()) {
+      if (this.satelliteSource === 'observed') {
+        observedWeight = 1;
+        simulatedWeight = 0;
+      } else if (this.satelliteSource === 'handoff') {
+        const elapsedH = Math.max(
+          0,
+          (ctx.frame.storm?.ageH ?? this.satelliteHandoffStartAgeH) -
+            this.satelliteHandoffStartAgeH,
+        );
+        const linear = clamp01(elapsedH / 6);
+        simulatedWeight = linear * linear * (3 - 2 * linear);
+        observedWeight = 1 - simulatedWeight;
+      }
+    }
+    this.satellite.draw(observedWeight);
+    this.env.draw(ctx, this.gpu, glowFade * simulatedWeight);
     this.radar.draw(ctx);
     this.rain.update(ctx, this.gpu);
     this.rain.composite(ctx, this.gpu, terrainFade);
     // The wind layer already renders the vortex flow, so the storm-spiral
     // swarm yields to it (two swarms would double-draw the same wind field).
+    // Enhanced IR also owns its full cloud field; additive point particles on
+    // top would turn the satellite texture back into an illustrative spiral.
     if (ctx.weatherLayer === 'wind') {
       this.wind.draw(ctx);
-    } else if (!ctx.reduced) {
+    } else if (ctx.weatherLayer !== 'infrared' && !ctx.reduced) {
       this.particles.draw(ctx);
     }
 
@@ -301,6 +332,7 @@ export class RenderPipeline implements RenderLayer {
     this.disposeTextures();
     this.terrain.dispose();
     this.env.dispose();
+    this.satellite.dispose();
     this.particles.dispose();
     this.wind.dispose();
     this.rain.dispose();
@@ -335,6 +367,27 @@ export class RenderPipeline implements RenderLayer {
   setWeatherLayer(layer: WeatherLayerId): void {
     if (layer !== this.weatherLayer) this.wind.clearTrails();
     this.weatherLayer = layer;
+  }
+
+  setSatellitePalette(palette: SatellitePaletteId): void {
+    this.satellitePalette = palette;
+    this.env.setSatellitePalette(palette);
+    this.satellite.setPalette(palette);
+  }
+
+  setSatelliteSource(source: SatelliteSourceMode, handoffStartAgeH = 0): void {
+    this.satelliteSource = source;
+    this.satelliteHandoffStartAgeH = Number.isFinite(handoffStartAgeH)
+      ? Math.max(0, handoffStartAgeH)
+      : 0;
+  }
+
+  setObservedSatelliteFrame(image: ImageBitmap | null, channel: SatelliteChannel = 'infrared'): void {
+    if (!image) {
+      this.satellite.clearFrame();
+      return;
+    }
+    this.satellite.setFrame(image, channel);
   }
 
   /** Decorative workload only; deterministic physics and flight tapes are untouched. */
@@ -458,6 +511,9 @@ export class RenderPipeline implements RenderLayer {
     this.caps = probeCaps(gl);
     this.terrain.init(gl);
     this.env.init(gl);
+    this.satellite.init(gl);
+    this.env.setSatellitePalette(this.satellitePalette);
+    this.satellite.setPalette(this.satellitePalette);
     this.particles.init(gl);
     this.wind.init(gl, this.caps);
     this.rain.init(gl, this.caps);
@@ -467,6 +523,7 @@ export class RenderPipeline implements RenderLayer {
       this.track.init(this.overlay);
     }
     this.env.resize(this.width, this.height);
+    this.satellite.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.wind.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);

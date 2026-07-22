@@ -32,6 +32,10 @@ separate from the browser runtime.
   permanent final test is intentionally absent from the acceptance gate.
 - `../docs/fidelity-benchmark.md` — generated HF-1 observational report.
 - `ensemble.bench.ts` — steady-state 20/40/80-member performance profile.
+- `satellite-cloud-validation.json` — frozen, timestamp-matched Shaheen
+  cold-cloud morphology screen. It is a visual-structure check, not a
+  radiometric or forecast-skill result; see
+  `../docs/satellite-cloud-validation.md`.
 
 The physical-structure subset contains six-hour main-track tropical fixes only.
 All position and structure values come from USA/JTWC columns. R34 is scored
@@ -51,6 +55,9 @@ npm run calibrate:structure
 npm run calibrate:intensity
 npm run fidelity
 npm run profile:ensemble
+
+# Re-run after capturing same-domain observed and simulated grayscale frames.
+python3 bake/validate_satellite_structure.py --help
 
 # Fail if data, metrics, reports, gates, or live parameters drift.
 npm run calibrate:check

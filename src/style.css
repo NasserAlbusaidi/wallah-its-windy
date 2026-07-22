@@ -31,6 +31,10 @@
 
 :root {
   --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --panel: rgba(4, 10, 18, 0.88);
+  --panel-solid: #07111d;
+  --line: color-mix(in srgb, var(--ridge-hi, #2c343c) 82%, transparent);
+  --line-bright: color-mix(in srgb, var(--track, #78dcff) 44%, transparent);
 }
 
 html,
@@ -49,12 +53,11 @@ body {
   position: fixed;
   inset: 0;
   /* The sea beyond the chart: a quiet vignette so the framed map floats. */
-  background: radial-gradient(
-    120% 120% at 50% 42%,
-    #081120 0%,
-    #050b14 55%,
-    #02050a 100%
-  );
+  background:
+    linear-gradient(rgba(120, 220, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 220, 255, 0.018) 1px, transparent 1px),
+    radial-gradient(120% 120% at 50% 42%, #081120 0%, #050b14 55%, #02050a 100%);
+  background-size: 56px 56px, 56px 56px, auto;
 }
 
 /* The chart frame: an aspect-correct, centered map (JS computes the rect in
@@ -73,6 +76,25 @@ body {
     0 0 0 1px rgba(0, 0, 0, 0.6),
     0 18px 60px rgba(0, 0, 0, 0.55),
     0 0 90px color-mix(in srgb, var(--track, #78dcff) 6%, transparent);
+}
+
+/* Survey marks make the map read as an instrument surface, not a wallpaper. */
+#map-frame::after {
+  position: absolute;
+  z-index: 4;
+  inset: 9px;
+  content: '';
+  background:
+    linear-gradient(var(--accent, #ffb74d), var(--accent, #ffb74d)) 0 0 / 20px 1px no-repeat,
+    linear-gradient(var(--accent, #ffb74d), var(--accent, #ffb74d)) 0 0 / 1px 20px no-repeat,
+    linear-gradient(var(--accent, #ffb74d), var(--accent, #ffb74d)) 100% 0 / 20px 1px no-repeat,
+    linear-gradient(var(--accent, #ffb74d), var(--accent, #ffb74d)) 100% 0 / 1px 20px no-repeat,
+    linear-gradient(var(--accent, #ffb74d), var(--accent, #ffb74d)) 0 100% / 20px 1px no-repeat,
+    linear-gradient(var(--accent, #ffb74d), var(--accent, #ffb74d)) 0 100% / 1px 20px no-repeat,
+    linear-gradient(var(--accent, #ffb74d), var(--accent, #ffb74d)) 100% 100% / 20px 1px no-repeat,
+    linear-gradient(var(--accent, #ffb74d), var(--accent, #ffb74d)) 100% 100% / 1px 20px no-repeat;
+  opacity: 0.42;
+  pointer-events: none;
 }
 
 /* The two stacked canvases fill the chart frame. WebGL2 draws the map; the 2D
@@ -291,31 +313,69 @@ body {
   user-select: none;
 }
 
-#title {
-  top: var(--space, 8px);
-  left: calc(var(--space, 8px) * 2);
-  font-weight: 500;
-  font-size: 15px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+#masthead {
+  top: 14px;
+  left: 16px;
+  display: grid;
+  gap: 5px;
+  width: 238px;
+  padding-left: 11px;
+  border-left: 1px solid var(--accent, #ffb74d);
+}
+.masthead-index {
+  margin: 0;
   color: var(--text, #7fd4e8);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.52;
+}
+#title {
+  margin: 0;
+  color: var(--storm-core, #e8f4ff);
+  font-size: clamp(15px, 1.3vw, 19px);
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  line-height: 1.1;
+  text-transform: uppercase;
 }
 #title .accent {
   color: var(--accent, #ffb74d);
 }
 
-.quiet-button {
-  top: 42px;
-  left: calc(var(--space, 8px) * 2);
-  padding: 0;
+.masthead-meta {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.model-state {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
   color: var(--text, #7fd4e8);
-  font: 400 10px/1.4 var(--mono);
-  letter-spacing: 0.09em;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.62;
+}
+.model-state i {
+  width: 5px;
+  height: 5px;
+  background: var(--track, #78dcff);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--track, #78dcff);
+}
+
+.quiet-button {
+  padding: 0;
+  color: var(--accent, #ffb74d);
+  font: 500 9px/1.4 var(--mono);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   background: none;
   border: 0;
   cursor: pointer;
-  opacity: 0.52;
+  opacity: 0.78;
 }
 .quiet-button:hover,
 .quiet-button:focus-visible {
@@ -328,37 +388,77 @@ body {
 }
 
 #month-picker {
-  top: var(--space, 8px);
-  right: calc(var(--space, 8px) * 2);
-  text-align: right;
+  top: 14px;
+  right: 16px;
+  display: grid;
+  grid-template-columns: 72px minmax(150px, 210px);
+  width: min(292px, calc(100vw - 32px));
+  overflow: hidden;
+  color: var(--text, #7fd4e8);
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top-color: var(--line-bright);
+  border-radius: var(--radius, 4px);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+#month-picker > header {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  padding: 7px 9px;
+  color: var(--storm-core, #e8f4ff);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+}
+#month-picker > header span:last-child {
+  color: var(--accent, #ffb74d);
+  font-size: 8px;
+  opacity: 0.72;
+}
+.run-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 9px 9px;
+}
+.month-field {
+  border-right: 1px solid var(--line);
+}
+.scenario-field {
+  min-width: 0;
 }
 #month-picker label {
   display: block;
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  margin: 0;
+  font-size: 8px;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
-  opacity: 0.6;
-  margin-bottom: calc(var(--space, 8px) / 2);
-}
-/* The Scenario label sits above its own select, spaced from the Month block. */
-#month-picker label[for='scenario'],
-#scenario-mode-label {
-  margin-top: var(--space, 8px);
+  opacity: 0.52;
 }
 #month,
 #scenario,
 #scenario-mode {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 24px 5px 7px;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
-  color: var(--text, #7fd4e8);
-  background: var(--ocean-shallow, #0a1522);
-  border: 1px solid var(--ridge-hi, #2c343c);
-  border-radius: var(--radius, 4px);
-  padding: calc(var(--space, 8px) / 2) var(--space, 8px);
+  color: var(--storm-core, #e8f4ff);
+  background:
+    linear-gradient(45deg, transparent 50%, var(--text, #7fd4e8) 50%) calc(100% - 10px) 13px / 4px 4px no-repeat,
+    linear-gradient(135deg, var(--text, #7fd4e8) 50%, transparent 50%) calc(100% - 6px) 13px / 4px 4px no-repeat,
+    var(--ocean-shallow, #0a1522);
+  border: 1px solid var(--line);
+  border-radius: 2px;
   cursor: pointer;
   appearance: none;
-  min-width: 8ch;
 }
 /* Pinned month during an event replay (or an unavailable scenario catalogue). */
 #month:disabled,
@@ -374,11 +474,14 @@ body {
   outline-offset: 2px;
 }
 #scenario-contract {
-  width: 27ch;
-  margin: 7px 0 0 auto;
+  grid-column: 1 / -1;
+  width: auto;
+  margin: 0;
+  padding: 7px 9px 8px;
   color: var(--accent, #ffb74d);
-  font-size: 9px;
+  font-size: 8px;
   line-height: 1.4;
+  border-top: 1px solid var(--line);
   opacity: 0.82;
 }
 #scenario-contract[hidden] {
@@ -387,6 +490,13 @@ body {
 #scenario-mode[hidden],
 #scenario-mode-label[hidden] {
   display: none;
+}
+.scenario-mode-field:has(#scenario-mode[hidden]) {
+  display: none;
+}
+.scenario-mode-field:not(:has(#scenario-mode[hidden])) {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
 }
 
 /* Windy-style layer rail: the one-tap layer picker on the right edge. Icons +
@@ -400,31 +510,48 @@ body {
   transition: top 240ms ease;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: 128px;
+  gap: 6px;
+  width: 142px;
   pointer-events: auto;
   z-index: 6;
+}
+#layer-rail:has(#satellite-workbench:not([hidden])) {
+  width: 214px;
+}
+.rail-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 3px;
+  color: var(--text, #7fd4e8);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.62;
+}
+.rail-head span:last-child {
+  color: var(--accent, #ffb74d);
 }
 #layer-buttons {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 .layer-button {
   display: grid;
   grid-template-columns: 16px 1fr auto;
   gap: 7px;
   align-items: center;
-  padding: 6px 8px;
+  min-height: 32px;
+  padding: 7px 8px;
   color: var(--text, #7fd4e8);
   font: 500 10px/1.2 var(--mono);
   letter-spacing: 0.05em;
   text-align: left;
   text-transform: lowercase;
-  background: color-mix(in srgb, var(--ocean-deep, #050a12) 84%, transparent);
-  border: 1px solid var(--ridge-hi, #2c343c);
-  border-radius: var(--radius, 4px);
-  backdrop-filter: blur(7px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  backdrop-filter: blur(10px);
   cursor: pointer;
   transition:
     border-color 140ms ease,
@@ -451,20 +578,23 @@ body {
 .layer-button[aria-pressed='true'] {
   color: var(--storm-core, #e8f4ff);
   border-color: var(--accent, #ffb74d);
-  background: color-mix(in srgb, var(--accent, #ffb74d) 13%, var(--ocean-deep, #050a12));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #ffb74d) 18%, transparent), transparent 76%),
+    var(--panel-solid);
+  box-shadow: inset 3px 0 0 var(--accent, #ffb74d);
 }
 #weather-legend {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 3px 8px;
-  padding: 6px 8px;
+  padding: 7px 8px;
   font-size: 8px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: color-mix(in srgb, var(--ocean-deep, #050a12) 84%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ridge-hi, #2c343c) 80%, transparent);
-  border-radius: var(--radius, 4px);
-  backdrop-filter: blur(7px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  backdrop-filter: blur(10px);
 }
 #weather-legend-name {
   color: var(--accent, #ffb74d);
@@ -570,6 +700,120 @@ body {
   );
 }
 
+/* Satellite desk: a compact provenance instrument, not a generic settings
+   card. The two-column labels read like a product console and make observed
+   versus simulated state visible at a glance. */
+#satellite-workbench {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--ocean-shallow) 78%, transparent), transparent 58%),
+    var(--panel-solid);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent, #ffb74d);
+  border-radius: 2px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 26%);
+}
+#satellite-workbench[hidden] {
+  display: none;
+}
+#satellite-workbench > header,
+.satellite-control-row {
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  gap: 6px;
+  align-items: center;
+}
+#satellite-workbench > header {
+  padding-bottom: 6px;
+  color: var(--storm-core, #e8f4ff);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+}
+#satellite-workbench > header span:last-child {
+  color: var(--accent, #ffb74d);
+  text-align: right;
+}
+.satellite-control-row > span {
+  color: var(--text, #7fd4e8);
+  font-size: 7px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+.satellite-segments {
+  display: flex;
+  min-width: 0;
+  border: 1px solid var(--line);
+}
+.satellite-segments button {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 4px;
+  color: var(--text, #7fd4e8);
+  font: 500 7px/1 var(--mono);
+  letter-spacing: 0.02em;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--line);
+  cursor: pointer;
+}
+.satellite-segments button:first-child {
+  border-left: 0;
+}
+.satellite-segments button:hover,
+.satellite-segments button:focus-visible {
+  color: var(--storm-core, #e8f4ff);
+  background: color-mix(in srgb, var(--track, #78dcff) 9%, transparent);
+}
+.satellite-segments button:focus-visible {
+  outline: 1px solid var(--accent, #ffb74d);
+  outline-offset: -2px;
+}
+.satellite-segments button[aria-pressed='true'] {
+  color: var(--ocean-deep, #050a12);
+  background: var(--accent, #ffb74d);
+}
+#satellite-status {
+  min-height: 29px;
+  padding: 6px 7px;
+  color: var(--text, #7fd4e8);
+  font-size: 7px;
+  line-height: 1.45;
+  letter-spacing: 0.035em;
+  background: rgb(0 0 0 / 18%);
+  border-left: 1px solid var(--track, #78dcff);
+  opacity: 0.78;
+}
+#satellite-status[data-tone='observed'] {
+  color: var(--storm-core, #e8f4ff);
+  border-left-color: #65e3b4;
+}
+#satellite-status[data-tone='loading'] {
+  border-left-color: var(--accent, #ffb74d);
+}
+#satellite-status[data-tone='unavailable'] {
+  color: #f3b3a5;
+  border-left-color: #ee725b;
+}
+#satellite-attribution {
+  justify-self: end;
+  color: var(--track, #78dcff);
+  font-size: 7px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+  opacity: 0.66;
+}
+#satellite-attribution:hover,
+#satellite-attribution:focus-visible {
+  color: var(--storm-core, #e8f4ff);
+  opacity: 1;
+}
+
 /* Forecast laboratory: a collapsible tape at the opposite edge from the
    recorder. The dense two-column rhythm echoes a sounding workstation. */
 #analysis-dock {
@@ -577,17 +821,22 @@ body {
   left: calc(var(--space, 8px) * 2);
   width: min(390px, calc(100vw - 32px));
   color: var(--text, #7fd4e8);
-  background: color-mix(in srgb, var(--ocean-deep, #050a12) 92%, transparent);
-  border: 1px solid var(--ridge-hi, #2c343c);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-left-color: var(--accent, #ffb74d);
-  border-radius: var(--radius, 4px);
-  backdrop-filter: blur(9px);
+  border-radius: 2px;
+  backdrop-filter: blur(12px);
   pointer-events: auto;
   /* Above the recorder: on 821-1282px windows the two can overlap, and the
      dock's summary tab must stay clickable. */
   z-index: 6;
 }
 #analysis-dock > summary {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 35px;
   padding: 7px 10px;
   color: var(--accent, #ffb74d);
   font-size: 9px;
@@ -596,8 +845,15 @@ body {
   list-style: none;
   text-transform: uppercase;
 }
+#analysis-dock > summary small {
+  color: var(--text, #7fd4e8);
+  font-size: 7px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: none;
+  opacity: 0.42;
+}
 #analysis-dock > summary::after {
-  float: right;
   content: 'open';
   color: var(--text, #7fd4e8);
   opacity: 0.45;
@@ -724,18 +980,85 @@ body {
   left: calc(var(--space, 8px) * 2);
   bottom: calc(var(--space, 8px) * 2);
   max-width: min(60ch, 70vw);
-  min-height: 3em;
-  padding: 2px 5px;
+  min-height: 2.6em;
+  padding: 6px 8px 6px 20px;
   color: var(--text, #7fd4e8);
-  background: color-mix(in srgb, var(--ocean-deep, #050a12) 54%, transparent);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left-color: var(--track, #78dcff);
   border-radius: 2px;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(9px);
   opacity: 0.92;
   pointer-events: none;
   transition: opacity 400ms ease;
 }
 #caption.hint {
-  opacity: 0.6;
+  color: var(--storm-core, #e8f4ff);
+  opacity: 0.86;
+}
+#caption::before {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  width: 5px;
+  height: 5px;
+  content: '';
+  background: var(--track, #78dcff);
+  border-radius: 50%;
+  box-shadow: 0 0 9px var(--track, #78dcff);
+  transform: translateY(-50%);
+}
+
+#interaction-guide {
+  bottom: 17px;
+  left: 50%;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 0;
+  overflow: hidden;
+  color: var(--text, #7fd4e8);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+#interaction-guide > span {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1px 8px;
+  min-width: 138px;
+  padding: 7px 10px;
+}
+#interaction-guide > span + span {
+  border-left: 1px solid var(--line);
+}
+#interaction-guide b {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: var(--accent, #ffb74d);
+  font-size: 8px;
+  font-weight: 500;
+  opacity: 0.74;
+}
+#interaction-guide small,
+#interaction-guide strong {
+  font-size: 8px;
+  font-weight: 400;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+#interaction-guide small {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.42;
+}
+#interaction-guide strong {
+  color: var(--storm-core, #e8f4ff);
+}
+#app:has(#flight-recorder:not([hidden])) #interaction-guide {
+  display: none;
 }
 
 /* Flight recorder — a narrow instrument tape, not a dashboard card. Live
@@ -1266,6 +1589,28 @@ body {
   }
 }
 
+/* At laptop widths the live tape occupies the lower-right quadrant. Move the
+   secondary laboratory to the quiet upper-left lane and remove the redundant
+   caption so none of the instruments mask one another. */
+@media (min-width: 821px) and (max-width: 1282px) {
+  #flight-recorder {
+    width: min(680px, calc(100vw - 204px));
+  }
+  #app:has(#flight-recorder:not([hidden])) #analysis-dock {
+    top: 78px;
+    bottom: auto;
+  }
+  #app:has(#flight-recorder:not([hidden])) #analysis-dock:not([open]) {
+    width: 184px;
+  }
+  #app:has(#flight-recorder:not([hidden])) #analysis-dock:not([open]) summary small {
+    display: none;
+  }
+  #app:has(#flight-recorder:not([hidden])) #caption {
+    display: none;
+  }
+}
+
 /* Historic ghost-track labels (C7). DOM type, not canvas — lowercase, faint,
    pinned at each ghost's peak-wind in-domain point by ui.layoutGhostLabels().
    The wrapper never intercepts clicks (spawns must fall through to the map). */
@@ -1296,7 +1641,9 @@ html[data-compact='true'] .ghost-label:not(.active) {
 /* Native model notes stay typographic and diagram-like, never a generic card. */
 #model-dialog {
   width: min(620px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
   padding: 0;
+  overflow-y: auto;
   color: var(--text, #7fd4e8);
   font-family: var(--mono);
   background:
@@ -1306,6 +1653,9 @@ html[data-compact='true'] .ghost-label:not(.active) {
   border-top-color: var(--track, #78dcff);
   border-radius: var(--radius, 4px);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.62);
+  overscroll-behavior: contain;
+  scrollbar-color: var(--accent, #ffb74d) transparent;
+  scrollbar-width: thin;
 }
 #model-dialog::backdrop {
   background: rgba(1, 5, 10, 0.76);
@@ -1369,7 +1719,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
   /* Rail becomes a horizontal icon strip below the pickers so the bottom
      stays free for the recorder and the right edge for the pickers. */
   #layer-rail {
-    top: calc(max(8px, env(safe-area-inset-top)) + 92px);
+    top: calc(max(8px, env(safe-area-inset-top)) + 104px);
     right: auto;
     left: 50%;
     width: auto;
@@ -1379,10 +1729,13 @@ html[data-compact='true'] .ghost-label:not(.active) {
     align-items: center;
     gap: 3px;
   }
+  #layer-rail:has(#satellite-workbench:not([hidden])) {
+    width: min(420px, calc(100vw - 12px));
+  }
   /* Event mode grows the picker stack (Run select + contract line): drop the
      strip below it so the mode selector stays tappable. */
   #app:has(#scenario-contract:not([hidden])) #layer-rail {
-    top: calc(max(8px, env(safe-area-inset-top)) + 158px);
+    top: calc(max(8px, env(safe-area-inset-top)) + 170px);
   }
   #layer-buttons {
     flex-direction: row;
@@ -1411,6 +1764,31 @@ html[data-compact='true'] .ghost-label:not(.active) {
   #weather-legend-scale {
     display: none;
   }
+  #satellite-workbench {
+    width: min(420px, calc(100vw - 12px));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px 8px;
+    padding: 5px 7px;
+  }
+  #satellite-workbench > header,
+  #satellite-status,
+  #satellite-attribution {
+    grid-column: 1 / -1;
+  }
+  .satellite-control-row {
+    display: block;
+  }
+  .satellite-control-row > span {
+    display: block;
+    margin-bottom: 3px;
+  }
+  .satellite-segments button {
+    padding-block: 4px;
+  }
+  #satellite-status {
+    min-height: 0;
+    padding: 3px 6px;
+  }
   #analysis-dock {
     bottom: max(54px, calc(env(safe-area-inset-bottom) + 48px));
     z-index: 7;
@@ -1418,6 +1796,20 @@ html[data-compact='true'] .ghost-label:not(.active) {
   #analysis-dock[open] {
     max-height: min(68dvh, 560px);
     overflow-y: auto;
+  }
+  #app:has(#flight-recorder:not([hidden])) #analysis-dock {
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  #app:has(#flight-recorder:not([hidden])) #analysis-dock:not([open]) {
+    right: 8px;
+    left: auto;
+    width: 184px;
+  }
+  #app:has(#flight-recorder:not([hidden])) #analysis-dock:not([open]) summary small {
+    display: none;
+  }
+  #app:has(#flight-recorder:not([hidden])) #caption {
+    display: none;
   }
   #flight-recorder {
     right: calc(var(--space, 8px) * 2);
@@ -1454,42 +1846,113 @@ html[data-compact='true'] .ghost-label:not(.active) {
 }
 
 @media (max-width: 600px) {
-  #title {
+  #masthead {
     top: max(8px, env(safe-area-inset-top));
     left: 10px;
-    max-width: 48vw;
-    font-size: 12px;
-    line-height: 1.35;
+    gap: 4px;
+    width: min(49vw, 184px);
+    padding-left: 8px;
+  }
+  .masthead-index {
+    max-width: 18ch;
+    font-size: 7px;
+  }
+  #title {
+    max-width: none;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+  .masthead-meta {
+    display: grid;
+    gap: 2px;
+  }
+  .model-state,
+  .quiet-button {
+    font-size: 7px;
   }
   .quiet-button {
-    top: calc(max(8px, env(safe-area-inset-top)) + 37px);
-    left: 10px;
-    min-height: 36px;
+    width: max-content;
+    min-height: 20px;
   }
   #month-picker {
     top: max(8px, env(safe-area-inset-top));
     right: 10px;
+    grid-template-columns: 58px 1fr;
+    width: min(47vw, 180px);
+  }
+  #month-picker > header {
+    padding: 5px 7px;
+    font-size: 7px;
+  }
+  #month-picker > header span:last-child {
+    display: none;
+  }
+  .run-field {
+    gap: 2px;
+    padding: 5px 6px 6px;
   }
   #month-picker label {
-    display: inline;
-    margin: 0 4px 0 0;
-    font-size: 8px;
-  }
-  #month-picker label[for='scenario'] {
     display: block;
-    margin-top: 5px;
+    margin: 0;
+    font-size: 7px;
   }
   #month,
   #scenario,
   #scenario-mode {
-    max-width: 47vw;
-    min-height: 36px;
-    padding: 3px 6px;
-    font-size: 10px;
+    max-width: none;
+    min-height: 30px;
+    padding: 3px 18px 3px 5px;
+    font-size: 9px;
+    background-position: calc(100% - 8px) 12px, calc(100% - 4px) 12px, 0 0;
   }
   #scenario-contract {
-    width: 25ch;
+    width: auto;
+    padding: 5px 7px;
+    font-size: 7px;
+  }
+  #layer-rail {
+    top: calc(max(8px, env(safe-area-inset-top)) + 100px);
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+    align-items: stretch;
+    transform: none;
+  }
+  #app:has(#scenario-contract:not([hidden])) #layer-rail {
+    top: calc(max(8px, env(safe-area-inset-top)) + 158px);
+  }
+  .rail-head {
+    padding: 0;
+  }
+  #layer-buttons {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    max-width: 100%;
+    padding-bottom: 3px;
+    overflow-x: auto;
+    scrollbar-color: var(--accent, #ffb74d) transparent;
+    scrollbar-width: thin;
+  }
+  .layer-button {
+    grid-template-columns: 15px auto;
+    flex: 0 0 auto;
+    min-width: auto;
+    min-height: 34px;
+    padding: 6px 8px;
+  }
+  .layer-button .label {
+    display: inline;
     font-size: 8px;
+  }
+  #weather-legend {
+    align-self: flex-start;
+  }
+  #map-frame {
+    top: calc(max(8px, env(safe-area-inset-top)) + 210px) !important;
+  }
+  #app:has(#scenario-contract:not([hidden])) #map-frame {
+    top: calc(max(8px, env(safe-area-inset-top)) + 270px) !important;
   }
   #analysis-dock {
     right: 8px;
@@ -1573,6 +2036,35 @@ html[data-compact='true'] .ghost-label:not(.active) {
     max-width: none;
     min-height: 2.6em;
     font-size: 10px;
+  }
+  #interaction-guide {
+    top: calc(max(8px, env(safe-area-inset-top)) + 457px);
+    right: 10px;
+    bottom: auto;
+    left: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    transform: none;
+  }
+  #app:has(#scenario-contract:not([hidden])) #interaction-guide {
+    top: calc(max(8px, env(safe-area-inset-top)) + 517px);
+  }
+  #interaction-guide > span {
+    grid-template-columns: auto 1fr;
+    gap: 4px;
+    min-width: 0;
+    padding: 7px 6px;
+  }
+  #interaction-guide b {
+    grid-row: auto;
+    font-size: 7px;
+  }
+  #interaction-guide small {
+    display: none;
+  }
+  #interaction-guide strong {
+    overflow: hidden;
+    font-size: 7px;
+    text-overflow: ellipsis;
   }
   #model-dialog form {
     padding: 15px;

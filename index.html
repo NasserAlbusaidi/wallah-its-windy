@@ -48,46 +48,62 @@
       <!-- thin cyan loading line -->
       <div id="progress"></div>
 
-      <!-- chrome: all type, no icons -->
-      <h1 id="title" class="chrome">Wallah It's <span class="accent">Windy</span></h1>
-      <button id="model-toggle" class="chrome quiet-button" type="button">
-        model notes
-      </button>
+      <header id="masthead" class="chrome" aria-label="Application identity">
+        <p class="masthead-index">Arabian Sea · Instrument 04</p>
+        <h1 id="title">Wallah It's <span class="accent">Windy</span></h1>
+        <div class="masthead-meta">
+          <span class="model-state"><i aria-hidden="true"></i>HF-6 research build</span>
+          <button id="model-toggle" class="quiet-button" type="button">
+            methodology
+          </button>
+        </div>
+      </header>
 
-      <div id="month-picker" class="chrome">
-        <label for="month">Month</label>
+      <section id="month-picker" class="chrome" aria-label="Run environment">
+        <header>
+          <span>Run environment</span>
+          <span>forcing setup</span>
+        </header>
+        <div class="run-field month-field">
+          <label for="month">Month</label>
         <!-- Only the Arabian-Sea cyclone season (May-Nov) is baked into env.bin;
              off-season months clamp to a neighbour, so offering them would alias
              silently. Restrict the picker to the season that actually varies. -->
-        <select id="month" aria-label="Spawn month">
-          <option value="4" selected>May</option>
-          <option value="5">June</option>
-          <option value="6">July</option>
-          <option value="7">August</option>
-          <option value="8">September</option>
-          <option value="9">October</option>
-          <option value="10">November</option>
-        </select>
+          <select id="month" aria-label="Spawn month">
+            <option value="4" selected>May</option>
+            <option value="5">June</option>
+            <option value="6">July</option>
+            <option value="7">August</option>
+            <option value="8">September</option>
+            <option value="9">October</option>
+            <option value="10">November</option>
+          </select>
+        </div>
 
         <!-- Scenario picker (C8): main.ts fills the frozen historical catalogue
              after loading scenarios.json, then lazy-loads only the selected bin. -->
-        <label for="scenario">Scenario</label>
-        <select id="scenario" aria-label="Scenario">
-          <option value="climatology" selected>climatology</option>
-        </select>
-        <label id="scenario-mode-label" for="scenario-mode" hidden>Run</label>
-        <select id="scenario-mode" aria-label="Event run mode" hidden>
-          <option value="hindcast" selected>observed hindcast</option>
-          <option value="counterfactual">counterfactual sandbox</option>
-        </select>
+        <div class="run-field scenario-field">
+          <label for="scenario">Scenario</label>
+          <select id="scenario" aria-label="Scenario">
+            <option value="climatology" selected>climatology</option>
+          </select>
+        </div>
+        <div class="run-field scenario-mode-field">
+          <label id="scenario-mode-label" for="scenario-mode" hidden>Run</label>
+          <select id="scenario-mode" aria-label="Event run mode" hidden>
+            <option value="hindcast" selected>observed hindcast</option>
+            <option value="counterfactual">counterfactual sandbox</option>
+          </select>
+        </div>
         <p id="scenario-contract" role="status" hidden>
           observed initialization · freely simulated · scored against IBTrACS
         </p>
-      </div>
+      </section>
 
       <!-- Windy-style layer rail: one tap per layer, keys 1-9 mirror the
            top-to-bottom order. Buttons are generated from weather-layers.ts. -->
       <nav id="layer-rail" class="chrome" aria-label="Map layers">
+        <header class="rail-head"><span>Weather layers</span><span>01—09</span></header>
         <div id="layer-buttons" role="group" aria-label="Layer picker"></div>
         <div id="weather-legend" data-layer="wind">
           <span id="weather-legend-name">wind</span>
@@ -95,6 +111,47 @@
           <span class="weather-scale" aria-hidden="true"></span>
           <span id="weather-legend-scale">0 · 12 · 25 · 38 · 50+</span>
         </div>
+        <section id="satellite-workbench" aria-label="Satellite imagery controls" hidden>
+          <header>
+            <span>Satellite desk</span>
+            <span id="satellite-kind">simulated</span>
+          </header>
+          <div class="satellite-control-row">
+            <span>source</span>
+            <div id="satellite-source" class="satellite-segments" role="group" aria-label="Satellite source">
+              <button type="button" data-source="simulated" aria-pressed="true">sim</button>
+              <button type="button" data-source="observed" aria-pressed="false">obs</button>
+              <button type="button" data-source="handoff" aria-pressed="false">obs→sim</button>
+            </div>
+          </div>
+          <div class="satellite-control-row">
+            <span>provider</span>
+            <div id="satellite-provider" class="satellite-segments" role="group" aria-label="Observed satellite provider">
+              <button type="button" data-provider="meteosat" aria-pressed="true">Meteosat</button>
+              <button type="button" data-provider="insat" aria-pressed="false">INSAT</button>
+            </div>
+          </div>
+          <div class="satellite-control-row palette-row">
+            <span>style</span>
+            <div id="satellite-palette" class="satellite-segments" role="group" aria-label="Satellite rendering style">
+              <button type="button" data-palette="enhanced" aria-pressed="true">enhanced</button>
+              <button type="button" data-palette="grayscale" aria-pressed="false">gray</button>
+              <button type="button" data-palette="visible" aria-pressed="false">visible</button>
+            </div>
+          </div>
+          <output id="satellite-status" data-tone="simulated">
+            generated from storm structure · no observed pixels
+          </output>
+          <a
+            id="satellite-attribution"
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            hidden
+          >
+            imagery source ↗
+          </a>
+        </section>
       </nav>
 
       <!-- Flight recorder: live physics explanation, then an immutable
@@ -329,7 +386,7 @@
       </section>
 
       <details id="analysis-dock" class="chrome">
-        <summary>forecast laboratory</summary>
+        <summary><span>Forecast laboratory</span><small>Ensemble + sensitivity</small></summary>
         <div class="analysis-body">
           <section aria-labelledby="ensemble-title">
             <h2 id="ensemble-title">uncertainty ensemble</h2>
@@ -400,6 +457,12 @@
 
       <!-- caption / epitaph slot -->
       <p id="caption" class="chrome hint">click the sea to spawn your own</p>
+
+      <aside id="interaction-guide" class="chrome" aria-label="Map controls">
+        <span><b>01</b><small>seed cyclone</small><strong>tap open water</strong></span>
+        <span><b>02</b><small>inspect field</small><strong>hover · hold</strong></span>
+        <span><b>03</b><small>change layer</small><strong>keys 1—9</strong></span>
+      </aside>
     </div>
 
     <dialog id="model-dialog" aria-labelledby="model-title">
@@ -457,11 +520,16 @@
           <p>
             SST, humidity, ocean heat, and shear show the exact baked field being
             sampled by the model. The wind view superposes the active ERA5
-            steering field with the parametric Holland vortex; infrared, rain-radar,
-            and storm-total rainfall views are simulated structural proxies
-            derived from the live vortex—not satellite brightness temperatures,
-            observed reflectivity, or a precipitation analysis. Keys 1–9 switch
-            layers.
+            steering field with the parametric Holland vortex. The generated cloud
+            field adds restrained context to wind, terrain, rain-radar, and
+            storm-total rainfall while leaving the environmental diagnostics clear.
+            On infrared, the satellite desk offers enhanced IR, grayscale, and
+            daytime visible-style palettes. It can show the simulated cloud field,
+            timestamp-labelled Meteosat/INSAT pixels when available, or a six-hour
+            visual handoff from observation to simulation. Observed pixels never
+            change the model state; this is not data assimilation. Rain products
+            remain structural proxies, not radar or precipitation observations.
+            Keys 1–9 switch layers.
           </p>
         </section>
         <section>

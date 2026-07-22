@@ -22,6 +22,10 @@ import type { WeatherLayerId } from '../weather-layers';
 /** Environment sampled at the storm centre (render's own CPU read of env.bin). */
 export interface EnvAtStorm {
   sstC: number;
+  /** ERA5 600/700-hPa mean relative humidity, percent. */
+  midlevelRhPct: number;
+  /** WOA23 tropical-cyclone heat potential, carried for render provenance. */
+  ohcKjCm2: number;
   /** Deep-layer shear magnitude, m/s. */
   shear: number;
   /** 200–850 hPa shear vector, upper minus lower wind. */

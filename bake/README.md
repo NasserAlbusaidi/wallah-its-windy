@@ -1,6 +1,7 @@
 # bake — baked map data for *Wallah It's Windy*
 
-Turns free, public, no-auth geodata into the five small files the browser loads.
+Turns free, public geodata into the baked data files the browser loads: five
+default files, plus opt-in event, ocean-column, steering, and satellite assets.
 Nothing here ships to the browser; it runs once at build time. The output format
 is LAW: see [`../BINARY-FORMATS.md`](../BINARY-FORMATS.md). This directory is the
 Python source of truth for the *actual* grid dimensions the self-describing `.bin`
@@ -20,7 +21,15 @@ macOS, Python 3.14, numpy 2.x. Raw downloads cache under `data/raw/` (gitignored
 a second run reuses them. Total runtime ≈ 15 s after downloads. The script prints
 its progress, selected real years, thermodynamic ranges, and bake-time asserts.
 
-## Outputs (`public/data/`, ~6.5 MB raw, budget ≤ 7 MB)
+On a clean checkout, `env.bin` needs the two ERA5 climatology files in
+`data/raw/` first (`bake/fetch_era5.py`, free CDS token — see the active
+pipeline below): winds alone would fall back to the labelled synthetic source,
+but humidity has no synthetic fallback, so the bake fails loudly instead of
+shipping fake RH. The four `fetch_*` scripts require `cdsapi`, which is not in
+`requirements.txt` (the bake itself is offline); install it into the venv
+before fetching.
+
+## Outputs (default bake: ~6.7 MB raw, budget ≤ 7 MB)
 
 | file | layers | grid | source |
 |------|--------|------|--------|
@@ -30,6 +39,13 @@ its progress, selected real years, thermodynamic ranges, and bake-time asserts.
 | `genesis.json` | `[{lat,lon}]` | — | IBTrACS North Indian |
 | `tracks.json` | ten observed ghost-track polylines | — | IBTrACS North Indian |
 
+Opt-in bakes commit more under `public/data/` (~26 MB total as committed): ten
+`env_<event>.bin` + `scenarios.json` (event bake, below), ten
+`steering_<event>.bin` (`npm run data:hf3:steering`), `ocean.bin` + `ocean.json`
+WOA23 temperature/salinity profiles (`npm run data:hf2a:profiles`), and
+`satellite/manifest.json` (satellite frames, below). The ≤ 7 MB budget applies
+to the five default files only.
+
 The physical-structure calibration subset is a separate offline artifact under
 `calibration/data/`; it never ships in `public/` or the browser bundle. Rebuild
 it from the same pinned IBTrACS raw download with:
@@ -38,9 +54,9 @@ it from the same pinned IBTrACS raw download with:
 python3 bake/extract_structure_validation.py
 ```
 
-The extractor verifies the raw SHA-256, keeps six-hour main-track tropical
-fixes from 2019–2024, and uses USA/JTWC columns consistently for position,
-one-minute wind, pressure, RMW, and quadrant radii.
+The extractor (`npm run data:structure`) verifies the raw SHA-256, keeps
+six-hour main-track tropical fixes from 2019–2024, and uses USA/JTWC columns
+consistently for position, one-minute wind, pressure, RMW, and quadrant radii.
 
 The larger HF-1 replay reference is also offline-only. It freezes 30 storms,
 reuses the ten public event bins, and bakes 20 additional compact bins under
@@ -91,7 +107,7 @@ name = `sst_${String(clamp(monthIndex,4,10)).padStart(2,'0')}`
 
 Months outside May–Nov are not baked (no Arabian-Sea cyclone season) — clamp.
 
-## Sources & licenses (all auth-free)
+## Sources & licenses (auth-free, except ERA5's free CDS token)
 
 - **GMRT** GridServer (bathymetry + topography), `resolution=med`, auto-coarsened
   to ~1.8 km over the full box, block-mean/any-land downsampled to 2 km.
@@ -327,3 +343,45 @@ For an explicit offline fallback only, set `WIW_HYDRO_FALLBACK=1`. That invokes
 the former GMRT priority-flood implementation in `bake/hydro.py`, emits zero
 `flowdir`/`travmin`, and makes the runtime use its legacy elevation/basin
 transport. A normal bake requires Rasterio and real HydroSHEDS inputs.
+
+## Later benchmark bakes (HF-2A…HF-6)
+
+Offline benchmark artifacts under `calibration/` (plus the two public ocean and
+steering outputs noted above); none are part of the default bake. npm aliases
+live in `package.json`.
+
+- `bake_ocean_profiles.py` (`npm run data:hf2a:profiles`) — WOA23 monthly
+  temperature/salinity profiles on the locked 26 depth midpoints →
+  `public/data/ocean.bin` + `ocean.json`. A separate WIWB container whose `nt`
+  axis is depth, not time.
+- `bake_event_ocean_profiles.py` — pre-initialization NOAA GODAS profiles per
+  benchmark storm (last complete calendar month before initialization; the
+  storm month is never read) → `calibration/data/hf2a-event-ocean.bin/.json`.
+- `hf2a_ocean_benchmark.py` (`npm run data:hf2a:ocean`, `--check`) — cold-wake
+  observation set from NOAA CoastWatch's auth-free Geo-polar Blended night-only
+  foundation SST. MUR v4.1 was dropped: it requires Earthdata credentials.
+- `bake_hf2_initial_structure.py` (`npm run data:hf2:initial-structure`) —
+  HF-2C initialization-structure sidecar from the pinned IBTrACS raw →
+  `calibration/data/hf2-initial-structure.json`.
+- `bake_hf3_steering.py` (`npm run data:hf3:steering`) — immutable
+  pressure-level steering sidecars for the 30-storm suite under
+  `calibration/data/hf3/`, plus the ten public `steering_<event>.bin`.
+- `hf6_catalog.py` / `fetch_hf6_benchmark.py` / `bake_hf6_benchmark.py`
+  (`npm run data:hf6:catalog` / `data:hf6:fetch` / `data:hf6:bake`) —
+  outcome-blind HF-6 catalogue, fetch of the sealed-confirmation cohort (wraps
+  the fidelity fetcher), and the sealed env + steering bins under
+  `calibration/data/hf6/`.
+- `hf6_observation_audit.py` (`npm run hf6:observation-audit`) — audits HF-6
+  outcome availability and prespecified strata.
+- `hf6_prospective.mjs` (`npm run hf6:prospective:check`, Node) — validates the
+  HF-6 prospective-run registry via `src/live-data.ts`.
+- `live_archive.mjs` (`npm run hf5:archive:sample`, Node) — validates and
+  content-addresses live-run JSON into an archive, also via `src/live-data.ts`.
+
+Support modules, imported rather than run: `sources.py` (downloads + terrain/
+SST/IBTrACS loaders), `binfmt.py` (WIWB writer/parser + golden vector),
+`event_catalog.py` (frozen ten-storm catalogue shared by fetch/bake/tests),
+`era5_humidity.py` (RH planes aligned to the wind bake's real years),
+`synth.py` (labelled synthetic wind fallback), `hydro.py`, `hydrosheds.py`.
+`test_events.py` is the offline standalone test for the event bake
+(`bake/.venv/bin/python bake/test_events.py`).

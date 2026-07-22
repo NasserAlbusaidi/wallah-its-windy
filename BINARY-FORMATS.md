@@ -5,10 +5,16 @@ The runtime **hardcodes no grid geometry**: every dimension, bounding box, and
 quantization scale is read from the file header. A version byte lets a stale
 cached file be **rejected loudly** instead of rendering as garbage.
 
-- Writer: `bake/bake.py` (not shipped to the browser).
+- Writer: `bake/binfmt.py` (`write_bin`), called by `bake/bake.py` and the
+  sibling bake scripts (`bake_ocean_profiles.py`, `bake_event_ocean_profiles.py`,
+  and — via `era5_event.py` — `bake_hf3_steering.py`,
+  `bake_fidelity_benchmark.py`, `bake_hf6_benchmark.py`). None ship to the
+  browser.
 - Reader: `src/loader.ts` (`parseBin`). This is the only reader; do not parse
   these bytes anywhere else.
-- Genesis zones are the one exception — they ship as JSON, see the end.
+- Tiny, human-inspectable assets ship as JSON instead of binary: `genesis.json`,
+  `scenarios.json`, `tracks.json`, `ocean.json`, the satellite manifest. See the
+  end.
 
 All multi-byte fields are **little-endian**.
 
@@ -32,9 +38,9 @@ index = ((t * ny) + row) * nx + col
 `src/grid.ts` owns the cell↔latlon math for this convention (`cellToLatLon`
 puts row 0 at the north edge). Nothing else may reimplement it.
 
-### `nt` semantics — two modes, decided by the consumer, not the header
+### `nt` semantics — decided by the consumer, not the header
 
-The byte layout is identical either way; what the planes MEAN is a contract
+The byte layout is identical in every mode; what the planes MEAN is a contract
 between the bake that wrote the file and the code that routes it:
 
 1. **Synoptic samples** (climatology `env.bin`
@@ -46,8 +52,21 @@ between the bake that wrote the file and the code that routes it:
 2. **Time axis** (event files, e.g. a Gonu `env` bake with 3-hourly steps):
    planes are consecutive timesteps; consumers select explicit `event-timeline`
    mode and `tFrac` linearly interpolates along `nt`.
+3. **Depth axis** (ocean profile bins `temp_MM`/`salt_MM`): planes are the 26
+   locked depth-layer midpoints (0–300 m interfaces), nothing time-varying.
 
 `sst_MM` and `ohc_MM` stay `nt = 1` in mode 1 (OISST/WOA23 climatology).
+
+### Layer-name convention
+
+Month-varying fields are named `<field>_MM`, where `MM` is the **0-indexed**
+calendar month, zero-padded (`sources.SEASON_MONTHS`: May = `04` … Nov = `10`).
+Climatology `env.bin` carries 8 fields × 7 months:
+`sst_MM u_MM v_MM shr_MM shu_MM shv_MM rh_MM ohc_MM`. Event bins carry the same
+eight names with a single fixed `MM` — the event's own calendar month (Gonu =
+`05`) — so the sampler resolves them unchanged. Single-plane layers are
+unsuffixed (`elev`, `landmask`, `flowacc`, …). Names must fit the 8-byte
+null-padded header field.
 
 ---
 
@@ -113,8 +132,9 @@ SST quantized to centidegrees uses `scale = 0.01, offset = 20.0`.
 ### Version handling
 
 `parseBin` throws if the magic is not `WIWB` or the version is not the value the
-build expects (currently `1`). Bump the version byte in `bake.py` whenever the
-record layout changes so old cached files fail fast with a clear message.
+build expects (currently `1`). Bump the version byte in BOTH `bake/binfmt.py`
+(`VERSION`) and `src/loader.ts` (`FORMAT_VERSION`) whenever the record layout
+changes so old cached files fail fast with a clear message.
 
 ---
 
@@ -122,7 +142,9 @@ record layout changes so old cached files fail fast with a clear message.
 
 A complete, tiny file: **2 layers, each 2×2×1**, bbox = the domain
 (50–70°E / 15–27°N). `test/loader.test.ts` parses these exact bytes and asserts
-the decoded values; keep this dump and that test in sync.
+the decoded values; `bake/binfmt.py assert_golden_vector()` writes the same
+bytes and asserts byte-identity at every bake. Keep this dump and both asserts
+in sync.
 
 - Layer `sst`: `int16`, quantized, `scale = 0.01`, `offset = 20.0`.
   Raw `[1000, 1050, 900, 1100]` → **`[30.0, 30.5, 29.0, 31.0]`** °C.
@@ -209,15 +231,17 @@ binary format would only add friction. Schema:
 
 These drive the faint historic-genesis-zone glow (eng task T8) that nudges spawns
 toward interesting outcomes without biasing the physics. The committed values are
-**approximate placeholders**; weekend two replaces them with points extracted
-from IBTrACS for storms that actually reached Oman.
+extracted from IBTrACS by the default bake: a storm qualifies if any fix enters
+the 52–62°E / 16–26°N Oman box; its point is the storm's first fix inside the
+playable domain, rounded to 3 dp (`sources.load_genesis_points`).
 
 ---
 
 ## Event scenarios — `env_<event>.bin`, `scenarios.json`, `tracks.json`
 
 The event bake (`bake/bake.py events`) adds one bin per frozen catalogue event
-plus two JSON catalogues:
+plus `scenarios.json`. `tracks.json` is written by the DEFAULT bake (step 5/5)
+but is documented here because scenarios reference its storm ids:
 
 - **`env_<event>.bin`** — the SAME WIWB format as `env.bin`
   (version 1, identical 88-byte records, 40×24, int16 quant scale 0.01, north
@@ -228,8 +252,9 @@ plus two JSON catalogues:
   the scenario's fixed month-suffix names so the existing sampler resolves them
   unchanged.
   SST/RH are event-time ERA5 fields; OHC linearly interpolates adjacent WOA23
-  monthly means. The real-storm wind vortex is washed out at bake time
-  (gaussian_filter σ=3 cells); see `bake/README.md`.
+  monthly means. The real-storm wind AND RH vortex is washed out at bake time
+  (gaussian_filter σ=3 cells); SST keeps its observed cold wake. See
+  `bake/README.md`.
 - **`scenarios.json`** — JSON (tiny). `{"version":1,"scenarios":[{id,label,bin,
   monthIndex,stepH,windowH,startIso,spawn:{lat,lon,seed},ghostId,
   benchmarkPartition,hindcast:{startIso,lat,lon,initialWindKt,
@@ -237,8 +262,51 @@ plus two JSON catalogues:
   storm-level `calibration` or `validation` split. `windowH =
   (planes−1)·stepH`, computed. `hindcast` is derived from the first observed
   ≥34-kt fix at least 1.2° inside the domain and aligns it to the bin's time axis.
-- **`tracks.json`** — JSON. `{"version":1,"storms":[{id,name,year,points:[{iso,
-  lat,lon,windKt,presMb}]}]}`; the historic ghost-track polylines. `lat/lon`
-  rounded to 3 dp; `windKt/presMb` are integers or `null` when the CSV cell is
-  blank; all fixes kept in time order (off-domain segments included — the canvas
-  clips them).
+- **`tracks.json`** — JSON. `{"version":1,"storms":[{id,name,year,partition,
+  points:[{iso,lat,lon,windKt,presMb}]}]}`; the historic ghost-track polylines.
+  `partition` is the frozen storm-level `calibration`/`validation` split.
+  `lat/lon` rounded to 3 dp; `windKt/presMb` are integers or `null` when the
+  CSV cell is blank; all fixes kept in time order (off-domain segments included
+  — the canvas clips them).
+
+---
+
+## `steering_<event>.bin` pressure-level sidecars
+
+`bake/bake_hf3_steering.py` (via `era5_event.build_pressure_wind_sidecar`) bakes
+six layers — `u850 v850 u500 v500 u250 v250` — int16 quant scale 0.01, on the
+same 40×24 grid and the same 3-hourly event time axis as the matching
+`env_<event>.bin`. Separate bytes on purpose: adding pressure levels must not
+mutate the frozen HF-1/HF-2 env bins. The full 30-storm set lives under
+`calibration/data/hf3/`, with `hf3-steering-manifest.json` beside it in
+`calibration/data/`; the ten public
+catalogue events get byte-identical copies at `public/data/steering_<event>.bin`,
+which the runtime locates by replacing `env_` with `steering_` in the scenario's
+bin path.
+
+---
+
+## Ocean profile bins — `ocean.bin`, `hf2a-event-ocean.bin`
+
+`bake/bake_ocean_profiles.py` writes `public/data/ocean.bin` (WOA23 monthly
+climatology): layers `temp_MM`/`salt_MM` per season month on the 40×24 env grid,
+int16 quantized, scale `0.001`, offset `20.0` (°C) / `35.0` (PSU). **`nt` = 26
+is a depth axis** — the midpoints of the locked 0–300 m interfaces (mode 3
+above). `ocean.json` is the provenance sidecar (grid, depth tables, source URLs
++ sha256); the runtime fetches only the bin.
+
+`bake/bake_event_ocean_profiles.py` writes the event twin,
+`calibration/data/hf2a-event-ocean.bin`: per-storm GODAS profiles from the last
+completed month before each hindcast initialization, as `tNNN`/`sNNN` layer
+pairs (`NNN` = the storm's index in the HF-2A contract partition order), same
+dtype/scales/depth axis, with `hf2a-event-ocean.json` metadata.
+
+---
+
+## Satellite frames — `public/data/satellite/manifest.json`
+
+Not WIWB. `bake/satellite_frames.py` caches observed Meteosat/INSAT frames as
+PNG/WebP crops of the domain plus a JSON manifest:
+`{"version":1,"frames":[{id,provider,satellite,product,observedAt,channel,
+imageUrl,sourceUrl,attribution,license,bbox,cached}]}`. The browser reads the
+manifest and displays the images directly; no binary parsing involved.

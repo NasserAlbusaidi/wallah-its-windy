@@ -66,7 +66,9 @@ npm install       # dev deps only
 npm run dev       # local dev server
 npm run build     # typecheck (tsc --noEmit) + vite build -> dist/
 npm run preview   # serve the production build
-npm test          # vitest run (physics, grid, loader golden vector, rng, bake<->runtime)
+npm test          # vitest run (full unit + integration suite)
+npm run test:watch # vitest in watch mode
+npm run typecheck # tsc --noEmit without a build
 npm run profile:ensemble # 20/40/80-member steady-state benchmark
 ```
 
@@ -360,6 +362,7 @@ upslope terrain component. Only land accumulation feeds the wadi visualization.
 
 ```
 index.html            chrome (title, month picker, caption, canvases)
+public/data/          baked .bin/.json assets the browser fetches
 src/
   main.ts             composition root: fixed-dt loop, sim/render/ui wiring, input
   grid.ts             THE coordinate/units module (latlon/cell/clip, m/s->deg/h)
@@ -367,33 +370,71 @@ src/
   tokens.ts           design tokens -> CSS vars + shader uniforms
   rng.ts              seeded RNG + shareable-storm URL hash
   loader.ts           .bin parser + validation + dequantize
+  raster-sampler.ts   bilinear CPU sampling of decoded raster layers
   env-sampler.ts      EnvSampler over env.bin (real SST) + analytic fallback
+  ocean-profile-sampler.ts bilinear reader for the WOA23 profile bin
   sim.ts              track/intensity physics: steering+beta+wander, DeMaria-Kaplan
+  steering.ts         HF-3 pressure-level steering ring + motion budget
   structure.ts        two-region Holland profile, RMW/outer-size evolution, radii
+  coastal-exposure.ts continuous inner/outer-vortex land + terrain exposure
+  ventilation.ts      annular environmental ventilation diagnostics
+  upper-ocean.ts      reduced Price/PWP-style upper-ocean column response
+  hydro-routing.ts    shared HydroSHEDS D8 routing contract + CPU oracle
   structure-validation.ts offline scoring, storm split, calibration acceptance
   storm-session.ts    recording, pause/seek/replay transport, comparison baseline
   flight-recorder.ts  immutable per-tick tape + debrief/snapshot construction
+  comparison.ts       same-identity paired-run validation and result deltas
+  narrative.ts        exact intensity budget -> plain-language dominant cause
+  intensity-sparkline.ts pure wind-versus-time sparkline geometry
+  historical-analog.ts geometric/intensity similarity to shipped historic ghosts
+  storm-names.ts      versioned WMO/ESCAP naming catalogue
+  scenarios.ts        historic-event catalogue validation + mode decisions
+  tracks.ts           IBTrACS ghost-track parsing + label anchoring
   hindcast.ts         observed-fix interpolation + track/intensity/pressure scores
   hindcast-benchmark.ts exact multi-storm runner + equal-storm aggregation
   fidelity-verification.ts exact lead errors, persistence + bootstrap intervals
   ensemble.ts         deterministic perturbations, probability grid, summaries
   ensemble.worker.ts  off-main-thread runs + decoded-bin URL cache
+  ensemble-client.ts  main-thread client for the analysis worker
+  ensemble-protocol.ts typed worker request/response contracts
+  ensemble-verification.ts HF-4 probabilistic verification + cone calibration
+  live-data.ts        provider-neutral HF-5 live-data boundary
+  live-providers.ts   HF-5 provider descriptors + cycle adapters
+  live-product.ts     DOM-free view of an issued forecast cycle
+  satellite-observations.ts observed-frame manifest, matching, WMS URLs
   weather-layers.ts   nine map-product labels, provenance, and legends
   category.ts         Saffir–Simpson thresholds, chip copy, tracker colours
   impact.ts           storm-total rain grid + per-city exposure (impact proxy)
-  render/wind.ts      Windy-style full-map wind flow (particles + trails)
-  comparison.ts       same-identity paired-run validation and result deltas
-  narrative.ts        exact intensity budget -> plain-language dominant cause
+  point-probe.ts      pure cursor environment/vortex reading
   export.ts           dependency-free PNG card + WebM replay renderer
   performance.ts      device-aware DPR/particle budgets (render only)
   tap-gesture.ts      tap-vs-drag/pinch input recognizer
   ui.ts               loading/demo/aftermath state machine, ripple, epitaph, slow-mo
-  render/             WebGL2 terrain, scalar, IR-proxy, radar, storm layers
+  render/
+    index.ts          render facade: per-frame DrawCtx + layer order
+    context.ts        internal DrawCtx/GPU-texture seam for layers
+    gl-utils.ts       WebGL2 program, quad, render-target helpers
+    textures.ts       decoded bin layers -> GPU textures
+    terrain.ts        hillshaded land + ocean-depth base pass
+    env.ts            GPU weather-map pass (scalar fields + IR proxy)
+    cloud-noise.ts    deterministic tileable noise for simulated clouds
+    satellite.ts      observed satellite image pass, physics-isolated
+    radar.ts          reflectivity-style simulated rain display
+    rain.ts           rain accumulation + wadi lighting (ping-pong target)
+    wind.ts           Windy-style full-map wind flow (particles + trails)
+    particles.ts      storm spiral particle swarm
+    vortex.ts         THE shared analytic Holland vortex (TS + GLSL)
+    track.ts          live track polyline + intensity halo overlay
+    ghosts.ts         faint historic IBTrACS track overlay
   style.css           instrument chrome styling
   fonts/              self-hosted IBM Plex Mono woff2 (400, 500)
-test/                 vitest: grid, loader (golden vector), rng, physics, integration
+test/                 vitest: per-module unit suites + bin/event integration
 bake/                 Python data-baking (not shipped) — see bake/README.md
 calibration/          pinned IBTrACS subsets, offline forcing, metrics + gates
-docs/                 generated calibration and observational benchmark reports
-ROADMAP.md             staged fidelity, forecasting, validation + product plan
+docs/                 generated benchmark reports + authored specs and findings
+BINARY-FORMATS.md     binary layout + golden test vector
+ROADMAP.md            staged fidelity, forecasting, validation + product plan
 ```
+
+The full module map and data flow live in
+[docs/architecture.md](docs/architecture.md).

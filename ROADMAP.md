@@ -49,7 +49,38 @@ persistence on validation.
 | HF-5 | Infrastructure complete | Provider-neutral boundary and immutable archive pass; scheduled live feed disabled |
 | HF-6 | Implementation complete; sealed result rejected | 72 storms/144 starts audited; 8 storms/16 starts scored once; prospective evidence still open |
 | Product depth | Complete | Probe, cities, names, analog, and sparkline |
-| UX big bet | Selected | Shared-camera pan and zoom |
+| UX big bet | Selected, not started | Shared-camera pan and zoom |
+
+## Current product and engineering state — 2026-07-27
+
+Product work delivered after the HF-6 evidence package, all presentation- or
+boundary-side with no physics or calibration change:
+
+- **HydroSHEDS flood-pulse routing (2026-07-20):** the approximate basin glow
+  was replaced by HydroSHEDS v1.1 DIR-based timed downstream routing
+  (`src/hydro-routing.ts`, `src/render/rain.ts`, `flowacc.bin` v1.2); legacy
+  bins fall back to the old approximation.
+- **Storm room and satellite desk (2026-07-22):** simulated vs observed IR/VIS
+  with provenance labels, Meteosat IODC frame matching, INSAT manifest
+  ingestion, and the observed-to-simulated visual handoff (see the satellite
+  visualization outcome under HF-5).
+- **Observed radar and rain accumulation (2026-07-26):** a timestamped
+  RainViewer past-radar loop beside the labelled simulated radar, plus
+  deterministic 1/3/6/24-hour and storm-lifetime accumulation windows with
+  URL-stable colour breaks.
+- **Windy-grade UI reskin (2026-07-27, PR #11, merge `89f1539`):** chrome/glass
+  tokens, panel material and type scale, category-coloured timeline with live
+  wind/pressure cluster, icon layer rail, eye-pinned storm tag, and a wind
+  palette retune. UI-only; determinism, loader, and calibration untouched.
+
+**The deploy gate is red.** Every main push since 2026-07-21 has failed CI at
+`npm run calibrate:check`: the HF-6 merge (`ba275f8`) rewrote model internals
+without resealing the hindcast calibration results, so the check fails with
+`[hindcast-calibration] FAIL results=false report=false liveParameters=false`
+(structure calibration passes; the fidelity re-check never runs because the
+chain stops at hindcast). The GitHub Pages site is frozen at the 2026-07-21
+build, so none of the product work above — including the merged reskin — is
+publicly visible. Repairing this gate is step 0 of the execution order below.
 
 ## Rules that apply to every phase
 
@@ -451,8 +482,9 @@ These features should grow around verified science rather than compete with it.
 
 ### Weather layers
 
-- Observed satellite infrared and microwave products where licensing and update
-  reliability allow them.
+- Observed satellite IR/VIS and observed radar are shipped with provenance
+  labels; extend to microwave products where licensing and update reliability
+  allow.
 - Forecast SST, humidity, OHC, shear, wind, rainfall, and uncertainty layers.
 - Explicit legends for observation, analysis, forecast, and simulated proxy.
 - Time controls that keep every visible layer synchronized to the same valid
@@ -469,8 +501,10 @@ These features should grow around verified science rather than compete with it.
 
 ### Hazard extensions — only after core fidelity
 
-- Replace approximate basin glow with HydroSHEDS DIR-based downstream flood
-  pulse routing.
+- **Done (2026-07-20):** the approximate basin glow was replaced by HydroSHEDS
+  v1.1 DIR-based timed downstream flood-pulse routing (`src/hydro-routing.ts`,
+  `src/render/rain.ts`, `flowacc.bin` v1.2); legacy bins fall back to the old
+  approximation.
 - Research rainfall accumulation and orographic enhancement validation.
 - Treat surge and inundation as separate future models with their own data and
   verification; never infer them directly from wind category alone.
@@ -495,26 +529,59 @@ honesty.
 
 ## Recommended execution order
 
-1. **Complete:** product-depth slice (probe, cities, names, analog, sparkline).
-2. **Complete:** HF-2 through HF-4 physical, track, and ensemble experiments;
+### Now
+
+0. **Repair the deploy gate.** Reseal the drifted hindcast baselines through
+   the documented flow (`npm run calibrate:intensity`, which also regenerates
+   `docs/hindcast-benchmark.md`), then let `npm run fidelity` re-verify or
+   reseal the fidelity results, with **zero physics edits riding along**.
+   Verify `npm run calibrate:check` locally, push, and confirm the Pages
+   deploy publishes the merged reskin. This step records what the
+   already-shipped HF-6 model actually computes — it does not touch any frozen
+   acceptance verdict, storm split, or threshold. Known wrinkle from the
+   2026-07-26 diagnosis: the November C6 fidelity case needs its replay
+   timeout bumped.
+1. **Ship visibly.** Once the deploy is green, the reskinned simulator is the
+   public face — share the Pages URL. Working-but-local (or in this case
+   merged-but-undeployed) is the trap.
+
+### Done — kept visible as the record
+
+2. **Complete:** product-depth slice (probe, cities, names, analog, sparkline).
+3. **Complete:** HF-2 through HF-4 physical, track, and ensemble experiments;
    their rejected gates remain frozen and visible.
-3. **Complete:** HF-5 provider boundary, failure contract, and immutable issue
+4. **Complete:** HF-5 provider boundary, failure contract, and immutable issue
    archive; operational live mode remains disabled without a scheduled feed.
-4. **Complete:** HF-6 catalogue, observation audit, sealed first look, model
+5. **Complete:** HF-6 catalogue, observation audit, sealed first look, model
    card, and versioned scorecard. The negative intensity/pressure result is the
    accepted scientific outcome, not a prompt to retune the sealed cohort.
-5. **Next product lane:** build the shared pan/zoom camera without changing
-   simulation state.
-6. **Next evidence lane:** archive future HF-5 runs before observations exist;
-   evaluate only after at least 12 forecasts across four storms mature.
-7. Add population exposure and automatic ensemble envelopes with the explicit
+6. **Complete:** post-HF-6 product lane — HydroSHEDS flood-pulse routing,
+   storm room + satellite desk, observed radar + rain accumulation, and the
+   windy-grade reskin (see the current-state section above).
+
+### Next
+
+7. **Product lane — pan/zoom:** build the shared camera per the contract above
+   without changing simulation state. Still the selected UX big bet; not
+   started as of 2026-07-27 (`src/grid.ts` has no view/camera state).
+8. **Evidence lane — prospective archiving:** archive future HF-5 runs before
+   observations exist; evaluate only after at least 12 forecasts across four
+   storms mature. This lane runs on the calendar, not on effort — it only
+   accumulates when real storms happen.
+9. Add population exposure and automatic ensemble envelopes with the explicit
    non-casualty and perturbation-frequency labels defined above.
-8. Start any revised intensity candidate as a new versioned phase with a new
-   development protocol and a newly sealed confirmation cohort.
-9. Add richer exports, mobile/accessibility hardening, and carefully validated
-   hazard models only after the relevant evidence and device gates exist.
+
+### Later
+
+10. Start any revised intensity candidate as a new versioned phase with a new
+    development protocol and a newly sealed confirmation cohort.
+11. Richer exports (GIF/satellite loop), the formal accessibility review and
+    dedicated mobile-layout pass (budgets, touch input, and compact layouts
+    already ship), and carefully validated hazard models — only after the
+    relevant evidence and device gates exist.
 
 HF-6 is finished as an implementation and evidence package. It does **not**
 finish prospective validation, turn the simulator into an operational model, or
 authorize stronger probability language. Pan/zoom remains the selected UX big
-bet; prospective archiving is the long-running scientific lane.
+bet; prospective archiving is the long-running scientific lane. Until step 0
+lands, nothing merged after 2026-07-21 is visible to anyone but this repo.

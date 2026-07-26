@@ -35,6 +35,22 @@ is no longer the source of truth for project status.
 - Prefix-safe geometric historical analog and an exact flight-tape intensity
   sparkline with pointer and keyboard inspection.
 
+## Delivered after the slice (2026-07-20 → 2026-07-27)
+
+- HydroSHEDS v1.1 ACC+DIR timed downstream flood-pulse routing (`flowacc.bin`
+  v1.2: ACC + D8 DIR + travel-time layers; conservative GPU routing pass with
+  CPU oracle and legacy-bin fallback).
+- Storm room and satellite desk: simulated vs observed IR/VIS with provenance
+  labels, Meteosat IODC frame matching, INSAT manifest ingestion, and the
+  observed-to-simulated visual handoff.
+- Observed radar frames (timestamped RainViewer loop) and deterministic
+  1/3/6/24-hour and storm-lifetime rain-accumulation windows with URL-stable
+  colour breaks, beside the labelled simulated products.
+- Windy-grade UI reskin (PR #11, merge `89f1539`): chrome/glass tokens, panel
+  material + type scale, category-coloured timeline with live wind/pressure
+  cluster, icon layer rail, eye-pinned storm tag, wind palette retune —
+  UI-only; no physics, loader, or calibration change.
+
 ## Selected UX investment
 
 - Build one shared pan/zoom view transform across `grid.ts`, every shader, and
@@ -45,9 +61,11 @@ is no longer the source of truth for project status.
 ## Parked product work
 
 - GIF/satellite-loop export.
-- HydroSHEDS DIR downstream flood-pulse routing.
 - Generated forecast-office-style advisories with explicit simulation labels.
-- Mobile layout, touch controls, accessibility, and device performance budgets.
+- Formal accessibility review and a dedicated mobile-layout pass (device
+  performance budgets, tap/pinch touch controls, long-press probe, and compact
+  layouts including the icon-only layer rail are already shipped —
+  `src/performance.ts`, `src/tap-gesture.ts`, `src/ui.ts`).
 
 These remain behind the frozen scientific gates and prospective evidence
 requirements in the roadmap.

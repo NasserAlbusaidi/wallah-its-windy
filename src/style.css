@@ -130,6 +130,70 @@ dd,
   touch-action: manipulation;
 }
 
+/* Storm identity pinned to the simulated eye. The zero-size root is the exact
+   projected coordinate; JS clamps only the chip offset within the map frame. */
+#storm-tag {
+  position: absolute;
+  z-index: 6;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+#storm-tag[hidden] {
+  display: none;
+}
+.storm-tag-eye {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--storm-category-solid);
+  border-radius: 50%;
+}
+#app #storm-tag .storm-tag-chip {
+  position: absolute;
+  top: var(--storm-tag-chip-top, -76px);
+  left: var(--storm-tag-chip-left, -220px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: calc(100vw - 20px);
+  padding: 8px 11px;
+  white-space: nowrap;
+  background: rgba(11, 16, 26, 0.88);
+  border-color: var(--storm-category-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.50);
+}
+#app #storm-tag .storm-tag-line1 {
+  color: var(--storm-category-solid);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+#app #storm-tag .storm-tag-line2 {
+  color: var(--text-hi);
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .storm-tag-eye {
+    animation: storm-eye-pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes storm-eye-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--storm-category-pulse);
+    }
+    50% {
+      box-shadow: 0 0 0 9px var(--storm-category-clear);
+    }
+  }
+}
+
 /* Accessible geographic overlays. They share the chart projection with the
    canvases but stay as DOM so names and exact readings remain inspectable. */
 #city-markers {
@@ -2840,7 +2904,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
 #hint-chips {
   position: absolute;
   z-index: 7;
-  bottom: 96px;
+  bottom: 143px;
   left: 16px;
   display: flex;
   gap: 8px;
@@ -3209,7 +3273,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
 
   #hint-chips {
     right: 8px;
-    bottom: 78px;
+    bottom: 125px;
     left: 8px;
   }
 

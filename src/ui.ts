@@ -61,6 +61,7 @@ import {
   WEATHER_LAYERS,
   weatherLayerDefinition,
 } from './weather-layers';
+import { formatStormTag, type StormTagInput } from './storm-tag';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -170,6 +171,11 @@ export interface PointProbePlacement {
   pinned: boolean;
 }
 
+export interface StormTagView extends StormTagInput {
+  lat: number;
+  lon: number;
+}
+
 interface Ripple {
   lat: number;
   lon: number;
@@ -276,6 +282,10 @@ export class UiController {
   private ghostContainer: HTMLElement | null = null;
   /** Which ghost is the active scenario (brighter label); null = none. */
   private activeGhostId: string | null = null;
+  private readonly stormTag = dom('storm-tag');
+  private readonly stormTagChip = dom('storm-tag-chip');
+  private readonly stormTagLine1 = dom('storm-tag-line1');
+  private readonly stormTagLine2 = dom('storm-tag-line2');
   /** Content signature of the rendered impact-city rows (skip rebuilds). */
   private impactCitiesKey = '';
   private readonly cityMarkerRoot = dom('city-markers');
@@ -1372,6 +1382,74 @@ export class UiController {
   highlightGhost(id: string | null): void {
     this.activeGhostId = id;
     for (const [gid, el] of this.ghostLabels) el.classList.toggle('active', gid === id);
+  }
+
+  /**
+   * Pin the live/replayed storm chip to the vortex eye. The anchor uses the
+   * exact pxX/pxY projection path as ghost labels; only the chip body is
+   * clamped so the eye ring never moves off the simulated centre.
+   */
+  updateStormTag(view: StormTagView | null): void {
+    if (!view) {
+      this.stormTag.hidden = true;
+      return;
+    }
+
+    const canvas = this.host.overlayCanvas;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (width <= 0 || height <= 0) {
+      this.stormTag.hidden = true;
+      return;
+    }
+
+    const copy = formatStormTag(view);
+    this.stormTagLine1.textContent = copy.line1;
+    this.stormTagLine2.textContent = copy.line2;
+    this.stormTag.style.setProperty(
+      '--storm-category-border',
+      categoryRgba(view.vKt, 0.55),
+    );
+    this.stormTag.style.setProperty(
+      '--storm-category-solid',
+      categoryRgba(view.vKt, 0.95),
+    );
+    this.stormTag.style.setProperty(
+      '--storm-category-pulse',
+      categoryRgba(view.vKt, 0.35),
+    );
+    this.stormTag.style.setProperty(
+      '--storm-category-clear',
+      categoryRgba(view.vKt, 0),
+    );
+
+    const x = this.pxX(view.lon, width);
+    const y = this.pxY(view.lat, height);
+    this.stormTag.style.left = `${x}px`;
+    this.stormTag.style.top = `${y}px`;
+    this.stormTag.hidden = false;
+
+    const chipWidth = this.stormTagChip.offsetWidth;
+    const chipHeight = this.stormTagChip.offsetHeight;
+    const margin = 10;
+    const desiredLeft = x - chipWidth - 20;
+    const desiredTop = y - chipHeight - 34;
+    const chipLeft = Math.min(
+      Math.max(margin, width - chipWidth - margin),
+      Math.max(margin, desiredLeft),
+    );
+    const chipTop = Math.min(
+      Math.max(margin, height - chipHeight - margin),
+      Math.max(margin, desiredTop),
+    );
+    this.stormTag.style.setProperty(
+      '--storm-tag-chip-left',
+      `${chipLeft - x}px`,
+    );
+    this.stormTag.style.setProperty(
+      '--storm-tag-chip-top',
+      `${chipTop - y}px`,
+    );
   }
 
   private addRipple(lat: number, lon: number, nowMs: number): void {

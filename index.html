@@ -21,6 +21,16 @@
         <!-- 2D vector overlay (track dots, halos, debug) above the map -->
         <canvas id="overlay-canvas"></canvas>
 
+        <!-- Live/replay storm identity. UI projects the zero-size anchor at the
+             eye; only the chip body is offset and clamped inside the map. -->
+        <div id="storm-tag" aria-live="off" hidden>
+          <span class="storm-tag-eye" aria-hidden="true"></span>
+          <span id="storm-tag-chip" class="storm-tag-chip chrome">
+            <span id="storm-tag-line1" class="storm-tag-line1"></span>
+            <span id="storm-tag-line2" class="storm-tag-line2"></span>
+          </span>
+        </div>
+
         <!-- Geographic product overlays. Markers and cards are DOM so their
              exact readings remain keyboard/touch accessible. -->
         <div id="city-markers" aria-label="Impact cities"></div>

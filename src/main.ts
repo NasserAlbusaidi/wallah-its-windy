@@ -2616,6 +2616,21 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
   const impactSummary = impact.summary(storm);
   ui.updateCityMarkers(storm, impactSummary);
   refreshPointProbe(storm);
+  ui.updateStormTag(
+    storm && !storm.isDemo && (storm.alive || session.replayMode)
+      ? {
+          label:
+            currentRunName?.name ??
+            activeScenario?.label ??
+            currentRunLabel,
+          vKt: storm.vKt,
+          hPa: storm.structure.centralPressureHpa,
+          trendKtPerH: storm.diagnostics.netKtPerH,
+          lat: storm.lat,
+          lon: storm.lon,
+        }
+      : null,
+  );
   ui.updateFlightRecorder({
     storm,
     label: currentRunLabel,

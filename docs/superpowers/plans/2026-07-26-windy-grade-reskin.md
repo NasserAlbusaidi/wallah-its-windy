@@ -366,7 +366,7 @@ it('every layer carries an inline svg icon', () => {
   (`ui.ts:1325` region) — reuse that exact projection helper.
 - Produces: `formatStormTag(input: {label: string; vKt: number; hPa: number; trendKtPerH: number}): {line1: string; line2: string}`.
 
-- [ ] **Step 1: Failing test** — `test/storm-tag.test.ts`:
+- [x] **Step 1: Failing test** — `test/storm-tag.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -387,20 +387,20 @@ describe('formatStormTag', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect fail.**
-- [ ] **Step 3: Implement** — `src/storm-tag.ts` pure module: category short
+- [x] **Step 2: Run, expect fail.**
+- [x] **Step 3: Implement** — `src/storm-tag.ts` pure module: category short
   label from `stormCategory(vKt)` (lowercased; check its real short-name field),
   trend word: `>= 0.5 → 'intensifying'`, `<= -0.5 → 'weakening'`, else
   `'steady'`.
-- [ ] **Step 4: Tests pass.**
-- [ ] **Step 5: DOM + projection** — `#storm-tag` chip (two lines + pulsing eye
+- [x] **Step 4: Tests pass.**
+- [x] **Step 5: DOM + projection** — `#storm-tag` chip (two lines + pulsing eye
   ring, border `categoryRgba(vKt, 0.55)`); position each frame alongside the
   ghost-label reprojection using the same lat/lon→CSS-px path, offset above the
   eye, clamped inside the map frame; `hidden` when no live/replay storm. Pulse
   animation inside `@media (prefers-reduced-motion: no-preference)`.
-- [ ] **Step 6: Hand-verify** — tag rides the eye during a run and while
+- [x] **Step 6: Hand-verify** — tag rides the eye during a run and while
   scrubbing a replay; hides on death/reset.
-- [ ] **Step 7: Full gates.**
+- [x] **Step 7: Full gates.**
 - [ ] **Step 8: Commit** — `git commit -am "feat: storm tag pinned to the eye"`
 
 ---

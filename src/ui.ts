@@ -991,6 +991,8 @@ export class UiController {
       let previousCategory = stormCategory(
         view.intensitySeries[0]?.vKt ?? storm.vKt,
       );
+      const timelineEndH =
+        view.intensitySeries[view.intensitySeries.length - 1]?.ageH || 1;
       for (let index = 1; index < view.intensitySeries.length; index++) {
         const point = view.intensitySeries[index];
         const nextCategory = stormCategory(point.vKt);
@@ -1000,7 +1002,7 @@ export class UiController {
         milestone.dataset.categoryMilestone = '';
         milestone.dataset.label = nextCategory.chip.toLowerCase();
         milestone.style.left =
-          `${((index / (view.intensitySeries.length - 1)) * 100).toFixed(1)}%`;
+          `${((point.ageH / timelineEndH) * 100).toFixed(1)}%`;
         milestone.style.background = categoryRgba(point.vKt, 1);
         milestone.setAttribute('aria-hidden', 'true');
         f.jumps.append(milestone);

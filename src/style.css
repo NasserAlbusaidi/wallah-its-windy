@@ -607,11 +607,11 @@ dd,
   z-index: 6;
 }
 #layer-rail:has(#satellite-workbench:not([hidden])) {
-  width: 214px;
+  width: 296px;
 }
 #layer-rail:has(#radar-workbench:not([hidden])),
 #layer-rail:has(#accum-workbench:not([hidden])) {
-  width: 238px;
+  width: 280px;
 }
 .rail-head {
   display: flex;
@@ -2914,7 +2914,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
 }
 
 #app:has(#flight-recorder:not([hidden])) #hint-chips {
-  bottom: calc(108px + min(60dvh, 384px));
+  bottom: calc(108px + min(60dvh, 520px));
 }
 
 #hint-chips #caption,
@@ -2969,7 +2969,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
   bottom: 96px;
   left: 16px;
   width: min(372px, calc(100vw - 32px));
-  max-height: min(60dvh, 384px);
+  max-height: min(60dvh, 520px);
   padding: 13px 15px 12px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -2977,8 +2977,17 @@ html[data-compact='true'] .ghost-label:not(.active) {
 }
 
 #app #flight-recorder .flight-head {
+  grid-template-columns: auto auto 1fr auto;
   gap: 8px;
   padding-bottom: 8px;
+}
+
+#app #flight-recorder #flight-clock {
+  justify-self: end;
+}
+
+#app #flight-recorder #flight-label {
+  display: none;
 }
 
 #app #flight-recorder #flight-explanation {
@@ -3004,6 +3013,15 @@ html[data-compact='true'] .ghost-label:not(.active) {
 
 #app #flight-recorder .flight-readouts {
   padding-bottom: 8px;
+}
+
+#app #flight-recorder #flight-ocean-depth,
+#app #flight-recorder #flight-rain {
+  white-space: normal;
+}
+
+#app #flight-recorder .structure-readouts .flight-readout:has(#flight-outer-shear) {
+  grid-column: span 2;
 }
 
 #analysis-dock {

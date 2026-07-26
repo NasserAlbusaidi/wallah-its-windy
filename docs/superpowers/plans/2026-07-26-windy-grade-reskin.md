@@ -435,17 +435,18 @@ describe('formatStormTag', () => {
 
 **Files:** none new — fixes land where found.
 
-- [ ] **Step 1: Honesty grep** — all of these must appear in rendered UI source:
+- [x] **Step 1: Honesty grep** — all of these must appear in rendered UI source:
   `rg -n "simulated rain radar|simulated satellite|HF-6 research build|not official guidance|SIMULATED" index.html src/` — every pre-reskin honesty string still present.
-- [ ] **Step 2: Screenshot matrix** — driver captures: idle demo, seed-7 Cat 3
+- [x] **Step 2: Screenshot matrix** — driver captures: idle demo, seed-7 Cat 3
   (wind, ir via key 3, radar via key 2), replay-scrub state, compact viewport
   (900×700). Read each PNG; fix visual bugs found (overlaps, contrast, focus
   rings).
-- [ ] **Step 3: A11y pass** — keyboard-only walk: layer keys, tab order through
+- [x] **Step 3: A11y pass** — keyboard-only walk: layer keys, tab order through
   timeline controls, dialog open/close; `:focus-visible` visible everywhere.
-- [ ] **Step 4: Full gates one last time** — `npm test`, `npm run build`,
+- [x] **Step 4: Full gates one last time** — `npm test`, `npm run build`,
   `npm run calibrate:check`, `npm run fidelity:check`.
 - [ ] **Step 5: Commit any fixes** — `git commit -am "fix: windy-grade QA sweep"`
+  **Not run by worker brief:** the reviewing judge owns staging and commit.
 
 ---
 

@@ -28,8 +28,10 @@ self-describing `.bin` assets the browser loads.
   under plain `node`); only `calibration/run.mjs`, `bake/hf6_prospective.mjs`,
   and `bake/live_archive.mjs` import `.ts` statically and need
   `node --experimental-strip-types`. The gate scripts (`hf2-gate.mjs`, ...)
-  run on plain `node` and import no `.ts`. Bake scripts hardcode
-  `bake/.venv/bin/python`. Wrong Node or missing venv fails these, not the app.
+  run on plain `node`; none imports `.ts` statically (`hf5-gate.mjs` loads
+  `.ts` only via `ssrLoadModule`). Bake scripts hardcode
+  `bake/.venv/bin/python` (except `data:structure`, which uses system
+  `python3`). Wrong Node or missing venv fails these, not the app.
 
 ## Determinism (the core invariant)
 
@@ -48,8 +50,9 @@ self-describing `.bin` assets the browser loads.
   (`src/flight-recorder.ts`); scrubbing rebuilds state from copied frames and
   never rewinds or re-drives the engine, so replay cannot corrupt the run.
 - Wall-clock time is allowed only in observed-imagery/live paths
-  (`satellite-observations.ts`, the satellite target-time code in main.ts) —
-  never in sim code or recorded output.
+  (`satellite-observations.ts`, `radar-observations.ts`, and the satellite
+  target-time and radar-timeline code in main.ts) — never in sim code or
+  recorded output.
 - The URL-hash format is a frozen compatibility contract: a climatology storm
   must encode to the exact legacy `lat=…&lon=…&month=…&seed=…` string; optional
   keys (the scenario `env` key) append validated and last, and unknown values
@@ -72,6 +75,14 @@ self-describing `.bin` assets the browser loads.
   work.
 - Dims, bbox, and quantization come from file headers — the runtime hardcodes
   no grid geometry. Do not add a second parser or inline byte offsets.
+
+## Design tokens
+
+- `src/tokens.ts` is the ONE design-token source: CSS custom properties
+  (`injectCssVars`, consumed by `src/style.css`) and WebGL colour uniforms are
+  both derived from the same rgb triples so they cannot drift. Tune colours
+  only there — never hardcode a colour in `style.css` or a shader.
+  `test/tokens.test.ts` pins the chrome palette.
 
 ## env.bin month-index quirk
 

@@ -12,7 +12,8 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > on real baked climate data. Its Holland-style structure carries parametric
 > central pressure, radius of maximum wind, persistent outer-core size,
 > shear/motion asymmetry, displaced rainfall, and quadrant 34/50/64-kt wind
-> radii, rendered as a dark nautical instrument. A fixed-seed
+> radii, rendered as a dark nautical instrument under Windy-style glass
+> chrome. A fixed-seed
 > demo storm opens mid-life on first load. Compare June vs October at one click;
 > share any storm by its URL. User storms carry a live flight recorder that
 > explains each intensity change in numbers and plain language, then becomes a
@@ -111,7 +112,12 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
   operationally calibrated forecast probabilities.
 - Use the same laboratory to re-run one seed with controlled SST, RH, shear,
   OHC, or initial-core changes.
-- Press Space or use the flight recorder's button to pause and resume.
+- Press Space or the play/pause button on the bottom timeline bar to pause and
+  resume. The bar carries the scrubber — its track coloured by the recorded
+  storm's category history, with start/peak/landfall/end jumps — a live
+  wind/pressure readout, the category chip, and the SIMULATED identity stamp.
+  A compact storm tag pinned to the storm's eye shows the simulated name,
+  current wind, category, trend, and central pressure.
 - After the storm ends, scrub its recorded track or jump to its peak, first
   landfall, and final frame. Replay reads immutable recorded frames; it never
   rewinds the simulation engine. The wind-versus-time strip exposes every exact
@@ -383,7 +389,9 @@ upslope terrain component. Only land accumulation feeds the wadi visualization.
 ## Layout
 
 ```
-index.html            chrome (title, month picker, caption, canvases)
+index.html            chrome (masthead, run environment, layer rail + product
+                      desks, flight recorder, hint chips, bottom timeline bar,
+                      storm-tag anchor, canvases)
 public/data/          baked .bin/.json assets the browser fetches
 src/
   main.ts             composition root: fixed-dt loop, sim/render/ui wiring, input
@@ -433,7 +441,10 @@ src/
   export.ts           dependency-free PNG card + WebM replay renderer
   performance.ts      device-aware DPR/particle budgets (render only)
   tap-gesture.ts      tap-vs-drag/pinch input recognizer
-  ui.ts               loading/demo/aftermath state machine, ripple, epitaph, slow-mo
+  timeline-gradient.ts category-coloured scrubber-track gradient from recorded frames
+  storm-tag.ts        two-line identity-chip copy pinned to the simulated eye
+  ui.ts               loading/demo/aftermath state machine, ripple, epitaph,
+                      slow-mo, timeline bar + storm-tag driver
   render/
     index.ts          render facade: per-frame DrawCtx + layer order
     context.ts        internal DrawCtx/GPU-texture seam for layers
@@ -451,7 +462,7 @@ src/
     vortex.ts         THE shared analytic Holland vortex (TS + GLSL)
     track.ts          live track polyline + intensity halo overlay
     ghosts.ts         faint historic IBTrACS track overlay
-  style.css           instrument chrome styling
+  style.css           windy-grade glass chrome styling
   fonts/              self-hosted IBM Plex Mono woff2 (400, 500)
 test/                 vitest: per-module unit suites + bin/event integration
 bake/                 Python data-baking (not shipped) — see bake/README.md

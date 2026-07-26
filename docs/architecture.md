@@ -1,7 +1,7 @@
 # Architecture
 
 Module map and data-flow reference for a developer or agent landing cold.
-Everything below was read from the code on 2026-07-22; when this document and
+Everything below was read from the code on 2026-07-27; when this document and
 the code disagree, the code wins.
 
 ## System overview
@@ -56,6 +56,7 @@ flowchart TD
   IMPACT --> RENDER
   SIM --> RENDER
   TAPE --> RENDER
+  TAPE --> UI
   JSONS --> UI
   UI --> SIM
   UI --> RENDER
@@ -109,7 +110,7 @@ Notes verified in code:
 | `grid.ts` | THE coordinate-convention owner: latlon ↔ grid cell ↔ clip space, wind m/s → deg/h, distances. Inline coordinate math elsewhere is a bug. | `DOMAIN` (50–70°E, 15–27°N), `latLonToCell`, `latLonToClip`, `offsetKm`, `greatCircleKm`, `windToDegPerHour` |
 | `rng.ts` | Seeded determinism + the shareable-storm URL hash. Never `Math.random()` in sim code. | `mulberry32`, `makeRng`, `randomSeed`, `readHash`/`encodeHash`/`writeHash` |
 | `category.ts` | Saffir–Simpson classification of sustained wind, in one place for chip, bar, and track colours. | `CATEGORIES`, `stormCategory`, `categoryRgba`, `intensityFraction` |
-| `tokens.ts` | The ONE design-token source: palette mirrored as CSS custom properties and normalized Float32 shader uniforms. | `TOKENS`, `uniform`, `injectCssVars`, `SPACING_UNIT` |
+| `tokens.ts` | The ONE design-token source: map palette + windy-grade chrome tokens (panel glass, radii, typography colours) mirrored as CSS custom properties and normalized Float32 shader uniforms. | `TOKENS`, `uniform`, `injectCssVars`, `SPACING_UNIT`, `RADIUS`, `PANEL_GLASS` |
 
 ### src/ — data loading and sampling
 
@@ -154,7 +155,7 @@ Notes verified in code:
 |---|---|---|
 | `scenarios.ts` | Historic-event catalogue validation + the pure decisions of a scenario switch (env mode, spawn); DOM-free half of the scenario runtime. Malformed JSON degrades to null, never throws. | `parseScenarios`, `Scenario`, `eventSpawn`, `samplingModeForSpawn`, `validateEventBinForScenario` |
 | `tracks.ts` | IBTrACS historic-track parsing + ghost polyline projection + label anchoring; DOM-free, degrades to null on bad shape. | `parseTracks`, `StormTrack`, `toGhostPolylines`, `computeLabelAnchors` |
-| `weather-layers.ts` | User-facing weather-map layer catalogue + legends. Array order is load-bearing: it is the layer rail order AND the Digit1..9 keyboard mapping. | `WEATHER_LAYERS`, `WeatherLayerId`, `SATELLITE_PALETTES`, `DEFAULT_WEATHER_LAYER` |
+| `weather-layers.ts` | User-facing weather-map layer catalogue + legends + per-layer rail icon SVG (`iconSvg`, required on every entry). Array order is load-bearing: it is the layer rail order AND the Digit1..9 keyboard mapping. | `WEATHER_LAYERS`, `WeatherLayerId`, `SATELLITE_PALETTES`, `DEFAULT_WEATHER_LAYER` |
 | `satellite-observations.ts` | Observed satellite frame manifest parsing, timestamp slot matching, Meteosat/INSAT URL builders, image loading. | `parseSatelliteManifest`, `matchObservedFrame`, `acquisitionSlotIso`, `loadObservedFrameImage` |
 | `radar-observations.ts` | Wall-clock observed-radar boundary: validates RainViewer's public manifest, caps the recent loop, builds provider tile URLs, and reprojects six-tile Web-Mercator mosaics onto the fixed app domain. Pixels never enter model state. | `parseRadarTimeline`, `recentRadarFrames`, `loadRadarMosaic`, `loadRadarCoverageFraction` |
 
@@ -190,10 +191,12 @@ Notes verified in code:
 | file | responsibility | key exports |
 |---|---|---|
 | `main.ts` | Composition root: boots chrome, WebGL2 + 2D overlay contexts, progressive asset loading (`MANIFEST`), constructs sim + renderer, runs the fixed-dt accumulator loop (`SIM_DT_MIN = 15`), wires the layer rail, keyboard, export buttons, worker requests. | (app entry) |
-| `ui.ts` | The UI brain: loading/demo/idle captions, spawn intent, epitaphs, month re-spawn, slow-mo pacing (`timescaleHoursPerSec`), flight-tape view. Pure presentation + intent; never touches WebGL or physics. | `UiController`, `epitaph`, `deathReasonPhrase` |
+| `ui.ts` | The UI brain: loading/demo/idle captions, spawn intent, epitaphs, month re-spawn, slow-mo pacing (`timescaleHoursPerSec`), flight-tape view, and the windy-grade chrome — bottom timeline bar (category-gradient scrubber via `timeline-gradient.ts`, age-positioned category milestones, live wind/pressure cluster), storm tag pinned to the vortex eye (`storm-tag.ts` copy), catalogue icons mounted on the layer rail. Pure presentation + intent; never touches WebGL or physics. | `UiController`, `StormTagView`, `epitaph`, `deathReasonPhrase` |
+| `timeline-gradient.ts` | Pure: flight-recorder intensity frames in, hard-stop `linear-gradient(90deg, …)` string out — paints the bottom timeline scrubber category-by-category (discrete stops at category boundaries, no blending). | `categoryGradientCss` |
+| `storm-tag.ts` | Pure copy for the map chip pinned to the simulated eye: two compact lines (NAME · kt / category · trend · hPa), trend classified from instantaneous kt/h, category vocabulary from the shared SSHS table. DOM anchoring/positioning lives in `ui.ts`. | `formatStormTag`, `StormTagInput`, `StormTagCopy` |
 | `tap-gesture.ts` | Distinguishes an intentional map tap from drag/pinch input. | `TapGesture` |
 | `performance.ts` | Deterministic render budgets from observable device traits; backing resolution, particle counts, and a compact-chrome flag adapt — never physics. | `chooseRenderProfile`, `RenderProfile` |
-| `style.css` | The instrument chrome; colours come from CSS vars injected by `tokens.ts`. | (stylesheet) |
+| `style.css` | The windy-grade glass chrome (panel material, icon rail, hint chips, timeline bar, storm-tag chip); colours and radii come from CSS vars injected by `tokens.ts`. | (stylesheet) |
 | `fonts/` | Self-hosted IBM Plex Mono woff2 (400/500). | (assets) |
 
 ### src/render/ — WebGL2 pipeline
@@ -278,7 +281,7 @@ terminates the worker.
 
 | task | files (verified) |
 |---|---|
-| Add a weather-map layer | `src/weather-layers.ts` (catalogue; array order = rail order + Digit1..9 keys), `src/render/env.ts` (`MODE`/`PALETTE` tables) or a new `src/render/` module, composition in `src/render/index.ts` `draw()`, rail built in `src/main.ts` from `WEATHER_LAYERS` |
+| Add a weather-map layer | `src/weather-layers.ts` (catalogue; array order = rail order + Digit1..9 keys), `src/render/env.ts` (`MODE`/`PALETTE` tables) or a new `src/render/` module, composition in `src/render/index.ts` `draw()`, rail built in `src/main.ts` from `WEATHER_LAYERS`. A rail icon is required in TWO type-enforced places: `iconSvg` in the catalogue entry (the icon that actually ships — `src/ui.ts` `installLayerRailIcons` swaps it in) and `LAYER_ICONS` in `src/main.ts` (initial mount) |
 | Tune intensity physics | `src/sim.ts` — `SIM` constants, `IntensityParameters`, `intensityRateKtPerH`; verify with `npm run calibrate:intensity:check` |
 | Tune storm structure (RMW, Holland B, wind radii) | `src/structure.ts`; calibration gate in `src/structure-validation.ts` via `npm run calibrate:structure` |
 | Tune track/steering behaviour | `src/sim.ts` (`TrackParameters`, `betaDriftMs`), `src/steering.ts` |

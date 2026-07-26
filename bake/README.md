@@ -10,7 +10,7 @@ headers advertise (the runtime hardcodes none of them).
 ## Reproduce
 
 ```bash
-cd cyclone-sim
+cd wallah-its-windy
 python3 -m venv bake/.venv
 bake/.venv/bin/python -m pip install --upgrade pip
 bake/.venv/bin/python -m pip install -r bake/requirements.txt

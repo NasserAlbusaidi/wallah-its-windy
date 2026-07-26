@@ -1,5 +1,10 @@
 # Windy-Grade Reskin Implementation Plan
 
+> **Status: EXECUTED AND MERGED** — all 8 tasks committed
+> (`7a2e078..6011be4`, plus follow-up fix `c7a3d67`) and merged to main as
+> `89f1539` (PR #11, 2026-07-27). Unchecked commit/gate boxes below reflect
+> the worker/judge split, not pending work.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Reskin the app chrome to the approved Windy-grade direction (spec:

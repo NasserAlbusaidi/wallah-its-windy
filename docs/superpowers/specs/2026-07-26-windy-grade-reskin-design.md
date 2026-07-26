@@ -1,6 +1,7 @@
 # Windy-grade reskin — design spec
 
-Status: draft for review · 2026-07-26
+Status: executed and merged 2026-07-27 — merge `89f1539` (PR #11). Kept as the
+design record; the companion plan holds the task-level execution log.
 Mockup: claude.ai artifact "Wallah It's Windy — Visual Direction Study", Direction 05
 (built over a real captured frame: seed 7, May climatology, hour 24, "Simulated
 Cyclone Shaheen", Cat 3, 111 kt / 943 hPa).

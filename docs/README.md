@@ -32,6 +32,16 @@ One line per document. Classes:
 | [`satellite-cloud-validation.md`](satellite-cloud-validation.md) | — | Qualitative cloud-morphology screen with an explicit claim boundary; not a forecast-skill score. |
 | [`structure-calibration.md`](structure-calibration.md) | **GENERATED** — `npm run calibrate:structure` | North Indian Ocean physical-structure calibration report. |
 
+## docs/superpowers/
+
+Working specs and implementation plans for delivered feature branches; kept as
+history once merged.
+
+| File | Class | What it is |
+| --- | --- | --- |
+| [`superpowers/specs/2026-07-26-windy-grade-reskin-design.md`](superpowers/specs/2026-07-26-windy-grade-reskin-design.md) | — | Design spec for the windy-grade UI reskin: glass panel chrome, type scale, icon layer rail, storm tag pinned to the eye, category-coloured timeline. UI-only; explicitly excludes physics, calibration, data-format, and URL-hash changes. |
+| [`superpowers/plans/2026-07-26-windy-grade-reskin.md`](superpowers/plans/2026-07-26-windy-grade-reskin.md) | — | Eight-task implementation plan for the reskin spec; delivered in PR #11 (merge `89f1539`), retained as the execution record. |
+
 ## Pipelines
 
 | File | Class | What it is |

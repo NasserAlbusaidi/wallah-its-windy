@@ -140,34 +140,36 @@ In `injectCssVars`, after the `--radius` line add:
   `--text-hi`, `--text-mut`, `--text-dim`, `--radius-panel`, `--radius-ctl`).
 - Produces: `.chrome` panels share one glass recipe; class contract unchanged.
 
-- [ ] **Step 1: Add the sans stack + base type** — in `:root` add
+- [x] **Step 1: Add the sans stack + base type** — in `:root` add
   `--sans: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;`
   Switch `body` `font-family` to `var(--sans)`; keep `--mono` for every selector
   that renders numbers/readouts (`output`, `dd`, `.flight-readouts`, clock,
   legend scale, probe values — grep `var(--mono)` and keep those on mono, but
   raise their sizes per the ramp below).
-- [ ] **Step 2: One glass recipe** — update the shared panel styling (the
+- [x] **Step 2: One glass recipe** — update the shared panel styling (the
   `.chrome` blocks and each panel's own rules) to:
   `background: var(--panel-glass); border: 1px solid var(--panel-edge); border-radius: var(--radius-panel); box-shadow: 0 8px 28px rgba(0,0,0,0.45); backdrop-filter: blur(10px);`
   Buttons/selects/inputs move to `border-radius: var(--radius-ctl)` and
   `background: rgba(146,190,224,0.10)`.
-- [ ] **Step 3: Type ramp sweep** — raise chrome sizes: eyebrows/labels
+- [x] **Step 3: Type ramp sweep** — raise chrome sizes: eyebrows/labels
   10px→uppercase tracked 0.08em, hints 11px, controls 12.5px, body 13px,
   explanation lead 14.5px/700, panel headers 11px/650. Kill every 7–9px
   font-size in chrome (map-space labels — city markers, graticule — may stay
   9–11px). Primary text colour: `var(--text-hi)`; secondary `var(--text-mut)`;
   keys/hints `var(--text-dim)`; active/focus/links `var(--ui-accent)`.
   The old cyan `var(--text)` remains ONLY in map-space overlays.
-- [ ] **Step 4: Focus + reduced motion** — every interactive element keeps a
+- [x] **Step 4: Focus + reduced motion** — every interactive element keeps a
   visible `:focus-visible` outline (`2px solid var(--ui-accent)`); confirm
   existing animations are inside `prefers-reduced-motion` guards (add guards
   where missing — e.g. `city-exposure-pulse`).
-- [ ] **Step 5: Visual check** — `npm run dev`, screenshot idle + storm
+- [x] **Step 5: Visual check** — `npm run dev`, screenshot idle + storm
   (`#lat=15.5&lon=64.5&month=4&seed=7`, wait for CAT 3) with the session driver
   (`scratchpad\driver\capture.mjs` pattern: headless Chrome +
   `--use-gl=angle --use-angle=d3d11 --enable-gpu`); compare against
   `test-e.png` for material/type feel. Fix obvious misses.
-- [ ] **Step 6: Full gates** — `npm test`, `npm run build`, `npm run calibrate:check`.
+  **Deviation:** skipped by worker brief; the reviewing judge performs this
+  visual check after Task 2.
+- [x] **Step 6: Full gates** — `npm test`, `npm run build`, `npm run calibrate:check`.
 - [ ] **Step 7: Commit** — `git commit -am "feat: windy-grade panel material and type scale"`
 
 ---

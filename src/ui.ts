@@ -29,7 +29,7 @@ import { DeathReason, AFTERMATH_FADE_MS } from './types';
 import { randomSeed, type HashState } from './rng';
 import { DOMAIN, greatCircleKm, latLonToCell, latLonToClip } from './grid';
 import { TOKENS } from './tokens';
-import { intensityFraction, stormCategory } from './category';
+import { categoryRgba, intensityFraction, stormCategory } from './category';
 import {
   experiencedWindPhrase,
   IMPACT_CITIES,
@@ -55,6 +55,7 @@ import {
   nearestIntensityIndex,
   type IntensitySparklineGeometry,
 } from './intensity-sparkline';
+import { categoryGradientCss } from './timeline-gradient';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -223,7 +224,15 @@ export class UiController {
     toggle: HTMLButtonElement;
     scrubber: HTMLInputElement;
     jumps: HTMLElement;
+    startJump: HTMLButtonElement;
+    peakJump: HTMLButtonElement;
     landfallJump: HTMLButtonElement;
+    endJump: HTMLButtonElement;
+    timelineClock: HTMLElement;
+    timelineNowKt: HTMLElement;
+    timelineNowHpa: HTMLElement;
+    timelineCategory: HTMLElement;
+    timelineId: HTMLElement;
     category: HTMLElement;
     needleNow: HTMLElement;
     needlePotential: HTMLElement;
@@ -279,6 +288,8 @@ export class UiController {
     buildIntensitySparkline([]);
   private sparklineDefaultIndex = 0;
   private sparklineInspectIndex: number | null = null;
+  /** Last tape length painted into the category-coloured timeline track. */
+  private timelineGradientFrameCount = -1;
 
   constructor(host: UiHost) {
     this.host = host;
@@ -331,7 +342,15 @@ export class UiController {
       toggle: dom('flight-toggle'),
       scrubber: dom('flight-scrubber'),
       jumps: dom('flight-jumps'),
+      startJump: dom('flight-start'),
+      peakJump: dom('flight-peak'),
       landfallJump: dom('flight-landfall'),
+      endJump: dom('flight-end'),
+      timelineClock: dom('timeline-clock'),
+      timelineNowKt: dom('timeline-now-kt'),
+      timelineNowHpa: dom('timeline-now-hpa'),
+      timelineCategory: dom('timeline-cat'),
+      timelineId: dom('timeline-id'),
       category: dom('flight-category'),
       needleNow: dom('scale-needle-now'),
       needlePotential: dom('scale-needle-potential'),
@@ -349,6 +368,14 @@ export class UiController {
       sparklineValue: dom('intensity-sparkline-value'),
       analog: dom('historical-analog'),
     };
+    for (const jump of [
+      this.flight.startJump,
+      this.flight.peakJump,
+      this.flight.landfallJump,
+      this.flight.endJump,
+    ]) {
+      jump.dataset.label = jump.textContent ?? '';
+    }
 
     const details = dom<HTMLButtonElement>('flight-details-toggle');
     details.addEventListener('click', () => {
@@ -879,6 +906,7 @@ export class UiController {
     const f = this.flight;
     if (!storm || storm.isDemo) {
       f.root.hidden = true;
+      this.timelineGradientFrameCount = -1;
       return;
     }
 
@@ -904,8 +932,39 @@ export class UiController {
             : mode === 'held'
               ? 'live held'
               : 'live tape';
-    f.clock.textContent = flightClock(storm.ageH);
+    const clock = flightClock(storm.ageH);
+    f.clock.textContent = clock;
+    f.timelineClock.textContent = clock;
     f.label.textContent = view.label;
+    f.timelineId.textContent = view.label;
+    if (view.frameCount !== this.timelineGradientFrameCount) {
+      f.scrubber.style.setProperty(
+        '--timeline-gradient',
+        categoryGradientCss(view.intensitySeries),
+      );
+      f.jumps
+        .querySelectorAll<HTMLElement>('[data-category-milestone]')
+        .forEach((milestone) => milestone.remove());
+      let previousCategory = stormCategory(
+        view.intensitySeries[0]?.vKt ?? storm.vKt,
+      );
+      for (let index = 1; index < view.intensitySeries.length; index++) {
+        const point = view.intensitySeries[index];
+        const nextCategory = stormCategory(point.vKt);
+        if (nextCategory.id === previousCategory.id) continue;
+        const milestone = document.createElement('span');
+        milestone.className = 'timeline-category-milestone';
+        milestone.dataset.categoryMilestone = '';
+        milestone.dataset.label = nextCategory.chip.toLowerCase();
+        milestone.style.left =
+          `${((index / (view.intensitySeries.length - 1)) * 100).toFixed(1)}%`;
+        milestone.style.background = categoryRgba(point.vKt, 1);
+        milestone.setAttribute('aria-hidden', 'true');
+        f.jumps.append(milestone);
+        previousCategory = nextCategory;
+      }
+      this.timelineGradientFrameCount = view.frameCount;
+    }
     this.updateSparkline(view);
     f.analog.hidden = view.historicalAnalog === null;
     if (view.historicalAnalog) {
@@ -974,6 +1033,14 @@ export class UiController {
     const category = stormCategory(storm.vKt);
     f.category.dataset.cat = category.id;
     f.category.textContent = category.chip;
+    const categoryColor = categoryRgba(storm.vKt, 1);
+    f.timelineNowKt.textContent = `${Math.round(storm.vKt)} kt`;
+    f.timelineNowHpa.textContent =
+      `${Math.round(structure.centralPressureHpa)} hPa`;
+    f.timelineCategory.dataset.cat = category.id;
+    f.timelineCategory.textContent = category.chip;
+    f.timelineCategory.style.background = categoryColor;
+    f.scrubber.style.setProperty('--timeline-current-color', categoryColor);
     f.needleNow.style.left = `${(intensityFraction(storm.vKt) * 100).toFixed(1)}%`;
     const potentialKt = d.mpiKt;
     const hasPotential = potentialKt > 1 && !d.overLand;
@@ -1018,8 +1085,23 @@ export class UiController {
     f.scrubber.max = String(Math.max(0, view.frameCount - 1));
     f.scrubber.value = String(Math.max(0, view.frameIndex));
     f.scrubber.disabled = !complete || view.frameCount < 2;
-    f.jumps.hidden = !complete;
-    f.landfallJump.disabled = view.milestones?.landfall == null;
+    f.jumps.hidden = view.frameCount < 2;
+    f.startJump.hidden = !complete;
+    f.peakJump.hidden = !complete;
+    f.landfallJump.hidden =
+      !complete || view.milestones?.landfall == null;
+    f.endJump.hidden = !complete;
+    if (view.milestones && view.frameCount > 1) {
+      const milestonePosition = (frameIndex: number): string =>
+        `${((frameIndex / (view.frameCount - 1)) * 100).toFixed(1)}%`;
+      f.startJump.style.left = milestonePosition(view.milestones.start);
+      f.peakJump.style.left = milestonePosition(view.milestones.peak);
+      f.endJump.style.left = milestonePosition(view.milestones.end);
+      if (view.milestones.landfall !== null) {
+        f.landfallJump.style.left =
+          milestonePosition(view.milestones.landfall);
+      }
+    }
     f.toggle.textContent = complete
       ? view.replayMode
         ? view.replayPlaying

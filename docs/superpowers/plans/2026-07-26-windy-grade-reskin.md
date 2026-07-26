@@ -224,7 +224,7 @@ In `injectCssVars`, after the `--radius` line add:
 - Produces: `categoryGradientCss(frames: readonly {vKt: number; ageH: number}[]): string`
   returning a `linear-gradient(90deg, ...)` with hard stops.
 
-- [ ] **Step 1: Failing test** — `test/timeline-gradient.test.ts`:
+- [x] **Step 1: Failing test** — `test/timeline-gradient.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -256,8 +256,8 @@ describe('categoryGradientCss', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect module-not-found fail.**
-- [ ] **Step 3: Implement** — `src/timeline-gradient.ts`:
+- [x] **Step 2: Run, expect module-not-found fail.**
+- [x] **Step 3: Implement** — `src/timeline-gradient.ts`:
 
 ```ts
 /**
@@ -294,8 +294,8 @@ export function categoryGradientCss(
 (Adjust to `StormCategory`'s real field names — check `src/category.ts:14-38`;
 if the interface exposes `label` not `name`, use that. The test drives it.)
 
-- [ ] **Step 4: Tests pass** — `npx vitest run test/timeline-gradient.test.ts`.
-- [ ] **Step 5: Wire it** — at the existing per-frame flight-recorder UI update
+- [x] **Step 4: Tests pass** — `npx vitest run test/timeline-gradient.test.ts`.
+- [x] **Step 5: Wire it** — at the existing per-frame flight-recorder UI update
   site (where `#flight-clock` is written): set the ruler track's
   `style.background` from `categoryGradientCss(snapshot.frames)` — regenerate
   only when frame COUNT changes (cache the last count). Fill Task 3's spans:
@@ -305,10 +305,10 @@ if the interface exposes `label` not `name`, use that. The test drives it.)
   dark text. `#timeline-id` ← the storm label already shown in
   `#flight-label` + a `[SIMULATED]` bordered stamp span (static HTML).
   Style `#flight-jumps` buttons as milestone dots on the ruler.
-- [ ] **Step 6: Hand-verify** — dev server: gradient grows live, colours match
+- [x] **Step 6: Hand-verify** — dev server: gradient grows live, colours match
   the category chip, scrubbing still works, replay unaffected (tape is
   read-only input).
-- [ ] **Step 7: Full gates.**
+- [x] **Step 7: Full gates.**
 - [ ] **Step 8: Commit** — `git commit -am "feat: category-coloured timeline track and live cluster"`
 
 ---

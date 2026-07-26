@@ -2821,7 +2821,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
 }
 
 #app:has(#flight-recorder:not([hidden])) #hint-chips {
-  bottom: calc(108px + min(58dvh, 360px));
+  bottom: calc(108px + min(60dvh, 384px));
 }
 
 #hint-chips #caption,
@@ -2845,11 +2845,12 @@ html[data-compact='true'] .ghost-label:not(.active) {
   opacity: 1;
 }
 
-#hint-chips #caption {
+#app #hint-chips #caption {
   max-width: min(50vw, 480px);
   color: var(--text-hi);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 #hint-chips #caption::before {
@@ -2875,7 +2876,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
   bottom: 96px;
   left: 16px;
   width: min(372px, calc(100vw - 32px));
-  max-height: min(58dvh, 360px);
+  max-height: min(60dvh, 384px);
   padding: 13px 15px 12px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -2904,7 +2905,12 @@ html[data-compact='true'] .ghost-label:not(.active) {
 #app #flight-recorder .flight-readouts,
 #app #flight-recorder .structure-readouts {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px 12px;
+  column-gap: 12px;
+  row-gap: 11px;
+}
+
+#app #flight-recorder .flight-readouts {
+  padding-bottom: 8px;
 }
 
 #analysis-dock {
@@ -2992,7 +2998,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
 
 #timeline #flight-scrubber::-webkit-slider-runnable-track {
   height: 6px;
-  background: rgba(109, 130, 150, 0.42);
+  background: var(--timeline-gradient, rgba(109, 130, 150, 0.42));
   border-radius: 3px;
 }
 
@@ -3001,43 +3007,42 @@ html[data-compact='true'] .ghost-label:not(.active) {
   height: 14px;
   margin-top: -4px;
   appearance: none;
-  background: var(--ui-accent);
+  background: var(--timeline-current-color, var(--ui-accent));
   border: 2px solid rgba(11, 16, 26, 0.95);
   border-radius: 2px;
-  box-shadow: 0 0 10px rgba(89, 216, 230, 0.50);
+  box-shadow: 0 0 10px var(--timeline-current-color, rgba(89, 216, 230, 0.50));
   transform: rotate(45deg);
 }
 
 #timeline #flight-scrubber::-moz-range-track {
   height: 6px;
-  background: rgba(109, 130, 150, 0.42);
+  background: var(--timeline-gradient, rgba(109, 130, 150, 0.42));
   border-radius: 3px;
 }
 
 #timeline #flight-scrubber::-moz-range-thumb {
   width: 11px;
   height: 11px;
-  background: var(--ui-accent);
+  background: var(--timeline-current-color, var(--ui-accent));
   border: 2px solid rgba(11, 16, 26, 0.95);
   border-radius: 2px;
-  box-shadow: 0 0 10px rgba(89, 216, 230, 0.50);
+  box-shadow: 0 0 10px var(--timeline-current-color, rgba(89, 216, 230, 0.50));
   transform: rotate(45deg);
 }
 
 #app #timeline #flight-scrubber:disabled {
   cursor: default;
-  opacity: 0.55;
+  opacity: 1;
 }
 
 #app #timeline #flight-jumps {
   position: absolute;
-  top: -8px;
+  top: 13px;
   right: 0;
   left: 0;
   z-index: 1;
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  display: block;
+  height: 8px;
   pointer-events: none;
 }
 
@@ -3045,18 +3050,46 @@ html[data-compact='true'] .ghost-label:not(.active) {
   display: none;
 }
 
+#app #timeline #flight-jumps button,
+#app #timeline #flight-jumps .timeline-category-milestone {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  min-width: 8px;
+  height: 8px;
+  min-height: 8px;
+  padding: 0;
+  color: transparent;
+  font-size: 0;
+  background: var(--timeline-current-color, var(--ui-accent));
+  border: 1.5px solid rgba(11, 16, 26, 0.92);
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(89, 216, 230, 0.42);
+  transform: translateX(-50%);
+}
+
 #app #timeline #flight-jumps button {
-  min-height: 20px;
-  padding: 2px 5px;
-  color: var(--text-mut);
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1;
-  background: rgba(11, 16, 26, 0.88);
-  border: 1px solid var(--panel-edge);
-  border-radius: var(--radius-ctl);
   pointer-events: auto;
+}
+
+#app #timeline #flight-jumps button::after,
+#app #timeline #flight-jumps .timeline-category-milestone::after {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  color: var(--text-mut);
+  content: attr(data-label);
+  font: 600 9px/1 var(--mono);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+#app #timeline #flight-jumps button::after {
+  top: 10px;
+}
+
+#app #timeline #flight-jumps button:disabled {
+  opacity: 0.34;
 }
 
 .timeline-now {

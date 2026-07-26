@@ -360,17 +360,22 @@ dd,
 
 .masthead-meta {
   display: flex;
-  gap: 9px;
+  flex-flow: row nowrap;
+  gap: 12px;
   align-items: center;
+  width: max-content;
+  white-space: nowrap;
 }
 .model-state {
   display: inline-flex;
+  flex: none;
   gap: 5px;
   align-items: center;
   color: var(--text-mut);
   font-size: 11px;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+  white-space: nowrap;
   opacity: 0.62;
 }
 .model-state i {
@@ -406,8 +411,8 @@ dd,
   top: 14px;
   right: 16px;
   display: grid;
-  grid-template-columns: 72px minmax(150px, 210px);
-  width: min(292px, calc(100vw - 32px));
+  grid-template-columns: 130px minmax(190px, 220px);
+  width: min(352px, calc(100vw - 32px));
   overflow: hidden;
   color: var(--text-hi);
   text-align: left;
@@ -474,6 +479,13 @@ dd,
   border-radius: 2px;
   cursor: pointer;
   appearance: none;
+}
+#month {
+  min-width: 104px;
+}
+#scenario,
+#scenario-mode {
+  min-width: 180px;
 }
 /* Pinned month during an event replay (or an unavailable scenario catalogue). */
 #month:disabled,
@@ -1539,12 +1551,12 @@ dd,
 
 .flight-readouts {
   display: grid;
-  grid-template-columns: 1.05fr 0.82fr 1fr 0.92fr 1fr 1.2fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 9px;
   margin: 8px 0 0;
 }
 .structure-readouts {
-  grid-template-columns: 1fr 1.15fr 1fr 1.3fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid color-mix(in srgb, var(--ridge-hi, #2c343c) 42%, transparent);
@@ -1565,11 +1577,11 @@ dd,
 .flight-readout dd,
 .debrief-grid dd {
   margin: 0;
-  overflow: hidden;
+  overflow: visible;
   color: var(--text-hi);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
 }
 .flight-readout.primary dd {
@@ -2009,7 +2021,8 @@ html[data-compact='true'] .ghost-label:not(.active) {
 }
 
 #app #masthead {
-  width: 238px;
+  width: max-content;
+  min-width: 238px;
   padding: 10px 14px;
 }
 
@@ -2479,6 +2492,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
   #scenario,
   #scenario-mode {
     max-width: none;
+    min-width: 0;
     min-height: 30px;
     padding: 3px 18px 3px 5px;
     font-size: 12.5px;

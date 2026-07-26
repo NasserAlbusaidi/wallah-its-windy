@@ -15,6 +15,7 @@
 /** 8px spacing unit and 4px corner radius (design doc Visual Design). */
 export const SPACING_UNIT = 8;
 export const RADIUS = 4;
+export const PANEL_GLASS = 'rgba(11,16,26,0.82)';
 
 interface RawToken {
   key: string;
@@ -79,11 +80,11 @@ const RAW: readonly RawToken[] = [
   // Wind-speed palette (Windy-style flow map): calm indigo -> teal -> green ->
   // amber -> magenta across 0..50 m/s. Consumed by the wind fill shader, the
   // particle-trail colouring, and the rail legend gradient.
-  { key: 'wind0', cssVar: '--wind-0', rgb: [40, 56, 110], a: 1 },
-  { key: 'wind1', cssVar: '--wind-1', rgb: [46, 135, 150], a: 1 },
-  { key: 'wind2', cssVar: '--wind-2', rgb: [88, 171, 88], a: 1 },
-  { key: 'wind3', cssVar: '--wind-3', rgb: [227, 179, 57], a: 1 },
-  { key: 'wind4', cssVar: '--wind-4', rgb: [204, 64, 120], a: 1 },
+  { key: 'wind0', cssVar: '--wind-0', rgb: [39, 59, 127], a: 1 },
+  { key: 'wind1', cssVar: '--wind-1', rgb: [35, 147, 165], a: 1 },
+  { key: 'wind2', cssVar: '--wind-2', rgb: [82, 186, 82], a: 1 },
+  { key: 'wind3', cssVar: '--wind-3', rgb: [250, 189, 37], a: 1 },
+  { key: 'wind4', cssVar: '--wind-4', rgb: [236, 61, 131], a: 1 },
   // Storm-total accumulated-rain palette (impact proxy): dry -> soaked.
   { key: 'precip0', cssVar: '--precip-0', rgb: [10, 20, 34], a: 1 },
   { key: 'precip1', cssVar: '--precip-1', rgb: [38, 108, 168], a: 1 },
@@ -100,6 +101,13 @@ const RAW: readonly RawToken[] = [
   { key: 'cat3', cssVar: '--cat-3', rgb: [255, 193, 64], a: 1 },
   { key: 'cat4', cssVar: '--cat-4', rgb: [255, 143, 32], a: 1 },
   { key: 'cat5', cssVar: '--cat-5', rgb: [255, 96, 96], a: 1 },
+  // Windy-grade chrome (design spec 2026-07-26): panel/typography tokens. The
+  // amber --accent stays map-side; chrome accent is this teal.
+  { key: 'uiAccent', cssVar: '--ui-accent', rgb: [89, 216, 230], a: 1 },
+  { key: 'panelEdge', cssVar: '--panel-edge', rgb: [146, 190, 224], a: 0.14 },
+  { key: 'textHi', cssVar: '--text-hi', rgb: [232, 241, 248], a: 1 },
+  { key: 'textMut', cssVar: '--text-mut', rgb: [143, 163, 184], a: 1 },
+  { key: 'textDim', cssVar: '--text-dim', rgb: [109, 130, 150], a: 1 },
 ] as const;
 
 export type TokenKey = (typeof RAW)[number]['key'];
@@ -153,4 +161,7 @@ export function injectCssVars(target: HTMLElement = document.documentElement): v
   }
   target.style.setProperty('--space', `${SPACING_UNIT}px`);
   target.style.setProperty('--radius', `${RADIUS}px`);
+  target.style.setProperty('--radius-panel', '10px');
+  target.style.setProperty('--radius-ctl', '7px');
+  target.style.setProperty('--panel-glass', PANEL_GLASS);
 }

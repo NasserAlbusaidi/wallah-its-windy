@@ -299,7 +299,7 @@ export class ParticleLayer implements RenderModule {
     gl.uniform1f(this.uSize, this.height * 0.011 * (0.8 + 0.5 * intensity));
     gl.uniform4fv(this.uCore, TOKENS.stormCore.rgba01);
     // Soft per-point alpha; demo storm and aftermath both render dimmer.
-    const baseAlpha = 0.10 * (ctx.demo ? 0.45 : 1) * ctx.aftermath;
+    const baseAlpha = 0.12 * (ctx.demo ? 0.45 : 1) * ctx.aftermath;
     gl.uniform1f(this.uAlpha, baseAlpha);
     gl.drawArrays(gl.POINTS, 0, this.count);
     gl.bindVertexArray(null);

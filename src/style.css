@@ -30,6 +30,7 @@
 }
 
 :root {
+  --sans: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
   --panel: rgba(4, 10, 18, 0.88);
   --panel-solid: #07111d;
@@ -43,10 +44,25 @@ body {
   height: 100%;
   overflow: hidden;
   background: var(--ocean-deep, #050a12);
-  color: var(--text, #7fd4e8);
-  font-family: var(--mono);
+  color: var(--text-hi);
+  font-family: var(--sans);
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Instrument values keep their monospaced voice while chrome prose moves to
+   the sans stack. Outputs and definition values are all live readouts. */
+output,
+dd,
+.flight-readouts,
+.radar-clock,
+#weather-legend-unit,
+#weather-legend-scale,
+#point-probe dd,
+.layer-button .key,
+.scale-ticks {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 #app {
@@ -114,6 +130,70 @@ body {
   touch-action: manipulation;
 }
 
+/* Storm identity pinned to the simulated eye. The zero-size root is the exact
+   projected coordinate; JS clamps only the chip offset within the map frame. */
+#storm-tag {
+  position: absolute;
+  z-index: 6;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+#storm-tag[hidden] {
+  display: none;
+}
+.storm-tag-eye {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--storm-category-solid);
+  border-radius: 50%;
+}
+#app #storm-tag .storm-tag-chip {
+  position: absolute;
+  top: var(--storm-tag-chip-top, -76px);
+  left: var(--storm-tag-chip-left, -220px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: calc(100vw - 20px);
+  padding: 8px 11px;
+  white-space: nowrap;
+  background: rgba(11, 16, 26, 0.88);
+  border-color: var(--storm-category-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.50);
+}
+#app #storm-tag .storm-tag-line1 {
+  color: var(--storm-category-solid);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+#app #storm-tag .storm-tag-line2 {
+  color: var(--text-hi);
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .storm-tag-eye {
+    animation: storm-eye-pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes storm-eye-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--storm-category-pulse);
+    }
+    50% {
+      box-shadow: 0 0 0 9px var(--storm-category-clear);
+    }
+  }
+}
+
 /* Accessible geographic overlays. They share the chart projection with the
    canvases but stay as DOM so names and exact readings remain inspectable. */
 #city-markers {
@@ -130,7 +210,7 @@ body {
   align-items: center;
   padding: 4px;
   color: color-mix(in srgb, var(--text, #7fd4e8) 72%, transparent);
-  font: 500 9px/1 var(--mono);
+  font: 600 11px/1 var(--sans);
   letter-spacing: 0.06em;
   text-transform: lowercase;
   white-space: nowrap;
@@ -162,7 +242,6 @@ body {
   box-shadow:
     0 0 0 3px rgba(255, 193, 64, 0.18),
     0 0 13px rgba(255, 143, 32, 0.9);
-  animation: city-exposure-pulse 1.4s ease-in-out infinite alternate;
 }
 .city-marker:focus-visible {
   color: var(--storm-core, #e8f4ff);
@@ -180,7 +259,7 @@ body {
   width: 220px;
   box-sizing: border-box;
   padding: 9px 10px;
-  color: var(--text, #7fd4e8);
+  color: var(--text-mut);
   background: rgba(4, 10, 18, 0.94);
   border: 1px solid color-mix(in srgb, var(--track, #78dcff) 45%, var(--ridge-hi, #2c343c));
   border-radius: var(--radius, 4px);
@@ -195,7 +274,7 @@ body {
   display: grid;
   gap: 5px;
   transform: translate(12px, 12px);
-  font-size: 9px;
+  font-size: 11px;
 }
 #city-detail strong,
 #point-probe strong {
@@ -212,7 +291,7 @@ body {
   top: 3px;
   right: 4px;
   padding: 2px 5px;
-  color: var(--text, #7fd4e8);
+  color: var(--text-mut);
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -230,8 +309,8 @@ body {
 }
 #point-probe-pin {
   padding: 2px 6px;
-  color: var(--text, #7fd4e8);
-  font: 500 8px/1.3 var(--mono);
+  color: var(--text-hi);
+  font: 600 11px/1.3 var(--sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   background: rgba(120, 220, 255, 0.05);
@@ -256,7 +335,7 @@ body {
 #point-probe dt {
   margin-bottom: 2px;
   overflow: hidden;
-  font-size: 7px;
+  font-size: 10px;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -266,14 +345,14 @@ body {
 #point-probe dd {
   margin: 0;
   color: var(--storm-core, #e8f4ff);
-  font-size: 9px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 #point-probe-source {
   margin: 7px 0 0;
   overflow: hidden;
-  font-size: 7px;
+  font-size: 10px;
   letter-spacing: 0.05em;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -324,8 +403,8 @@ body {
 }
 .masthead-index {
   margin: 0;
-  color: var(--text, #7fd4e8);
-  font-size: 9px;
+  color: var(--text-mut);
+  font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   opacity: 0.52;
@@ -345,17 +424,22 @@ body {
 
 .masthead-meta {
   display: flex;
-  gap: 9px;
+  flex-flow: row nowrap;
+  gap: 12px;
   align-items: center;
+  width: max-content;
+  white-space: nowrap;
 }
 .model-state {
   display: inline-flex;
+  flex: none;
   gap: 5px;
   align-items: center;
-  color: var(--text, #7fd4e8);
-  font-size: 9px;
+  color: var(--text-mut);
+  font-size: 11px;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+  white-space: nowrap;
   opacity: 0.62;
 }
 .model-state i {
@@ -369,7 +453,7 @@ body {
 .quiet-button {
   padding: 0;
   color: var(--accent, #ffb74d);
-  font: 500 9px/1.4 var(--mono);
+  font: 600 11px/1.4 var(--sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   background: none;
@@ -391,10 +475,10 @@ body {
   top: 14px;
   right: 16px;
   display: grid;
-  grid-template-columns: 72px minmax(150px, 210px);
-  width: min(292px, calc(100vw - 32px));
+  grid-template-columns: 130px minmax(190px, 220px);
+  width: min(352px, calc(100vw - 32px));
   overflow: hidden;
-  color: var(--text, #7fd4e8);
+  color: var(--text-hi);
   text-align: left;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -410,14 +494,14 @@ body {
   justify-content: space-between;
   padding: 7px 9px;
   color: var(--storm-core, #e8f4ff);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   border-bottom: 1px solid var(--line);
 }
 #month-picker > header span:last-child {
   color: var(--accent, #ffb74d);
-  font-size: 8px;
+  font-size: 10px;
   opacity: 0.72;
 }
 .run-field {
@@ -435,7 +519,7 @@ body {
 #month-picker label {
   display: block;
   margin: 0;
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   opacity: 0.52;
@@ -452,13 +536,20 @@ body {
   font-weight: 500;
   color: var(--storm-core, #e8f4ff);
   background:
-    linear-gradient(45deg, transparent 50%, var(--text, #7fd4e8) 50%) calc(100% - 10px) 13px / 4px 4px no-repeat,
-    linear-gradient(135deg, var(--text, #7fd4e8) 50%, transparent 50%) calc(100% - 6px) 13px / 4px 4px no-repeat,
+    linear-gradient(45deg, transparent 50%, var(--text-mut) 50%) calc(100% - 10px) 13px / 4px 4px no-repeat,
+    linear-gradient(135deg, var(--text-mut) 50%, transparent 50%) calc(100% - 6px) 13px / 4px 4px no-repeat,
     var(--ocean-shallow, #0a1522);
   border: 1px solid var(--line);
   border-radius: 2px;
   cursor: pointer;
   appearance: none;
+}
+#month {
+  min-width: 104px;
+}
+#scenario,
+#scenario-mode {
+  min-width: 180px;
 }
 /* Pinned month during an event replay (or an unavailable scenario catalogue). */
 #month:disabled,
@@ -479,7 +570,7 @@ body {
   margin: 0;
   padding: 7px 9px 8px;
   color: var(--accent, #ffb74d);
-  font-size: 8px;
+  font-size: 11px;
   line-height: 1.4;
   border-top: 1px solid var(--line);
   opacity: 0.82;
@@ -511,23 +602,23 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 142px;
+  width: 184px;
   pointer-events: auto;
   z-index: 6;
 }
 #layer-rail:has(#satellite-workbench:not([hidden])) {
-  width: 214px;
+  width: 296px;
 }
 #layer-rail:has(#radar-workbench:not([hidden])),
 #layer-rail:has(#accum-workbench:not([hidden])) {
-  width: 238px;
+  width: 280px;
 }
 .rail-head {
   display: flex;
   justify-content: space-between;
   padding: 0 3px;
-  color: var(--text, #7fd4e8);
-  font-size: 8px;
+  color: var(--text-mut);
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   opacity: 0.62;
@@ -538,24 +629,23 @@ body {
 #layer-buttons {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .layer-button {
   display: grid;
-  grid-template-columns: 16px 1fr auto;
-  gap: 7px;
+  grid-template-columns: 15px 1fr auto;
+  gap: 9px;
   align-items: center;
-  min-height: 32px;
-  padding: 7px 8px;
-  color: var(--text, #7fd4e8);
-  font: 500 10px/1.2 var(--mono);
-  letter-spacing: 0.05em;
+  min-height: 0;
+  padding: 7px 9px;
+  color: #c9d8e6;
+  font: 600 12.5px/1.2 var(--sans);
+  letter-spacing: 0;
   text-align: left;
   text-transform: lowercase;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  backdrop-filter: blur(10px);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-ctl);
   cursor: pointer;
   transition:
     border-color 140ms ease,
@@ -565,11 +655,12 @@ body {
 .layer-button svg {
   width: 15px;
   height: 15px;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 .layer-button .key {
-  font-size: 8px;
-  opacity: 0.35;
+  color: var(--text-dim);
+  font-size: 10px;
+  opacity: 1;
 }
 .layer-button:hover {
   color: var(--storm-core, #e8f4ff);
@@ -592,7 +683,7 @@ body {
   grid-template-columns: 1fr auto;
   gap: 3px 8px;
   padding: 7px 8px;
-  font-size: 8px;
+  font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   background: var(--panel);
@@ -732,7 +823,7 @@ body {
 #satellite-workbench > header {
   padding-bottom: 6px;
   color: var(--storm-core, #e8f4ff);
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   border-bottom: 1px solid var(--line);
@@ -742,8 +833,8 @@ body {
   text-align: right;
 }
 .satellite-control-row > span {
-  color: var(--text, #7fd4e8);
-  font-size: 7px;
+  color: var(--text-dim);
+  font-size: 10px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   opacity: 0.5;
@@ -757,8 +848,8 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   padding: 5px 4px;
-  color: var(--text, #7fd4e8);
-  font: 500 7px/1 var(--mono);
+  color: var(--text-hi);
+  font: 600 12.5px/1 var(--mono);
   letter-spacing: 0.02em;
   background: transparent;
   border: 0;
@@ -784,8 +875,8 @@ body {
 #satellite-status {
   min-height: 29px;
   padding: 6px 7px;
-  color: var(--text, #7fd4e8);
-  font-size: 7px;
+  color: var(--text-mut);
+  font-size: 11px;
   line-height: 1.45;
   letter-spacing: 0.035em;
   background: rgb(0 0 0 / 18%);
@@ -806,7 +897,7 @@ body {
 #satellite-attribution {
   justify-self: end;
   color: var(--track, #78dcff);
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-decoration: none;
   text-transform: uppercase;
@@ -854,7 +945,7 @@ body {
 #accum-workbench > header {
   padding-bottom: 6px;
   color: var(--storm-core, #e8f4ff);
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   border-bottom: 1px solid var(--line);
@@ -868,8 +959,8 @@ body {
   color: var(--accent, #ffb74d);
 }
 .product-control-row > span {
-  color: var(--text, #7fd4e8);
-  font-size: 7px;
+  color: var(--text-dim);
+  font-size: 10px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   opacity: 0.5;
@@ -884,8 +975,8 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   padding: 5px 4px;
-  color: var(--text, #7fd4e8);
-  font: 500 7px/1 var(--mono);
+  color: var(--text-hi);
+  font: 600 12.5px/1 var(--mono);
   letter-spacing: 0.02em;
   background: transparent;
   border: 0;
@@ -947,20 +1038,20 @@ body {
   justify-content: space-between;
   gap: 8px;
   color: var(--storm-core, #e8f4ff);
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.055em;
   text-transform: uppercase;
 }
 #radar-age {
-  color: var(--text, #7fd4e8);
+  color: var(--text-dim);
   opacity: 0.54;
 }
 .radar-coverage-key {
   display: flex;
   gap: 6px;
   align-items: center;
-  color: var(--text, #7fd4e8);
-  font-size: 6px;
+  color: var(--text-dim);
+  font-size: 10px;
   letter-spacing: 0.075em;
   text-transform: uppercase;
   opacity: 0.56;
@@ -982,8 +1073,8 @@ body {
 #accum-status {
   min-height: 29px;
   padding: 6px 7px;
-  color: var(--text, #7fd4e8);
-  font-size: 7px;
+  color: var(--text-mut);
+  font-size: 11px;
   line-height: 1.45;
   letter-spacing: 0.035em;
   background: rgb(0 0 0 / 18%);
@@ -1008,7 +1099,7 @@ body {
 #radar-attribution {
   justify-self: end;
   color: var(--track, #78dcff);
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-decoration: none;
   text-transform: uppercase;
@@ -1026,7 +1117,7 @@ body {
   bottom: 70px;
   left: calc(var(--space, 8px) * 2);
   width: min(390px, calc(100vw - 32px));
-  color: var(--text, #7fd4e8);
+  color: var(--text-hi);
   background: var(--panel);
   border: 1px solid var(--line);
   border-left-color: var(--accent, #ffb74d);
@@ -1045,15 +1136,15 @@ body {
   min-height: 35px;
   padding: 7px 10px;
   color: var(--accent, #ffb74d);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.13em;
   cursor: pointer;
   list-style: none;
   text-transform: uppercase;
 }
 #analysis-dock > summary small {
-  color: var(--text, #7fd4e8);
-  font-size: 7px;
+  color: var(--text-mut);
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.05em;
   text-transform: none;
@@ -1061,7 +1152,7 @@ body {
 }
 #analysis-dock > summary::after {
   content: 'open';
-  color: var(--text, #7fd4e8);
+  color: var(--text-dim);
   opacity: 0.45;
 }
 #analysis-dock[open] > summary::after {
@@ -1082,7 +1173,7 @@ body {
 .analysis-body h2 {
   margin: 0 0 4px;
   color: var(--storm-core, #e8f4ff);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1090,7 +1181,7 @@ body {
 .analysis-body p {
   min-height: 4.2em;
   margin: 0 0 8px;
-  font-size: 8px;
+  font-size: 13px;
   line-height: 1.4;
   opacity: 0.54;
 }
@@ -1101,15 +1192,15 @@ body {
   align-items: center;
 }
 .analysis-action label {
-  font-size: 8px;
+  font-size: 10px;
   opacity: 0.55;
   text-transform: uppercase;
 }
 #ensemble-size,
 .analysis-body button {
   min-height: 27px;
-  color: var(--text, #7fd4e8);
-  font: 500 8px/1 var(--mono);
+  color: var(--text-hi);
+  font: 600 12.5px/1 var(--sans);
   background: var(--ocean-shallow, #0a1522);
   border: 1px solid var(--ridge-hi, #2c343c);
   border-radius: var(--radius, 4px);
@@ -1134,7 +1225,7 @@ body {
   min-height: 2.8em;
   margin-top: 7px;
   color: var(--accent, #ffb74d);
-  font-size: 8px;
+  font-size: 11px;
   line-height: 1.4;
 }
 .analysis-results {
@@ -1144,14 +1235,14 @@ body {
   margin: 4px 0 0;
 }
 .analysis-results dt {
-  font-size: 7px;
+  font-size: 10px;
   opacity: 0.45;
   text-transform: uppercase;
 }
 .analysis-results dd {
   margin: 0;
   color: var(--storm-core, #e8f4ff);
-  font-size: 9px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .sensitivity-grid {
@@ -1163,7 +1254,7 @@ body {
   grid-template-columns: 56px 1fr 46px;
   gap: 4px;
   align-items: center;
-  font-size: 7px;
+  font-size: 10px;
   text-transform: uppercase;
 }
 .sensitivity-grid input {
@@ -1172,7 +1263,7 @@ body {
 }
 .sensitivity-grid output {
   color: var(--storm-core, #e8f4ff);
-  font-size: 7px;
+  font-size: 11px;
   text-align: right;
 }
 #sensitivity-run {
@@ -1188,7 +1279,7 @@ body {
   max-width: min(60ch, 70vw);
   min-height: 2.6em;
   padding: 6px 8px 6px 20px;
-  color: var(--text, #7fd4e8);
+  color: var(--text-mut);
   background: var(--panel);
   border: 1px solid var(--line);
   border-left-color: var(--track, #78dcff);
@@ -1222,7 +1313,7 @@ body {
   grid-template-columns: repeat(3, auto);
   gap: 0;
   overflow: hidden;
-  color: var(--text, #7fd4e8);
+  color: var(--text-mut);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 2px;
@@ -1244,13 +1335,13 @@ body {
   grid-row: 1 / 3;
   align-self: center;
   color: var(--accent, #ffb74d);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 500;
   opacity: 0.74;
 }
 #interaction-guide small,
 #interaction-guide strong {
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 400;
   line-height: 1.25;
   white-space: nowrap;
@@ -1275,7 +1366,7 @@ body {
   bottom: calc(var(--space, 8px) * 2);
   width: min(720px, calc(100vw - 188px));
   padding: 10px 12px 11px;
-  color: var(--text, #7fd4e8);
+  color: var(--text-hi);
   background:
     linear-gradient(90deg, rgba(77, 216, 255, 0.05), transparent 38%),
     rgba(5, 10, 18, 0.88);
@@ -1284,7 +1375,6 @@ body {
   border-radius: var(--radius, 4px);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(8px);
-  animation: flight-recorder-in 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 #flight-recorder[hidden] {
   display: none;
@@ -1340,7 +1430,7 @@ body {
 }
 #flight-label {
   overflow: hidden;
-  color: var(--text, #7fd4e8);
+  color: var(--text-mut);
   opacity: 0.55;
   text-align: right;
   text-overflow: ellipsis;
@@ -1376,7 +1466,7 @@ body {
 #flight-contract {
   margin: 7px 0 0;
   color: var(--accent, #ffb74d);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   opacity: 0.78;
@@ -1430,7 +1520,7 @@ body {
 .scale-ticks span {
   position: absolute;
   transform: translateX(-50%);
-  font-size: 7px;
+  font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 0.42;
@@ -1441,7 +1531,7 @@ body {
 #intensity-note {
   margin: 2px 0 0;
   color: var(--storm-core, #e8f4ff);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.04em;
   opacity: 0.85;
 }
@@ -1465,7 +1555,7 @@ body {
   overflow: visible;
 }
 .sparkline-thresholds line {
-  stroke: color-mix(in srgb, var(--text, #7fd4e8) 15%, transparent);
+  stroke: color-mix(in srgb, var(--text-mut) 15%, transparent);
   stroke-width: 0.35;
   stroke-dasharray: 1.5 2.5;
   vector-effect: non-scaling-stroke;
@@ -1497,14 +1587,14 @@ body {
   right: 0;
   bottom: 0;
   color: var(--storm-core, #e8f4ff);
-  font-size: 8px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   opacity: 0.72;
 }
 #historical-analog {
   margin: 5px 0 0;
-  color: var(--text, #7fd4e8);
-  font-size: 8px;
+  color: var(--text-mut);
+  font-size: 11px;
   letter-spacing: 0.04em;
   opacity: 0.68;
 }
@@ -1516,7 +1606,7 @@ body {
 #impact-live {
   margin: 6px 0 0;
   color: var(--cat-3, #ffc140);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.05em;
 }
 #impact-live[hidden] {
@@ -1525,12 +1615,12 @@ body {
 
 .flight-readouts {
   display: grid;
-  grid-template-columns: 1.05fr 0.82fr 1fr 0.92fr 1fr 1.2fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 9px;
   margin: 8px 0 0;
 }
 .structure-readouts {
-  grid-template-columns: 1fr 1.15fr 1fr 1.3fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid color-mix(in srgb, var(--ridge-hi, #2c343c) 42%, transparent);
@@ -1542,20 +1632,23 @@ body {
 .flight-readout dt,
 .debrief-grid dt {
   margin: 0 0 2px;
-  color: var(--text, #7fd4e8);
-  font-size: 9px;
+  color: var(--text-dim);
+  font-size: 10px;
   letter-spacing: 0.1em;
   opacity: 0.48;
   text-transform: uppercase;
 }
+#app #flight-recorder .flight-readout dt {
+  white-space: nowrap;
+}
 .flight-readout dd,
 .debrief-grid dd {
   margin: 0;
-  overflow: hidden;
-  color: var(--text, #7fd4e8);
+  overflow: visible;
+  color: var(--text-hi);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
 }
 .flight-readout.primary dd {
@@ -1595,7 +1688,7 @@ body {
 #impact-report h2 {
   margin: 0;
   color: var(--track, #78dcff);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1610,9 +1703,9 @@ body {
 }
 #impact-flood {
   margin: 7px 0 0;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.05em;
-  color: var(--text, #7fd4e8);
+  color: var(--text-mut);
 }
 #impact-flood[data-risk='moderate'] { color: var(--cat-3, #ffc140); }
 #impact-flood[data-risk='high'] { color: var(--cat-4, #ff8f20); }
@@ -1644,15 +1737,15 @@ body {
 #hindcast-score h2 {
   margin: 0;
   color: var(--accent, #ffb74d);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 #hindcast-samples {
   margin: 6px 0 0;
-  color: var(--text, #7fd4e8);
-  font-size: 8px;
+  color: var(--text-mut);
+  font-size: 11px;
   opacity: 0.54;
 }
 #comparison-labels {
@@ -1667,16 +1760,16 @@ body {
   margin: 0;
 }
 .comparison-grid dt {
-  color: var(--text, #7fd4e8);
-  font-size: 8px;
+  color: var(--text-dim);
+  font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 0.48;
 }
 .comparison-grid dd {
   margin: 2px 0 0;
-  color: var(--text, #7fd4e8);
-  font-size: 9px;
+  color: var(--text-hi);
+  font-size: 12px;
 }
 
 #flight-actions {
@@ -1691,8 +1784,8 @@ body {
 .export-actions > span {
   display: block;
   margin-bottom: 5px;
-  color: var(--text, #7fd4e8);
-  font-size: 8px;
+  color: var(--text-dim);
+  font-size: 10px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   opacity: 0.48;
@@ -1706,8 +1799,8 @@ body {
   min-width: 0;
   flex: 1;
   padding: 3px 6px;
-  color: var(--text, #7fd4e8);
-  font: 500 9px/1.2 var(--mono);
+  color: var(--text-hi);
+  font: 600 12.5px/1.2 var(--sans);
   background: rgba(10, 21, 34, 0.82);
   border: 1px solid var(--ridge-hi, #2c343c);
   border-radius: var(--radius, 4px);
@@ -1717,7 +1810,7 @@ body {
   min-height: 1.4em;
   margin-top: 4px;
   color: var(--accent, #ffb74d);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .flight-transport {
@@ -1731,7 +1824,7 @@ body {
 #flight-actions button {
   min-height: 25px;
   padding: 3px 7px;
-  color: var(--text, #7fd4e8);
+  color: var(--text-hi);
   font: 500 10px/1.2 var(--mono);
   letter-spacing: 0.06em;
   text-transform: lowercase;
@@ -1817,6 +1910,31 @@ body {
   }
 }
 
+/* The compact 900px review viewport still sits above the mobile breakpoint.
+   Collapse only the quiet rail to the 40px icon contract; product workbenches
+   keep their existing expanded widths whenever one is open. */
+@media (min-width: 821px) and (max-width: 1000px) {
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) {
+    width: 40px;
+    padding: 8px 3px;
+  }
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .rail-head,
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) #weather-legend,
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .rail-footer,
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .layer-button .label,
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .layer-button .key {
+    display: none;
+  }
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .layer-button {
+    grid-template-columns: 15px;
+    justify-content: center;
+    justify-items: center;
+    width: 34px;
+    min-height: 34px;
+    padding: 7px;
+  }
+}
+
 /* Historic ghost-track labels (C7). DOM type, not canvas — lowercase, faint,
    pinned at each ghost's peak-wind in-domain point by ui.layoutGhostLabels().
    The wrapper never intercepts clicks (spawns must fall through to the map). */
@@ -1850,7 +1968,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
   max-height: calc(100dvh - 32px);
   padding: 0;
   overflow-y: auto;
-  color: var(--text, #7fd4e8);
+  color: var(--text-hi);
   font-family: var(--mono);
   background:
     linear-gradient(135deg, rgba(77, 216, 255, 0.07), transparent 40%),
@@ -1879,14 +1997,14 @@ html[data-compact='true'] .ghost-label:not(.active) {
 #model-dialog header p {
   margin: 0;
   color: var(--accent, #ffb74d);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 #model-dialog button {
   padding: 0;
-  color: var(--text, #7fd4e8);
-  font: 400 9px/1 var(--mono);
+  color: var(--text-hi);
+  font: 600 12.5px/1 var(--sans);
   background: none;
   border: 0;
   cursor: pointer;
@@ -1909,7 +2027,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
 #model-dialog h3 {
   margin: 0;
   color: var(--accent, #ffb74d);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1920,6 +2038,347 @@ html[data-compact='true'] .ghost-label:not(.active) {
   line-height: 1.65;
   opacity: 0.76;
 }
+
+/* Windy-grade P1 material: every chrome surface shares the approved glass
+   recipe. Nested weather desks and the native dialog follow the same material
+   even though they are not `.chrome` nodes themselves. */
+#app .chrome,
+#weather-legend,
+#satellite-workbench,
+#radar-workbench,
+#accum-workbench,
+#model-dialog {
+  background: var(--panel-glass);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+#layer-rail {
+  padding: 8px;
+}
+
+#app .chrome button,
+#app .chrome input,
+#model-dialog button {
+  background: rgba(146, 190, 224, 0.10);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-ctl);
+}
+
+#app .chrome select {
+  background:
+    linear-gradient(45deg, transparent 50%, var(--text-mut) 50%) calc(100% - 10px) 13px / 4px 4px no-repeat,
+    linear-gradient(135deg, var(--text-mut) 50%, transparent 50%) calc(100% - 6px) 13px / 4px 4px no-repeat,
+    rgba(146, 190, 224, 0.10);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-ctl);
+}
+
+/* Windy-grade P1 type ramp and chrome palette. Map-space labels intentionally
+   keep the legacy cyan instrument colour; panel prose no longer uses it. */
+#app .chrome,
+#model-dialog {
+  color: var(--text-hi);
+  font-family: var(--sans);
+  font-size: 13px;
+  text-shadow: none;
+}
+
+#app .chrome :where(p, span, small, strong, label, dt, dd, output, button, select, a) {
+  color: inherit;
+}
+
+#app .chrome :is(button, select, input),
+#model-dialog button {
+  color: var(--text-hi);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+#app output,
+#app dd,
+#app .flight-readouts,
+#app .radar-clock,
+#app #weather-legend-unit,
+#app #weather-legend-scale,
+#app #point-probe dd,
+#app .layer-button .key,
+#app .scale-ticks {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+#app #masthead {
+  width: max-content;
+  min-width: 238px;
+  padding: 10px 14px;
+}
+
+#app #title {
+  color: var(--text-hi);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  text-transform: lowercase;
+}
+
+#app #title .accent,
+#app .quiet-button,
+#app .rail-head span:last-child,
+#app #weather-legend-name,
+#app #satellite-workbench > header span:last-child,
+#app #radar-workbench > header span:last-child,
+#app #accum-workbench > header span:last-child,
+#app #satellite-attribution,
+#app #radar-attribution,
+#app #analysis-dock > summary,
+#app #flight-status,
+#app #flight-explanation[data-tone='strengthening'] strong,
+#app #flight-explanation[data-tone='weakening'] strong,
+#app #flight-trend[data-sign='up'],
+#app #flight-trend[data-sign='down'],
+#app #impact-report h2,
+#app #run-comparison h2,
+#app #hindcast-score h2,
+#model-dialog header p,
+#model-dialog h3,
+#model-dialog a {
+  color: var(--ui-accent);
+}
+
+#app .masthead-index,
+#app #month-picker label,
+#app .rail-head,
+#app .satellite-control-row > span,
+#app .product-control-row > span,
+#app .analysis-action label,
+#app .analysis-results dt,
+#app .sensitivity-grid label,
+#app .flight-readout dt,
+#app .debrief-grid dt,
+#app .comparison-grid dt,
+#app .compare-action > label,
+#app .export-actions > span,
+#app .scale-ticks span {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  opacity: 1;
+  text-transform: uppercase;
+}
+
+#app #month-picker > header,
+#app #satellite-workbench > header,
+#app #radar-workbench > header,
+#app #accum-workbench > header,
+#app #analysis-dock > summary,
+#app .analysis-body h2,
+#app .flight-head,
+#app #impact-report h2,
+#app #run-comparison h2,
+#app #hindcast-score h2,
+#model-dialog h3 {
+  color: var(--text-mut);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  opacity: 1;
+  text-transform: uppercase;
+}
+
+#app .model-state,
+#app #month-picker > header span:last-child,
+#app #scenario-contract,
+#app .layer-button .key,
+#app #weather-legend,
+#app #satellite-status,
+#app #radar-status,
+#app #accum-status,
+#app #satellite-attribution,
+#app #radar-attribution,
+#app .radar-clock,
+#app .radar-coverage-key,
+#app #analysis-dock > summary small,
+#app #ensemble-status,
+#app #sensitivity-status,
+#app #caption,
+#app #interaction-guide,
+#app #flight-contract,
+#app #intensity-note,
+#app #intensity-sparkline-value,
+#app #historical-analog,
+#app #impact-live,
+#app #hindcast-samples,
+#app #export-status {
+  color: var(--text-mut);
+  font-size: 11px;
+  opacity: 1;
+}
+
+#app #month-picker > header span:last-child,
+#app .layer-button .key,
+#app .radar-coverage-key,
+#app #analysis-dock > summary small,
+#app #scenario-contract {
+  color: var(--text-dim);
+}
+
+#app #month,
+#app #scenario,
+#app #scenario-mode,
+#app .layer-button,
+#app .satellite-segments button,
+#app .product-segments button,
+#app .radar-transport button,
+#app .analysis-body button,
+#app #ensemble-size,
+#app #compare-target,
+#app .flight-transport button,
+#app #flight-actions button {
+  font-size: 12.5px;
+}
+
+#app .layer-button {
+  color: var(--text-hi);
+  font-family: var(--sans);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+#app .layer-button .key {
+  font-size: 10px;
+}
+
+#app #weather-legend {
+  font-size: 10.5px;
+}
+
+#app .satellite-segments button,
+#app .product-segments button,
+#app .radar-transport button,
+#app #accum-window button {
+  font-family: var(--mono);
+}
+
+#app #city-detail {
+  color: var(--text-mut);
+  font-size: 11px;
+}
+
+#app #city-detail strong,
+#app #point-probe strong {
+  color: var(--text-hi);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+#app #point-probe {
+  width: 300px;
+  color: var(--text-mut);
+}
+
+#app #point-probe dl {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#app #point-probe dt,
+#app #point-probe-source {
+  color: var(--text-dim);
+  font-size: 10px;
+  opacity: 1;
+}
+
+#app #point-probe dd {
+  color: var(--text-hi);
+  font-size: 11px;
+}
+
+#app #analysis-dock > summary small,
+#app .analysis-body p,
+#app #flight-explanation span,
+#app #impact-headline,
+#app #comparison-labels,
+#model-dialog section p {
+  color: var(--text-mut);
+}
+
+#app .analysis-body p,
+#app #flight-explanation,
+#app #impact-headline,
+#app #comparison-labels,
+#model-dialog section p {
+  font-size: 13px;
+}
+
+#app #flight-explanation {
+  line-height: 1.45;
+}
+
+#app #flight-explanation strong,
+#app #flight-verdict {
+  color: var(--text-hi);
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+#app .flight-readout dd,
+#app .debrief-grid dd,
+#app .analysis-results dd,
+#app .comparison-grid dd {
+  color: var(--text-hi);
+  font-size: 12px;
+  opacity: 1;
+}
+
+#app .flight-readout.primary dd {
+  font-size: 13px;
+}
+
+#app #flight-category,
+#app .layer-button[aria-pressed='true'],
+#app .satellite-segments button[aria-pressed='true'],
+#app .product-segments button[aria-pressed='true'],
+#app .radar-transport button[aria-pressed='true'],
+#app #point-probe-pin[aria-pressed='true'] {
+  color: #06131c;
+}
+
+#app .layer-button[aria-pressed='true'],
+#app .satellite-segments button[aria-pressed='true'],
+#app .product-segments button[aria-pressed='true'],
+#app .radar-transport button[aria-pressed='true'],
+#app #point-probe-pin[aria-pressed='true'] {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  box-shadow: 0 2px 14px rgba(89, 216, 230, 0.35);
+}
+
+#app .layer-button[aria-pressed='true'] .key {
+  color: rgba(6, 19, 28, 0.62);
+}
+
+#app .chrome button:hover:not(:disabled):not([aria-pressed='true']),
+#model-dialog button:hover,
+#app .chrome a:hover {
+  color: var(--ui-accent);
+  border-color: var(--ui-accent);
+}
+
+#app #satellite-status[data-tone='unavailable'],
+#app #radar-status[data-tone='stale'],
+#app #radar-status[data-tone='unavailable'] {
+  color: #f3b3a5;
+}
+
+#app #impact-flood[data-risk='moderate'] { color: var(--cat-3, #ffc140); }
+#app #impact-flood[data-risk='high'] { color: var(--cat-4, #ff8f20); }
+#app #impact-flood[data-risk='extreme'] { color: var(--cat-5, #ff6060); }
 
 @media (max-width: 820px) {
   /* Rail becomes a horizontal icon strip below the pickers so the bottom
@@ -2061,8 +2520,8 @@ html[data-compact='true'] .ghost-label:not(.active) {
   .flight-details-toggle {
     display: inline;
     padding: 0;
-    color: var(--text, #7fd4e8);
-    font: 400 9px/1 var(--mono);
+    color: var(--text-hi);
+    font: 600 12.5px/1 var(--sans);
     background: none;
     border: 0;
     cursor: pointer;
@@ -2080,7 +2539,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
   }
   .masthead-index {
     max-width: 18ch;
-    font-size: 7px;
+    font-size: 10px;
   }
   #title {
     max-width: none;
@@ -2093,7 +2552,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
   }
   .model-state,
   .quiet-button {
-    font-size: 7px;
+    font-size: 11px;
   }
   .quiet-button {
     width: max-content;
@@ -2107,7 +2566,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
   }
   #month-picker > header {
     padding: 5px 7px;
-    font-size: 7px;
+    font-size: 11px;
   }
   #month-picker > header span:last-child {
     display: none;
@@ -2119,21 +2578,22 @@ html[data-compact='true'] .ghost-label:not(.active) {
   #month-picker label {
     display: block;
     margin: 0;
-    font-size: 7px;
+    font-size: 10px;
   }
   #month,
   #scenario,
   #scenario-mode {
     max-width: none;
+    min-width: 0;
     min-height: 30px;
     padding: 3px 18px 3px 5px;
-    font-size: 9px;
+    font-size: 12.5px;
     background-position: calc(100% - 8px) 12px, calc(100% - 4px) 12px, 0 0;
   }
   #scenario-contract {
     width: auto;
     padding: 5px 7px;
-    font-size: 7px;
+    font-size: 11px;
   }
   #layer-rail {
     top: calc(max(8px, env(safe-area-inset-top)) + 100px);
@@ -2160,15 +2620,16 @@ html[data-compact='true'] .ghost-label:not(.active) {
     scrollbar-width: thin;
   }
   .layer-button {
-    grid-template-columns: 15px auto;
+    grid-template-columns: 15px;
+    justify-items: center;
     flex: 0 0 auto;
-    min-width: auto;
+    min-width: 34px;
     min-height: 34px;
-    padding: 6px 8px;
+    padding: 7px;
   }
-  .layer-button .label {
-    display: inline;
-    font-size: 8px;
+  .layer-button .label,
+  .layer-button .key {
+    display: none;
   }
   #weather-legend {
     align-self: flex-start;
@@ -2203,7 +2664,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
     gap: 7px;
   }
   #flight-category {
-    font-size: 9px;
+    font-size: 11px;
     padding: 1px 5px;
   }
   .scale-ticks {
@@ -2281,14 +2742,14 @@ html[data-compact='true'] .ghost-label:not(.active) {
   }
   #interaction-guide b {
     grid-row: auto;
-    font-size: 7px;
+    font-size: 10px;
   }
   #interaction-guide small {
     display: none;
   }
   #interaction-guide strong {
     overflow: hidden;
-    font-size: 7px;
+    font-size: 11px;
     text-overflow: ellipsis;
   }
   #model-dialog form {
@@ -2306,6 +2767,22 @@ html[data-compact='true'] .ghost-label:not(.active) {
 @media (pointer: coarse) and (min-width: 821px) {
   .layer-button {
     min-height: 38px;
+  }
+}
+
+/* Every keyboard target uses one clear chrome-accent focus treatment,
+   including dynamically generated layer and milestone controls. */
+:focus-visible {
+  outline: 2px solid var(--ui-accent) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .city-marker[data-exposed='true']::before {
+    animation: city-exposure-pulse 1.4s ease-in-out infinite alternate;
+  }
+  #flight-recorder {
+    animation: flight-recorder-in 240ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
 
@@ -2327,5 +2804,592 @@ html[data-compact='true'] .ghost-label:not(.active) {
   }
   .flight-transport button {
     transition: none;
+  }
+  #app .chrome,
+  #app .chrome *,
+  #model-dialog,
+  #model-dialog * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Windy-grade P2 structure: brand pill, map hints, recorder card + timeline.
+   The transport ids stay unchanged; only their containing surface moved.
+   -------------------------------------------------------------------------- */
+
+#app #masthead {
+  top: 16px;
+  left: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: max-content;
+  min-width: 0;
+  padding: 10px 16px 10px 14px;
+  border-left: 1px solid var(--panel-edge);
+}
+
+#app #title {
+  white-space: nowrap;
+}
+
+.brand-divider {
+  width: 1px;
+  height: 18px;
+  flex: 0 0 1px;
+  background: rgba(146, 190, 224, 0.22);
+}
+
+#app .masthead-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#app .model-state {
+  gap: 7px;
+  color: var(--text-mut);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 1;
+}
+
+#app .model-state i {
+  background: var(--ui-accent);
+  box-shadow: 0 0 6px var(--ui-accent);
+}
+
+#app .quiet-button {
+  min-height: 0;
+  padding: 0;
+  color: var(--text-mut);
+  font-size: 11px;
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+#app #guidance-chip {
+  top: 62px;
+  left: 16px;
+  margin: 0;
+  padding: 5px 10px;
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1.3;
+  background: rgba(11, 16, 26, 0.60);
+  border-color: rgba(146, 190, 224, 0.10);
+  border-radius: 99px;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+
+.rail-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 1px 2px 0;
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+#hint-chips {
+  position: absolute;
+  z-index: 7;
+  bottom: 143px;
+  left: 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+#app:has(#flight-recorder:not([hidden])) #hint-chips {
+  bottom: calc(108px + min(60dvh, 520px));
+}
+
+#hint-chips #caption,
+#hint-chips #interaction-guide {
+  position: static;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 7px 11px;
+  color: var(--text-mut);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  background: rgba(11, 16, 26, 0.72);
+  border: 1px solid var(--panel-edge);
+  border-radius: 99px;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+  transform: none;
+  opacity: 1;
+}
+
+#app #hint-chips #caption {
+  max-width: min(50vw, 480px);
+  color: var(--text-hi);
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+#hint-chips #caption::before {
+  display: none;
+}
+
+#hint-chips #interaction-guide {
+  display: block;
+}
+
+#hint-chips #interaction-guide > span {
+  display: inline;
+  min-width: 0;
+  padding: 0;
+}
+
+#app:has(#flight-recorder:not([hidden])) #interaction-guide {
+  display: block;
+}
+
+#app #flight-recorder {
+  right: auto;
+  bottom: 96px;
+  left: 16px;
+  width: min(372px, calc(100vw - 32px));
+  max-height: min(60dvh, 520px);
+  padding: 13px 15px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#app #flight-recorder .flight-head {
+  grid-template-columns: auto auto 1fr auto;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+#app #flight-recorder #flight-clock {
+  justify-self: end;
+}
+
+#app #flight-recorder #flight-label {
+  display: none;
+}
+
+#app #flight-recorder #flight-explanation {
+  display: block;
+  margin-top: 8px;
+}
+
+#app #flight-recorder #flight-explanation span {
+  display: block;
+  margin-top: 2px;
+  overflow: visible;
+  text-align: left;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+#app #flight-recorder .flight-readouts,
+#app #flight-recorder .structure-readouts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 11px;
+}
+
+#app #flight-recorder .flight-readouts {
+  padding-bottom: 8px;
+}
+
+#app #flight-recorder #flight-ocean-depth,
+#app #flight-recorder #flight-rain {
+  white-space: normal;
+}
+
+#app #flight-recorder .structure-readouts .flight-readout:has(#flight-outer-shear) {
+  grid-column: span 2;
+}
+
+#analysis-dock {
+  bottom: 96px;
+}
+
+#app:has(#flight-recorder:not([hidden])) #analysis-dock {
+  top: auto;
+  right: auto;
+  bottom: 96px;
+  left: 404px;
+}
+
+#app #timeline {
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  z-index: 8;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  height: 64px;
+  padding: 0 16px;
+  pointer-events: auto;
+}
+
+#app #timeline .timeline-play {
+  position: relative;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  background: rgba(89, 216, 230, 0.14);
+  border: 1px solid rgba(89, 216, 230, 0.50);
+  border-radius: 50%;
+}
+
+#app #timeline .timeline-play::before {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  width: 3px;
+  height: 12px;
+  content: '';
+  background: var(--ui-accent);
+  border-radius: 1px;
+  box-shadow: 6px 0 0 var(--ui-accent);
+}
+
+#timeline-clock {
+  min-width: 58px;
+  color: var(--text-hi);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.timeline-ruler {
+  position: relative;
+  height: 34px;
+  min-width: 120px;
+  flex: 1 1 auto;
+}
+
+#app #timeline #flight-scrubber {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  cursor: ew-resize;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  opacity: 1;
+}
+
+#timeline #flight-scrubber::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--timeline-gradient, rgba(109, 130, 150, 0.42));
+  border-radius: 3px;
+}
+
+#timeline #flight-scrubber::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  appearance: none;
+  background: var(--timeline-current-color, var(--ui-accent));
+  border: 2px solid rgba(11, 16, 26, 0.95);
+  border-radius: 2px;
+  box-shadow: 0 0 10px var(--timeline-current-color, rgba(89, 216, 230, 0.50));
+  transform: rotate(45deg);
+}
+
+#timeline #flight-scrubber::-moz-range-track {
+  height: 6px;
+  background: var(--timeline-gradient, rgba(109, 130, 150, 0.42));
+  border-radius: 3px;
+}
+
+#timeline #flight-scrubber::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  background: var(--timeline-current-color, var(--ui-accent));
+  border: 2px solid rgba(11, 16, 26, 0.95);
+  border-radius: 2px;
+  box-shadow: 0 0 10px var(--timeline-current-color, rgba(89, 216, 230, 0.50));
+  transform: rotate(45deg);
+}
+
+#app #timeline #flight-scrubber:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+#app #timeline #flight-jumps {
+  position: absolute;
+  top: 13px;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  display: block;
+  height: 8px;
+  pointer-events: none;
+}
+
+#app #timeline #flight-jumps[hidden] {
+  display: none;
+}
+
+#app #timeline #flight-jumps button,
+#app #timeline #flight-jumps .timeline-category-milestone {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  min-width: 8px;
+  height: 8px;
+  min-height: 8px;
+  padding: 0;
+  color: transparent;
+  font-size: 0;
+  background: var(--timeline-current-color, var(--ui-accent));
+  border: 1.5px solid rgba(11, 16, 26, 0.92);
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(89, 216, 230, 0.42);
+  transform: translateX(-50%);
+}
+
+#app #timeline #flight-jumps button {
+  pointer-events: auto;
+}
+
+#app #timeline #flight-jumps button::after,
+#app #timeline #flight-jumps .timeline-category-milestone::after {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  color: var(--text-mut);
+  content: attr(data-label);
+  font: 600 9px/1 var(--mono);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+#app #timeline #flight-jumps button::after {
+  top: 10px;
+}
+
+#app #timeline #flight-jumps button:disabled {
+  opacity: 0.34;
+}
+
+.timeline-now {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 136px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#timeline-now-kt {
+  color: var(--text-hi);
+  font-size: 19px;
+  font-weight: 500;
+}
+
+#timeline-now-hpa {
+  color: var(--text-mut);
+  font-size: 12px;
+}
+
+#timeline-cat {
+  min-width: 54px;
+  padding: 5px 9px;
+  color: #201404;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  text-align: center;
+  border-radius: 6px;
+}
+
+.timeline-identity {
+  display: flex;
+  min-width: 194px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#timeline-id {
+  overflow: hidden;
+  color: var(--text-mut);
+  font-size: 11.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simulated-stamp {
+  align-self: flex-start;
+  padding: 2px 5px;
+  color: var(--text-mut);
+  font-family: var(--sans);
+  font-size: 8.5px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.10em;
+  border: 1px solid rgba(146, 190, 224, 0.40);
+  border-radius: 3px;
+}
+
+@media (max-width: 820px) {
+  #app #masthead {
+    top: max(8px, env(safe-area-inset-top));
+    left: 8px;
+    gap: 8px;
+    max-width: calc(100vw - 16px);
+    padding: 8px 10px;
+  }
+
+  #app #title {
+    font-size: 14px;
+  }
+
+  #app .masthead-meta {
+    gap: 7px;
+  }
+
+  #app #guidance-chip {
+    top: calc(max(8px, env(safe-area-inset-top)) + 48px);
+    left: 8px;
+  }
+
+  #hint-chips {
+    right: 8px;
+    bottom: 125px;
+    left: 8px;
+  }
+
+  #app:has(#flight-recorder:not([hidden])) #hint-chips {
+    display: none;
+  }
+
+  #app #flight-recorder {
+    right: 8px;
+    bottom: 78px;
+    left: 8px;
+    width: auto;
+    max-height: min(56dvh, calc(100dvh - 170px));
+  }
+
+  #analysis-dock,
+  #app:has(#flight-recorder:not([hidden])) #analysis-dock {
+    top: auto;
+    right: 8px;
+    bottom: 78px;
+    left: auto;
+  }
+
+  #app #timeline {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    gap: 8px;
+    height: 58px;
+    padding: 0 10px;
+  }
+
+  #timeline-clock {
+    min-width: 46px;
+    font-size: 11px;
+  }
+
+  .timeline-now {
+    min-width: 0;
+  }
+
+  #timeline-now-hpa,
+  .timeline-identity {
+    display: none;
+  }
+
+  #timeline-now-kt {
+    font-size: 15px;
+  }
+
+  #timeline-cat {
+    min-width: 46px;
+    padding-inline: 6px;
+  }
+
+  .timeline-ruler {
+    min-width: 70px;
+  }
+}
+
+@media (max-width: 600px) {
+  #app #masthead {
+    right: 8px;
+    width: auto;
+  }
+
+  #app .masthead-meta {
+    margin-left: auto;
+  }
+
+  #app .model-state {
+    font-size: 10px;
+  }
+
+  #app .quiet-button {
+    display: none;
+  }
+
+  #app #guidance-chip {
+    max-width: calc(100vw - 16px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #hint-chips #interaction-guide {
+    display: none;
+  }
+
+  #timeline-clock,
+  #timeline-now-kt {
+    display: none;
+  }
+
+  #app #timeline .timeline-play {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
   }
 }

@@ -60,9 +60,18 @@ export interface WeatherLayerDefinition {
   id: WeatherLayerId;
   label: string;
   shortLabel: string;
+  iconSvg: string;
   legend: string;
   unit: string;
   simulated: boolean;
+}
+
+function railIcon(body: string): string {
+  return (
+    '<svg viewBox="0 0 16 16" stroke="currentColor" fill="none" ' +
+    'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ' +
+    `aria-hidden="true">${body}</svg>`
+  );
 }
 
 export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
@@ -70,6 +79,9 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     id: 'wind',
     label: 'wind flow',
     shortLabel: 'wind',
+    iconSvg: railIcon(
+      '<path d="M1.5 5.5h8a2 2 0 1 0-2-2.5"/><path d="M1.5 8.5h11a2 2 0 1 1-2 2.5"/><path d="M1.5 11.5h5"/>',
+    ),
     legend: '0 · 12 · 25 · 38 · 50+',
     unit: 'm/s · steering + storm vortex',
     simulated: true,
@@ -78,6 +90,9 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     id: 'rain',
     label: 'simulated rain radar',
     shortLabel: 'radar',
+    iconSvg: railIcon(
+      '<path d="M2 13a7 7 0 0 1 12-5"/><path d="M5 13a4.5 4.5 0 0 1 7.5-3.4"/><circle cx="8.6" cy="10.6" r="1.1"/>',
+    ),
     legend: 'light · moderate · heavy · extreme',
     unit: 'reflectivity-style rain-rate proxy',
     simulated: true,
@@ -86,6 +101,9 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     id: 'infrared',
     label: 'simulated satellite infrared',
     shortLabel: 'satellite IR',
+    iconSvg: railIcon(
+      '<rect x="5" y="5" width="6" height="6" rx="1"/><path d="M1.5 6.5 5 8m6 0 3.5-1.5M8 11v3"/>',
+    ),
     legend: 'warm surface · cold cloud · overshooting top',
     unit: 'simulated brightness temperature · °C',
     simulated: true,
@@ -94,6 +112,9 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     id: 'accum',
     label: 'rain accumulation',
     shortLabel: 'rain accum',
+    iconSvg: railIcon(
+      '<path d="M8 2.5s-4 4.4-4 7a4 4 0 0 0 8 0c0-2.6-4-7-4-7Z"/>',
+    ),
     legend: '0 · 100 · 250 · 500 · 750+',
     unit: 'mm · deterministic simulated-rain ledger',
     simulated: true,
@@ -102,6 +123,9 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     id: 'sst',
     label: 'sea-surface temperature',
     shortLabel: 'sea temp',
+    iconSvg: railIcon(
+      '<path d="M7 2.5v7a2.5 2.5 0 1 0 2 0v-7a1 1 0 0 0-2 0Z"/>',
+    ),
     legend: '24 · 26 · 28 · 30 · 32',
     unit: '°C',
     simulated: false,
@@ -110,6 +134,9 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     id: 'humidity',
     label: 'mid-level humidity',
     shortLabel: 'humidity',
+    iconSvg: railIcon(
+      '<path d="M4.5 3.5c2-2 5-2 7 0s2 5 0 7l-3.5 3-3.5-3c-2-2-2-5 0-7Z"/><path d="M6.5 8h3"/>',
+    ),
     legend: '20 · 40 · 60 · 80 · 100',
     unit: '% RH at 600/700 hPa',
     simulated: false,
@@ -118,6 +145,9 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     id: 'ohc',
     label: 'ocean heat content',
     shortLabel: 'ocean heat',
+    iconSvg: railIcon(
+      '<path d="M1.5 5c2-2 3.5 2 5.5 0s3.5 2 5.5 0"/><path d="M1.5 9c2-2 3.5 2 5.5 0s3.5 2 5.5 0"/><path d="M1.5 13c2-2 3.5 2 5.5 0s3.5 2 5.5 0"/>',
+    ),
     legend: '0 · 30 · 60 · 90 · 120+',
     unit: 'kJ/cm² above 26 °C',
     simulated: false,
@@ -126,6 +156,9 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     id: 'shear',
     label: 'deep-layer wind shear',
     shortLabel: 'shear',
+    iconSvg: railIcon(
+      '<path d="M2 5h9m0 0-2.5-2.5M11 5 8.5 7.5"/><path d="M14 11H5m0 0 2.5-2.5M5 11l2.5 2.5"/>',
+    ),
     legend: '0 · 10 · 20 · 30 · 40+',
     unit: 'm/s · 200–850 hPa',
     simulated: false,
@@ -134,6 +167,9 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     id: 'terrain',
     label: 'terrain instrument',
     shortLabel: 'terrain',
+    iconSvg: railIcon(
+      '<path d="m1.5 13 4.5-8 3 5 2-3 3.5 6Z"/>',
+    ),
     legend: 'bathymetry · topography · storm structure',
     unit: 'bathymetry · topography',
     simulated: false,

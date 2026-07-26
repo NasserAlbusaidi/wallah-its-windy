@@ -187,25 +187,25 @@ In `injectCssVars`, after the `--radius` line add:
   `#timeline-clock`, `#timeline-now-kt`, `#timeline-now-hpa`, `#timeline-cat`,
   `#timeline-id` for Task 4.
 
-- [ ] **Step 1: Masthead → brand pill** — restructure `#masthead` in
+- [x] **Step 1: Masthead → brand pill** — restructure `#masthead` in
   `index.html`: keep `<h1 id="title">`, `#model-toggle`, and the
   `HF-6 research build` text; arrange as one horizontal pill (wordmark ·
   divider · live dot · build tag · methodology). Add beneath it
   `<p id="guidance-chip" class="chrome">experimental forecast companion — not official guidance</p>`
   (copy exact string from `src/live-product.ts` usage).
-- [ ] **Step 2: Caption/guide → hint chips** — replace `#interaction-guide`'s
+- [x] **Step 2: Caption/guide → hint chips** — replace `#interaction-guide`'s
   3-step layout with two chips: `click the sea to spawn your own` (merge with
   `#caption`'s role — keep the `#caption` element itself, main.ts writes to it)
   and `hover · hold to inspect`; move `keys 1–9` into the layer rail footer.
-- [ ] **Step 3: Timeline bar skeleton** — move the `.flight-transport` block out
+- [x] **Step 3: Timeline bar skeleton** — move the `.flight-transport` block out
   of `#flight-recorder` to the end of `#app` as
   `<footer id="timeline" class="chrome"> [play] [#timeline-clock] [ruler: #flight-scrubber + #flight-jumps] [#timeline-now-kt #timeline-now-hpa #timeline-cat] [#timeline-id + SIMULATED stamp] </footer>`.
   Style full-width bottom, recorder card sits above-left of it. The scrubber
   input styles into the category track container (gradient arrives in Task 4).
-- [ ] **Step 4: Verify wiring by hand** — `npm run dev`; spawn a storm; pause,
+- [x] **Step 4: Verify wiring by hand** — `npm run dev`; spawn a storm; pause,
   scrub, and milestone buttons must all still work (they will if ids moved
   intact — `document.getElementById` does not care about position).
-- [ ] **Step 5: Full gates** — `npm test`, `npm run build`, `npm run calibrate:check`.
+- [x] **Step 5: Full gates** — `npm test`, `npm run build`, `npm run calibrate:check`.
 - [ ] **Step 6: Commit** — `git commit -am "feat: brand pill, hint chips, bottom timeline bar"`
 
 ---

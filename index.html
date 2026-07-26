@@ -51,8 +51,8 @@
       <div id="progress"></div>
 
       <header id="masthead" class="chrome" aria-label="Application identity">
-        <p class="masthead-index">Arabian Sea · Instrument 04</p>
         <h1 id="title">Wallah It's <span class="accent">Windy</span></h1>
+        <span class="brand-divider" aria-hidden="true"></span>
         <div class="masthead-meta">
           <span class="model-state"><i aria-hidden="true"></i>HF-6 research build</span>
           <button id="model-toggle" class="quiet-button" type="button">
@@ -60,6 +60,9 @@
           </button>
         </div>
       </header>
+      <p id="guidance-chip" class="chrome">
+        experimental forecast companion — not official guidance
+      </p>
 
       <section id="month-picker" class="chrome" aria-label="Run environment">
         <header>
@@ -222,6 +225,9 @@
             fixed-step integral · parametric rain · no radar assimilation
           </output>
         </section>
+        <footer class="rail-footer">
+          <span>keys 1–9</span>
+        </footer>
       </nav>
 
       <!-- Flight recorder: live physics explanation, then an immutable
@@ -434,25 +440,6 @@
           </div>
         </div>
 
-        <div class="flight-transport">
-          <button id="flight-toggle" type="button">pause</button>
-          <input
-            id="flight-scrubber"
-            type="range"
-            min="0"
-            max="0"
-            value="0"
-            step="1"
-            aria-label="Storm replay timeline"
-            disabled
-          />
-          <nav id="flight-jumps" aria-label="Replay milestones" hidden>
-            <button id="flight-start" type="button">start</button>
-            <button id="flight-peak" type="button">peak</button>
-            <button id="flight-landfall" type="button">landfall</button>
-            <button id="flight-end" type="button">end</button>
-          </nav>
-        </div>
       </section>
 
       <details id="analysis-dock" class="chrome">
@@ -525,14 +512,46 @@
         </div>
       </details>
 
-      <!-- caption / epitaph slot -->
-      <p id="caption" class="chrome hint">click the sea to spawn your own</p>
+      <div id="hint-chips" aria-label="Map controls">
+        <!-- Caption stays live: main.ts replaces this text with spawn feedback
+             and storm epitaphs without changing the hint-chip structure. -->
+        <p id="caption" class="chrome hint">click the sea to spawn your own</p>
+        <aside id="interaction-guide" class="chrome">
+          <span>hover · hold to inspect</span>
+        </aside>
+      </div>
 
-      <aside id="interaction-guide" class="chrome" aria-label="Map controls">
-        <span><b>01</b><small>seed cyclone</small><strong>tap open water</strong></span>
-        <span><b>02</b><small>inspect field</small><strong>hover · hold</strong></span>
-        <span><b>03</b><small>change layer</small><strong>keys 1—9</strong></span>
-      </aside>
+      <footer id="timeline" class="chrome" aria-label="Storm timeline">
+        <button id="flight-toggle" class="timeline-play" type="button">pause</button>
+        <span id="timeline-clock"></span>
+        <div class="timeline-ruler">
+          <input
+            id="flight-scrubber"
+            type="range"
+            min="0"
+            max="0"
+            value="0"
+            step="1"
+            aria-label="Storm replay timeline"
+            disabled
+          />
+          <nav id="flight-jumps" aria-label="Replay milestones" hidden>
+            <button id="flight-start" type="button">start</button>
+            <button id="flight-peak" type="button">peak</button>
+            <button id="flight-landfall" type="button">landfall</button>
+            <button id="flight-end" type="button">end</button>
+          </nav>
+        </div>
+        <span class="timeline-now">
+          <span id="timeline-now-kt"></span>
+          <span id="timeline-now-hpa"></span>
+        </span>
+        <span id="timeline-cat"></span>
+        <span class="timeline-identity">
+          <span id="timeline-id"></span>
+          <span class="simulated-stamp">SIMULATED</span>
+        </span>
+      </footer>
     </div>
 
     <dialog id="model-dialog" aria-labelledby="model-title">

@@ -85,6 +85,9 @@ import type {
   SatelliteSourceMode,
 } from '../satellite-observations';
 import { ObservedSatelliteLayer } from './satellite';
+import { normalizeRainAccumulationMm } from '../rain-accumulation';
+import type { RadarSourceMode } from '../radar-observations';
+import { ObservedRadarLayer } from './observed-radar';
 
 /** Baked data handed to the renderer (mode A); any field may arrive progressively. */
 export interface RenderResources {
@@ -192,6 +195,7 @@ export class RenderPipeline implements RenderLayer {
   private satellitePalette: SatellitePaletteId = 'enhanced';
   private satelliteSource: SatelliteSourceMode = 'simulated';
   private satelliteHandoffStartAgeH = 0;
+  private radarSource: RadarSourceMode = 'simulated';
   private envPlane = -1;
   private envNextPlane = -1;
   private envPlaneMode = '';
@@ -205,6 +209,7 @@ export class RenderPipeline implements RenderLayer {
   private terrain = new TerrainLayer();
   private env = new EnvLayer();
   private satellite = new ObservedSatelliteLayer();
+  private observedRadar = new ObservedRadarLayer();
   private particles = new ParticleLayer();
   private wind = new WindLayer();
   private rain = new RainLayer();
@@ -253,6 +258,7 @@ export class RenderPipeline implements RenderLayer {
     this.height = Math.max(1, height);
     this.env.resize(this.width, this.height);
     this.satellite.resize(this.width, this.height);
+    this.observedRadar.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.wind.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
@@ -300,16 +306,25 @@ export class RenderPipeline implements RenderLayer {
     }
     this.satellite.draw(observedWeight);
     this.env.draw(ctx, this.gpu, glowFade * simulatedWeight);
-    this.radar.draw(ctx);
+    const observedRadar =
+      ctx.weatherLayer === 'rain' &&
+      this.radarSource === 'observed' &&
+      this.observedRadar.hasFrame();
+    if (observedRadar) this.observedRadar.draw(0.94);
+    else this.radar.draw(ctx);
     this.rain.update(ctx, this.gpu);
-    this.rain.composite(ctx, this.gpu, terrainFade);
+    if (!observedRadar) this.rain.composite(ctx, this.gpu, terrainFade);
     // The wind layer already renders the vortex flow, so the storm-spiral
     // swarm yields to it (two swarms would double-draw the same wind field).
     // Enhanced IR also owns its full cloud field; additive point particles on
     // top would turn the satellite texture back into an illustrative spiral.
     if (ctx.weatherLayer === 'wind') {
       this.wind.draw(ctx);
-    } else if (ctx.weatherLayer !== 'infrared' && !ctx.reduced) {
+    } else if (
+      ctx.weatherLayer !== 'infrared' &&
+      !observedRadar &&
+      !ctx.reduced
+    ) {
       this.particles.draw(ctx);
     }
 
@@ -333,6 +348,7 @@ export class RenderPipeline implements RenderLayer {
     this.terrain.dispose();
     this.env.dispose();
     this.satellite.dispose();
+    this.observedRadar.dispose();
     this.particles.dispose();
     this.wind.dispose();
     this.rain.dispose();
@@ -388,6 +404,22 @@ export class RenderPipeline implements RenderLayer {
       return;
     }
     this.satellite.setFrame(image, channel);
+  }
+
+  setRadarSource(source: RadarSourceMode): void {
+    this.radarSource = source;
+  }
+
+  setObservedRadarFrame(image: TexImageSource | null): void {
+    if (!image) {
+      this.observedRadar.clearFrame();
+      return;
+    }
+    this.observedRadar.setFrame(image);
+  }
+
+  setObservedRadarCoverage(image: TexImageSource | null): void {
+    this.observedRadar.setCoverage(image);
   }
 
   /** Decorative workload only; deterministic physics and flight tapes are untouched. */
@@ -512,6 +544,7 @@ export class RenderPipeline implements RenderLayer {
     this.terrain.init(gl);
     this.env.init(gl);
     this.satellite.init(gl);
+    this.observedRadar.init(gl);
     this.env.setSatellitePalette(this.satellitePalette);
     this.satellite.setPalette(this.satellitePalette);
     this.particles.init(gl);
@@ -770,8 +803,9 @@ export class RenderPipeline implements RenderLayer {
   }
 
   /**
-   * Upload the impact tracker's storm-total rain grid when its version moves.
-   * R8, 0..300 mm normalized — a 200×120 grid, so re-uploads are trivial.
+   * Upload the impact tracker's active rain-ledger window when its version
+   * moves. R8 stores a fixed, piecewise physical mm scale; the grid is only
+   * 200×120, so deterministic per-tick re-uploads remain trivial.
    */
   private syncRainAccum(frame: FrameState): void {
     const gl = this.gl;
@@ -788,7 +822,7 @@ export class RenderPipeline implements RenderLayer {
     if (view.version === this.accumVersion && this.gpu.rainAccum) return;
     const bytes = new Uint8Array(view.nx * view.ny);
     for (let i = 0; i < bytes.length; i++) {
-      const n = view.mm[i] / 300;
+      const n = normalizeRainAccumulationMm(view.mm[i], view.breaksMm);
       bytes[i] = n <= 0 ? 0 : n >= 1 ? 255 : Math.round(n * 255);
     }
     if (!this.gpu.rainAccum) {

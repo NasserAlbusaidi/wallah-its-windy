@@ -507,9 +507,15 @@ export class UiController {
     dom('point-probe-rh').textContent = `${reading.midlevelRhPct.toFixed(0)}%`;
     dom('point-probe-shear').textContent = `${reading.shearMs.toFixed(1)} m/s`;
     dom('point-probe-ohc').textContent = `${reading.ohcKjCm2.toFixed(0)} kJ/cm²`;
+    dom('point-probe-rain-label').textContent =
+      `model rain · ${reading.simulatedRainWindowLabel}`;
+    dom('point-probe-rain').textContent =
+      reading.simulatedRainMm === null
+        ? '—'
+        : `${reading.simulatedRainMm.toFixed(1)} mm`;
     dom('point-probe-source').textContent =
       `${reading.environmentKind} · ${reading.environmentLabel} · ` +
-      `${reading.validTimeLabel} · wind is simulated`;
+      `${reading.validTimeLabel} · wind + rain are simulated`;
   }
 
   hidePointProbe(): void {

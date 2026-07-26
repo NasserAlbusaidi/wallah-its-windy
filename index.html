@@ -8,6 +8,7 @@
       content="Wallah It's Windy — spawn a tropical cyclone in the Arabian Sea and let the environment decide its fate."
     />
     <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <title>WALLAH IT'S WINDY</title>
   </head>
   <body>
@@ -40,6 +41,7 @@
             <div><dt>mid rh</dt><dd id="point-probe-rh">—</dd></div>
             <div><dt>shear</dt><dd id="point-probe-shear">—</dd></div>
             <div><dt>ohc</dt><dd id="point-probe-ohc">—</dd></div>
+            <div><dt id="point-probe-rain-label">model rain · storm</dt><dd id="point-probe-rain">—</dd></div>
           </dl>
           <p id="point-probe-source">—</p>
         </aside>
@@ -151,6 +153,74 @@
           >
             imagery source ↗
           </a>
+        </section>
+        <section id="radar-workbench" aria-label="Weather radar controls" hidden>
+          <header>
+            <span>Radar desk</span>
+            <span id="radar-kind">simulated</span>
+          </header>
+          <div class="product-control-row">
+            <span>source</span>
+            <div id="radar-source" class="product-segments" role="group" aria-label="Radar source">
+              <button type="button" data-source="simulated" aria-pressed="true">sim</button>
+              <button type="button" data-source="observed" aria-pressed="false">observed</button>
+            </div>
+          </div>
+          <div id="radar-observed-controls" hidden>
+            <div class="radar-transport" role="group" aria-label="Observed radar timeline transport">
+              <button id="radar-prev" type="button" aria-label="Previous radar frame">−10m</button>
+              <button id="radar-play" type="button" aria-label="Play radar loop" aria-pressed="false">play</button>
+              <button id="radar-next" type="button" aria-label="Next radar frame">+10m</button>
+            </div>
+            <input
+              id="radar-timeline"
+              type="range"
+              min="0"
+              max="0"
+              step="1"
+              value="0"
+              aria-label="Observed radar frame"
+            />
+            <div class="radar-clock">
+              <output id="radar-time">—</output>
+              <span id="radar-age">past composite</span>
+            </div>
+            <div class="radar-coverage-key">
+              <i aria-hidden="true"></i>
+              <span>hatch = outside radar coverage</span>
+            </div>
+          </div>
+          <output id="radar-status" data-tone="simulated">
+            generated from storm rain rates · no observed pixels
+          </output>
+          <a
+            id="radar-attribution"
+            href="https://www.rainviewer.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            hidden
+          >
+            weather data by RainViewer ↗
+          </a>
+        </section>
+        <section id="accum-workbench" aria-label="Rain accumulation controls" hidden>
+          <header>
+            <span>Rain ledger</span>
+            <span>simulated</span>
+          </header>
+          <div class="product-control-row accumulation-row">
+            <span>window</span>
+            <div id="accum-window" class="product-segments" role="group" aria-label="Rain accumulation window">
+              <button type="button" data-window="1h" aria-pressed="false">1h</button>
+              <button type="button" data-window="3h" aria-pressed="false">3h</button>
+              <button type="button" data-window="6h" aria-pressed="false">6h</button>
+              <button type="button" data-window="24h" aria-pressed="false">24h</button>
+              <button type="button" data-window="storm" aria-pressed="true">storm</button>
+            </div>
+          </div>
+          <output id="accum-status" data-tone="simulated">
+            fixed-step integral · parametric rain · no radar assimilation
+          </output>
         </section>
       </nav>
 
@@ -527,8 +597,12 @@
             daytime visible-style palettes. It can show the simulated cloud field,
             timestamp-labelled Meteosat/INSAT pixels when available, or a six-hour
             visual handoff from observation to simulation. Observed pixels never
-            change the model state; this is not data assimilation. Rain products
-            remain structural proxies, not radar or precipitation observations.
+            change the model state; this is not data assimilation. The radar desk
+            separately offers a recent, timestamped RainViewer past-radar loop.
+            Those real pixels are a wall-clock display layer only. The simulated
+            rain desk integrates 1-, 3-, 6-, and 24-hour or storm-lifetime totals
+            from fixed 15-minute model steps; it is not an observed precipitation
+            analysis.
             Keys 1–9 switch layers.
           </p>
         </section>

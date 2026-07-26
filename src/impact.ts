@@ -26,10 +26,18 @@ import { latLonToCell, cellToLatLon } from './grid';
 import { hollandWindSpeedKt } from './structure';
 import { stormCategory } from './category';
 import type { BinLayer, LatLon, RainAccumView, StormState } from './types';
+import {
+  DEFAULT_RAIN_ACCUMULATION_WINDOW,
+  rainAccumulationDefinition,
+  type RainAccumulationWindow,
+} from './rain-accumulation';
 
 /** Grid resolution: 0.1° (~11 km) — impact bookkeeping, not a weather model. */
 const GRID_NX = 200;
 const GRID_NY = 120;
+/** The simulation's fixed 15-minute rain-ledger cadence. */
+const HISTORY_STEP_H = 0.25;
+const HISTORY_CAPACITY = 24 / HISTORY_STEP_H;
 
 /** Rainband spatial envelope bounds in RMW multiples (mirror of rain.ts). */
 const BAND_INNER_Q = 1.45;
@@ -101,7 +109,17 @@ export function windAtPointKt(storm: StormState, point: LatLon): number {
 export class ImpactTracker {
   private readonly nx = GRID_NX;
   private readonly ny = GRID_NY;
-  private mm = new Float32Array(GRID_NX * GRID_NY);
+  private totalMm = new Float32Array(GRID_NX * GRID_NY);
+  private windowMm = new Float32Array(GRID_NX * GRID_NY);
+  private depositMm = new Float32Array(GRID_NX * GRID_NY);
+  private history = Array.from(
+    { length: HISTORY_CAPACITY },
+    () => new Float32Array(GRID_NX * GRID_NY),
+  );
+  private historyHead = 0;
+  private historyCount = 0;
+  private rainWindow: RainAccumulationWindow =
+    DEFAULT_RAIN_ACCUMULATION_WINDOW;
   private version = 0;
   /** Land flag per impact cell, resampled from the terrain mask when it lands. */
   private land = new Uint8Array(GRID_NX * GRID_NY);
@@ -112,7 +130,10 @@ export class ImpactTracker {
     nx: GRID_NX,
     ny: GRID_NY,
     bbox: DOMAIN,
-    mm: this.mm,
+    mm: this.totalMm,
+    breaksMm: rainAccumulationDefinition(
+      DEFAULT_RAIN_ACCUMULATION_WINDOW,
+    ).breaksMm,
     version: 0,
   };
 
@@ -142,17 +163,42 @@ export class ImpactTracker {
 
   /** Start a fresh run: zero the grid and the city trackers. */
   reset(): void {
-    this.mm.fill(0);
+    this.totalMm.fill(0);
+    this.windowMm.fill(0);
+    this.depositMm.fill(0);
+    this.historyHead = 0;
+    this.historyCount = 0;
     this.maxLandRainMm = 0;
     this.cityPeakKt.fill(0);
     this.cityClosestKm.fill(Infinity);
     this.version++;
-    this.view = { ...this.view, version: this.version };
+    this.view = {
+      ...this.view,
+      mm: this.rainWindow === 'storm' ? this.totalMm : this.windowMm,
+      version: this.version,
+    };
   }
 
   /** The render-facing grid view (bumped version signals a re-upload). */
   rainView(): RainAccumView {
     return this.view;
+  }
+
+  /**
+   * Select the displayed ledger window. The storm-total/city bookkeeping stays
+   * untouched; a finite window is rebuilt from the bounded 24-hour tick ring.
+   */
+  setRainWindow(window: RainAccumulationWindow): void {
+    if (window === this.rainWindow) return;
+    this.rainWindow = window;
+    if (window !== 'storm') this.rebuildWindow(window);
+    this.version++;
+    this.view = {
+      ...this.view,
+      mm: window === 'storm' ? this.totalMm : this.windowMm,
+      breaksMm: rainAccumulationDefinition(window).breaksMm,
+      version: this.version,
+    };
   }
 
   /**
@@ -163,6 +209,7 @@ export class ImpactTracker {
    */
   record(storm: StormState, dtH: number): void {
     if (!storm.alive || dtH <= 0) return;
+    this.depositMm.fill(0);
     const d = storm.diagnostics;
     const s = storm.structure;
     const rainCenterLat = storm.lat + s.rainOffsetNorthKm / 111;
@@ -208,14 +255,23 @@ export class ImpactTracker {
             d.rainbandRainMmH * bandEnvelope * 0.68 +
             (onLand ? d.orographicRainMmH * bandEnvelope : 0);
           if (rateMmH <= 0.01) continue;
-          const next = this.mm[index] + rateMmH * dtH;
-          this.mm[index] = next;
+          const deposited = rateMmH * dtH;
+          this.depositMm[index] = deposited;
+          const next = this.totalMm[index] + deposited;
+          this.totalMm[index] = next;
           if (onLand && next > this.maxLandRainMm) this.maxLandRainMm = next;
         }
       }
-      this.version++;
-      this.view = { ...this.view, version: this.version };
     }
+    // Push even an all-zero step: elapsed model time must age finite windows
+    // out deterministically while a storm crosses a dry part of the domain.
+    this.pushHistory(this.depositMm, dtH);
+    this.version++;
+    this.view = {
+      ...this.view,
+      mm: this.rainWindow === 'storm' ? this.totalMm : this.windowMm,
+      version: this.version,
+    };
 
     // City exposure: parametric Holland wind at the city's range and bearing.
     for (let i = 0; i < IMPACT_CITIES.length; i++) {
@@ -235,6 +291,19 @@ export class ImpactTracker {
 
   /** Rain accumulated at (lat,lon)'s cell, mm. */
   rainAtMm(lat: number, lon: number): number {
+    return this.rainGridAtMm(this.totalMm, lat, lon);
+  }
+
+  /** Rain in the currently selected display window at (lat,lon), mm. */
+  displayRainAtMm(lat: number, lon: number): number {
+    return this.rainGridAtMm(this.view.mm, lat, lon);
+  }
+
+  private rainGridAtMm(
+    grid: Float32Array,
+    lat: number,
+    lon: number,
+  ): number {
     const cell = latLonToCell(
       { nx: this.nx, ny: this.ny, bbox: DOMAIN },
       lat,
@@ -242,7 +311,59 @@ export class ImpactTracker {
     );
     const c = Math.max(0, Math.min(this.nx - 1, Math.round(cell.col)));
     const r = Math.max(0, Math.min(this.ny - 1, Math.round(cell.row)));
-    return this.mm[r * this.nx + c];
+    return grid[r * this.nx + c];
+  }
+
+  private pushHistory(deposit: Float32Array, dtH: number): void {
+    // Runtime calls are exactly 0.25 h. Splitting keeps tests/tools that batch
+    // several fixed steps honest without changing the production cadence.
+    const pieces = Math.max(1, Math.round(dtH / HISTORY_STEP_H));
+    const fraction = 1 / pieces;
+    for (let piece = 0; piece < pieces; piece++) {
+      const activeSteps = this.activeWindowSteps();
+      if (activeSteps !== null && this.historyCount >= activeSteps) {
+        const outgoing =
+          (this.historyHead - activeSteps + HISTORY_CAPACITY) %
+          HISTORY_CAPACITY;
+        const old = this.history[outgoing];
+        for (let index = 0; index < this.windowMm.length; index++) {
+          this.windowMm[index] = Math.max(0, this.windowMm[index] - old[index]);
+        }
+      }
+
+      const slot = this.history[this.historyHead];
+      for (let index = 0; index < slot.length; index++) {
+        const amount = deposit[index] * fraction;
+        slot[index] = amount;
+        if (activeSteps !== null) this.windowMm[index] += amount;
+      }
+      this.historyHead = (this.historyHead + 1) % HISTORY_CAPACITY;
+      this.historyCount = Math.min(HISTORY_CAPACITY, this.historyCount + 1);
+    }
+  }
+
+  private activeWindowSteps(): number | null {
+    const hours = rainAccumulationDefinition(this.rainWindow).hours;
+    return hours === null ? null : Math.round(hours / HISTORY_STEP_H);
+  }
+
+  private rebuildWindow(window: RainAccumulationWindow): void {
+    this.windowMm.fill(0);
+    const hours = rainAccumulationDefinition(window).hours;
+    if (hours === null) return;
+    const steps = Math.min(
+      this.historyCount,
+      Math.round(hours / HISTORY_STEP_H),
+    );
+    for (let offset = 1; offset <= steps; offset++) {
+      const slot =
+        this.history[
+          (this.historyHead - offset + HISTORY_CAPACITY) % HISTORY_CAPACITY
+        ];
+      for (let index = 0; index < this.windowMm.length; index++) {
+        this.windowMm[index] += slot[index];
+      }
+    }
   }
 
   /** Assemble the presentation summary. `storm` selects the live-exposure city. */

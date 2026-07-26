@@ -367,7 +367,8 @@ void main() {
     return;
   }
 
-  // Storm-total rainfall (impact proxy): 0..300 mm accumulated by the tracker.
+  // Fixed-window or storm-total rainfall. The CPU ledger maps each window's
+  // physical mm breaks onto 0..1 before this texture reaches the shader.
   if (u_mode == 8) {
     float mmN = u_hasAccum * texture(u_rainTotal, v_uv).r;
     vec3 color = fiveStop(

@@ -12,6 +12,9 @@ export interface PointProbeReading extends LatLon {
   midlevelRhPct: number;
   shearMs: number;
   ohcKjCm2: number;
+  /** Selected deterministic rain-ledger window; null while viewing replay. */
+  simulatedRainMm: number | null;
+  simulatedRainWindowLabel: string;
   environmentKind: ProbeEnvironmentKind;
   environmentLabel: string;
   validTimeLabel: string;
@@ -23,6 +26,8 @@ export interface PointProbeInput extends LatLon {
   environmentKind: ProbeEnvironmentKind;
   environmentLabel: string;
   validTimeLabel: string;
+  simulatedRainMm?: number | null;
+  simulatedRainWindowLabel?: string;
 }
 
 export function createPointProbeReading(input: PointProbeInput): PointProbeReading {
@@ -38,6 +43,8 @@ export function createPointProbeReading(input: PointProbeInput): PointProbeReadi
     midlevelRhPct: environment.midlevelRhPct,
     shearMs: environment.shear,
     ohcKjCm2: environment.ohcKjCm2,
+    simulatedRainMm: input.simulatedRainMm ?? null,
+    simulatedRainWindowLabel: input.simulatedRainWindowLabel ?? 'storm',
     environmentKind: input.environmentKind,
     environmentLabel: input.environmentLabel,
     validTimeLabel: input.validTimeLabel,

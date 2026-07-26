@@ -92,11 +92,10 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
   },
   {
     id: 'accum',
-    label: 'storm-total rainfall',
+    label: 'rain accumulation',
     shortLabel: 'rain accum',
-    // Ticks sit at the shader's equal-interval color stops (linear 0-300 mm).
-    legend: '0 · 75 · 150 · 225 · 300+',
-    unit: 'mm · parametric storm-total proxy',
+    legend: '0 · 100 · 250 · 500 · 750+',
+    unit: 'mm · deterministic simulated-rain ledger',
     simulated: true,
   },
   {

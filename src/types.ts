@@ -429,8 +429,10 @@ export interface RainAccumView {
   nx: number;
   ny: number;
   bbox: BBox;
-  /** Storm-total rain per cell, millimetres. */
+  /** Active fixed-window or storm-total rain per cell, millimetres. */
   mm: Float32Array;
+  /** Stable five-stop physical scale used to encode this view. */
+  breaksMm: readonly [number, number, number, number, number];
   version: number;
 }
 

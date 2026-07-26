@@ -95,6 +95,26 @@ import {
   type SatelliteSourceMode,
 } from './satellite-observations';
 import { ImpactTracker } from './impact';
+import {
+  DEFAULT_RAIN_ACCUMULATION_WINDOW,
+  isRainAccumulationWindow,
+  rainAccumulationDefinition,
+  rainAccumulationLegend,
+  type RainAccumulationWindow,
+} from './rain-accumulation';
+import {
+  RAINVIEWER_ATTRIBUTION_URL,
+  RAINVIEWER_MANIFEST_URL,
+  loadRadarCoverageMask,
+  loadRadarMosaic,
+  parseRadarTimeline,
+  radarFrameAgeMinutes,
+  radarFrameIso,
+  recentRadarFrames,
+  type RadarSourceMode,
+  type RadarTimeline,
+  type RadarTimelineFrame,
+} from './radar-observations';
 import { createPointProbeReading } from './point-probe';
 import { simulatedStormName } from './storm-names';
 import { findHistoricalAnalog, type HistoricalAnalog } from './historical-analog';
@@ -197,6 +217,48 @@ const satelliteStatus = must(
 const satelliteAttribution = must(
   document.getElementById('satellite-attribution') as HTMLAnchorElement | null,
   '#satellite-attribution',
+);
+const radarWorkbench = must(document.getElementById('radar-workbench'), '#radar-workbench');
+const radarKind = must(document.getElementById('radar-kind'), '#radar-kind');
+const radarSourceControls = must(document.getElementById('radar-source'), '#radar-source');
+const radarObservedControls = must(
+  document.getElementById('radar-observed-controls'),
+  '#radar-observed-controls',
+);
+const radarPrev = must(
+  document.getElementById('radar-prev') as HTMLButtonElement | null,
+  '#radar-prev',
+);
+const radarPlay = must(
+  document.getElementById('radar-play') as HTMLButtonElement | null,
+  '#radar-play',
+);
+const radarNext = must(
+  document.getElementById('radar-next') as HTMLButtonElement | null,
+  '#radar-next',
+);
+const radarTimelineInput = must(
+  document.getElementById('radar-timeline') as HTMLInputElement | null,
+  '#radar-timeline',
+);
+const radarTime = must(
+  document.getElementById('radar-time') as HTMLOutputElement | null,
+  '#radar-time',
+);
+const radarAge = must(document.getElementById('radar-age'), '#radar-age');
+const radarStatus = must(
+  document.getElementById('radar-status') as HTMLOutputElement | null,
+  '#radar-status',
+);
+const radarAttribution = must(
+  document.getElementById('radar-attribution') as HTMLAnchorElement | null,
+  '#radar-attribution',
+);
+const accumWorkbench = must(document.getElementById('accum-workbench'), '#accum-workbench');
+const accumWindowControls = must(document.getElementById('accum-window'), '#accum-window');
+const accumStatus = must(
+  document.getElementById('accum-status') as HTMLOutputElement | null,
+  '#accum-status',
 );
 const ensembleSize = must(
   document.getElementById('ensemble-size') as HTMLSelectElement | null,
@@ -352,6 +414,20 @@ let satelliteRequestAbort: AbortController | null = null;
 let satelliteHandoffStartAgeH = 0;
 let satelliteHandoffStarted = false;
 let satelliteHandoffSettled = false;
+let activeRadarSource: RadarSourceMode = 'simulated';
+let radarManifest: RadarTimeline | null = null;
+let radarFrames: RadarTimelineFrame[] = [];
+let radarFrameIndex = 0;
+const radarFrameCache = new Map<number, HTMLCanvasElement>();
+let radarRequestSeq = 0;
+let radarManifestAbort: AbortController | null = null;
+let radarFrameAbort: AbortController | null = null;
+let radarCoverageFraction: number | null = null;
+let radarManifestFetchedAtMs = 0;
+let radarPlaying = false;
+let radarPlayTimer: number | null = null;
+let activeRainAccumulationWindow: RainAccumulationWindow =
+  DEFAULT_RAIN_ACCUMULATION_WINDOW;
 let activeEnsemble: EnsembleResult | null = null;
 let analysisRequestSeq = 0;
 
@@ -1281,6 +1357,12 @@ function pointProbeReadingAt(point: LatLon, storm: StormState | null) {
     validTimeLabel: activeScenario && storm
       ? `event +${storm.ageH.toFixed(1)} h`
       : 'monthly climatology',
+    simulatedRainMm: session.replayMode
+      ? null
+      : impact.displayRainAtMm(point.lat, point.lon),
+    simulatedRainWindowLabel: rainAccumulationDefinition(
+      activeRainAccumulationWindow,
+    ).label,
   });
 }
 
@@ -1373,6 +1455,239 @@ function updateSatelliteButtons(): void {
     : activeSatelliteSource;
 }
 
+function setRadarStatus(
+  message: string,
+  tone: 'simulated' | 'loading' | 'observed' | 'stale' | 'unavailable',
+): void {
+  radarStatus.value = message;
+  radarStatus.textContent = message;
+  radarStatus.dataset.tone = tone;
+  radarAttribution.hidden = tone !== 'observed' && tone !== 'stale';
+}
+
+function updateRadarButtons(): void {
+  for (const button of radarSourceControls.querySelectorAll<HTMLButtonElement>('button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.source === activeRadarSource));
+  }
+  radarKind.textContent = activeRadarSource;
+  radarObservedControls.hidden = activeRadarSource !== 'observed';
+  radarPlay.setAttribute('aria-pressed', String(radarPlaying));
+  radarPlay.textContent = radarPlaying ? 'pause' : 'play';
+}
+
+function updateRadarTimelineUi(): void {
+  const frame = radarFrames[radarFrameIndex] ?? null;
+  radarTimelineInput.max = String(Math.max(0, radarFrames.length - 1));
+  radarTimelineInput.value = String(Math.min(radarFrameIndex, Math.max(0, radarFrames.length - 1)));
+  radarTimelineInput.disabled = radarFrames.length === 0;
+  radarPrev.disabled = radarFrames.length < 2;
+  radarNext.disabled = radarFrames.length < 2;
+  radarPlay.disabled = radarFrames.length < 2;
+  if (!frame) {
+    radarTime.value = '—';
+    radarTime.textContent = '—';
+    radarAge.textContent = 'past composite';
+    return;
+  }
+  const iso = radarFrameIso(frame);
+  const ageMinutes = radarFrameAgeMinutes(frame);
+  radarTime.value = formatObservedTime(iso);
+  radarTime.textContent = formatObservedTime(iso);
+  radarAge.textContent = `${Math.round(ageMinutes)} min behind wall clock`;
+}
+
+function selectedRadarStatus(): void {
+  const frame = radarFrames[radarFrameIndex];
+  if (!frame || activeRadarSource !== 'observed') return;
+  const ageMinutes = radarFrameAgeMinutes(frame);
+  const coverage = radarCoverageFraction == null
+    ? 'coverage mask loading'
+    : `${Math.round(radarCoverageFraction * 100)}% provider-mask coverage`;
+  const tone = ageMinutes > 30 ? 'stale' : 'observed';
+  setRadarStatus(
+    `${coverage} · ${Math.round(ageMinutes)} min old · display only · not assimilated`,
+    tone,
+  );
+  radarAttribution.href = RAINVIEWER_ATTRIBUTION_URL;
+  radarAttribution.textContent = 'weather data by RainViewer ↗';
+  radarAttribution.hidden = false;
+}
+
+async function showRadarFrame(index: number): Promise<void> {
+  if (activeRadarSource !== 'observed' || radarFrames.length === 0 || !radarManifest) return;
+  radarFrameIndex = Math.max(0, Math.min(radarFrames.length - 1, Math.round(index)));
+  updateRadarTimelineUi();
+  const frame = radarFrames[radarFrameIndex];
+  const cached = radarFrameCache.get(frame.time);
+  if (cached) {
+    renderCtrl?.setObservedRadarFrame?.(cached);
+    selectedRadarStatus();
+    return;
+  }
+
+  const requestSeq = ++radarRequestSeq;
+  radarFrameAbort?.abort();
+  const abort = new AbortController();
+  radarFrameAbort = abort;
+  setRadarStatus(
+    `loading ${formatObservedTime(radarFrameIso(frame))} · 6 bounded tiles…`,
+    'loading',
+  );
+  try {
+    const canvas = await loadRadarMosaic(radarManifest, frame, abort.signal);
+    if (
+      abort.signal.aborted ||
+      requestSeq !== radarRequestSeq ||
+      activeRadarSource !== 'observed' ||
+      radarFrames[radarFrameIndex]?.time !== frame.time
+    ) {
+      return;
+    }
+    radarFrameCache.set(frame.time, canvas);
+    renderCtrl?.setObservedRadarFrame?.(canvas);
+    selectedRadarStatus();
+  } catch (error) {
+    if (!abort.signal.aborted && requestSeq === radarRequestSeq) {
+      renderCtrl?.setObservedRadarFrame?.(null);
+      setRadarStatus(
+        `observed tiles unavailable · simulated pixels are not substituted · ${String(error)}`,
+        'unavailable',
+      );
+    }
+  }
+}
+
+async function refreshRadarTimeline(force = false): Promise<void> {
+  if (activeRadarSource !== 'observed' || activeWeatherLayer !== 'rain') return;
+  if (
+    !force &&
+    radarManifest &&
+    Date.now() - radarManifestFetchedAtMs < 5 * 60_000
+  ) {
+    await showRadarFrame(radarFrameIndex);
+    return;
+  }
+
+  radarManifestAbort?.abort();
+  const abort = new AbortController();
+  radarManifestAbort = abort;
+  setRadarStatus('requesting RainViewer past-radar timeline…', 'loading');
+  const selectedTime = radarFrames[radarFrameIndex]?.time ?? null;
+  try {
+    const response = await fetch(RAINVIEWER_MANIFEST_URL, {
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-store',
+      signal: abort.signal,
+    });
+    if (!response.ok) throw new Error(`timeline HTTP ${response.status}`);
+    const parsed = parseRadarTimeline(await response.json());
+    if (!parsed) throw new Error('timeline schema was not recognised');
+    if (abort.signal.aborted || activeRadarSource !== 'observed') return;
+
+    if (radarManifest && radarManifest.host !== parsed.host) radarFrameCache.clear();
+    if (radarManifest && radarManifest.host !== parsed.host) {
+      radarCoverageFraction = null;
+      renderCtrl?.setObservedRadarCoverage?.(null);
+    }
+    radarManifest = parsed;
+    radarFrames = recentRadarFrames(parsed);
+    const preservedIndex = selectedTime == null
+      ? -1
+      : radarFrames.findIndex((frame) => frame.time === selectedTime);
+    radarFrameIndex = preservedIndex >= 0 ? preservedIndex : radarFrames.length - 1;
+    radarManifestFetchedAtMs = Date.now();
+    updateRadarTimelineUi();
+
+    void loadRadarCoverageMask(parsed.host, abort.signal)
+      .then((coverage) => {
+        if (abort.signal.aborted || radarManifest !== parsed) return;
+        radarCoverageFraction = coverage.fraction;
+        renderCtrl?.setObservedRadarCoverage?.(coverage.image);
+        selectedRadarStatus();
+      })
+      .catch((error: unknown) => {
+        if (!abort.signal.aborted) {
+          radarCoverageFraction = null;
+          renderCtrl?.setObservedRadarCoverage?.(null);
+          console.warn('[radar] coverage mask unavailable:', error);
+        }
+      });
+    await showRadarFrame(radarFrameIndex);
+  } catch (error) {
+    if (!abort.signal.aborted) {
+      radarFrames = [];
+      updateRadarTimelineUi();
+      renderCtrl?.setObservedRadarFrame?.(null);
+      setRadarStatus(
+        `observed timeline unavailable · simulated pixels are not substituted · ${String(error)}`,
+        'unavailable',
+      );
+    }
+  }
+}
+
+function stopRadarLoop(): void {
+  radarPlaying = false;
+  if (radarPlayTimer != null) {
+    window.clearTimeout(radarPlayTimer);
+    radarPlayTimer = null;
+  }
+  updateRadarButtons();
+}
+
+async function advanceRadarLoop(): Promise<void> {
+  if (!radarPlaying || radarFrames.length < 2) return;
+  await showRadarFrame((radarFrameIndex + 1) % radarFrames.length);
+  if (radarPlaying) {
+    radarPlayTimer = window.setTimeout(() => void advanceRadarLoop(), 650);
+  }
+}
+
+function setRadarPlaying(playing: boolean): void {
+  stopRadarLoop();
+  if (!playing || activeRadarSource !== 'observed' || radarFrames.length < 2) return;
+  radarPlaying = true;
+  updateRadarButtons();
+  radarPlayTimer = window.setTimeout(() => void advanceRadarLoop(), 250);
+}
+
+function setRadarSource(source: RadarSourceMode): void {
+  activeRadarSource = source;
+  renderCtrl?.setRadarSource?.(source);
+  updateRadarButtons();
+  updateWeatherLegend();
+  if (source === 'simulated') {
+    stopRadarLoop();
+    radarManifestAbort?.abort();
+    radarFrameAbort?.abort();
+    renderCtrl?.setObservedRadarFrame?.(null);
+    setRadarStatus(
+      'generated from deterministic storm rain rates · no observed pixels',
+      'simulated',
+    );
+    return;
+  }
+  void refreshRadarTimeline();
+}
+
+function setRainAccumulationWindow(windowId: RainAccumulationWindow): void {
+  activeRainAccumulationWindow = windowId;
+  impact.setRainWindow(windowId);
+  for (const button of accumWindowControls.querySelectorAll<HTMLButtonElement>('button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.window === windowId));
+  }
+  const definition = rainAccumulationDefinition(windowId);
+  const period = definition.hours == null
+    ? 'storm lifetime'
+    : `trailing ${definition.label}`;
+  const message = `${period} · fixed 15 min integration · parametric rain · no radar assimilation`;
+  accumStatus.value = message;
+  accumStatus.textContent = message;
+  updateWeatherLegend();
+  refreshPointProbe();
+}
+
 function updateWeatherLegend(): void {
   const definition = weatherLayerDefinition(activeWeatherLayer);
   weatherLegend.dataset.layer = activeWeatherLayer;
@@ -1383,6 +1698,15 @@ function updateWeatherLegend(): void {
       ? `simulated · ${palette.unit}`
       : `${activeSatelliteProvider} · ${palette.unit}`;
     weatherLegendScale.textContent = palette.legend;
+  } else if (activeWeatherLayer === 'rain' && activeRadarSource === 'observed') {
+    weatherLegendName.textContent = 'observed radar';
+    weatherLegendUnit.textContent = 'RainViewer composite · display only';
+    weatherLegendScale.textContent = 'light · moderate · heavy · intense';
+  } else if (activeWeatherLayer === 'accum') {
+    const accumulation = rainAccumulationDefinition(activeRainAccumulationWindow);
+    weatherLegendName.textContent = `${accumulation.label} accumulation`;
+    weatherLegendUnit.textContent = 'mm · deterministic simulated-rain ledger';
+    weatherLegendScale.textContent = rainAccumulationLegend(activeRainAccumulationWindow);
   } else {
     weatherLegendName.textContent = definition.shortLabel;
     weatherLegendUnit.textContent = definition.unit;
@@ -1591,12 +1915,18 @@ function setWeatherLayer(layer: WeatherLayerId): void {
   activeWeatherLayer = layer;
   renderCtrl?.setWeatherLayer?.(layer);
   satelliteWorkbench.hidden = layer !== 'infrared';
+  radarWorkbench.hidden = layer !== 'rain';
+  accumWorkbench.hidden = layer !== 'accum';
+  if (layer !== 'rain') stopRadarLoop();
   updateWeatherLegend();
   for (const button of layerButtons.querySelectorAll<HTMLButtonElement>('.layer-button')) {
     button.setAttribute('aria-pressed', String(button.dataset.layer === layer));
   }
   if (layer === 'infrared' && activeSatelliteSource !== 'simulated') {
     void refreshSatelliteObservation();
+  }
+  if (layer === 'rain' && activeRadarSource === 'observed') {
+    void refreshRadarTimeline();
   }
 }
 
@@ -1654,9 +1984,41 @@ for (const button of satellitePaletteControls.querySelectorAll<HTMLButtonElement
     }
   });
 }
+for (const button of radarSourceControls.querySelectorAll<HTMLButtonElement>('button[data-source]')) {
+  button.addEventListener('click', () => {
+    const source = button.dataset.source;
+    if (source === 'simulated' || source === 'observed') setRadarSource(source);
+  });
+}
+radarPrev.addEventListener('click', () => {
+  stopRadarLoop();
+  void showRadarFrame(radarFrameIndex - 1);
+});
+radarNext.addEventListener('click', () => {
+  stopRadarLoop();
+  void showRadarFrame(radarFrameIndex + 1);
+});
+radarPlay.addEventListener('click', () => setRadarPlaying(!radarPlaying));
+radarTimelineInput.addEventListener('input', () => {
+  stopRadarLoop();
+  void showRadarFrame(Number(radarTimelineInput.value));
+});
+for (const button of accumWindowControls.querySelectorAll<HTMLButtonElement>('button[data-window]')) {
+  button.addEventListener('click', () => {
+    const windowId = button.dataset.window ?? '';
+    if (isRainAccumulationWindow(windowId)) setRainAccumulationWindow(windowId);
+  });
+}
 setSatellitePalette(DEFAULT_SATELLITE_PALETTE);
 setSatelliteSource('simulated');
+setRadarSource('simulated');
+setRainAccumulationWindow(DEFAULT_RAIN_ACCUMULATION_WINDOW);
 setWeatherLayer(DEFAULT_WEATHER_LAYER);
+window.setInterval(() => {
+  if (activeWeatherLayer === 'rain' && activeRadarSource === 'observed') {
+    void refreshRadarTimeline(true);
+  }
+}, 5 * 60_000);
 
 function currentAnalysisUrls(): {
   envUrl: string;
@@ -2352,6 +2714,9 @@ type RenderController = RenderLayer & {
   setSatellitePalette?(palette: SatellitePaletteId): void;
   setSatelliteSource?(source: SatelliteSourceMode, handoffStartAgeH?: number): void;
   setObservedSatelliteFrame?(image: ImageBitmap | null, channel?: SatelliteChannel): void;
+  setRadarSource?(source: RadarSourceMode): void;
+  setObservedRadarFrame?(image: TexImageSource | null): void;
+  setObservedRadarCoverage?(image: TexImageSource | null): void;
   setParticleBudget?(count: number): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;

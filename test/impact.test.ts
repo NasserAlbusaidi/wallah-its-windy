@@ -114,6 +114,55 @@ describe('ImpactTracker', () => {
     expect(run()).toEqual(run());
   });
 
+  it('rebuilds fixed accumulation windows from the deterministic 24 h tick ring', () => {
+    const tracker = new ImpactTracker();
+    const stationary = storm(22, 60, 80);
+    for (let i = 0; i < 32; i++) tracker.record(stationary, 0.25);
+    const peak = () => Math.max(...tracker.rainView().mm);
+
+    const stormTotal = peak();
+    tracker.setRainWindow('6h');
+    const sixHour = peak();
+    tracker.setRainWindow('3h');
+    const threeHour = peak();
+    tracker.setRainWindow('1h');
+    const oneHour = peak();
+
+    expect(stormTotal).toBeGreaterThan(sixHour);
+    expect(sixHour).toBeGreaterThan(threeHour);
+    expect(threeHour).toBeGreaterThan(oneHour);
+    expect(tracker.rainView().breaksMm).toEqual([0, 10, 25, 50, 80]);
+
+    tracker.setRainWindow('storm');
+    expect(peak()).toBeCloseTo(stormTotal, 5);
+  });
+
+  it('ages deposits out of an actively selected trailing window', () => {
+    const tracker = new ImpactTracker();
+    const stationary = storm(22, 60, 80);
+    tracker.setRainWindow('1h');
+    for (let i = 0; i < 4; i++) tracker.record(stationary, 0.25);
+    const firstHour = Math.max(...tracker.rainView().mm);
+    for (let i = 0; i < 8; i++) tracker.record(stationary, 0.25);
+    const latestHour = Math.max(...tracker.rainView().mm);
+
+    expect(latestHour).toBeCloseTo(firstHour, 5);
+    const rainLat =
+      stationary.lat + stationary.structure.rainOffsetNorthKm / 111;
+    const rainLon =
+      stationary.lon +
+      (
+        stationary.structure.rainOffsetEastKm +
+        stationary.structure.rmwKm
+      ) /
+        (111 * Math.cos((stationary.lat * Math.PI) / 180));
+    expect(tracker.displayRainAtMm(rainLat, rainLon)).toBeLessThan(
+      tracker.rainAtMm(rainLat, rainLon),
+    );
+    tracker.setRainWindow('storm');
+    expect(Math.max(...tracker.rainView().mm)).toBeCloseTo(firstHour * 3, 4);
+  });
+
   it('reset() clears the grid, the version moving so the GPU re-uploads', () => {
     const tracker = new ImpactTracker();
     tracker.record(storm(22, 60, 80), 1);

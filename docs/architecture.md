@@ -42,7 +42,9 @@ flowchart TD
   TAPE["storm-session.ts / flight-recorder.ts<br/>immutable per-tick tape"]
   RENDER["render/* — WebGL2 layers + 2D overlay,<br/>interpolates between fixed steps"]
   UI["ui.ts + main.ts — chrome, intent,<br/>fixed-dt accumulator loop"]
-  IMPACT["impact.ts — fed live engine state,<br/>not the tape"]
+  IMPACT["impact.ts — storm-total + bounded<br/>24 h deterministic rain ledger"]
+  RADARAPI["RainViewer public API<br/>past radar + coverage tiles"]
+  RADARBOUNDARY["radar-observations.ts<br/>bounded tiles + reprojection"]
   DOWNSTREAM["export.ts · comparison.ts<br/>narrative.ts · historical-analog.ts"]
 
   BAKE --> BINS
@@ -51,11 +53,13 @@ flowchart TD
   SIM <--> STRUCT
   SIM --> TAPE --> DOWNSTREAM
   SIM --> IMPACT
+  IMPACT --> RENDER
   SIM --> RENDER
   TAPE --> RENDER
   JSONS --> UI
   UI --> SIM
   UI --> RENDER
+  RADARAPI --> RADARBOUNDARY --> RENDER
 
   subgraph worker["Ensemble worker path (off main thread)"]
     CLIENT["ensemble-client.ts"]
@@ -135,10 +139,11 @@ Notes verified in code:
 | `storm-session.ts` | Lifecycle + replay transport for one deterministic run: recording, pause, seeking, replay playback, paired-run baseline. Recorded frames never drive the live engine. | `StormSession` |
 | `flight-recorder.ts` | Immutable per-tick storm history for debrief and replay; scrubbing rebuilds state from copied frames. | `FlightRecorder`, `FlightFrame`, `FlightRunSnapshot`, `StormDebrief`, `compassDirection` |
 | `comparison.ts` | Pure paired-run analysis: same genesis + seed, environment changed; validates that invariant. | `compareRuns`, `RunComparison` |
-| `impact.ts` | Deterministic landfall-impact bookkeeping: storm-total rain grid (explicit parametric proxy, labeled as such) + per-city wind/rain/flood-tier table. | `ImpactTracker`, `IMPACT_CITIES`, `floodRiskTier`, `windAtPointKt`, `experiencedWindPhrase` |
+| `impact.ts` | Deterministic landfall-impact bookkeeping: storm-total rain, a 96-step/24-hour tick ring for 1/3/6/24-hour display windows, and per-city wind/rain/flood-tier table. The selected display window never changes storm-total impact state. | `ImpactTracker`, `IMPACT_CITIES`, `floodRiskTier`, `windAtPointKt`, `experiencedWindPhrase` |
+| `rain-accumulation.ts` | Fixed accumulation-window definitions, physical millimetre breaks, and piecewise GPU normalization. No DOM or wall clock. | `RAIN_ACCUMULATION_WINDOWS`, `rainAccumulationDefinition`, `normalizeRainAccumulationMm` |
 | `narrative.ts` | Translates the exact intensity budget into one causal sentence. | `explainIntensity`, `CausalNarrative` |
 | `intensity-sparkline.ts` | Pure geometry for the flight-tape wind-vs-time sparkline. | `buildIntensitySparkline`, `nearestIntensityIndex` |
-| `point-probe.ts` | Pure point-probe reading from the same environment + vortex data the sim uses; DOM positioning lives in main/ui. | `createPointProbeReading`, `PointProbeReading` |
+| `point-probe.ts` | Pure point-probe reading from the same environment + vortex data the sim uses, with selected-window rain supplied by the deterministic impact ledger; DOM positioning lives in main/ui. | `createPointProbeReading`, `PointProbeReading` |
 | `export.ts` | Dependency-free storm artifacts: PNG debrief card and WebM replay loop rendered from the immutable tape, never by rewinding the engine. | `makeDebriefCard`, `makeReplayVideo`, `exportFileStem`, `downloadBlob` |
 | `historical-analog.ts` | Deterministic geometric/intensity similarity against shipped historic ghosts; educational analogue, not a forecast claim. | `findHistoricalAnalog`, `HistoricalAnalog` |
 | `storm-names.ts` | Versioned WMO/ESCAP North Indian Ocean naming roster; names identify simulations only. | `simulatedStormName`, `NORTH_INDIAN_OCEAN_NAMES` |
@@ -151,6 +156,7 @@ Notes verified in code:
 | `tracks.ts` | IBTrACS historic-track parsing + ghost polyline projection + label anchoring; DOM-free, degrades to null on bad shape. | `parseTracks`, `StormTrack`, `toGhostPolylines`, `computeLabelAnchors` |
 | `weather-layers.ts` | User-facing weather-map layer catalogue + legends. Array order is load-bearing: it is the layer rail order AND the Digit1..9 keyboard mapping. | `WEATHER_LAYERS`, `WeatherLayerId`, `SATELLITE_PALETTES`, `DEFAULT_WEATHER_LAYER` |
 | `satellite-observations.ts` | Observed satellite frame manifest parsing, timestamp slot matching, Meteosat/INSAT URL builders, image loading. | `parseSatelliteManifest`, `matchObservedFrame`, `acquisitionSlotIso`, `loadObservedFrameImage` |
+| `radar-observations.ts` | Wall-clock observed-radar boundary: validates RainViewer's public manifest, caps the recent loop, builds provider tile URLs, and reprojects six-tile Web-Mercator mosaics onto the fixed app domain. Pixels never enter model state. | `parseRadarTimeline`, `recentRadarFrames`, `loadRadarMosaic`, `loadRadarCoverageFraction` |
 
 ### src/ — ensemble worker path
 
@@ -194,7 +200,7 @@ Notes verified in code:
 
 | file | responsibility | key exports |
 |---|---|---|
-| `index.ts` | The render facade implementing the public `RenderLayer` contract; owns layer construction, GPU texture bundle, and per-frame composition in luminance order: terrain → observed satellite → env glow → radar → rain → wind/particles → ghosts → track. | `RenderPipeline`, `createRenderer`, `createRenderLayers`, `RenderResources` |
+| `index.ts` | The render facade implementing the public `RenderLayer` contract; owns layer construction, GPU texture bundle, and per-frame composition in luminance order: terrain → observed satellite → env glow → simulated/observed radar → rain → wind/particles → ghosts → track. | `RenderPipeline`, `createRenderer`, `createRenderLayers`, `RenderResources` |
 | `context.ts` | Internal seam: the facade derives a richer `DrawCtx` (interpolated centre in clip space, env at storm, aftermath fade, texture bundle) once per frame for the layer modules. Not exported to other builders. | `DrawCtx`, `GpuTextures`, `RenderModule`, `EnvAtStorm` |
 | `gl-utils.ts` | Thin WebGL2 helpers: program compile/link with loud errors, fullscreen quad VAO, render targets with half-float → UNSIGNED_BYTE fallback. | `makeProgram`, `makeQuadVao`, `makeRenderTarget`, `probeCaps` |
 | `textures.ts` | Turns decoded `BinLayer`s into R8/R16F GPU textures; resolves layer names via candidate lists; plane interpolation helpers. | `buildElevationTex`, `buildR8Tex`, `pickLayer`, `planeOf`, `environmentPlaneInterpolation`, `SST_MIN_C`/`SST_MAX_C` |
@@ -202,6 +208,7 @@ Notes verified in code:
 | `env.ts` | GPU weather-map pass: SST glow, scalar env modes, simulated infrared (explicitly a proxy, not satellite data), rain-mode base darkening. Mode/palette tables per `WeatherLayerId`. | `EnvLayer` |
 | `satellite.ts` | Observed satellite image pass; pixels stay isolated from model physics. | `ObservedSatelliteLayer` |
 | `radar.ts` | Reflectivity-style display of the simulated eyewall and spiral rainbands. | `RadarLayer` |
+| `observed-radar.ts` | Provider-alpha-preserving fullscreen pass for the selected timestamped radar mosaic, plus an instrument hatch driven by the separate provider coverage mask. No thresholding, reflectivity conversion, or feedback into rain physics. | `ObservedRadarLayer` |
 | `rain.ts` | Orographic rain accumulation + wadi lighting on a half-res ping-pong render target; in-shader decay + routed transport. | `RainLayer` |
 | `wind.ts` | Windy-style full-map wind flow: ~3k particles through baked steering + the shared Holland vortex, fading trails. Decorative; fixed private RNG seed. | `WindLayer` |
 | `particles.ts` | The storm as a satellite spiral: 8k CPU-advected particles through the shared vortex, aspect-corrected, downshear smear. | `ParticleLayer` |
@@ -278,6 +285,8 @@ terminates the worker.
 | Add a baked data source | `bake/bake.py` + `bake/binfmt.py` (writer), document in `BINARY-FORMATS.md`, register in `MANIFEST` in `src/main.ts`, add layer-name candidates in `src/render/textures.ts` `pickLayer` if rendered |
 | Add a historical event/scenario | `bake/event_catalog.py` (frozen catalogue), rebake `env_<id>.bin`/`steering_<id>.bin` + `public/data/scenarios.json`, shape validated by `src/scenarios.ts` |
 | Change impact scoring, flood tiers, city list | `src/impact.ts` (`ImpactTracker`, `floodRiskTier`, `IMPACT_CITIES`) |
+| Change rain accumulation windows or scales | `src/rain-accumulation.ts`; ring integration in `src/impact.ts`; upload normalization in `src/render/index.ts` |
+| Change the observed-radar provider boundary | `src/radar-observations.ts` (manifest/tile validation + reprojection), `src/main.ts` (wall-clock transport/provenance), `src/render/observed-radar.ts` (display-only pass) |
 | Touch the export card or replay video | `src/export.ts` (`makeDebriefCard`, `makeReplayVideo`) |
 | Change colours/palette | `src/tokens.ts` only — CSS vars and shader uniforms both derive from it |
 | Change category thresholds or labels | `src/category.ts` |

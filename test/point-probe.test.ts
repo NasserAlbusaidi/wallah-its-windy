@@ -76,6 +76,8 @@ describe('point probe', () => {
       environmentKind: 'analysis',
       environmentLabel: 'Gonu ERA5 event',
       validTimeLabel: '+24 h',
+      simulatedRainMm: 42.75,
+      simulatedRainWindowLabel: '6 h',
     });
     expect(reading).toMatchObject({
       sstC: 29.25,
@@ -83,6 +85,8 @@ describe('point probe', () => {
       shearMs: 8.75,
       ohcKjCm2: 63.25,
       environmentKind: 'analysis',
+      simulatedRainMm: 42.75,
+      simulatedRainWindowLabel: '6 h',
     });
     expect(reading.modeledWindKt).toBe(windAtPointKt(active, point));
   });
@@ -98,5 +102,6 @@ describe('point probe', () => {
       validTimeLabel: 'seasonal mean',
     });
     expect(reading.modeledWindKt).toBeNull();
+    expect(reading.simulatedRainMm).toBeNull();
   });
 });

@@ -24,8 +24,9 @@ No joystick, no dragging the storm: you author it, physics finishes it.
 > scoring and a separate counterfactual mode. A separate frozen 30-storm
 > observational benchmark measures the exact runtime at 12/24/48/72 hours
 > against a no-future-information persistence baseline. The map can switch
-> among terrain, wind, simulated rain products, environmental fields, and a
-> satellite desk with simulated or timestamp-matched observed imagery. A worker-run
+> among terrain, wind, deterministic rain products, environmental fields, a
+> timestamped observed-radar loop, and a satellite desk with simulated or
+> timestamp-matched observed imagery. A worker-run
 > forecast laboratory adds deterministic ensembles, track member-frequency fields,
 > and same-storm sensitivity experiments without blocking the map.
 
@@ -76,17 +77,22 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
 
 - Click open water to spawn a storm.
 - Hover the chart for modeled surface wind, SST, humidity, shear, and OHC at the
-  cursor. Use **pin** to hold the reading; on touch, long-press the chart. The
-  card identifies analysis, climatology, or fallback fields and always labels
-  vortex wind as simulated.
+  cursor, plus exact millimetres from the selected simulated-rain window. Use
+  **pin** to hold the reading; on touch, long-press the chart. The card identifies
+  analysis, climatology, or fallback fields and always labels vortex wind and
+  rain as simulated. Rain is withheld while scrubbing replay because the ledger
+  is live-run state, not a stored historical analysis.
 - Eight coastal-city markers open exact current/run impact readings. A marker
   glows amber only while the same Holland profile used by the impact report
   puts that city at or above 34 kt.
-- Pick a layer on the right-edge rail (or press 1–9): wind flow, simulated
-  rain radar, simulated infrared, storm-total rainfall, SST, humidity, OHC,
-  shear, and the terrain instrument. SST/RH/OHC/shear render the exact active
-  baked plane; wind superposes ERA5 steering with the parametric vortex; IR,
-  radar, and storm-total rainfall are explicitly simulated proxies.
+- Pick a layer on the right-edge rail (or press 1–9): wind flow, radar,
+  simulated infrared, rain accumulation, SST, humidity, OHC, shear, and the
+  terrain instrument. The radar desk switches between the model's
+  reflectivity-style proxy and a timestamped eight-frame RainViewer past-radar
+  loop. Observed pixels are display-only, carry provider/time/age/coverage
+  provenance, and are never assimilated. The accumulation desk exposes fixed
+  1/3/6/24-hour and storm-lifetime windows from the deterministic 15-minute
+  parametric-rain ledger.
 - On the infrared layer, choose enhanced IR, operational grayscale, or a
   daytime visible-style rendering. Source controls switch among the simulated
   cloud field, timestamp-matched observed imagery, and a six-model-hour visual
@@ -156,8 +162,22 @@ The rain view maps the separated simulated rain rates through a
 Marshall–Palmer-style `Z = 200 R^1.6` transform and a
 reflectivity palette; it follows the
 [NWS reflectivity concept](https://training.weather.gov/nwstc/NEXRAD/RADAR/3-1.htm)
-but is not a radar observation. The interface labels both proxy products
-as simulated and keeps observed satellite pixels source- and time-labelled.
+but is not a radar observation. Its accumulation companion integrates those
+same rates on a fixed 0.1° bookkeeping grid. A bounded 96-step ring preserves
+the trailing 24 hours, so changing among 1/3/6/24-hour windows is deterministic
+and changing the display never changes storm physics or storm-total impact
+accounting.
+
+The observed radar mode fetches RainViewer's public past-radar manifest and at
+most eight recent 10-minute frames. Each selected frame uses six zoom-5 tiles
+over the fixed domain, is reprojected row-by-row from Web Mercator onto the
+equirectangular map, and remains a separate GPU pass. There is deliberately no
+observed-to-simulated radar handoff and no model-time label: it is a recent
+wall-clock composite with provider attribution, age, coverage-mask status, and
+an explicit “not assimilated” label. The provider mask is also rendered as a
+restrained hatch outside radar range, so missing coverage cannot masquerade as
+“no rain.” A failed request shows unavailable rather than silently substituting
+simulated pixels.
 
 On touch screens, a short stable tap spawns, a long-press pins the point probe,
 and drag/multi-touch gestures do neither. Narrow layouts keep the causal sentence
@@ -203,7 +223,9 @@ npm run hf6:gate:check                      # enforce implementation + honesty g
   with per-cell travel time (`flowacc.bin`). ERA5 supplies steering, shear, and
   600/700-hPa relative humidity; NOAA WOA23 supplies OHC26. Optional observed
   satellite frames use EUMETSAT EUMETView or registered MOSDAC/INSAT inputs,
-  each recorded in `public/data/satellite/manifest.json`.
+  each recorded in `public/data/satellite/manifest.json`. Recent observed-radar
+  pixels and coverage masks are requested directly from RainViewer at runtime
+  under its public weather-maps API terms and always retain visible attribution.
 - GMRT, NOAA, and HydroSHEDS downloads are public and auth-free. ERA5
   reproduction requires a configured CDS API token and accepted Copernicus
   licence.
@@ -402,9 +424,11 @@ src/
   live-providers.ts   HF-5 provider descriptors + cycle adapters
   live-product.ts     DOM-free view of an issued forecast cycle
   satellite-observations.ts observed-frame manifest, matching, WMS URLs
+  radar-observations.ts bounded RainViewer timeline, tiles + reprojection
+  rain-accumulation.ts deterministic display windows, scales + normalization
   weather-layers.ts   nine map-product labels, provenance, and legends
   category.ts         Saffir–Simpson thresholds, chip copy, tracker colours
-  impact.ts           storm-total rain grid + per-city exposure (impact proxy)
+  impact.ts           fixed-window/storm rain ledger + per-city impact proxy
   point-probe.ts      pure cursor environment/vortex reading
   export.ts           dependency-free PNG card + WebM replay renderer
   performance.ts      device-aware DPR/particle budgets (render only)
@@ -420,6 +444,7 @@ src/
     cloud-noise.ts    deterministic tileable noise for simulated clouds
     satellite.ts      observed satellite image pass, physics-isolated
     radar.ts          reflectivity-style simulated rain display
+    observed-radar.ts display-only observed radar texture pass
     rain.ts           rain accumulation + wadi lighting (ping-pong target)
     wind.ts           Windy-style full-map wind flow (particles + trails)
     particles.ts      storm spiral particle swarm

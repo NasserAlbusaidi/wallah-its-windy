@@ -24,7 +24,14 @@ and copy its choices (colours, radii, sizes are all in its `<style>` block).
 
 ## Global Constraints
 
-- `npm test`, `npm run build`, `npm run calibrate:check` must pass at the end of EVERY task.
+- Gates at the end of EVERY task: `npm test` and `npm run build` fully green, PLUS
+  no-new-drift on calibration: `node --experimental-strip-types calibration/run.mjs --check`
+  must print `[structure-calibration] PASS`, and the two KNOWN-RED baselines must
+  remain byte-identical to baseline (pre-existing on main e213119, discovered
+  2026-07-26, tracked separately — NOT this branch's concern):
+  `[hindcast-calibration] FAIL results=false report=false liveParameters=false`
+  and `[fidelity] FAIL results=false reference=true report=false gate=false`.
+  Any DIFFERENT output from those two checks means this branch caused new drift → stop.
 - Never edit: `src/sim.ts`, `src/rng.ts`, `src/loader.ts`, anything in `calibration/`, `bake/`, machine-generated docs (`docs/fidelity-benchmark.md`, `docs/hindcast-benchmark.md`, `docs/structure-calibration.md`, `docs/hf6-scorecard.md`).
 - Honesty strings survive verbatim and visible: `simulated` labels on simulated products, `HF-6 research build`, `experimental forecast companion — not official guidance`, ensemble copy stays frequency-not-probability.
 - URL-hash format untouched (`test/rng.test.ts` guards it — do not modify that test).
@@ -66,7 +73,7 @@ Key existing APIs (do not re-invent):
   `PANEL_GLASS = 'rgba(11,16,26,0.82)'` and new CSS vars `--radius-panel: 10px`,
   `--radius-ctl: 7px` injected by `injectCssVars`.
 
-- [ ] **Step 1: Write the failing test** — create `test/tokens.test.ts`:
+- [x] **Step 1: Write the failing test** — create `test/tokens.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -92,9 +99,9 @@ describe('windy-grade chrome tokens', () => {
 });
 ```
 
-- [ ] **Step 2: Run it, expect failure** — `npx vitest run test/tokens.test.ts` →
+- [x] **Step 2: Run it, expect failure** — `npx vitest run test/tokens.test.ts` →
   fails (`uiAccent` missing / `PANEL_GLASS` not exported).
-- [ ] **Step 3: Implement** — in `src/tokens.ts` RAW array append (keep the file's
+- [x] **Step 3: Implement** — in `src/tokens.ts` RAW array append (keep the file's
   comment style):
 
 ```ts
@@ -117,7 +124,7 @@ In `injectCssVars`, after the `--radius` line add:
   target.style.setProperty('--panel-glass', PANEL_GLASS);
 ```
 
-- [ ] **Step 4: Tests pass** — `npx vitest run test/tokens.test.ts` → PASS.
+- [x] **Step 4: Tests pass** — `npx vitest run test/tokens.test.ts` → PASS.
 - [ ] **Step 5: Full gates** — `npm test`, `npm run build`, `npm run calibrate:check` → all green.
 - [ ] **Step 6: Commit** — `git add src/tokens.ts test/tokens.test.ts && git commit -m "feat: add windy-grade chrome tokens"`
 

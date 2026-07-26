@@ -414,18 +414,18 @@ describe('formatStormTag', () => {
 **Interfaces:**
 - Consumes: nothing new. Legend gradient + shaders follow tokens automatically.
 
-- [ ] **Step 1: Capture BEFORE** — driver screenshot of the seed-7 Cat-3 wind view.
-- [ ] **Step 2: Retune** — raise saturation/luminance of `wind0..wind4` toward
+- [x] **Step 1: Capture BEFORE** — driver screenshot of the seed-7 Cat-3 wind view.
+- [x] **Step 2: Retune** — raise saturation/luminance of `wind0..wind4` toward
   the mock's filtered look (mock applied `saturate(1.18) brightness(1.06)`
   over `#28386e #2e8796 #58ab58 #e3b939 #cc4078`). Start with:
   `wind0 [45,66,133] · wind1 [46,152,168] · wind2 [94,190,94] · wind3 [242,187,48] · wind4 [224,62,126]`,
   then eyeball against the mock capture and adjust once. In
   `src/render/particles.ts` raise the trail alpha constant modestly (≤ +20%);
   it is render-only — confirm the constant feeds draw colour, not physics.
-- [ ] **Step 3: Capture AFTER + compare** — same driver shot; the field should
+- [x] **Step 3: Capture AFTER + compare** — same driver shot; the field should
   read vivid WITHOUT any CSS filter. No `filter:` rules on canvases in
   style.css.
-- [ ] **Step 4: Full gates** — including `npm run calibrate:check` and
+- [x] **Step 4: Full gates** — including `npm run calibrate:check` and
   `npm run fidelity:check` (palettes are render-only; green proves it).
 - [ ] **Step 5: Commit** — `git commit -am "feat: retune wind palette for windy-grade vividness"`
 

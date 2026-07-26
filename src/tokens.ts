@@ -80,11 +80,11 @@ const RAW: readonly RawToken[] = [
   // Wind-speed palette (Windy-style flow map): calm indigo -> teal -> green ->
   // amber -> magenta across 0..50 m/s. Consumed by the wind fill shader, the
   // particle-trail colouring, and the rail legend gradient.
-  { key: 'wind0', cssVar: '--wind-0', rgb: [40, 56, 110], a: 1 },
-  { key: 'wind1', cssVar: '--wind-1', rgb: [46, 135, 150], a: 1 },
-  { key: 'wind2', cssVar: '--wind-2', rgb: [88, 171, 88], a: 1 },
-  { key: 'wind3', cssVar: '--wind-3', rgb: [227, 179, 57], a: 1 },
-  { key: 'wind4', cssVar: '--wind-4', rgb: [204, 64, 120], a: 1 },
+  { key: 'wind0', cssVar: '--wind-0', rgb: [39, 59, 127], a: 1 },
+  { key: 'wind1', cssVar: '--wind-1', rgb: [35, 147, 165], a: 1 },
+  { key: 'wind2', cssVar: '--wind-2', rgb: [82, 186, 82], a: 1 },
+  { key: 'wind3', cssVar: '--wind-3', rgb: [250, 189, 37], a: 1 },
+  { key: 'wind4', cssVar: '--wind-4', rgb: [236, 61, 131], a: 1 },
   // Storm-total accumulated-rain palette (impact proxy): dry -> soaked.
   { key: 'precip0', cssVar: '--precip-0', rgb: [10, 20, 34], a: 1 },
   { key: 'precip1', cssVar: '--precip-1', rgb: [38, 108, 168], a: 1 },

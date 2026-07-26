@@ -56,6 +56,11 @@ import {
   type IntensitySparklineGeometry,
 } from './intensity-sparkline';
 import { categoryGradientCss } from './timeline-gradient';
+import {
+  isWeatherLayerId,
+  WEATHER_LAYERS,
+  weatherLayerDefinition,
+} from './weather-layers';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -393,12 +398,40 @@ export class UiController {
     dom<HTMLButtonElement>('city-detail-close').addEventListener('click', () => {
       this.cityDetail.hidden = true;
     });
+    this.installLayerRailIcons();
     this.bindSparklineInspection();
   }
 
   // -------------------------------------------------------------------------
   // Geographic product overlays: city markers + point probe
   // -------------------------------------------------------------------------
+
+  private installLayerRailIcons(): void {
+    const root = dom('layer-buttons');
+    let observer: MutationObserver | null = null;
+    const decorate = (): void => {
+      let mounted = 0;
+      for (const button of root.querySelectorAll<HTMLButtonElement>('.layer-button')) {
+        const layer = button.dataset.layer;
+        if (!layer || !isWeatherLayerId(layer)) continue;
+        // Trusted static catalogue markup: labels remain textContent in the
+        // button factory, while only our compile-time SVG is parsed as HTML.
+        button.querySelector(':scope > svg')?.remove();
+        button.insertAdjacentHTML(
+          'afterbegin',
+          weatherLayerDefinition(layer).iconSvg,
+        );
+        mounted += 1;
+      }
+      if (mounted === WEATHER_LAYERS.length) observer?.disconnect();
+    };
+
+    // main.ts mounts the static rail after the controller is constructed.
+    // Observe that one child-list change, decorate all nine rows, then detach.
+    observer = new MutationObserver(decorate);
+    observer.observe(root, { childList: true });
+    decorate();
+  }
 
   private buildCityMarkers(): void {
     this.cityMarkerRoot.replaceChildren();

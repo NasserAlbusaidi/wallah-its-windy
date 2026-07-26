@@ -538,7 +538,7 @@ dd,
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 142px;
+  width: 184px;
   pointer-events: auto;
   z-index: 6;
 }
@@ -565,24 +565,23 @@ dd,
 #layer-buttons {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .layer-button {
   display: grid;
-  grid-template-columns: 16px 1fr auto;
-  gap: 7px;
+  grid-template-columns: 15px 1fr auto;
+  gap: 9px;
   align-items: center;
-  min-height: 32px;
-  padding: 7px 8px;
-  color: var(--text-hi);
-  font: 500 10px/1.2 var(--mono);
-  letter-spacing: 0.05em;
+  min-height: 0;
+  padding: 7px 9px;
+  color: #c9d8e6;
+  font: 600 12.5px/1.2 var(--sans);
+  letter-spacing: 0;
   text-align: left;
   text-transform: lowercase;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  backdrop-filter: blur(10px);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-ctl);
   cursor: pointer;
   transition:
     border-color 140ms ease,
@@ -592,11 +591,12 @@ dd,
 .layer-button svg {
   width: 15px;
   height: 15px;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 .layer-button .key {
+  color: var(--text-dim);
   font-size: 10px;
-  opacity: 0.35;
+  opacity: 1;
 }
 .layer-button:hover {
   color: var(--storm-core, #e8f4ff);
@@ -1574,6 +1574,9 @@ dd,
   opacity: 0.48;
   text-transform: uppercase;
 }
+#app #flight-recorder .flight-readout dt {
+  white-space: nowrap;
+}
 .flight-readout dd,
 .debrief-grid dd {
   margin: 0;
@@ -1840,6 +1843,31 @@ dd,
   }
   #app:has(#flight-recorder:not([hidden])) #caption {
     display: none;
+  }
+}
+
+/* The compact 900px review viewport still sits above the mobile breakpoint.
+   Collapse only the quiet rail to the 40px icon contract; product workbenches
+   keep their existing expanded widths whenever one is open. */
+@media (min-width: 821px) and (max-width: 1000px) {
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) {
+    width: 40px;
+    padding: 8px 3px;
+  }
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .rail-head,
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) #weather-legend,
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .rail-footer,
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .layer-button .label,
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .layer-button .key {
+    display: none;
+  }
+  #layer-rail:not(:has(#satellite-workbench:not([hidden]))):not(:has(#radar-workbench:not([hidden]))):not(:has(#accum-workbench:not([hidden]))) .layer-button {
+    grid-template-columns: 15px;
+    justify-content: center;
+    justify-items: center;
+    width: 34px;
+    min-height: 34px;
+    padding: 7px;
   }
 }
 
@@ -2528,15 +2556,16 @@ html[data-compact='true'] .ghost-label:not(.active) {
     scrollbar-width: thin;
   }
   .layer-button {
-    grid-template-columns: 15px auto;
+    grid-template-columns: 15px;
+    justify-items: center;
     flex: 0 0 auto;
-    min-width: auto;
+    min-width: 34px;
     min-height: 34px;
-    padding: 6px 8px;
+    padding: 7px;
   }
-  .layer-button .label {
-    display: inline;
-    font-size: 12.5px;
+  .layer-button .label,
+  .layer-button .key {
+    display: none;
   }
   #weather-legend {
     align-self: flex-start;

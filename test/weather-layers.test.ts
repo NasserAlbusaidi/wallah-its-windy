@@ -29,6 +29,13 @@ describe('weather layer catalogue', () => {
     expect(WEATHER_LAYERS[WEATHER_LAYERS.length - 1].id).toBe('terrain');
   });
 
+  it('every layer carries an inline svg icon', () => {
+    for (const layer of WEATHER_LAYERS) {
+      expect(layer.iconSvg).toContain('<svg');
+      expect(layer.iconSvg).toContain('viewBox="0 0 16 16"');
+    }
+  });
+
   it('validates only catalogue ids', () => {
     for (const layer of WEATHER_LAYERS) {
       expect(isWeatherLayerId(layer.id)).toBe(true);

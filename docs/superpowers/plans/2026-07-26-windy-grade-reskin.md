@@ -323,7 +323,7 @@ if the interface exposes `label` not `name`, use that. The test drives it.)
 **Interfaces:**
 - Produces: `WeatherLayerDefinition.iconSvg: string` (inline `<svg viewBox="0 0 16 16">…</svg>`, stroke-based, `stroke="currentColor" fill="none"`).
 
-- [ ] **Step 1: Failing test** — extend `test/weather-layers.test.ts`:
+- [x] **Step 1: Failing test** — extend `test/weather-layers.test.ts`:
 
 ```ts
 it('every layer carries an inline svg icon', () => {
@@ -334,20 +334,20 @@ it('every layer carries an inline svg icon', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect fail.**
-- [ ] **Step 3: Implement** — add `iconSvg` to the interface and each of the 9
+- [x] **Step 2: Run, expect fail.**
+- [x] **Step 3: Implement** — add `iconSvg` to the interface and each of the 9
   definitions. Use the mock's icons verbatim (`direction-e.html`, the
   `.rail .row svg` blocks — wind curves, radar arcs, satellite box, raindrop,
   thermometer, humidity drop, ocean-heat waves, shear arrows, terrain peaks);
   wrap each as
   `<svg viewBox="0 0 16 16" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">…</svg>`.
-- [ ] **Step 4: Render them** — in the `ui.ts` layer-button factory, prepend
+- [x] **Step 4: Render them** — in the `ui.ts` layer-button factory, prepend
   `iconSvg` via `insertAdjacentHTML` (trusted static string from our own
   catalogue — note this in a comment), keep label + key numeral. Style rows per
   mock: active row filled `var(--ui-accent)` with dark text + glow; compact
   breakpoints (`style.css:1950`, `style.css:2153`) go icon-only ~40px.
-- [ ] **Step 5: Hand-verify** — rail matches mock; keys 1–9 unchanged.
-- [ ] **Step 6: Full gates.**
+- [x] **Step 5: Hand-verify** — rail matches mock; keys 1–9 unchanged.
+- [x] **Step 6: Full gates.**
 - [ ] **Step 7: Commit** — `git commit -am "feat: icon layer rail"`
 
 ---

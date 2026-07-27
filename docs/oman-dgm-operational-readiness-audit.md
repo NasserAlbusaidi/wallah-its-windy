@@ -411,6 +411,147 @@ The main layer catalogue is defined in
 not carry a complete issue-time, valid-time, source, uncertainty, and vertical
 coordinate contract.
 
+### Post-audit layer-integrity addendum — 27 July 2026
+
+The following findings were submitted after the main audit and checked against
+the committed runtime, shaders, bake scripts, and binary artefacts. They do not
+change the no-go decision, but they sharpen the distinction between display
+defects and limits imposed by the shipped data.
+
+#### Storm clouds use the inner-core radius as their only size scale
+
+**Implementation defect.** The apparent shrinking of the simulated infrared
+cloud shield as the cyclone intensifies has a specific cause. The structural
+model deliberately contracts the radius of maximum wind (RMW) with increasing
+wind using the bounded Willoughby–Rahn climatological proxy in
+[`src/structure.ts`](../src/structure.ts). That is a defensible first-order
+behaviour for the eye and eyewall. The same model separately predicts an outer
+size, and the live parameters allow that outer circulation to grow with wind.
+
+The infrared shader in [`src/render/env.ts`](../src/render/env.ts), however,
+receives only `structure.rmwKm / 666` as `u_rMax`. Its central overcast,
+rainbands, cirrus canopy, shear displacement, and eye are all expressed as
+multiples of that one inner-core radius. It never receives `outerSizeKm` or a
+34-kt wind radius. Consequently a strengthening storm can have a correctly
+contracting eye and eyewall but an incorrectly contracting entire cloud shield,
+even while its diagnosed outer circulation expands.
+
+The widening accumulation display does not contradict this diagnosis. It is a
+storm-total history: deposited rain remains on the grid as the storm moves and
+new deposits are added. The instantaneous radar rainband also uses an
+RMW-normalized envelope, so future correction should provide separate inner-core
+and outer-cloud/rainband scales rather than merely enlarging every storm feature.
+
+Required remedy: pass both RMW and a verified outer-size measure into the cloud
+and precipitation render paths. Keep the eye and eyewall tied to RMW; tie the
+central dense overcast, outer rainbands, and cirrus canopy to independently
+bounded structural radii.
+
+#### Instantaneous radar and accumulated rain use different rainband means
+
+**Implementation defect.** The simulated radar shader in
+[`src/render/radar.ts`](../src/render/radar.ts) modulates its rainband with
+`max(0.08, 0.54 + 0.46·sin(...))`, whose azimuthal mean is 0.54. The impact
+ledger in [`src/impact.ts`](../src/impact.ts) deposits the same nominal
+rainband rate with a fixed factor of 0.68. Its azimuthally averaged rainband is
+therefore `0.68 / 0.54 = 1.259`, approximately 26% larger than the instantaneous
+radar product implies.
+
+There is an important qualification. The accumulation layer faithfully renders
+the CPU ledger; the disagreement is between products, not between that ledger
+and its own display. The 0.68 comment in `impact.ts` also matches the separate
+land/wadi rain shader in [`src/render/rain.ts`](../src/render/rain.ts), which
+uses `0.68 + 0.32·sin(...)`. The comment is therefore not numerically invented,
+but it is ambiguous because it does not identify that shader and does not match
+the user-facing simulated radar.
+
+Required remedy: define one shared rainband spatial contract for radar, impact
+accumulation, and land/wadi forcing, or explicitly document and validate any
+intentional product-specific transfer functions.
+
+#### Missing `ocean.bin` is assigned the wrong provenance tier
+
+**Implementation defect.** The boot loader in
+[`src/main.ts`](../src/main.ts) intentionally turns a missing or failed
+`data/ocean.bin` fetch into `null`. The ocean sampler then returns no profile.
+At reset, [`src/sim.ts`](../src/sim.ts) nevertheless labels every non-event
+column `climatological-subsurface` before it knows whether the profile exists.
+[`src/upper-ocean.ts`](../src/upper-ocean.ts) correctly generates an analytic
+temperature/salinity profile from scalar SST and OHC when the profile is absent,
+but preserves the already assigned climatological label. Its
+`missingSourceFlag` is consequently false.
+
+The result is silent provenance degradation: diagnostics and exports can claim a
+WOA23-initialized subsurface column while the model is using a fabricated
+analytic profile. `analytic-fallback` remains reachable through lower-level
+defaults and tests, but not through the normal shipped application path for this
+failure.
+
+Required remedy: sample the profile first and derive `initializationTier` from
+the result. A missing or malformed climatological profile must set
+`analytic-fallback`, raise `missingSourceFlag`, and produce a visible degraded
+data-state indication.
+
+#### Vector ventilation is diagnostic, not shipped intensity physics
+
+**Model limitation and profile-selection risk.** The annular calculation in
+[`src/ventilation.ts`](../src/ventilation.ts) is implemented and unit-tested. It
+retains the Tang–Emanuel dimensional form—shear times a bounded RH-derived
+entropy-deficit proxy divided by potential intensity—but it is not a full
+thermodynamic Tang–Emanuel ventilation calculation because the required entropy
+profiles are absent.
+
+The running application does not select `hf2-experimental`.
+[`src/main.ts`](../src/main.ts) supplies no physics override, so
+[`src/sim.ts`](../src/sim.ts) selects `shipped` and explicitly passes that
+profile into organization and intensity. The vector ventilation index is still
+calculated and recorded as a diagnostic, but the shipped intensity tendency and
+organization target use scalar shear and mid-level RH fallbacks. Shear direction
+therefore changes structure and rain geometry, but does not directly change the
+deployed intensity tendency.
+
+Required remedy: do not describe the vector ventilation index as active
+intensity physics until the experimental profile passes its scientific gates and
+is deliberately promoted. In the meantime, label it diagnostic-only in the UI
+and model documentation.
+
+#### The shipped environment artefact has a hard information ceiling
+
+Independent parsing of `public/data/env.bin` with the reference parser in
+[`bake/binfmt.py`](../bake/binfmt.py) found 56 layer records on the 40 × 24,
+0.5-degree grid: `sst`, `u`, `v`, `shr`, `shu`, `shv`, `rh`, and `ohc` for each
+month suffix `04` through `10`. Atmospheric wind, shear, and RH fields contain
+four selected real-year planes per month; SST and OHC have one climatological
+plane per month.
+
+- The baked `u` and `v` fields are deep-layer steering, while `shu` and `shv`
+  retain only `V200 − V850`. Absolute 200-hPa winds and the individual
+  850/500/250-hPa winds are not persisted. The browser cannot uniquely
+  reconstruct another shear layer pair or a data-derived upper-level outflow
+  field.
+- [`bake/fetch_era5.py`](../bake/fetch_era5.py) requests pressure-level `u` and
+  `v`, 600/700-hPa RH, and SST. It does not request atmospheric temperature or
+  geopotential. Emanuel potential intensity, tropopause height, CAPE, and other
+  profile-based thermodynamics are therefore not derivable from the shipped
+  artefact; the current intensity ceiling is the SST-based DeMaria–Kaplan proxy.
+- The atmospheric runtime forcing is not a 30-year mean. The raw ERA5 request
+  spans 1991–2020, but [`bake/era5.py`](../bake/era5.py) deliberately selects
+  four distinct real years per month. As `CLAUDE.md` already states,
+  `SHEAR_THRESHOLD_MS = 14` is calibrated to this monthly-mean, selected-year
+  representation and is not portable to daily or hourly forecast shear without
+  recalibration.
+- The observation contract and baker support only infrared and visible
+  satellite channels. There is no microwave or water-vapour channel. A
+  quantitative brightness-temperature product would additionally require
+  calibrated radiance/channel metadata; adding atmospheric temperature or
+  geopotential alone would not supply it.
+
+These are acquisition and schema limits, not parser omissions. Adding the
+derived products requires versioning the data contract, retaining the necessary
+vertical and radiometric source variables, updating the baker and browser
+samplers, and recalibrating every model term that consumes the changed
+distribution.
+
 ## Interface and product-surface audit
 
 ### Masthead, disclaimer, and methodology

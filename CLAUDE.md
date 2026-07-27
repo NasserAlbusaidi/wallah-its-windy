@@ -21,17 +21,19 @@ self-describing `.bin` assets the browser loads.
   `hf6:prospective:check`, `data:hf6:catalog:check` — sealed-cohort
   verification; must pass untouched after any model change.
 - CI deploy gate (`.github/workflows/deploy.yml`, Node 22): `npm ci`,
-  `npm test`, `npm run calibrate:check`, `npm run build`. Breaking any of these
-  blocks the GitHub Pages deploy.
+  `npm test`, `npm run calibrate:check`, the three HF-6 checks, then
+  `npm run build`. Breaking any of these blocks the GitHub Pages deploy.
 - Runtime `.ts` reaches the offline scripts two ways: most `calibration/*.mjs`
   load it through an in-process Vite server (`vite.ssrLoadModule`, which works
   under plain `node`); only `calibration/run.mjs`, `bake/hf6_prospective.mjs`,
   and `bake/live_archive.mjs` import `.ts` statically and need
   `node --experimental-strip-types`. The gate scripts (`hf2-gate.mjs`, ...)
   run on plain `node`; none imports `.ts` statically (`hf5-gate.mjs` loads
-  `.ts` only via `ssrLoadModule`). Bake scripts hardcode
-  `bake/.venv/bin/python` (except `data:structure`, which uses system
-  `python3`). Wrong Node or missing venv fails these, not the app.
+  `.ts` only via `ssrLoadModule`). Data scripts use
+  `node bake/run-python.mjs`, which resolves the repository venv's POSIX
+  `bin/python` or Windows `Scripts/python.exe` layout and never falls back to a
+  system interpreter (except the documented `data:structure` command).
+  Wrong Node or a missing venv fails these, not the app.
 
 ## Determinism (the core invariant)
 

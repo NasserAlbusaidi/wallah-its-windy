@@ -11,13 +11,17 @@ headers advertise (the runtime hardcodes none of them).
 
 ```bash
 cd wallah-its-windy
+# Windows may use `python`; POSIX installations commonly use `python3`.
 python3 -m venv bake/.venv
-bake/.venv/bin/python -m pip install --upgrade pip
-bake/.venv/bin/python -m pip install -r bake/requirements.txt
-bake/.venv/bin/python bake/bake.py
+node bake/run-python.mjs -m pip install --upgrade pip
+node bake/run-python.mjs -m pip install -r bake/requirements.txt
+node bake/run-python.mjs bake/bake.py
 ```
 
-macOS, Python 3.14, numpy 2.x. Raw downloads cache under `data/raw/` (gitignored);
+The launcher selects `.venv/bin/python` on POSIX and
+`.venv/Scripts/python.exe` on Windows, and fails rather than falling back to a
+system interpreter. macOS, Python 3.14, numpy 2.x. Raw downloads cache under
+`data/raw/` (gitignored);
 a second run reuses them. Total runtime ≈ 15 s after downloads. The script prints
 its progress, selected real years, thermodynamic ranges, and bake-time asserts.
 
@@ -206,7 +210,7 @@ Opt-in, NOT part of the default bake (it must never touch env.bin/terrain.bin/
 flowacc.bin/genesis.json):
 
 ```bash
-bake/.venv/bin/python bake/bake.py events
+node bake/run-python.mjs bake/bake.py events
 ```
 
 emits ten `public/data/env_<event>.bin` files and
@@ -264,7 +268,7 @@ historical frames may be frozen into `public/data/satellite/manifest.json` for
 reproducible runs:
 
 ```bash
-bake/.venv/bin/python bake/satellite_frames.py meteosat \
+node bake/run-python.mjs bake/satellite_frames.py meteosat \
   --observed-at 2021-10-01T02:30:00Z \
   --channel infrared
 ```
@@ -278,7 +282,7 @@ downloads. Download and render the authorized granule outside the repository,
 then ingest that raster without passing credentials to the script:
 
 ```bash
-bake/.venv/bin/python bake/satellite_frames.py insat \
+node bake/run-python.mjs bake/satellite_frames.py insat \
   --observed-at 2023-06-12T23:00:00Z \
   --channel infrared \
   --input-image /secure/path/to/rendered-granule.png \
@@ -310,7 +314,7 @@ de-duplicate by ISO time.
 
 ### Track-diversity spike (design D10 / eng task T7) — `bake/spike_tracks.py`
 
-The pre-freeze spike (`bake/.venv/bin/python bake/spike_tracks.py`) integrates ~20
+The pre-freeze spike (`node bake/run-python.mjs bake/spike_tracks.py`) integrates ~20
 pure-steering tracks from varied spawns and reports whether nearby spawns collapse
 onto rails (too-smooth monthly means). It is the reference implementation the TS
 steering integrator is checked against.
@@ -384,4 +388,4 @@ SST/IBTrACS loaders), `binfmt.py` (WIWB writer/parser + golden vector),
 `era5_humidity.py` (RH planes aligned to the wind bake's real years),
 `synth.py` (labelled synthetic wind fallback), `hydro.py`, `hydrosheds.py`.
 `test_events.py` is the offline standalone test for the event bake
-(`bake/.venv/bin/python bake/test_events.py`).
+(`node bake/run-python.mjs bake/test_events.py`).

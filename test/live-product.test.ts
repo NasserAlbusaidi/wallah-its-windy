@@ -31,4 +31,17 @@ describe('HF-5 live product presentation', () => {
     await expect(fetchIssuedLiveRun('https://example.invalid/current', adapter))
       .rejects.toThrow(/partial response/u);
   });
+
+  it('accepts a valid decoded body when transfer bytes were compressed', async () => {
+    const body = JSON.stringify(fixture);
+    const adapter = async () => new Response(body, {
+      status: 200,
+      headers: {
+        'content-encoding': 'br',
+        'content-length': String(Math.floor(body.length / 2)),
+      },
+    });
+    await expect(fetchIssuedLiveRun('https://example.invalid/current', adapter))
+      .resolves.toMatchObject({ cycle: fixture.cycle });
+  });
 });

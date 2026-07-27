@@ -196,8 +196,14 @@ export async function fetchPublicCycleManifest(
   const response = await fetchImpl(url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`public cycle: HTTP ${response.status}`);
   const expected = Number(response.headers.get('content-length'));
+  const encoding = response.headers.get('content-encoding')?.toLowerCase();
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (Number.isFinite(expected) && expected > 0 && bytes.byteLength !== expected) {
+  if (
+    (!encoding || encoding === 'identity')
+    && Number.isFinite(expected)
+    && expected > 0
+    && bytes.byteLength !== expected
+  ) {
     throw new Error(`public cycle: partial response ${bytes.byteLength}/${expected}`);
   }
   const parsed = parsePublicCycleManifest(JSON.parse(new TextDecoder().decode(bytes)));

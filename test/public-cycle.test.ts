@@ -91,6 +91,18 @@ describe('public-source monitor', () => {
       .rejects.toThrow(/partial response/u);
   });
 
+  it('does not compare decoded bytes with a compressed transfer length', async () => {
+    const body = JSON.stringify(fixture());
+    const adapter = async () => new Response(body, {
+      headers: {
+        'content-encoding': 'gzip',
+        'content-length': String(Math.floor(body.length / 2)),
+      },
+    });
+    await expect(fetchPublicCycleManifest('https://example.invalid/current', adapter))
+      .resolves.toMatchObject({ product: 'public-source-monitor' });
+  });
+
   it('fails closed on malformed source metadata', () => {
     const value = fixture() as { sources: Array<{ fetchedAt: unknown }> };
     value.sources[0]!.fetchedAt = 'not-a-date';

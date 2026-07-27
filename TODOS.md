@@ -30,8 +30,9 @@ is no longer the source of truth for project status.
   environment/Holland-profile values.
 - Eight accessible impact-city markers with instantaneous 34-kt glow and run
   detail cards.
-- Deterministic, versioned WMO/ESCAP simulated storm names in the tape, exports,
-  ensemble summary, and stable shared URL.
+- Deterministic neutral `SIM-…` storm identifiers in the tape, exports,
+  ensemble summary, and stable shared URL; official roster names remain
+  reserved for real historical systems.
 - Prefix-safe geometric historical analog and an exact flight-tape intensity
   sparkline with pointer and keyboard inspection.
 

@@ -214,12 +214,13 @@ through `src/loader.ts` (the only reader) and hardcodes no geometry — every
 dimension, bbox, and quantization scale comes from the file header.
 
 ```bash
+# Windows may use `python`; POSIX installations commonly use `python3`.
 python3 -m venv bake/.venv
-bake/.venv/bin/python -m pip install -r bake/requirements.txt
-bake/.venv/bin/python bake/bake.py          # ~15s; writes public/data/*
-bake/.venv/bin/python bake/fetch_event_benchmark.py # CDS-cached 10-storm inputs
-bake/.venv/bin/python bake/bake.py events   # event bins + frozen catalogue
-bake/.venv/bin/python bake/satellite_frames.py meteosat \
+node bake/run-python.mjs -m pip install -r bake/requirements.txt
+node bake/run-python.mjs bake/bake.py          # ~15s; writes public/data/*
+node bake/run-python.mjs bake/fetch_event_benchmark.py # CDS-cached 10-storm inputs
+node bake/run-python.mjs bake/bake.py events   # event bins + frozen catalogue
+node bake/run-python.mjs bake/satellite_frames.py meteosat \
   --observed-at 2021-10-01T02:30:00Z --channel infrared # optional frame cache
 npm run data:fidelity:catalog               # freeze the 30-storm HF-1 catalogue
 npm run data:fidelity:fetch                 # fetch the 20 additional ERA5 cases
@@ -231,7 +232,12 @@ npm run data:hf6:fetch                      # acquire sealed ERA5 inputs (networ
 npm run data:hf6:bake                       # bake 16 sealed initialization packages
 npm run hf6:verify:check                    # reproduce the committed first look
 npm run hf6:gate:check                      # enforce implementation + honesty gates
+npm run hf6:prospective:check               # enforce prospective anti-leakage registry
 ```
+
+`bake/run-python.mjs` resolves `bake/.venv/bin/python` on POSIX and
+`bake/.venv/Scripts/python.exe` on Windows. It fails closed when the
+repository-owned environment is missing and never substitutes a system Python.
 
 - Binary format + golden test vector: **`BINARY-FORMATS.md`**.
 - Full provenance, licenses, and bake details: **`bake/README.md`**.

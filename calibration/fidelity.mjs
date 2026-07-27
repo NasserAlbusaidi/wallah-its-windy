@@ -166,7 +166,9 @@ async function loadBinArtifact(path) {
   return {
     parsed: parseBuffer(bytes),
     manifest: {
-      path: path.slice(ROOT.length + 1),
+      // Artifact manifests are committed and checked byte-for-byte on Linux.
+      // Normalize Windows separators so either platform generates the same JSON.
+      path: path.slice(ROOT.length + 1).replaceAll('\\', '/'),
       bytes: bytes.byteLength,
       sha256: digest(bytes),
     },

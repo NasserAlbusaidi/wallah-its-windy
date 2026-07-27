@@ -53,17 +53,17 @@
       "sha256": "6d0e10c88a436cf9e2777fe168eee8c6c163b1ec8934f921218ef67cafbacf30"
     },
     "terrain": {
-      "path": "public\\data\\terrain.bin",
+      "path": "public/data/terrain.bin",
       "bytes": 2084344,
       "sha256": "a350399d3ce4960313f92e58f4f08d04b9c76ca6a7c35319d27443f3344ae262"
     },
     "oceanProfiles": {
-      "path": "public\\data\\ocean.bin",
+      "path": "public/data/ocean.bin",
       "bytes": 700120,
       "sha256": "0811050864a24374e1cc7ed0e1d8519a85ec9e72505d1f9af28a6abca3498434"
     },
     "eventOceanProfiles": {
-      "path": "calibration\\data\\hf2a-event-ocean.bin",
+      "path": "calibration/data/hf2a-event-ocean.bin",
       "bytes": 1600264,
       "sha256": "d1110713658d950b0f1ea54556c8ce4a31f501ab7a4672f129001ad432f24975"
     },
@@ -85,181 +85,181 @@
     "pressureLevelSteering": [
       {
         "id": "as1980",
-        "path": "calibration\\data\\hf3\\steering_as1980.bin",
+        "path": "calibration/data/hf3/steering_as1980.bin",
         "bytes": 461336,
         "sha256": "dd88e3880ee81abc91e16cd2298e3c9388770e8c0a578f9f5b243a2681c61577"
       },
       {
         "id": "as1981",
-        "path": "calibration\\data\\hf3\\steering_as1981.bin",
+        "path": "calibration/data/hf3/steering_as1981.bin",
         "bytes": 461336,
         "sha256": "637a132899af36c828e226fdea345f08b909d49fe7e9f4197c144bc835694e6e"
       },
       {
         "id": "as1982",
-        "path": "calibration\\data\\hf3\\steering_as1982.bin",
+        "path": "calibration/data/hf3/steering_as1982.bin",
         "bytes": 369176,
         "sha256": "3644b22c013eb70194bfc5a1fb28543b75273ac7b264eb3253ffe2ee5c464035"
       },
       {
         "id": "as1983",
-        "path": "calibration\\data\\hf3\\steering_as1983.bin",
+        "path": "calibration/data/hf3/steering_as1983.bin",
         "bytes": 369176,
         "sha256": "48fcb8d4974c558e5b77e1e4626e03c2d9cf9ebe1b02261005d45bf2043ad95d"
       },
       {
         "id": "as1985",
-        "path": "calibration\\data\\hf3\\steering_as1985.bin",
+        "path": "calibration/data/hf3/steering_as1985.bin",
         "bytes": 645656,
         "sha256": "90937d7ef114ec7303a84f1ba19df908b8b397d9f71ec322caef700e02ee0c56"
       },
       {
         "id": "as1987",
-        "path": "calibration\\data\\hf3\\steering_as1987.bin",
+        "path": "calibration/data/hf3/steering_as1987.bin",
         "bytes": 829976,
         "sha256": "99042f0cee4977877d8a36f497c5f79c3b737d171b519984bcd7c53607ff8b02"
       },
       {
         "id": "as1992",
-        "path": "calibration\\data\\hf3\\steering_as1992.bin",
+        "path": "calibration/data/hf3/steering_as1992.bin",
         "bytes": 553496,
         "sha256": "6c4212fc4fa9b1c4890842e8e4cf29ab76846aa9a769a8611e63efdecefb2425"
       },
       {
         "id": "as1993",
-        "path": "calibration\\data\\hf3\\steering_as1993.bin",
+        "path": "calibration/data/hf3/steering_as1993.bin",
         "bytes": 553496,
         "sha256": "daa95a61480753af319ac7b6f5fe9970c0e85019661ceb664556c301feb70a01"
       },
       {
         "id": "as1994",
-        "path": "calibration\\data\\hf3\\steering_as1994.bin",
+        "path": "calibration/data/hf3/steering_as1994.bin",
         "bytes": 461336,
         "sha256": "e11180af54e619cc5a1d7f01c7d0469fa4cf158a86a7bf2654736f46208bc36d"
       },
       {
         "id": "as1995",
-        "path": "calibration\\data\\hf3\\steering_as1995.bin",
+        "path": "calibration/data/hf3/steering_as1995.bin",
         "bytes": 737816,
         "sha256": "beeaefd35a3782306715ccc1dc7b8bb2a084f8c153064153142d6e60162daa04"
       },
       {
         "id": "as1998",
-        "path": "calibration\\data\\hf3\\steering_as1998.bin",
+        "path": "calibration/data/hf3/steering_as1998.bin",
         "bytes": 461336,
         "sha256": "97cfb314959a75782fbce04f5338379020c8072ce612d157c549082249809224"
       },
       {
         "id": "as1998dec",
-        "path": "calibration\\data\\hf3\\steering_as1998dec.bin",
+        "path": "calibration/data/hf3/steering_as1998dec.bin",
         "bytes": 461336,
         "sha256": "b5a69c68f89816a1b553e5b38f90c04e6f4e006902071e612fcf81db0019a4de"
       },
       {
         "id": "as1999",
-        "path": "calibration\\data\\hf3\\steering_as1999.bin",
+        "path": "calibration/data/hf3/steering_as1999.bin",
         "bytes": 645656,
         "sha256": "9cc249c21de67bd5754049befcaeab3791f2a4038807d32325cc4f122fc11326"
       },
       {
         "id": "as2001",
-        "path": "calibration\\data\\hf3\\steering_as2001.bin",
+        "path": "calibration/data/hf3/steering_as2001.bin",
         "bytes": 737816,
         "sha256": "43b0f167e0ce4536b64467e1471a0a5d24bb6891bcf0affce767ed7c21aa44e1"
       },
       {
         "id": "mukda2006",
-        "path": "calibration\\data\\hf3\\steering_mukda2006.bin",
+        "path": "calibration/data/hf3/steering_mukda2006.bin",
         "bytes": 737816,
         "sha256": "fc996d5595e6497c6476d4fc112cb953999f5f5414f9054ecc56b6aa9b4a72f7"
       },
       {
         "id": "gonu2007",
-        "path": "calibration\\data\\hf3\\steering_gonu2007.bin",
+        "path": "calibration/data/hf3/steering_gonu2007.bin",
         "bytes": 737816,
         "sha256": "603207f916d307661121b8829dafe1a667705579b37173c4c57c85f42bb21c0c"
       },
       {
         "id": "as2007",
-        "path": "calibration\\data\\hf3\\steering_as2007.bin",
+        "path": "calibration/data/hf3/steering_as2007.bin",
         "bytes": 369176,
         "sha256": "8760605539e9b99c41af2a6a0d687d41ea0c4791bc13924ef4cf8d8a2272403a"
       },
       {
         "id": "phet2010",
-        "path": "calibration\\data\\hf3\\steering_phet2010.bin",
+        "path": "calibration/data/hf3/steering_phet2010.bin",
         "bytes": 829976,
         "sha256": "404611affcaa0df2cb548fc7c6e00f2ceb45927af1ec5f01513b0b7f5be4187d"
       },
       {
         "id": "keila2011",
-        "path": "calibration\\data\\hf3\\steering_keila2011.bin",
+        "path": "calibration/data/hf3/steering_keila2011.bin",
         "bytes": 553496,
         "sha256": "e630b08e50522f573301dc04768deb515a00593c21c24fcad8ab9ff890d79a1e"
       },
       {
         "id": "nanauk2014",
-        "path": "calibration\\data\\hf3\\steering_nanauk2014.bin",
+        "path": "calibration/data/hf3/steering_nanauk2014.bin",
         "bytes": 645656,
         "sha256": "623eeecc0576ac903495c2302fd5e20761aa10947d1675d5e98738fa7329773b"
       },
       {
         "id": "nilofar2014",
-        "path": "calibration\\data\\hf3\\steering_nilofar2014.bin",
+        "path": "calibration/data/hf3/steering_nilofar2014.bin",
         "bytes": 737816,
         "sha256": "5a2d942a268d31f4855cf971ca721bec8770c5b3b94a7f3c701682c02eb4777d"
       },
       {
         "id": "ashobaa2015",
-        "path": "calibration\\data\\hf3\\steering_ashobaa2015.bin",
+        "path": "calibration/data/hf3/steering_ashobaa2015.bin",
         "bytes": 737816,
         "sha256": "ae790caea954f35a18cc569d7b3782457f3c8bee0dc335694ffcdb377808801f"
       },
       {
         "id": "mekunu2018",
-        "path": "calibration\\data\\hf3\\steering_mekunu2018.bin",
+        "path": "calibration/data/hf3/steering_mekunu2018.bin",
         "bytes": 553496,
         "sha256": "42dce75de313fbce4190566aad35bf3556a32c9f1eebdf6900441e94a731f26f"
       },
       {
         "id": "vayu2019",
-        "path": "calibration\\data\\hf3\\steering_vayu2019.bin",
+        "path": "calibration/data/hf3/steering_vayu2019.bin",
         "bytes": 829976,
         "sha256": "377584d3af5debf4bd6b96ae07723b36801c842a3b9c7ab972ef3f19938f2ad4"
       },
       {
         "id": "hikaa2019",
-        "path": "calibration\\data\\hf3\\steering_hikaa2019.bin",
+        "path": "calibration/data/hf3/steering_hikaa2019.bin",
         "bytes": 553496,
         "sha256": "be5d75f093837c5e33572ca58a4255979017158f13cf6f0dfaa0dd7f5417f8ee"
       },
       {
         "id": "kyarr2019",
-        "path": "calibration\\data\\hf3\\steering_kyarr2019.bin",
+        "path": "calibration/data/hf3/steering_kyarr2019.bin",
         "bytes": 829976,
         "sha256": "335ebe849306a16576fab346efd662f5ddfb177603cd65a3c18a2f4bd8bbeb40"
       },
       {
         "id": "maha2019",
-        "path": "calibration\\data\\hf3\\steering_maha2019.bin",
+        "path": "calibration/data/hf3/steering_maha2019.bin",
         "bytes": 737816,
         "sha256": "4871feb12d3d89dbb42aa3d4f124b4943cd090ce9af27726fe7553aee6c086d0"
       },
       {
         "id": "shaheen2021",
-        "path": "calibration\\data\\hf3\\steering_shaheen2021.bin",
+        "path": "calibration/data/hf3/steering_shaheen2021.bin",
         "bytes": 1935896,
         "sha256": "bca42dc1dd774d6ecac60ebf86dd0b06e535eedf29335be2d55d8096f16c84ba"
       },
       {
         "id": "biparjoy2023",
-        "path": "calibration\\data\\hf3\\steering_biparjoy2023.bin",
+        "path": "calibration/data/hf3/steering_biparjoy2023.bin",
         "bytes": 922136,
         "sha256": "12068a0f8dad8fc94c1a9ae34f56e1983c9f15fdea749e91acdcd8e95a2ff9b5"
       },
       {
         "id": "asna2024",
-        "path": "calibration\\data\\hf3\\steering_asna2024.bin",
+        "path": "calibration/data/hf3/steering_asna2024.bin",
         "bytes": 737816,
         "sha256": "ae532a6c6a2f09d4ae07539d6129f9e8cae71eeb40b4242e72bee4f1a112188e"
       }
@@ -267,181 +267,181 @@
     "environments": [
       {
         "id": "as1980",
-        "path": "calibration\\data\\fidelity\\env_as1980.bin",
+        "path": "calibration/data/fidelity/env_as1980.bin",
         "bytes": 615112,
         "sha256": "2b70d86f0bc8abdd98195658f5ce2af61bca5362b1c0494557dcc7405712cff5"
       },
       {
         "id": "as1981",
-        "path": "calibration\\data\\fidelity\\env_as1981.bin",
+        "path": "calibration/data/fidelity/env_as1981.bin",
         "bytes": 615112,
         "sha256": "c30729e11a81876a4904032665e32233c9b56eb02a7413cb30577dadb11f50ff"
       },
       {
         "id": "as1982",
-        "path": "calibration\\data\\fidelity\\env_as1982.bin",
+        "path": "calibration/data/fidelity/env_as1982.bin",
         "bytes": 492232,
         "sha256": "79e04dac35f80f78edabfd90dc6457e535ef8fedf787af9505be140ede696430"
       },
       {
         "id": "as1983",
-        "path": "calibration\\data\\fidelity\\env_as1983.bin",
+        "path": "calibration/data/fidelity/env_as1983.bin",
         "bytes": 492232,
         "sha256": "6787832c607c3abfadb50af4afc82ec4739bfe0e89d1d62932475097e8bcd71a"
       },
       {
         "id": "as1985",
-        "path": "calibration\\data\\fidelity\\env_as1985.bin",
+        "path": "calibration/data/fidelity/env_as1985.bin",
         "bytes": 860872,
         "sha256": "405dd45661d9dc5f267a2df0a9c858313a3a0b0171f50c6f39edcafbbf799fb9"
       },
       {
         "id": "as1987",
-        "path": "calibration\\data\\fidelity\\env_as1987.bin",
+        "path": "calibration/data/fidelity/env_as1987.bin",
         "bytes": 1106632,
         "sha256": "90bb17d166534924d5f27c372fb4b24c4d3635c83ace7529ef65b9c39511f0ed"
       },
       {
         "id": "as1992",
-        "path": "calibration\\data\\fidelity\\env_as1992.bin",
+        "path": "calibration/data/fidelity/env_as1992.bin",
         "bytes": 737992,
         "sha256": "845d4f1dc88738101c89bc60a8e07118300e81cdd53009fba7a59f18a2568b02"
       },
       {
         "id": "as1993",
-        "path": "calibration\\data\\fidelity\\env_as1993.bin",
+        "path": "calibration/data/fidelity/env_as1993.bin",
         "bytes": 737992,
         "sha256": "24db6a54adcc28b230b6aa065e25d138094f343ed728d72aa622f15b02ee2ab1"
       },
       {
         "id": "as1994",
-        "path": "calibration\\data\\fidelity\\env_as1994.bin",
+        "path": "calibration/data/fidelity/env_as1994.bin",
         "bytes": 615112,
         "sha256": "d9d1fcd8338bbd31b2cc21b42dd94dfd3840d83960d3755682f2933bbe1cc6d8"
       },
       {
         "id": "as1995",
-        "path": "calibration\\data\\fidelity\\env_as1995.bin",
+        "path": "calibration/data/fidelity/env_as1995.bin",
         "bytes": 983752,
         "sha256": "a5c201853a9be23e1e16f842f09727178f6cad632e6d90029cfac154e2d19852"
       },
       {
         "id": "as1998",
-        "path": "calibration\\data\\fidelity\\env_as1998.bin",
+        "path": "calibration/data/fidelity/env_as1998.bin",
         "bytes": 615112,
         "sha256": "dd5177fb33dcf397e49d9f26746448629d17560128d0354520f0f73c41d09b0e"
       },
       {
         "id": "as1998dec",
-        "path": "calibration\\data\\fidelity\\env_as1998dec.bin",
+        "path": "calibration/data/fidelity/env_as1998dec.bin",
         "bytes": 615112,
         "sha256": "7e5d699c434b865acfc51525ab460dc866d610c5867e57f04e8942e4379b9775"
       },
       {
         "id": "as1999",
-        "path": "calibration\\data\\fidelity\\env_as1999.bin",
+        "path": "calibration/data/fidelity/env_as1999.bin",
         "bytes": 860872,
         "sha256": "5523fdc2447945cddb2ed3f31cd64459efd0a536171bb499313e4639c533fb1c"
       },
       {
         "id": "as2001",
-        "path": "calibration\\data\\fidelity\\env_as2001.bin",
+        "path": "calibration/data/fidelity/env_as2001.bin",
         "bytes": 983752,
         "sha256": "05cb14f444ce6dfa81c84dd8046e378e6755de769214b374a9046e3be7dfa0d0"
       },
       {
         "id": "mukda2006",
-        "path": "calibration\\data\\fidelity\\env_mukda2006.bin",
+        "path": "calibration/data/fidelity/env_mukda2006.bin",
         "bytes": 983752,
         "sha256": "09e7ef840309ab0b23a89b0e4c69a627142df0e444c2ac420363ec6b316e8788"
       },
       {
         "id": "gonu2007",
-        "path": "public\\data\\env_gonu.bin",
+        "path": "public/data/env_gonu.bin",
         "bytes": 983752,
         "sha256": "31895447c0ebf783b49f8ff36721d73d5777a38056bbd0c190b1dc719ba311a1"
       },
       {
         "id": "as2007",
-        "path": "calibration\\data\\fidelity\\env_as2007.bin",
+        "path": "calibration/data/fidelity/env_as2007.bin",
         "bytes": 492232,
         "sha256": "2bc892bda8de9a526109a8062d6f0bc72c38e559a29e9f13d3ca0b50cde9e021"
       },
       {
         "id": "phet2010",
-        "path": "public\\data\\env_phet.bin",
+        "path": "public/data/env_phet.bin",
         "bytes": 1106632,
         "sha256": "b28c3fdd8a028e3aa32b13c92b51a680808ac943eb3e2ad8fca350c1a24a473f"
       },
       {
         "id": "keila2011",
-        "path": "calibration\\data\\fidelity\\env_keila2011.bin",
+        "path": "calibration/data/fidelity/env_keila2011.bin",
         "bytes": 737992,
         "sha256": "fcf46edb30aa25a491df00c89d1d2631315c63f2bfff949b8fac2d82da449e54"
       },
       {
         "id": "nanauk2014",
-        "path": "calibration\\data\\fidelity\\env_nanauk2014.bin",
+        "path": "calibration/data/fidelity/env_nanauk2014.bin",
         "bytes": 860872,
         "sha256": "5d8e5e1a76e6a7700570cb5dbfde1d1a8762e1bf50c597bdafc5bb980d482e0e"
       },
       {
         "id": "nilofar2014",
-        "path": "public\\data\\env_nilofar.bin",
+        "path": "public/data/env_nilofar.bin",
         "bytes": 983752,
         "sha256": "112cc53475e3f6785b402bf16f354ed838f28c6d0b5b4b468f403ab9bb789125"
       },
       {
         "id": "ashobaa2015",
-        "path": "public\\data\\env_ashobaa.bin",
+        "path": "public/data/env_ashobaa.bin",
         "bytes": 983752,
         "sha256": "31b488c1de438049ef55a49d82ff68ddd5138396ca2e3f2f854919297b72e4a8"
       },
       {
         "id": "mekunu2018",
-        "path": "public\\data\\env_mekunu.bin",
+        "path": "public/data/env_mekunu.bin",
         "bytes": 737992,
         "sha256": "2091f5e59d2d3bec1d7eac6adb34e72749349ac15f649a694af279ae123a6f31"
       },
       {
         "id": "vayu2019",
-        "path": "public\\data\\env_vayu.bin",
+        "path": "public/data/env_vayu.bin",
         "bytes": 1106632,
         "sha256": "5097ed6b26568302008ecbf29d653db6109385c7bb8a503e4a4fce29571d3da1"
       },
       {
         "id": "hikaa2019",
-        "path": "public\\data\\env_hikaa.bin",
+        "path": "public/data/env_hikaa.bin",
         "bytes": 737992,
         "sha256": "1b8fd2e726f1f67d65a914ee70a3f421bb428e33f29cee000cf7e6a4f77e1c4a"
       },
       {
         "id": "kyarr2019",
-        "path": "public\\data\\env_kyarr.bin",
+        "path": "public/data/env_kyarr.bin",
         "bytes": 1106632,
         "sha256": "eeb33d7896d9094068ca1686e550d2582ad9b82a48f686a6678516e0485c40d3"
       },
       {
         "id": "maha2019",
-        "path": "calibration\\data\\fidelity\\env_maha2019.bin",
+        "path": "calibration/data/fidelity/env_maha2019.bin",
         "bytes": 983752,
         "sha256": "4d91865ac8518c4198039b83ab7ebc5a318fd02a946766a4bf23197b8a544ac4"
       },
       {
         "id": "shaheen2021",
-        "path": "public\\data\\env_shaheen.bin",
+        "path": "public/data/env_shaheen.bin",
         "bytes": 2581192,
         "sha256": "eb6784ea089f51f70113f51215a16c93d7dade11ea5692612e6cfd7d59c0e5ef"
       },
       {
         "id": "biparjoy2023",
-        "path": "public\\data\\env_biparjoy.bin",
+        "path": "public/data/env_biparjoy.bin",
         "bytes": 1229512,
         "sha256": "d82bb389381f6a5799fd67d86dda000c9222fa613cbede4ce320d48983043363"
       },
       {
         "id": "asna2024",
-        "path": "calibration\\data\\fidelity\\env_asna2024.bin",
+        "path": "calibration/data/fidelity/env_asna2024.bin",
         "bytes": 983752,
         "sha256": "0e89ecb1f64634ea1c10229cbce3ea8b81031e2600acb7262e65f187b3337291"
       }

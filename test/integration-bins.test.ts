@@ -259,7 +259,9 @@ describe('November post-monsoon rescue (C6)', () => {
     // quantization tolerance while catching an all-hostile regression.
     expect(productivePlanes).toBeGreaterThanOrEqual(2);
     expect(totalCat1 / totalStorms).toBeGreaterThanOrEqual(0.005);
-  });
+    // This exhaustive sweep takes about 27 seconds on the shared Linux runner.
+    // Keep the longer allowance local so ordinary tests retain the 20 s ceiling.
+  }, 60_000);
 });
 
 describe('flowacc.bin', () => {

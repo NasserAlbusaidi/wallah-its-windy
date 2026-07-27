@@ -21,6 +21,7 @@
     "data:hf2:initial-structure": "node bake/run-python.mjs bake/bake_hf2_initial_structure.py",
     "data:hf3:steering": "node bake/run-python.mjs bake/bake_hf3_steering.py",
     "data:structure": "python3 bake/extract_structure_validation.py",
+    "live:acquire": "node bake/run-python.mjs -u bake/public_cycle.py",
     "fidelity": "node --experimental-strip-types calibration/fidelity.mjs",
     "fidelity:development": "node --experimental-strip-types calibration/fidelity.mjs --partition=development",
     "fidelity:check": "node --experimental-strip-types calibration/fidelity.mjs --check",
@@ -61,7 +62,7 @@
     "profile:ensemble": "vitest bench --run calibration/ensemble.bench.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --maxWorkers=4",
     "test:watch": "vitest"
   },
   "devDependencies": {

@@ -4,6 +4,8 @@ bake/.venv
 __pycache__/
 *.pyc
 data/raw
+public/data/live/
+tmp/
 *.log
 .DS_Store
 .gstack/

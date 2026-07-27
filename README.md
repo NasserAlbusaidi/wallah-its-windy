@@ -37,8 +37,13 @@ The current scientific and product sequence is maintained in
 phase artifacts under `calibration/` preserve every scientific gate. HF-2,
 HF-3, and HF-4 are implemented but rejected by their frozen acceptance rules;
 the app does not promote their ensemble output to calibrated probability. HF-5
-implements provider-neutral normalization and immutable forecast issuance, but
-no scheduled live feed is configured. HF-6 is implementation-complete: it
+implements provider-neutral normalization and immutable forecast issuance. A
+scheduled public-source monitor now acquires and normalizes regional GFS
+atmosphere and near-real-time OISST, snapshots the RSMC New Delhi bulletin
+state, and checks RTOFS availability. It deliberately keeps forecast output
+disabled because no normalized active advisory, regional three-dimensional
+upper-ocean field, or GEFS ensemble is yet available. HF-6 is
+implementation-complete: it
 expands the audit to 72 storms and 144 initializations, and the untouched
 eight-storm/16-initialization sealed first look has been scored. Track skill was
 positive against persistence at 12/24/48 hours, but the frozen intensity and
@@ -130,6 +135,9 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
   time but no invented UTC valid time. Observed overlays on an active run
   require acknowledgement and remain labelled as matched, pending, or
   unsynchronised. Synthetic storms use neutral `SIM-…` identifiers.
+- Its **public inputs** disclosure reports the scheduled source cycle and each
+  acquisition gate. This is an availability monitor only: partial current data
+  never replaces the sandbox environment or masquerades as a forecast.
 - After the storm ends, scrub its recorded track or jump to its peak, first
   landfall, and final frame. Replay reads immutable recorded frames; it never
   rewinds the simulation engine. The wind-versus-time strip exposes every exact
@@ -233,6 +241,7 @@ npm run data:hf6:bake                       # bake 16 sealed initialization pack
 npm run hf6:verify:check                    # reproduce the committed first look
 npm run hf6:gate:check                      # enforce implementation + honesty gates
 npm run hf6:prospective:check               # enforce prospective anti-leakage registry
+npm run live:acquire                        # acquire public current inputs, fail closed
 ```
 
 `bake/run-python.mjs` resolves `bake/.venv/bin/python` on POSIX and
@@ -253,6 +262,12 @@ repository-owned environment is missing and never substitutes a system Python.
 - GMRT, NOAA, and HydroSHEDS downloads are public and auth-free. ERA5
   reproduction requires a configured CDS API token and accepted Copernicus
   licence.
+- The scheduled source monitor uses NOAA/NCEP's regional GFS GRIB filter and
+  NOAA CoastWatch's OISST ERDDAP subset without credentials. It links to RSMC
+  New Delhi as the official regional advisory source. RTOFS is checked but not
+  downloaded because the exposed three-dimensional global file is roughly
+  816 MB and has no regional subset. Provider failures leave the current
+  forecast gate closed.
 - Raw downloads cache under `data/raw/` (gitignored); the venv under `bake/.venv`.
 
 ### Provenance — steering/shear are REAL ERA5 (with synoptic samples)
@@ -449,6 +464,7 @@ src/
   live-data.ts        provider-neutral HF-5 live-data boundary
   live-providers.ts   HF-5 provider descriptors + cycle adapters
   live-product.ts     DOM-free view of an issued forecast cycle
+  public-cycle.ts     fail-closed view of the scheduled public-source monitor
   satellite-observations.ts observed-frame manifest, matching, WMS URLs
   radar-observations.ts bounded RainViewer timeline, tiles + reprojection
   rain-accumulation.ts deterministic display windows, scales + normalization

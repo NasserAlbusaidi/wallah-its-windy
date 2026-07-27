@@ -3,7 +3,11 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '45 */6 * * *'
 
 permissions:
   contents: read
@@ -19,12 +23,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
       - run: npm ci
+      - run: python -m venv bake/.venv
+      - run: node bake/run-python.mjs -m pip install -r bake/requirements-live.txt
+      # Provider failures produce a verified fail-closed manifest and do not
+      # turn the climatology sandbox into a current forecast.
+      - run: npm run live:acquire
       - run: npm test
       - run: npm run calibrate:check
       # Sealed HF-6 cohort must stay in sync with the runtime it certifies.
@@ -37,11 +49,21 @@ jobs:
       # Protect the anti-leakage registry from its first issued forecast onward.
       - run: npm run hf6:prospective:check
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      # Each run is immutable under its unique workflow/run-attempt identity.
+      # This begins the prospective source archive; it does not by itself
+      # satisfy the two-season validation gate.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: public-cycle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tmp/public-cycle-archive
+          retention-days: 90
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:

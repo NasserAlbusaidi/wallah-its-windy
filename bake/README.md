@@ -382,6 +382,36 @@ live in `package.json`.
 - `live_archive.mjs` (`npm run hf5:archive:sample`, Node) — validates and
   content-addresses live-run JSON into an archive, also via `src/live-data.ts`.
 
+### Scheduled public-source monitor — `public_cycle.py`
+
+`npm run live:acquire` discovers the latest complete NOAA/NCEP GFS cycle and
+downloads a 50–70°E / 15–27°N regional GRIB2 subset for 0–120 hours at six-hour
+intervals. It decodes deep-layer steering, 200–850-hPa shear, and 600/700-hPa
+relative humidity with ecCodes, then combines those fields with a regional
+near-real-time NOAA OISST ERDDAP subset.
+
+The same run archives the RSMC New Delhi public bulletin page and checks the
+current RTOFS three-dimensional ocean volume. It does not download that roughly
+816 MB global RTOFS file because NOMADS exposes no Arabian Sea subset. GEFS
+normalization is also not implemented. The resulting `public/data/live`
+environment therefore contains only seven fields and deliberately omits OHC;
+the runtime's eight-field forecast validator cannot promote it.
+
+Every raw response, normalized partial environment, and hash-addressed manifest
+is written non-overwriting under `tmp/public-cycle-archive`. GitHub Actions runs
+the acquisition every six hours, publishes the current fail-closed manifest
+with the site, and retains each workflow snapshot as a uniquely named artifact
+for 90 days. This starts an immutable acquisition record; it is not yet the
+multi-season prospective forecast archive required by HF-6.
+
+The acquisition environment is intentionally small and separate:
+
+```bash
+python -m venv bake/.venv
+node bake/run-python.mjs -m pip install -r bake/requirements-live.txt
+npm run live:acquire
+```
+
 Support modules, imported rather than run: `sources.py` (downloads + terrain/
 SST/IBTrACS loaders), `binfmt.py` (WIWB writer/parser + golden vector),
 `event_catalog.py` (frozen ten-storm catalogue shared by fetch/bake/tests),

@@ -49,7 +49,7 @@
       "organizationRecoveryH": 30,
       "organizationDisruptionH": 10,
       "ohcMpiWeight": 0.2,
-      "organizationIntensification": 0.6
+      "organizationIntensification": 0.55
     },
     "deployed": {
       "intensifyKPerH": 0.08,
@@ -70,16 +70,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2007-06-03T06:00:00Z",
-          "endIso": "2007-06-07T00:45:00.000Z",
-          "trackSamples": 31,
-          "intensitySamples": 31,
-          "pressureSamples": 31,
-          "trackMaeKm": 52.46336699120694,
-          "trackRmseKm": 59.085403142600484,
-          "intensityMaeKt": 34.53617054798023,
-          "intensityBiasKt": -33.216097357930416,
-          "pressureMaeHpa": 27.144882927111464,
-          "peakBiasKt": -53.382256335308995
+          "endIso": "2007-06-08T12:30:00.000Z",
+          "trackSamples": 39,
+          "intensitySamples": 32,
+          "pressureSamples": 32,
+          "trackMaeKm": 55.48902676034746,
+          "trackRmseKm": 62.949119403842865,
+          "intensityMaeKt": 26.799407569450395,
+          "intensityBiasKt": -25.489460697515206,
+          "pressureMaeHpa": 23.090713520101264,
+          "peakBiasKt": -44.97457017815003
         }
       },
       {
@@ -88,16 +88,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2010-06-01T09:00:00Z",
-          "endIso": "2010-06-03T06:30:00.000Z",
-          "trackSamples": 16,
-          "intensitySamples": 16,
-          "pressureSamples": 16,
-          "trackMaeKm": 189.91066621393793,
-          "trackRmseKm": 209.22472823548267,
-          "intensityMaeKt": 27.644473727427645,
-          "intensityBiasKt": -27.39194996949759,
-          "pressureMaeHpa": 20.418008303178595,
-          "peakBiasKt": -41.89056424163142
+          "endIso": "2010-06-03T11:15:00.000Z",
+          "trackSamples": 17,
+          "intensitySamples": 17,
+          "pressureSamples": 17,
+          "trackMaeKm": 184.50106355942341,
+          "trackRmseKm": 204.3819391386963,
+          "intensityMaeKt": 21.769243721537872,
+          "intensityBiasKt": -21.384025631965173,
+          "pressureMaeHpa": 17.533264086493464,
+          "peakBiasKt": -33.94981036525383
         }
       },
       {
@@ -106,16 +106,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2014-10-28T09:00:00Z",
-          "endIso": "2014-10-30T06:45:00.000Z",
+          "endIso": "2014-10-30T07:00:00.000Z",
           "trackSamples": 16,
           "intensitySamples": 16,
           "pressureSamples": 16,
-          "trackMaeKm": 70.33901935873631,
-          "trackRmseKm": 82.39520957733149,
-          "intensityMaeKt": 17.699572952494552,
-          "intensityBiasKt": -17.699572952494552,
-          "pressureMaeHpa": 8.876330968520293,
-          "peakBiasKt": -19.28056112515297
+          "trackMaeKm": 70.33566181068375,
+          "trackRmseKm": 82.39066532303539,
+          "intensityMaeKt": 16.848787976942766,
+          "intensityBiasKt": -16.848787976942766,
+          "pressureMaeHpa": 9.329223338442425,
+          "peakBiasKt": -19.10618952959976
         }
       },
       {
@@ -124,16 +124,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2015-06-08T03:00:00Z",
-          "endIso": "2015-06-08T20:45:00.000Z",
-          "trackSamples": 6,
-          "intensitySamples": 6,
-          "pressureSamples": 6,
-          "trackMaeKm": 50.43206914653007,
-          "trackRmseKm": 56.87431490156405,
-          "intensityMaeKt": 2.8102577032839657,
-          "intensityBiasKt": -1.6087765243552539,
-          "pressureMaeHpa": 6.774496944640987,
-          "peakBiasKt": 2.012935660192589
+          "endIso": "2015-06-08T21:30:00.000Z",
+          "trackSamples": 7,
+          "intensitySamples": 7,
+          "pressureSamples": 7,
+          "trackMaeKm": 51.637954389061306,
+          "trackRmseKm": 57.16569752903382,
+          "intensityMaeKt": 4.260690374118956,
+          "intensityBiasKt": -2.7414175975120196,
+          "pressureMaeHpa": 7.89319686892694,
+          "peakBiasKt": 2.506674037084828
         }
       },
       {
@@ -146,12 +146,12 @@
           "trackSamples": 5,
           "intensitySamples": 5,
           "pressureSamples": 5,
-          "trackMaeKm": 23.45109790866301,
-          "trackRmseKm": 26.5610733083647,
-          "intensityMaeKt": 24.771219703693486,
-          "intensityBiasKt": -23.43948017807961,
-          "pressureMaeHpa": 16.33138663147754,
-          "peakBiasKt": 4.547285210505876
+          "trackMaeKm": 23.451981343572832,
+          "trackRmseKm": 26.562564208403863,
+          "intensityMaeKt": 24.385181322497978,
+          "intensityBiasKt": -22.301532877182808,
+          "pressureMaeHpa": 16.339144551719166,
+          "peakBiasKt": 7.062661725408162
         }
       },
       {
@@ -164,12 +164,12 @@
           "trackSamples": 15,
           "intensitySamples": 15,
           "pressureSamples": 15,
-          "trackMaeKm": 20.79374986324955,
-          "trackRmseKm": 23.422886514944192,
-          "intensityMaeKt": 20.899249433290983,
-          "intensityBiasKt": -20.899249433290983,
-          "pressureMaeHpa": 13.054424950300215,
-          "peakBiasKt": -31.782014998635745
+          "trackMaeKm": 20.810796223260578,
+          "trackRmseKm": 23.43918339894886,
+          "intensityMaeKt": 20.886607375063775,
+          "intensityBiasKt": -20.886607375063775,
+          "pressureMaeHpa": 13.096930547325776,
+          "peakBiasKt": -31.757005078121928
         }
       },
       {
@@ -178,16 +178,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2019-06-13T21:00:00Z",
-          "endIso": "2019-06-15T18:00:00.000Z",
+          "endIso": "2019-06-15T20:30:00.000Z",
           "trackSamples": 16,
           "intensitySamples": 16,
           "pressureSamples": 16,
-          "trackMaeKm": 70.59976091014163,
-          "trackRmseKm": 76.60059489247544,
-          "intensityMaeKt": 18.184771087514925,
-          "intensityBiasKt": 1.0546045889402702,
-          "pressureMaeHpa": 14.16412441066479,
-          "peakBiasKt": 15.879744267988542
+          "trackMaeKm": 70.62529440492878,
+          "trackRmseKm": 76.62933946059945,
+          "intensityMaeKt": 18.673338713388365,
+          "intensityBiasKt": 9.994621413969648,
+          "pressureMaeHpa": 14.144138439564543,
+          "peakBiasKt": 25.121306371646256
         }
       },
       {
@@ -196,16 +196,16 @@
         "partition": "validation",
         "score": {
           "startIso": "2019-10-26T21:00:00Z",
-          "endIso": "2019-10-29T15:00:00.000Z",
+          "endIso": "2019-10-29T16:00:00.000Z",
           "trackSamples": 23,
           "intensitySamples": 23,
           "pressureSamples": 23,
-          "trackMaeKm": 25.360221552550787,
-          "trackRmseKm": 32.13631014560103,
-          "intensityMaeKt": 47.93872389579229,
-          "intensityBiasKt": -47.93872389579229,
-          "pressureMaeHpa": 39.07546269671238,
-          "peakBiasKt": -19.942921191468656
+          "trackMaeKm": 25.3366285507248,
+          "trackRmseKm": 32.11576043736252,
+          "intensityMaeKt": 46.38622271557731,
+          "intensityBiasKt": -46.38622271557731,
+          "pressureMaeHpa": 39.23006891518702,
+          "peakBiasKt": -19.93266208156075
         }
       },
       {
@@ -214,16 +214,16 @@
         "partition": "validation",
         "score": {
           "startIso": "2021-10-01T00:00:00Z",
-          "endIso": "2021-10-03T18:00:00.000Z",
+          "endIso": "2021-10-03T19:30:00.000Z",
           "trackSamples": 23,
           "intensitySamples": 23,
           "pressureSamples": 23,
-          "trackMaeKm": 51.176173088531115,
-          "trackRmseKm": 55.890447546590615,
-          "intensityMaeKt": 12.035333682040037,
-          "intensityBiasKt": -12.012581942553629,
-          "pressureMaeHpa": 8.87655663399815,
-          "peakBiasKt": 3.1011989571661474
+          "trackMaeKm": 51.18880935038824,
+          "trackRmseKm": 55.89947055819212,
+          "intensityMaeKt": 11.0945045919621,
+          "intensityBiasKt": -7.742668480830819,
+          "pressureMaeHpa": 8.658207962245783,
+          "peakBiasKt": 22.686379746441503
         }
       },
       {
@@ -232,36 +232,36 @@
         "partition": "validation",
         "score": {
           "startIso": "2023-06-09T18:00:00Z",
-          "endIso": "2023-06-10T18:15:00.000Z",
+          "endIso": "2023-06-10T19:30:00.000Z",
           "trackSamples": 9,
           "intensitySamples": 9,
           "pressureSamples": 9,
-          "trackMaeKm": 48.26146725354351,
-          "trackRmseKm": 55.340444036639006,
-          "intensityMaeKt": 21.565546686384874,
-          "intensityBiasKt": -20.244138129380417,
-          "pressureMaeHpa": 16.573994692702122,
-          "peakBiasKt": -9.053661493479936
+          "trackMaeKm": 48.249932329539476,
+          "trackRmseKm": 55.326739863002985,
+          "intensityMaeKt": 19.38863605233441,
+          "intensityBiasKt": -17.69380345347225,
+          "pressureMaeHpa": 15.58053376383143,
+          "peakBiasKt": -7.866883012910677
         }
       }
     ],
     "calibrationAggregate": {
       "storms": 7,
-      "trackMaeKm": 68.28424719892364,
-      "intensityMaeKt": 20.935102165097966,
-      "intensityBiasKt": -17.60007454667259,
-      "pressureMaeHpa": 15.251950733699127,
-      "peakAbsBiasKt": 24.110765977059447,
-      "objective": 0.9245944280074109
+      "trackMaeKm": 68.12168264161116,
+      "intensityMaeKt": 19.089036721857155,
+      "intensityBiasKt": -14.236744391744585,
+      "pressureMaeHpa": 14.48951590751051,
+      "peakAbsBiasKt": 23.496888183609254,
+      "objective": 0.872934386270918
     },
     "validationAggregate": {
       "storms": 3,
-      "trackMaeKm": 41.59928729820847,
-      "intensityMaeKt": 27.1798680880724,
-      "intensityBiasKt": -26.731814655908778,
-      "pressureMaeHpa": 21.508671341137546,
-      "peakAbsBiasKt": 10.69926054737158,
-      "objective": 0.9541324644517869
+      "trackMaeKm": 41.59179007688417,
+      "intensityMaeKt": 25.62312111995794,
+      "intensityBiasKt": -23.940898216626795,
+      "pressureMaeHpa": 21.15627021375474,
+      "peakAbsBiasKt": 16.828641613637643,
+      "objective": 1.00403841041038
     }
   },
   "proposed": {
@@ -272,16 +272,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2007-06-03T06:00:00Z",
-          "endIso": "2007-06-08T12:30:00.000Z",
+          "endIso": "2007-06-08T20:00:00.000Z",
           "trackSamples": 39,
           "intensitySamples": 32,
           "pressureSamples": 32,
-          "trackMaeKm": 55.48842228136762,
-          "trackRmseKm": 62.94176868796655,
-          "intensityMaeKt": 15.662737173051902,
-          "intensityBiasKt": -10.951880107155652,
-          "pressureMaeHpa": 13.395807098918038,
-          "peakBiasKt": -32.90477626878817
+          "trackMaeKm": 55.48902676034746,
+          "trackRmseKm": 62.949119403842865,
+          "intensityMaeKt": 13.541199041625305,
+          "intensityBiasKt": -5.6004624912938645,
+          "pressureMaeHpa": 12.184482487206985,
+          "peakBiasKt": -27.25414741379508
         }
       },
       {
@@ -290,16 +290,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2010-06-01T09:00:00Z",
-          "endIso": "2010-06-03T14:00:00.000Z",
-          "trackSamples": 18,
-          "intensitySamples": 18,
-          "pressureSamples": 18,
-          "trackMaeKm": 179.98607932984658,
-          "trackRmseKm": 200.09103658141225,
-          "intensityMaeKt": 22.525123873034296,
-          "intensityBiasKt": -22.187738646845567,
-          "pressureMaeHpa": 17.215868256790436,
-          "peakBiasKt": -35.85254736628981
+          "endIso": "2010-06-03T19:00:00.000Z",
+          "trackSamples": 20,
+          "intensitySamples": 20,
+          "pressureSamples": 20,
+          "trackMaeKm": 168.4220729297873,
+          "trackRmseKm": 190.93987120473727,
+          "intensityMaeKt": 17.24503181120392,
+          "intensityBiasKt": -16.141607640764917,
+          "pressureMaeHpa": 13.804705775374753,
+          "peakBiasKt": -25.79972500182768
         }
       },
       {
@@ -308,16 +308,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2014-10-28T09:00:00Z",
-          "endIso": "2014-10-30T10:30:00.000Z",
+          "endIso": "2014-10-30T11:00:00.000Z",
           "trackSamples": 17,
           "intensitySamples": 17,
           "pressureSamples": 17,
-          "trackMaeKm": 72.00541342699269,
-          "trackRmseKm": 83.44030894225467,
-          "intensityMaeKt": 11.190088089813916,
-          "intensityBiasKt": -9.956318871465793,
-          "pressureMaeHpa": 6.536706552390141,
-          "peakBiasKt": -16.529861384395417
+          "trackMaeKm": 72.0021107973346,
+          "trackRmseKm": 83.43591696387912,
+          "intensityMaeKt": 10.640604403009421,
+          "intensityBiasKt": -8.261329252554669,
+          "pressureMaeHpa": 7.183672404551785,
+          "peakBiasKt": -16.431712017931105
         }
       },
       {
@@ -326,16 +326,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2015-06-08T03:00:00Z",
-          "endIso": "2015-06-09T01:45:00.000Z",
+          "endIso": "2015-06-09T02:45:00.000Z",
           "trackSamples": 8,
           "intensitySamples": 8,
           "pressureSamples": 8,
-          "trackMaeKm": 52.16547483448449,
-          "trackRmseKm": 57.00218933379158,
-          "intensityMaeKt": 3.7590956481596294,
-          "intensityBiasKt": -0.8014383486388912,
-          "pressureMaeHpa": 6.463430799747542,
-          "peakBiasKt": 4.173481425660434
+          "trackMaeKm": 52.170992143072624,
+          "trackRmseKm": 57.00929868324454,
+          "intensityMaeKt": 3.623746763600443,
+          "intensityBiasKt": 0.3499107222951592,
+          "pressureMaeHpa": 6.665584883192139,
+          "peakBiasKt": 5.068578396241975
         }
       },
       {
@@ -348,12 +348,12 @@
           "trackSamples": 4,
           "intensitySamples": 4,
           "pressureSamples": 4,
-          "trackMaeKm": 21.8165049736863,
-          "trackRmseKm": 25.632424712944772,
-          "intensityMaeKt": 17.63564846180698,
-          "intensityBiasKt": -14.584201692254835,
-          "pressureMaeHpa": 13.312400212870244,
-          "peakBiasKt": 8.58125868442795
+          "trackMaeKm": 21.821019720250504,
+          "trackRmseKm": 25.638344486933487,
+          "intensityMaeKt": 17.391399034748673,
+          "intensityBiasKt": -13.444754340095416,
+          "pressureMaeHpa": 13.344097548435855,
+          "peakBiasKt": 10.9030723010614
         }
       },
       {
@@ -366,12 +366,12 @@
           "trackSamples": 15,
           "intensitySamples": 15,
           "pressureSamples": 15,
-          "trackMaeKm": 20.79374986324955,
-          "trackRmseKm": 23.422886514944192,
-          "intensityMaeKt": 18.94664153914959,
-          "intensityBiasKt": -18.94664153914959,
-          "pressureMaeHpa": 11.96519311828669,
-          "peakBiasKt": -28.221431412361667
+          "trackMaeKm": 20.810796223260578,
+          "trackRmseKm": 23.43918339894886,
+          "intensityMaeKt": 18.926457259409244,
+          "intensityBiasKt": -18.926457259409244,
+          "pressureMaeHpa": 12.005139923250356,
+          "peakBiasKt": -28.178416013613223
         }
       },
       {
@@ -380,16 +380,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2019-06-13T21:00:00Z",
-          "endIso": "2019-06-16T01:15:00.000Z",
-          "trackSamples": 18,
-          "intensitySamples": 18,
-          "pressureSamples": 18,
-          "trackMaeKm": 68.96399378717044,
-          "trackRmseKm": 74.61215600041083,
-          "intensityMaeKt": 20.80498957748577,
-          "intensityBiasKt": 12.191768401922367,
-          "pressureMaeHpa": 16.570393735206064,
-          "peakBiasKt": 27.379071061176603
+          "endIso": "2019-06-16T04:00:00.000Z",
+          "trackSamples": 19,
+          "intensitySamples": 19,
+          "pressureSamples": 19,
+          "trackMaeKm": 67.57416535697372,
+          "trackRmseKm": 73.28633287914963,
+          "intensityMaeKt": 25.097908665105013,
+          "intensityBiasKt": 17.65824880479052,
+          "pressureMaeHpa": 18.69928980616009,
+          "peakBiasKt": 35.791590554521306
         }
       },
       {
@@ -398,16 +398,16 @@
         "partition": "validation",
         "score": {
           "startIso": "2019-10-26T21:00:00Z",
-          "endIso": "2019-10-30T03:30:00.000Z",
+          "endIso": "2019-10-30T05:15:00.000Z",
           "trackSamples": 27,
           "intensitySamples": 27,
           "pressureSamples": 27,
-          "trackMaeKm": 29.090188003434854,
-          "trackRmseKm": 36.112995325495625,
-          "intensityMaeKt": 41.11989847977322,
-          "intensityBiasKt": -41.11989847977322,
-          "pressureMaeHpa": 32.25522916795423,
-          "peakBiasKt": -19.23551463717746
+          "trackMaeKm": 29.04987197575481,
+          "trackRmseKm": 36.07160608119848,
+          "intensityMaeKt": 38.01673848334814,
+          "intensityBiasKt": -38.01673848334814,
+          "pressureMaeHpa": 31.43464768221047,
+          "peakBiasKt": -19.201458500149656
         }
       },
       {
@@ -416,16 +416,16 @@
         "partition": "validation",
         "score": {
           "startIso": "2021-10-01T00:00:00Z",
-          "endIso": "2021-10-03T18:30:00.000Z",
+          "endIso": "2021-10-03T19:30:00.000Z",
           "trackSamples": 23,
           "intensitySamples": 23,
           "pressureSamples": 23,
-          "trackMaeKm": 51.176173088531115,
-          "trackRmseKm": 55.890447546590615,
-          "intensityMaeKt": 9.064357773037704,
-          "intensityBiasKt": -6.0703085522980365,
-          "pressureMaeHpa": 6.980778715542783,
-          "peakBiasKt": 17.21333192507872
+          "trackMaeKm": 51.18880935038824,
+          "trackRmseKm": 55.89947055819212,
+          "intensityMaeKt": 9.740653998892917,
+          "intensityBiasKt": -1.9853054628268538,
+          "pressureMaeHpa": 7.945118664956384,
+          "peakBiasKt": 37.55457136741602
         }
       },
       {
@@ -434,36 +434,36 @@
         "partition": "validation",
         "score": {
           "startIso": "2023-06-09T18:00:00Z",
-          "endIso": "2023-06-11T00:30:00.000Z",
+          "endIso": "2023-06-11T02:30:00.000Z",
           "trackSamples": 11,
           "intensitySamples": 11,
           "pressureSamples": 11,
-          "trackMaeKm": 47.638380674865,
-          "trackRmseKm": 53.58524967899318,
-          "intensityMaeKt": 21.97344113789358,
-          "intensityBiasKt": -19.238184164088544,
-          "pressureMaeHpa": 17.076596962441787,
-          "peakBiasKt": -10.250058566200494
+          "trackMaeKm": 47.636443134882796,
+          "trackRmseKm": 53.579919656264835,
+          "intensityMaeKt": 19.74629106469294,
+          "intensityBiasKt": -16.37774750051596,
+          "pressureMaeHpa": 15.784795934495348,
+          "peakBiasKt": -9.404736851674372
         }
       }
     ],
     "calibrationAggregate": {
       "storms": 7,
-      "trackMaeKm": 67.31709121382823,
-      "intensityMaeKt": 15.789189194643155,
-      "intensityBiasKt": -9.319492971941136,
-      "pressureMaeHpa": 12.208542824887022,
-      "peakAbsBiasKt": 21.94891822901429,
-      "objective": 0.7592811100456934
+      "trackMaeKm": 65.47002627586097,
+      "intensityMaeKt": 15.209478139814575,
+      "intensityBiasKt": -6.338064493861777,
+      "pressureMaeHpa": 11.983853261167424,
+      "peakAbsBiasKt": 21.346748814141684,
+      "objective": 0.7378455075382557
     },
     "validationAggregate": {
       "storms": 3,
-      "trackMaeKm": 42.634913922276986,
-      "intensityMaeKt": 24.0525657969015,
-      "intensityBiasKt": -22.1427970653866,
-      "pressureMaeHpa": 18.7708682819796,
-      "peakAbsBiasKt": 15.566301709485558,
-      "objective": 0.9212745907744925
+      "trackMaeKm": 42.625041487008616,
+      "intensityMaeKt": 22.501227848978,
+      "intensityBiasKt": -18.79326381556365,
+      "pressureMaeHpa": 18.388187427220736,
+      "peakAbsBiasKt": 22.05358890641335,
+      "objective": 0.9755381066888237
     }
   },
   "deployed": {
@@ -474,16 +474,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2007-06-03T06:00:00Z",
-          "endIso": "2007-06-07T00:45:00.000Z",
-          "trackSamples": 31,
-          "intensitySamples": 31,
-          "pressureSamples": 31,
-          "trackMaeKm": 52.46336699120694,
-          "trackRmseKm": 59.085403142600484,
-          "intensityMaeKt": 34.53617054798023,
-          "intensityBiasKt": -33.216097357930416,
-          "pressureMaeHpa": 27.144882927111464,
-          "peakBiasKt": -53.382256335308995
+          "endIso": "2007-06-08T12:30:00.000Z",
+          "trackSamples": 39,
+          "intensitySamples": 32,
+          "pressureSamples": 32,
+          "trackMaeKm": 55.48902676034746,
+          "trackRmseKm": 62.949119403842865,
+          "intensityMaeKt": 26.799407569450395,
+          "intensityBiasKt": -25.489460697515206,
+          "pressureMaeHpa": 23.090713520101264,
+          "peakBiasKt": -44.97457017815003
         }
       },
       {
@@ -492,16 +492,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2010-06-01T09:00:00Z",
-          "endIso": "2010-06-03T06:30:00.000Z",
-          "trackSamples": 16,
-          "intensitySamples": 16,
-          "pressureSamples": 16,
-          "trackMaeKm": 189.91066621393793,
-          "trackRmseKm": 209.22472823548267,
-          "intensityMaeKt": 27.644473727427645,
-          "intensityBiasKt": -27.39194996949759,
-          "pressureMaeHpa": 20.418008303178595,
-          "peakBiasKt": -41.89056424163142
+          "endIso": "2010-06-03T11:15:00.000Z",
+          "trackSamples": 17,
+          "intensitySamples": 17,
+          "pressureSamples": 17,
+          "trackMaeKm": 184.50106355942341,
+          "trackRmseKm": 204.3819391386963,
+          "intensityMaeKt": 21.769243721537872,
+          "intensityBiasKt": -21.384025631965173,
+          "pressureMaeHpa": 17.533264086493464,
+          "peakBiasKt": -33.94981036525383
         }
       },
       {
@@ -510,16 +510,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2014-10-28T09:00:00Z",
-          "endIso": "2014-10-30T06:45:00.000Z",
+          "endIso": "2014-10-30T07:00:00.000Z",
           "trackSamples": 16,
           "intensitySamples": 16,
           "pressureSamples": 16,
-          "trackMaeKm": 70.33901935873631,
-          "trackRmseKm": 82.39520957733149,
-          "intensityMaeKt": 17.699572952494552,
-          "intensityBiasKt": -17.699572952494552,
-          "pressureMaeHpa": 8.876330968520293,
-          "peakBiasKt": -19.28056112515297
+          "trackMaeKm": 70.33566181068375,
+          "trackRmseKm": 82.39066532303539,
+          "intensityMaeKt": 16.848787976942766,
+          "intensityBiasKt": -16.848787976942766,
+          "pressureMaeHpa": 9.329223338442425,
+          "peakBiasKt": -19.10618952959976
         }
       },
       {
@@ -528,16 +528,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2015-06-08T03:00:00Z",
-          "endIso": "2015-06-08T20:45:00.000Z",
-          "trackSamples": 6,
-          "intensitySamples": 6,
-          "pressureSamples": 6,
-          "trackMaeKm": 50.43206914653007,
-          "trackRmseKm": 56.87431490156405,
-          "intensityMaeKt": 2.8102577032839657,
-          "intensityBiasKt": -1.6087765243552539,
-          "pressureMaeHpa": 6.774496944640987,
-          "peakBiasKt": 2.012935660192589
+          "endIso": "2015-06-08T21:30:00.000Z",
+          "trackSamples": 7,
+          "intensitySamples": 7,
+          "pressureSamples": 7,
+          "trackMaeKm": 51.637954389061306,
+          "trackRmseKm": 57.16569752903382,
+          "intensityMaeKt": 4.260690374118956,
+          "intensityBiasKt": -2.7414175975120196,
+          "pressureMaeHpa": 7.89319686892694,
+          "peakBiasKt": 2.506674037084828
         }
       },
       {
@@ -550,12 +550,12 @@
           "trackSamples": 5,
           "intensitySamples": 5,
           "pressureSamples": 5,
-          "trackMaeKm": 23.45109790866301,
-          "trackRmseKm": 26.5610733083647,
-          "intensityMaeKt": 24.771219703693486,
-          "intensityBiasKt": -23.43948017807961,
-          "pressureMaeHpa": 16.33138663147754,
-          "peakBiasKt": 4.547285210505876
+          "trackMaeKm": 23.451981343572832,
+          "trackRmseKm": 26.562564208403863,
+          "intensityMaeKt": 24.385181322497978,
+          "intensityBiasKt": -22.301532877182808,
+          "pressureMaeHpa": 16.339144551719166,
+          "peakBiasKt": 7.062661725408162
         }
       },
       {
@@ -568,12 +568,12 @@
           "trackSamples": 15,
           "intensitySamples": 15,
           "pressureSamples": 15,
-          "trackMaeKm": 20.79374986324955,
-          "trackRmseKm": 23.422886514944192,
-          "intensityMaeKt": 20.899249433290983,
-          "intensityBiasKt": -20.899249433290983,
-          "pressureMaeHpa": 13.054424950300215,
-          "peakBiasKt": -31.782014998635745
+          "trackMaeKm": 20.810796223260578,
+          "trackRmseKm": 23.43918339894886,
+          "intensityMaeKt": 20.886607375063775,
+          "intensityBiasKt": -20.886607375063775,
+          "pressureMaeHpa": 13.096930547325776,
+          "peakBiasKt": -31.757005078121928
         }
       },
       {
@@ -582,16 +582,16 @@
         "partition": "calibration",
         "score": {
           "startIso": "2019-06-13T21:00:00Z",
-          "endIso": "2019-06-15T18:00:00.000Z",
+          "endIso": "2019-06-15T20:30:00.000Z",
           "trackSamples": 16,
           "intensitySamples": 16,
           "pressureSamples": 16,
-          "trackMaeKm": 70.59976091014163,
-          "trackRmseKm": 76.60059489247544,
-          "intensityMaeKt": 18.184771087514925,
-          "intensityBiasKt": 1.0546045889402702,
-          "pressureMaeHpa": 14.16412441066479,
-          "peakBiasKt": 15.879744267988542
+          "trackMaeKm": 70.62529440492878,
+          "trackRmseKm": 76.62933946059945,
+          "intensityMaeKt": 18.673338713388365,
+          "intensityBiasKt": 9.994621413969648,
+          "pressureMaeHpa": 14.144138439564543,
+          "peakBiasKt": 25.121306371646256
         }
       },
       {
@@ -600,16 +600,16 @@
         "partition": "validation",
         "score": {
           "startIso": "2019-10-26T21:00:00Z",
-          "endIso": "2019-10-29T15:00:00.000Z",
+          "endIso": "2019-10-29T16:00:00.000Z",
           "trackSamples": 23,
           "intensitySamples": 23,
           "pressureSamples": 23,
-          "trackMaeKm": 25.360221552550787,
-          "trackRmseKm": 32.13631014560103,
-          "intensityMaeKt": 47.93872389579229,
-          "intensityBiasKt": -47.93872389579229,
-          "pressureMaeHpa": 39.07546269671238,
-          "peakBiasKt": -19.942921191468656
+          "trackMaeKm": 25.3366285507248,
+          "trackRmseKm": 32.11576043736252,
+          "intensityMaeKt": 46.38622271557731,
+          "intensityBiasKt": -46.38622271557731,
+          "pressureMaeHpa": 39.23006891518702,
+          "peakBiasKt": -19.93266208156075
         }
       },
       {
@@ -618,16 +618,16 @@
         "partition": "validation",
         "score": {
           "startIso": "2021-10-01T00:00:00Z",
-          "endIso": "2021-10-03T18:00:00.000Z",
+          "endIso": "2021-10-03T19:30:00.000Z",
           "trackSamples": 23,
           "intensitySamples": 23,
           "pressureSamples": 23,
-          "trackMaeKm": 51.176173088531115,
-          "trackRmseKm": 55.890447546590615,
-          "intensityMaeKt": 12.035333682040037,
-          "intensityBiasKt": -12.012581942553629,
-          "pressureMaeHpa": 8.87655663399815,
-          "peakBiasKt": 3.1011989571661474
+          "trackMaeKm": 51.18880935038824,
+          "trackRmseKm": 55.89947055819212,
+          "intensityMaeKt": 11.0945045919621,
+          "intensityBiasKt": -7.742668480830819,
+          "pressureMaeHpa": 8.658207962245783,
+          "peakBiasKt": 22.686379746441503
         }
       },
       {
@@ -636,45 +636,45 @@
         "partition": "validation",
         "score": {
           "startIso": "2023-06-09T18:00:00Z",
-          "endIso": "2023-06-10T18:15:00.000Z",
+          "endIso": "2023-06-10T19:30:00.000Z",
           "trackSamples": 9,
           "intensitySamples": 9,
           "pressureSamples": 9,
-          "trackMaeKm": 48.26146725354351,
-          "trackRmseKm": 55.340444036639006,
-          "intensityMaeKt": 21.565546686384874,
-          "intensityBiasKt": -20.244138129380417,
-          "pressureMaeHpa": 16.573994692702122,
-          "peakBiasKt": -9.053661493479936
+          "trackMaeKm": 48.249932329539476,
+          "trackRmseKm": 55.326739863002985,
+          "intensityMaeKt": 19.38863605233441,
+          "intensityBiasKt": -17.69380345347225,
+          "pressureMaeHpa": 15.58053376383143,
+          "peakBiasKt": -7.866883012910677
         }
       }
     ],
     "calibrationAggregate": {
       "storms": 7,
-      "trackMaeKm": 68.28424719892364,
-      "intensityMaeKt": 20.935102165097966,
-      "intensityBiasKt": -17.60007454667259,
-      "pressureMaeHpa": 15.251950733699127,
-      "peakAbsBiasKt": 24.110765977059447,
-      "objective": 0.9245944280074109
+      "trackMaeKm": 68.12168264161116,
+      "intensityMaeKt": 19.089036721857155,
+      "intensityBiasKt": -14.236744391744585,
+      "pressureMaeHpa": 14.48951590751051,
+      "peakAbsBiasKt": 23.496888183609254,
+      "objective": 0.872934386270918
     },
     "validationAggregate": {
       "storms": 3,
-      "trackMaeKm": 41.59928729820847,
-      "intensityMaeKt": 27.1798680880724,
-      "intensityBiasKt": -26.731814655908778,
-      "pressureMaeHpa": 21.508671341137546,
-      "peakAbsBiasKt": 10.69926054737158,
-      "objective": 0.9541324644517869
+      "trackMaeKm": 41.59179007688417,
+      "intensityMaeKt": 25.62312111995794,
+      "intensityBiasKt": -23.940898216626795,
+      "pressureMaeHpa": 21.15627021375474,
+      "peakAbsBiasKt": 16.828641613637643,
+      "objective": 1.00403841041038
     }
   },
   "decision": {
     "accepted": false,
-    "reason": "The calibration winner failed at least one untouched gate (improvement 3.4%, worst wind-MAE regression 0.4 kt, pressure regression -2.7 hPa, track regression 1.04 km).",
-    "validationImprovementFraction": 0.03443743390093479,
-    "maximumIntensityRegressionKt": 0.4078944515087066,
-    "pressureRegressionHpa": -2.7378030591579474,
-    "trackRegressionKm": 1.035626624068513
+    "reason": "The calibration winner failed at least one untouched gate (improvement 2.8%, worst wind-MAE regression 0.4 kt, pressure regression -2.8 hPa, track regression 1.03 km).",
+    "validationImprovementFraction": 0.028385670733360988,
+    "maximumIntensityRegressionKt": 0.35765501235853137,
+    "pressureRegressionHpa": -2.7680827865340056,
+    "trackRegressionKm": 1.0332514101244428
   },
   "liveParametersMatch": true
 }

@@ -590,6 +590,7 @@ for (const scenario of scenarios) {
       () => ({ kind: 'event-timeline' }),
     ),
     RUNTIME_TRACK_PARAMETERS,
+    'shipped',
   );
   const lastObservedMs = Date.parse(inDomainTrack.points.at(-1).iso);
   const commonEndH = (lastObservedMs - Date.parse(startIso)) / 3_600_000;

@@ -579,13 +579,42 @@ export interface RainRates {
   totalMmH: number;
 }
 
+/**
+ * Moisture support available to the parametric rain model, in [0,1].
+ *
+ * The environmental term represents imported mid-level moisture. The vortex
+ * term represents storm-scale convergence and moisture recycling: it grows
+ * only when a real circulation and an organized convective core coexist, and
+ * fills part of the deficit left by dry ambient air. This deliberately avoids
+ * treating a monthly environmental RH value as the storm core's humidity.
+ *
+ * This remains a reduced-order diagnostic, not forecast QPF. Its role is to
+ * keep the rain proxy internally consistent with a strong organized vortex
+ * while preserving a genuinely dry, weak, disorganized state.
+ */
+export function precipitationMoistureSupport(
+  vKt: number,
+  organization: number,
+  midlevelRhPct: number,
+): number {
+  const ambient = clamp01((midlevelRhPct - 20) / 60);
+  const circulation = clamp01((vKt - 20) / 60);
+  const organizedCore = clamp01(organization);
+  const vortexConvergence = 0.72 * circulation * organizedCore;
+  return clamp01(ambient + (1 - ambient) * vortexConvergence);
+}
+
 /** Separated, bounded precipitation components for rendering and debrief. */
 export function precipitationRates(
   vKt: number,
   organization: number,
   midlevelRhPct: number,
 ): RainRates {
-  const moisture = clamp01((midlevelRhPct - 30) / 50);
+  const moisture = precipitationMoistureSupport(
+    vKt,
+    organization,
+    midlevelRhPct,
+  );
   const core = 0.15 + 0.85 * clamp01(organization);
   const eyewallMmH =
     vKt < 34

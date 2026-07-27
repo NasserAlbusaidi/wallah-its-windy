@@ -62,6 +62,11 @@ import {
   weatherLayerDefinition,
 } from './weather-layers';
 import { formatStormTag, type StormTagInput } from './storm-tag';
+import {
+  SIMULATED_WIND_CONVENTION,
+  northIndianOceanClassification,
+  regionalCategoryChip,
+} from './wind-conventions';
 
 // Overlay colours are DERIVED from the one token source (design task T5) — never
 // hardcoded — so retuning tokens.ts moves the genesis glow and the ripple too.
@@ -514,8 +519,8 @@ export class UiController {
       const exposed = currentWindKt >= 34;
       marker.dataset.exposed = String(exposed);
       const exact =
-        `${city.label}: ${currentWindKt.toFixed(1)} kt modeled now; ` +
-        `run peak ${run ? run.peakWindKt.toFixed(1) : '0.0'} kt`;
+        `${city.label}: ${currentWindKt.toFixed(1)} kt 1-min modeled now; ` +
+        `run peak ${run ? run.peakWindKt.toFixed(1) : '0.0'} kt 1-min`;
       marker.setAttribute('aria-label', exact);
       marker.title = exact;
     }
@@ -534,9 +539,9 @@ export class UiController {
         : 0;
     this.cityDetailName.textContent = city.label;
     this.cityDetailCurrent.textContent =
-      `modeled now · ${currentWindKt.toFixed(1)} kt`;
+      `modeled now · ${currentWindKt.toFixed(1)} kt 1-min`;
     this.cityDetailRun.textContent = run
-      ? `run peak ${run.peakWindKt.toFixed(1)} kt · closest ` +
+      ? `run peak ${run.peakWindKt.toFixed(1)} kt 1-min · closest ` +
         `${Number.isFinite(run.closestKm) ? `${Math.round(run.closestKm)} km` : '—'} · ` +
         `${Math.round(run.rainMm)} mm parametric rain`
       : 'run totals not available yet';
@@ -572,7 +577,7 @@ export class UiController {
     dom('point-probe-wind').textContent =
       reading.modeledWindKt === null
         ? '—'
-        : `${reading.modeledWindKt.toFixed(1)} kt`;
+        : `${reading.modeledWindKt.toFixed(1)} kt · 1-min sustained`;
     dom('point-probe-sst').textContent = `${reading.sstC.toFixed(1)}°c`;
     dom('point-probe-rh').textContent = `${reading.midlevelRhPct.toFixed(0)}%`;
     dom('point-probe-shear').textContent = `${reading.shearMs.toFixed(1)} m/s`;
@@ -684,13 +689,14 @@ export class UiController {
     if (!point) return;
     this.flight.sparklineCursor.setAttribute('x1', point.x.toFixed(2));
     this.flight.sparklineCursor.setAttribute('x2', point.x.toFixed(2));
-    const exact = `${point.ageH.toFixed(1)} h · ${point.vKt.toFixed(1)} kt`;
+    const exact =
+      `${point.ageH.toFixed(1)} h · ${point.vKt.toFixed(1)} kt 1-min`;
     this.flight.sparklineValue.textContent = exact;
     const peak = this.sparklineGeometry.points[this.sparklineGeometry.peakIndex];
     this.flight.sparkline.setAttribute(
       'aria-label',
       `Recorded storm intensity. Selected ${exact}. ` +
-        `Peak ${peak ? `${peak.vKt.toFixed(1)} knots at ${peak.ageH.toFixed(1)} hours` : 'unavailable'}. ` +
+        `Peak ${peak ? `${peak.vKt.toFixed(1)} one-minute knots at ${peak.ageH.toFixed(1)} hours` : 'unavailable'}. ` +
         'Use left and right arrow keys to inspect exact recorded frames.',
     );
   }
@@ -988,19 +994,23 @@ export class UiController {
       f.jumps
         .querySelectorAll<HTMLElement>('[data-category-milestone]')
         .forEach((milestone) => milestone.remove());
-      let previousCategory = stormCategory(
+      let previousCategory = northIndianOceanClassification(
         view.intensitySeries[0]?.vKt ?? storm.vKt,
+        SIMULATED_WIND_CONVENTION.averagingMinutes,
       );
       const timelineEndH =
         view.intensitySeries[view.intensitySeries.length - 1]?.ageH || 1;
       for (let index = 1; index < view.intensitySeries.length; index++) {
         const point = view.intensitySeries[index];
-        const nextCategory = stormCategory(point.vKt);
-        if (nextCategory.id === previousCategory.id) continue;
+        const nextCategory = northIndianOceanClassification(
+          point.vKt,
+          SIMULATED_WIND_CONVENTION.averagingMinutes,
+        );
+        if (nextCategory.category.id === previousCategory.category.id) continue;
         const milestone = document.createElement('span');
         milestone.className = 'timeline-category-milestone';
         milestone.dataset.categoryMilestone = '';
-        milestone.dataset.label = nextCategory.chip.toLowerCase();
+        milestone.dataset.label = regionalCategoryChip(nextCategory).toLowerCase();
         milestone.style.left =
           `${((point.ageH / timelineEndH) * 100).toFixed(1)}%`;
         milestone.style.background = categoryRgba(point.vKt, 1);
@@ -1073,17 +1083,28 @@ export class UiController {
       `${compactDirection(structure.motionUms, structure.motionVms)} ` +
       `${motionSpeed.toFixed(1)} · ${structure.translationAsymmetryKt.toFixed(1)} kt`;
 
-    // Category chip + intensity scale: where the storm sits on the SSHS band
-    // and how far the model's live MPI says this water could still take it.
+    // Regional chip + intensity scale, with the SSHS table retained only for
+    // the secondary comparison colour.
     const category = stormCategory(storm.vKt);
+    const regional = northIndianOceanClassification(
+      storm.vKt,
+      SIMULATED_WIND_CONVENTION.averagingMinutes,
+    );
+    const regionalChip = regionalCategoryChip(regional);
+    const regionalTitle =
+      `${regional.category.name} — indicative RSMC band from simulated ` +
+      'one-minute sustained wind; no three-minute conversion applied';
     f.category.dataset.cat = category.id;
-    f.category.textContent = category.chip;
+    f.category.textContent = regionalChip;
+    f.category.title = regionalTitle;
+    f.category.setAttribute('aria-label', regionalTitle);
     const categoryColor = categoryRgba(storm.vKt, 1);
-    f.timelineNowKt.textContent = `${Math.round(storm.vKt)} kt`;
+    f.timelineNowKt.textContent = `${Math.round(storm.vKt)} kt 1m`;
     f.timelineNowHpa.textContent =
       `${Math.round(structure.centralPressureHpa)} hPa`;
     f.timelineCategory.dataset.cat = category.id;
-    f.timelineCategory.textContent = category.chip;
+    f.timelineCategory.textContent = regionalChip;
+    f.timelineCategory.title = regionalTitle;
     f.timelineCategory.style.background = categoryColor;
     f.scrubber.style.setProperty('--timeline-current-color', categoryColor);
     f.needleNow.style.left = `${(intensityFraction(storm.vKt) * 100).toFixed(1)}%`;
@@ -1096,16 +1117,20 @@ export class UiController {
     }
     if (d.overLand) {
       f.intensityNote.textContent =
-        `${Math.round(storm.vKt)} kt · over land — no ocean fuel, decaying`;
+        `${Math.round(storm.vKt)} kt 1-min · over land — no ocean fuel, decaying`;
     } else if (potentialKt <= storm.vKt + 3) {
       f.intensityNote.textContent =
-        `${Math.round(storm.vKt)} kt · at its ceiling for this water ` +
-        `(mpi ${Math.round(potentialKt)} kt)`;
+        `${Math.round(storm.vKt)} kt 1-min · at its ceiling for this water ` +
+        `(mpi ${Math.round(potentialKt)} kt 1-min)`;
     } else {
-      const potentialCategory = stormCategory(potentialKt);
+      const potentialCategory = northIndianOceanClassification(
+        potentialKt,
+        SIMULATED_WIND_CONVENTION.averagingMinutes,
+      );
       f.intensityNote.textContent =
-        `${Math.round(storm.vKt)} kt now · this ocean supports ` +
-        `${potentialCategory.chip.toLowerCase()} (mpi ${Math.round(potentialKt)} kt)`;
+        `${Math.round(storm.vKt)} kt 1-min now · this ocean supports ` +
+        `${regionalCategoryChip(potentialCategory).toLowerCase()} ` +
+        `(indicative RSMC band · mpi ${Math.round(potentialKt)} kt 1-min)`;
     }
 
     // Live coastal exposure: visible while a city is inside the storm's reach.
@@ -1163,7 +1188,7 @@ export class UiController {
     if (!view.debrief) return;
     const summary = view.debrief;
     f.verdict.textContent = deathReasonPhrase(summary.death.reason);
-    f.peak.textContent = `${Math.round(summary.death.peakKt)} kt`;
+    f.peak.textContent = `${Math.round(summary.death.peakKt)} kt 1-min`;
     f.life.textContent = durationPhrase(summary.death.durationH);
     f.muscat.textContent = approachDistance(summary.death.closestApproachKm);
     f.landfall.textContent = summary.landfall
@@ -1182,10 +1207,13 @@ export class UiController {
     f.impactReport.hidden = impact === null;
     if (impact) {
       if (summary.landfall && view.landfallKt !== null) {
-        const landfallCategory = stormCategory(view.landfallKt);
+        const landfallCategory = northIndianOceanClassification(
+          view.landfallKt,
+          SIMULATED_WIND_CONVENTION.averagingMinutes,
+        );
         f.impactHeadline.textContent =
-          `ashore as a ${landfallCategory.name} · ` +
-          `${Math.round(view.landfallKt)} kt near ` +
+          `ashore in the indicative ${landfallCategory.category.name} band · ` +
+          `${Math.round(view.landfallKt)} kt 1-min near ` +
           formatLatLon(summary.landfall.lat, summary.landfall.lon);
       } else {
         const closestKm = summary.death.closestApproachKm;
@@ -1205,7 +1233,7 @@ export class UiController {
           ? exposed.map((entry) => [
               entry.city.label,
               `${experiencedWindPhrase(entry.peakWindKt)} · ` +
-                `${Math.round(entry.peakWindKt)} kt · ` +
+                `${Math.round(entry.peakWindKt)} kt 1-min · ` +
                 `${Math.round(entry.rainMm)} mm`,
             ])
           : [['coast', 'no damaging winds reached any city']];
@@ -1661,7 +1689,12 @@ export function deathReasonPhrase(reason: DeathReason): string {
  */
 export function epitaph(d: StormDeath): string {
   const cause = deathReasonPhrase(d.reason);
-  const parts = [cause, approachPhrase(d.closestApproachKm), durationPhrase(d.durationH), `peak ${Math.round(d.peakKt)} kt`];
+  const parts = [
+    cause,
+    approachPhrase(d.closestApproachKm),
+    durationPhrase(d.durationH),
+    `peak ${Math.round(d.peakKt)} kt 1-min`,
+  ];
   return parts.join(' · ');
 }
 

@@ -109,7 +109,9 @@ Notes verified in code:
 | `types.ts` | The shared contract surface between sim, render, ui, and data builders. Interfaces, enums, and a few shared constants (`DType`, `MUSCAT`, `AFTERMATH_FADE_MS`); no runtime logic. | `StormState`, `SpawnParams`, `FrameState`, `RenderLayer`, `SimEngine`, `EnvSampler`, `ParsedBin`, `BinLayer`, `EnvSamplingMode` |
 | `grid.ts` | THE coordinate-convention owner: latlon ↔ grid cell ↔ clip space, wind m/s → deg/h, distances. Inline coordinate math elsewhere is a bug. | `DOMAIN` (50–70°E, 15–27°N), `latLonToCell`, `latLonToClip`, `offsetKm`, `greatCircleKm`, `windToDegPerHour` |
 | `rng.ts` | Seeded determinism + the shareable-storm URL hash. Never `Math.random()` in sim code. | `mulberry32`, `makeRng`, `randomSeed`, `readHash`/`encodeHash`/`writeHash` |
-| `category.ts` | Saffir–Simpson classification of sustained wind, in one place for chip, bar, and track colours. | `CATEGORIES`, `stormCategory`, `categoryRgba`, `intensityFraction` |
+| `category.ts` | Secondary Saffir–Simpson comparison palette for legacy diagnostics and track colours. | `CATEGORIES`, `stormCategory`, `categoryRgba`, `intensityFraction` |
+| `wind-conventions.ts` | North Indian Ocean regional classes plus explicit simulator wind averaging, height, exposure, measure, source, and conversion metadata. | `SIMULATED_WIND_CONVENTION`, `NORTH_INDIAN_OCEAN_CATEGORIES`, `northIndianOceanClassification` |
+| `product-identity.ts` | Pure product-mode, model-valid-time, and observation-sync boundary used by the permanent UI identity. | `buildProductIdentity`, `modelValidTimeIso`, `requiresObservationAcknowledgement` |
 | `tokens.ts` | The ONE design-token source: map palette + windy-grade chrome tokens (panel glass, radii, typography colours) mirrored as CSS custom properties and normalized Float32 shader uniforms. | `TOKENS`, `uniform`, `injectCssVars`, `SPACING_UNIT`, `RADIUS`, `PANEL_GLASS` |
 
 ### src/ — data loading and sampling

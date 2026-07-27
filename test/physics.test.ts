@@ -28,6 +28,7 @@ import {
   betaDriftMs,
   organizationTarget,
   advanceOrganization,
+  precipitationMoistureSupport,
   precipitationRates,
 } from '../src/sim';
 
@@ -352,6 +353,31 @@ describe('thermodynamic intensity coupling', () => {
 });
 
 describe('separated rainfall components', () => {
+  it('lets an organized tropical circulation moisten its core in dry ambient air', () => {
+    const support = precipitationMoistureSupport(105, 0.82, 10);
+    const rain = precipitationRates(105, 0.82, 10);
+
+    expect(support).toBeGreaterThan(0.5);
+    expect(rain.eyewallMmH).toBeGreaterThan(0);
+    expect(rain.rainbandMmH).toBeGreaterThan(0);
+    expect(rain.orographicMmH).toBeGreaterThan(0);
+    expect(rain.totalMmH).toBeGreaterThan(0);
+  });
+
+  it('does not invent a moisture floor for a dry, weak, disorganized disturbance', () => {
+    expect(precipitationMoistureSupport(15, 0, 10)).toBe(0);
+    expect(precipitationRates(15, 0, 10).totalMmH).toBe(0);
+  });
+
+  it('increases moisture support with ambient humidity and core organization', () => {
+    const dryWeak = precipitationMoistureSupport(80, 0.2, 25);
+    const dryOrganized = precipitationMoistureSupport(80, 0.8, 25);
+    const moistOrganized = precipitationMoistureSupport(80, 0.8, 70);
+
+    expect(dryOrganized).toBeGreaterThan(dryWeak);
+    expect(moistOrganized).toBeGreaterThan(dryOrganized);
+  });
+
   it('requires tropical-storm winds for an eyewall but retains rainbands', () => {
     const depression = precipitationRates(30, 0.5, 75);
     expect(depression.eyewallMmH).toBe(0);

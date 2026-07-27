@@ -116,8 +116,12 @@ import {
   type RadarTimelineFrame,
 } from './radar-observations';
 import { createPointProbeReading } from './point-probe';
-import { simulatedStormName } from './storm-names';
+import { neutralSimulatedStormName } from './storm-names';
 import { findHistoricalAnalog, type HistoricalAnalog } from './historical-analog';
+import {
+  buildProductIdentity,
+  requiresObservationAcknowledgement,
+} from './product-identity';
 import {
   requestEnsemble,
   requestSensitivity,
@@ -339,6 +343,19 @@ const pointProbePin = must(
   document.getElementById('point-probe-pin') as HTMLButtonElement | null,
   '#point-probe-pin',
 );
+const productIdentityEl = must(
+  document.getElementById('product-identity'),
+  '#product-identity',
+);
+const productModeEl = must(document.getElementById('product-mode'), '#product-mode');
+const productValidTimeEl = must(
+  document.getElementById('product-valid-time'),
+  '#product-valid-time',
+);
+const productSourceStateEl = must(
+  document.getElementById('product-source-state'),
+  '#product-source-state',
+);
 
 const gl = glCanvas.getContext('webgl2', { antialias: true, alpha: false });
 if (!gl) {
@@ -415,6 +432,8 @@ let satelliteHandoffStartAgeH = 0;
 let satelliteHandoffStarted = false;
 let satelliteHandoffSettled = false;
 let activeRadarSource: RadarSourceMode = 'simulated';
+let satelliteOverlayAcknowledged = false;
+let radarOverlayAcknowledged = false;
 let radarManifest: RadarTimeline | null = null;
 let radarFrames: RadarTimelineFrame[] = [];
 let radarFrameIndex = 0;
@@ -748,13 +767,6 @@ async function loadAll(): Promise<void> {
   // rides the right physics (never a silent climatology fallback — C8). Otherwise
   // the ambient demo (design T1), fast-forwarded so it opens mid-life.
   const shared = readHash();
-  sharedNameOverride =
-    shared?.stormName && shared.stormNameCatalogueVersion
-      ? {
-          name: shared.stormName,
-          catalogueVersion: shared.stormNameCatalogueVersion,
-        }
-      : null;
   const sharedScenario = shared ? findScenario(scenarios, shared.env) : null;
   if (shared && sharedScenario) {
     const bin = await loadEventBin(sharedScenario);
@@ -798,11 +810,7 @@ let prevHead: Head | null = null;
 let currHead: Head | null = null;
 let accumulatorMin = 0;
 let currentRunLabel = '';
-let currentRunName: ReturnType<typeof simulatedStormName> | null = null;
-let sharedNameOverride: {
-  name: string;
-  catalogueVersion: string;
-} | null = null;
+let currentRunName: ReturnType<typeof neutralSimulatedStormName> | null = null;
 let hindcastScoreCache: HindcastScore | null = null;
 let hindcastScoreFrameCount = -1;
 /** vKt at the recorded landfall frame, resolved once per landfall. */
@@ -857,7 +865,7 @@ function labelForRun(params: SpawnParams): string {
   const environment = activeScenario
     ? `${activeScenario.label} counterfactual`
     : `${(option?.textContent ?? 'season').toLowerCase()} climatology`;
-  const identity = currentRunName ?? simulatedStormName(params.seed);
+  const identity = currentRunName ?? neutralSimulatedStormName(params.seed);
   return `${identity.label} · ${environment}`;
 }
 
@@ -985,19 +993,11 @@ function doSpawn(
     ? 'spawn or select a storm'
     : 'ready · worker cache will reuse this environment';
   const s = engine.getState();
-  const generatedName = simulatedStormName(spawn.seed);
+  const generatedName = neutralSimulatedStormName(spawn.seed);
   currentRunName =
     activeScenario && activeRunMode === 'hindcast'
       ? null
-      : sharedNameOverride
-        ? {
-            ...generatedName,
-            name: sharedNameOverride.name,
-            label: `Simulated Cyclone ${sharedNameOverride.name}`,
-            catalogueVersion: sharedNameOverride.catalogueVersion,
-          }
-        : generatedName;
-  sharedNameOverride = null;
+      : generatedName;
   currentRunLabel = labelForRun(spawn);
   if (s) {
     session.start(
@@ -1033,6 +1033,10 @@ function doSpawn(
   hindcastScoreFrameCount = -1;
   landfallKtCache = null;
   analogCache = null;
+  satelliteOverlayAcknowledged = false;
+  radarOverlayAcknowledged = false;
+  if (activeSatelliteSource !== 'simulated') setSatelliteSource('simulated');
+  if (activeRadarSource !== 'simulated') setRadarSource('simulated');
   impact.reset();
   currHead = s ? headOf(s) : null;
   prevHead = currHead;
@@ -1318,6 +1322,80 @@ function displayedStorm(): StormState | null {
   return session.stormView(live).storm;
 }
 
+function activeObservationProduct(): {
+  label: string;
+  validTimeIso: string | null;
+} | null {
+  if (
+    activeWeatherLayer === 'infrared' &&
+    activeSatelliteSource !== 'simulated' &&
+    !(activeSatelliteSource === 'handoff' && satelliteHandoffSettled)
+  ) {
+    return {
+      label: `${activeSatelliteProvider} observed`,
+      validTimeIso: satelliteFrame?.observedAt ?? null,
+    };
+  }
+  if (activeWeatherLayer === 'rain' && activeRadarSource === 'observed') {
+    const frame = radarFrames[radarFrameIndex];
+    return {
+      label: 'RainViewer observed',
+      validTimeIso: frame ? radarFrameIso(frame) : null,
+    };
+  }
+  return null;
+}
+
+function refreshProductIdentity(storm: StormState | null = displayedStorm()): void {
+  const identity = buildProductIdentity({
+    scenarioLabel: activeScenario?.label,
+    scenarioStartIso: activeScenario?.startIso,
+    hindcastStartIso: activeScenario?.hindcast?.startIso,
+    runMode: activeRunMode,
+    ageH: storm?.ageH ?? null,
+    observation: activeObservationProduct(),
+  });
+  productIdentityEl.dataset.mode = identity.mode;
+  productIdentityEl.dataset.observationState = identity.observationState;
+  productModeEl.textContent = identity.modeLabel;
+  productValidTimeEl.textContent = identity.validTimeLabel;
+  productSourceStateEl.textContent = identity.sourceLabel;
+}
+
+function acknowledgeObservationOverlay(
+  kind: 'satellite' | 'radar',
+  source: 'observed' | 'handoff',
+): boolean {
+  const alreadyAcknowledged = kind === 'satellite'
+    ? satelliteOverlayAcknowledged
+    : radarOverlayAcknowledged;
+  if (!requiresObservationAcknowledgement(
+    displayedStorm() !== null,
+    source,
+    alreadyAcknowledged,
+  )) {
+    return true;
+  }
+  const identity = buildProductIdentity({
+    scenarioLabel: activeScenario?.label,
+    scenarioStartIso: activeScenario?.startIso,
+    hindcastStartIso: activeScenario?.hindcast?.startIso,
+    runMode: activeRunMode,
+    ageH: displayedStorm()?.ageH ?? null,
+  });
+  const accepted = window.confirm(
+    `Observed ${kind} pixels are a display layer, not model input.\n\n` +
+    `${identity.modeLabel}\n${identity.validTimeLabel}\n\n` +
+    'The observation valid time may not match the model clock. Continue with ' +
+    'an explicitly labelled observation overlay?',
+  );
+  if (accepted) {
+    if (kind === 'satellite') satelliteOverlayAcknowledged = true;
+    else radarOverlayAcknowledged = true;
+  }
+  return accepted;
+}
+
 function pointProbeReadingAt(point: LatLon, storm: StormState | null) {
   const monthIndex = currentSpawn?.monthIndex ?? readPickerMonth();
   const tFrac =
@@ -1344,6 +1422,13 @@ function pointProbeReadingAt(point: LatLon, storm: StormState | null) {
       ? 'analysis' as const
       : 'climatology' as const
     : 'fallback' as const;
+  const identity = buildProductIdentity({
+    scenarioLabel: activeScenario?.label,
+    scenarioStartIso: activeScenario?.startIso,
+    hindcastStartIso: activeScenario?.hindcast?.startIso,
+    runMode: activeRunMode,
+    ageH: storm?.ageH ?? null,
+  });
   return createPointProbeReading({
     ...point,
     environment,
@@ -1354,9 +1439,7 @@ function pointProbeReadingAt(point: LatLon, storm: StormState | null) {
       : direct
         ? `${(monthLabel ?? 'season').toLowerCase()} monthly fields`
         : 'analytic degraded mode',
-    validTimeLabel: activeScenario && storm
-      ? `event +${storm.ageH.toFixed(1)} h`
-      : 'monthly climatology',
+    validTimeLabel: identity.validTimeLabel.toLowerCase(),
     simulatedRainMm: session.replayMode
       ? null
       : impact.displayRainAtMm(point.lat, point.lon),
@@ -1653,6 +1736,7 @@ function setRadarPlaying(playing: boolean): void {
 }
 
 function setRadarSource(source: RadarSourceMode): void {
+  if (source === 'simulated') radarOverlayAcknowledged = false;
   activeRadarSource = source;
   renderCtrl?.setRadarSource?.(source);
   updateRadarButtons();
@@ -1663,7 +1747,7 @@ function setRadarSource(source: RadarSourceMode): void {
     radarFrameAbort?.abort();
     renderCtrl?.setObservedRadarFrame?.(null);
     setRadarStatus(
-      'generated from deterministic storm rain rates · no observed pixels',
+      'MODEL RAIN PROXY · generated from deterministic storm rain rates · no observed pixels',
       'simulated',
     );
     return;
@@ -1681,7 +1765,7 @@ function setRainAccumulationWindow(windowId: RainAccumulationWindow): void {
   const period = definition.hours == null
     ? 'storm lifetime'
     : `trailing ${definition.label}`;
-  const message = `${period} · fixed 15 min integration · parametric rain · no radar assimilation`;
+  const message = `MODEL RAIN PROXY · ${period} · fixed 15 min integration · no radar assimilation`;
   accumStatus.value = message;
   accumStatus.textContent = message;
   updateWeatherLegend();
@@ -1707,6 +1791,10 @@ function updateWeatherLegend(): void {
     weatherLegendName.textContent = `${accumulation.label} accumulation`;
     weatherLegendUnit.textContent = 'mm · deterministic simulated-rain ledger';
     weatherLegendScale.textContent = rainAccumulationLegend(activeRainAccumulationWindow);
+  } else if (activeWeatherLayer === 'rain') {
+    weatherLegendName.textContent = 'model rain proxy';
+    weatherLegendUnit.textContent = 'simulated structure · not observed dBZ';
+    weatherLegendScale.textContent = definition.legend;
   } else {
     weatherLegendName.textContent = definition.shortLabel;
     weatherLegendUnit.textContent = definition.unit;
@@ -1876,6 +1964,7 @@ function setSatellitePalette(palette: SatellitePaletteId): void {
 }
 
 function setSatelliteSource(source: SatelliteSourceMode): void {
+  if (source === 'simulated') satelliteOverlayAcknowledged = false;
   activeSatelliteSource = source;
   satelliteHandoffStartAgeH = displayedStorm()?.ageH ?? 0;
   satelliteHandoffStarted = false;
@@ -1964,6 +2053,13 @@ for (const button of satelliteSourceControls.querySelectorAll<HTMLButtonElement>
   button.addEventListener('click', () => {
     const source = button.dataset.source;
     if (source === 'simulated' || source === 'observed' || source === 'handoff') {
+      if (
+        source !== 'simulated' &&
+        !acknowledgeObservationOverlay('satellite', source)
+      ) {
+        updateSatelliteButtons();
+        return;
+      }
       setSatelliteSource(source);
     }
   });
@@ -1987,6 +2083,13 @@ for (const button of satellitePaletteControls.querySelectorAll<HTMLButtonElement
 for (const button of radarSourceControls.querySelectorAll<HTMLButtonElement>('button[data-source]')) {
   button.addEventListener('click', () => {
     const source = button.dataset.source;
+    if (
+      source === 'observed' &&
+      !acknowledgeObservationOverlay('radar', source)
+    ) {
+      updateRadarButtons();
+      return;
+    }
     if (source === 'simulated' || source === 'observed') setRadarSource(source);
   });
 }
@@ -2616,6 +2719,7 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
   const impactSummary = impact.summary(storm);
   ui.updateCityMarkers(storm, impactSummary);
   refreshPointProbe(storm);
+  refreshProductIdentity(storm);
   ui.updateStormTag(
     storm && !storm.isDemo && (storm.alive || session.replayMode)
       ? {

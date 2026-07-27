@@ -86,6 +86,25 @@ export interface SimulatedStormName {
   official: false;
 }
 
+const NEUTRAL_STORM_CATALOG_VERSION = 'neutral-simulation-id-v1';
+
+/**
+ * Neutral identity for a synthetic storm. Official roster names remain available
+ * for catalogue demonstrations, but the running product uses this identifier so
+ * an experiment cannot be mistaken for a named operational cyclone.
+ */
+export function neutralSimulatedStormName(seed: number): SimulatedStormName {
+  const unsigned = Number.isFinite(seed) ? Math.trunc(seed) >>> 0 : 0;
+  const name = `SIM-${unsigned.toString(16).toUpperCase().padStart(8, '0')}`;
+  return {
+    name,
+    label: `Synthetic storm ${name}`,
+    catalogueIndex: unsigned,
+    catalogueVersion: NEUTRAL_STORM_CATALOG_VERSION,
+    official: false,
+  };
+}
+
 /** Stable name for a stable unsigned 32-bit seed. */
 export function simulatedStormName(seed: number): SimulatedStormName {
   const unsigned = Number.isFinite(seed) ? Math.trunc(seed) >>> 0 : 0;

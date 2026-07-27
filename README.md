@@ -50,6 +50,10 @@ simulator and retrospective forecast-companion prototype, not a replacement for
 official guidance. The consolidated **[HF-1–HF-6 findings](docs/findings-hf1-hf6.md)**
 explain what improved, what failed, and which claims the evidence supports.
 
+For a strict, full-surface assessment of suitability for Oman’s Directorate
+General of Meteorology, see the
+**[Oman DGM operational-readiness audit](docs/oman-dgm-operational-readiness-audit.md)**.
+
 ## Stack
 
 Vite + vanilla TypeScript + WebGL2, **zero runtime dependencies** (dev-only:
@@ -101,10 +105,12 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
   come from EUMETView; INSAT frames can be loaded from the provenance manifest
   after a registered MOSDAC download. The handoff is visual initialization,
   not data assimilation.
-- The storm panel shows the live Saffir–Simpson category chip, an intensity
-  bar with the model's MPI "potential" marker, and — near or after landfall —
-  a coastal-impact report (parametric city winds, storm-total rain, and a
-  flash-flood proxy tier). The track is coloured by category.
+- The storm panel uses North Indian Ocean terminology as its primary category
+  copy. Because the simulator remains calibrated to USA/JTWC one-minute
+  sustained wind, the RSMC three-minute band is marked indicative and no
+  averaging-period or gust conversion is implied. The intensity bar carries
+  the model's MPI "potential" marker, while the track retains a secondary
+  Saffir–Simpson comparison palette.
 - Open **forecast laboratory** to run a 20/40/80-member deterministic ensemble.
   The map shows every member plus the fraction of members entering each grid
   cell. Peak-intensity quantiles and landfall/hurricane/major probabilities are
@@ -115,9 +121,15 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
 - Press Space or the play/pause button on the bottom timeline bar to pause and
   resume. The bar carries the scrubber — its track coloured by the recorded
   storm's category history, with start/peak/landfall/end jumps — a live
-  wind/pressure readout, the category chip, and the SIMULATED identity stamp.
+  wind/pressure readout with averaging-period metadata, the regional reference
+  chip, and the SIMULATED identity stamp.
   A compact storm tag pinned to the storm's eye shows the simulated name,
   current wind, category, trend, and central pressure.
+- The permanent product-identity bar distinguishes climatology, historical
+  hindcast, and historical counterfactual modes. Climatology has elapsed model
+  time but no invented UTC valid time. Observed overlays on an active run
+  require acknowledgement and remain labelled as matched, pending, or
+  unsynchronised. Synthetic storms use neutral `SIM-…` identifiers.
 - After the storm ends, scrub its recorded track or jump to its peak, first
   landfall, and final frame. Replay reads immutable recorded frames; it never
   rewinds the simulation engine. The wind-versus-time strip exposes every exact
@@ -435,7 +447,8 @@ src/
   radar-observations.ts bounded RainViewer timeline, tiles + reprojection
   rain-accumulation.ts deterministic display windows, scales + normalization
   weather-layers.ts   nine map-product labels, provenance, and legends
-  category.ts         Saffir–Simpson thresholds, chip copy, tracker colours
+  category.ts         secondary Saffir–Simpson comparison palette
+  wind-conventions.ts RSMC regional classes + explicit wind metadata
   impact.ts           fixed-window/storm rain ledger + per-city impact proxy
   point-probe.ts      pure cursor environment/vortex reading
   export.ts           dependency-free PNG card + WebM replay renderer

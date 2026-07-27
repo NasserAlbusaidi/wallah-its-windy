@@ -1,11 +1,10 @@
 /**
- * category.ts — Saffir–Simpson classification of a sustained wind, in one place.
+ * category.ts — secondary Saffir–Simpson comparison palette.
  *
  * The chip in the storm panel, the intensity bar, and the category-coloured
  * track all read this table, so a threshold retune moves every surface at once.
- * SSHS (not the IMD scale) is deliberate: the app already speaks
- * "hurricane"/"major" in the ensemble copy, and Cat 1–5 is the vocabulary most
- * visitors know. Winds are 1-minute sustained knots, matching StormState.vKt.
+ * Regional product copy comes from wind-conventions.ts. This table remains for
+ * one-minute comparison colour, legacy replay gradients, and SSHS diagnostics.
  */
 
 import { TOKENS } from './tokens';

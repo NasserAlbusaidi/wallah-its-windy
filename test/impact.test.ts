@@ -205,9 +205,15 @@ describe('ImpactTracker', () => {
 describe('experienced wind phrasing', () => {
   it('maps peak winds onto honest marine-scale phrases', () => {
     expect(experiencedWindPhrase(10)).toBe('light winds');
-    expect(experiencedWindPhrase(25)).toBe('gusty winds');
-    expect(experiencedWindPhrase(40)).toBe('gale-force winds');
-    expect(experiencedWindPhrase(55)).toBe('storm-force winds');
-    expect(experiencedWindPhrase(100)).toBe('cat 3 winds');
+    expect(experiencedWindPhrase(25)).toBe('depression winds (indicative)');
+    expect(experiencedWindPhrase(40)).toBe(
+      'cyclonic storm winds (indicative)',
+    );
+    expect(experiencedWindPhrase(55)).toBe(
+      'severe cyclonic storm winds (indicative)',
+    );
+    expect(experiencedWindPhrase(100)).toBe(
+      'extremely severe cyclonic storm winds (indicative)',
+    );
   });
 });

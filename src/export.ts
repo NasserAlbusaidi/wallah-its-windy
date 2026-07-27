@@ -18,6 +18,11 @@ import {
   windRadiusFromQuadrantsKm,
 } from './structure';
 import type { WindRadiiKm } from './types';
+import {
+  SIMULATED_WIND_CONVENTION,
+  northIndianOceanClassification,
+  regionalCategoryChip,
+} from './wind-conventions';
 
 const WIDTH = 1600;
 const HEIGHT = 900;
@@ -151,9 +156,14 @@ function drawType(
 
   ctx.fillStyle = CYAN;
   ctx.font = '400 23px "IBM Plex Mono", monospace';
+  const regional = northIndianOceanClassification(
+    frame.vKt,
+    SIMULATED_WIND_CONVENTION.averagingMinutes,
+  );
   const structureMetrics = [
     `FRAME ${Math.round(frame.ageH)} H`,
-    `WIND ${Math.round(frame.vKt)} KT`,
+    `WIND ${Math.round(frame.vKt)} KT 1-MIN`,
+    `RSMC BAND ${regionalCategoryChip(regional)} INDICATIVE`,
     `MSLP ${Math.round(frame.structure.centralPressureHpa)} HPA`,
     `RMW ${Math.round(frame.structure.rmwKm)} KM`,
     `OUTER ${Math.round(frame.structure.outerSizeKm)} KM`,
@@ -162,7 +172,7 @@ function drawType(
   ctx.fillText(structureMetrics.join('   ·   '), 70, 798);
 
   const outcomeMetrics = [
-    `PEAK ${Math.round(death.peakKt)} KT`,
+    `PEAK ${Math.round(death.peakKt)} KT 1-MIN`,
     `LIFE ${duration(death.durationH)}`,
     `MUSCAT ${Math.round(death.closestApproachKm)} KM`,
   ];

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
   NORTH_INDIAN_OCEAN_NAMES,
+  neutralSimulatedStormName,
   simulatedStormName,
   STORM_NAME_CATALOG_SHA256,
   STORM_NAME_CATALOG_VERSION,
@@ -43,5 +44,16 @@ describe('North Indian Ocean simulated storm names', () => {
     expect(simulatedStormName(-1).name).toBe(
       NORTH_INDIAN_OCEAN_NAMES[0xffffffff % 169],
     );
+  });
+
+  it('provides neutral identifiers for synthetic product runs', () => {
+    expect(neutralSimulatedStormName(13)).toEqual({
+      name: 'SIM-0000000D',
+      label: 'Synthetic storm SIM-0000000D',
+      catalogueIndex: 13,
+      catalogueVersion: 'neutral-simulation-id-v1',
+      official: false,
+    });
+    expect(neutralSimulatedStormName(-1).name).toBe('SIM-FFFFFFFF');
   });
 });

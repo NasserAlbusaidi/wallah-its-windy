@@ -41,6 +41,7 @@ history once merged.
 | --- | --- | --- |
 | [`superpowers/specs/2026-07-26-windy-grade-reskin-design.md`](superpowers/specs/2026-07-26-windy-grade-reskin-design.md) | — | Design spec for the windy-grade UI reskin: glass panel chrome, type scale, icon layer rail, storm tag pinned to the eye, category-coloured timeline. UI-only; explicitly excludes physics, calibration, data-format, and URL-hash changes. |
 | [`superpowers/plans/2026-07-26-windy-grade-reskin.md`](superpowers/plans/2026-07-26-windy-grade-reskin.md) | — | Eight-task implementation plan for the reskin spec; delivered in PR #11 (merge `89f1539`), retained as the execution record. |
+| [`superpowers/specs/2026-07-27-layer-integrity-remediation-design.md`](superpowers/specs/2026-07-27-layer-integrity-remediation-design.md) | — | Design spec answering the 27 July layer-integrity addendum: cloud-shield canopy scale, one rainband contract, ocean provenance tagging, asset-byte pinning, upper-level sidecar bin, and the governance path for Emanuel PI. Records two adversarial review passes inline. |
 
 ## Pipelines
 

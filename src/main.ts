@@ -130,6 +130,10 @@ import type {
   EnsembleResult,
   EnvironmentPerturbation,
 } from './ensemble';
+import {
+  buildPublicCycleView,
+  fetchPublicCycleManifest,
+} from './public-cycle';
 
 // Render facade. Composited passes in luminance order (terrain -> env glow ->
 // rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
@@ -356,6 +360,26 @@ const productSourceStateEl = must(
   document.getElementById('product-source-state'),
   '#product-source-state',
 );
+const publicDataMonitorEl = must(
+  document.getElementById('public-data-monitor') as HTMLDetailsElement | null,
+  '#public-data-monitor',
+);
+const publicDataHeadlineEl = must(
+  document.getElementById('public-data-headline'),
+  '#public-data-headline',
+);
+const publicDataCycleEl = must(
+  document.getElementById('public-data-cycle'),
+  '#public-data-cycle',
+);
+const publicDataUpdatedEl = must(
+  document.getElementById('public-data-updated'),
+  '#public-data-updated',
+);
+const publicDataSourcesEl = must(
+  document.getElementById('public-data-sources'),
+  '#public-data-sources',
+);
 
 const gl = glCanvas.getContext('webgl2', { antialias: true, alpha: false });
 if (!gl) {
@@ -507,17 +531,19 @@ const MAP_ASPECT =
   ((DOMAIN.lonMax - DOMAIN.lonMin) *
     Math.cos((((DOMAIN.latMin + DOMAIN.latMax) / 2) * Math.PI) / 180)) /
   (DOMAIN.latMax - DOMAIN.latMin);
-/** Fraction of the fitted rect the chart occupies — the "zoomed out" framing. */
-const MAP_FILL = 0.92;
+/** Let the map use nearly all of the limiting viewport dimension. */
+const MAP_FILL_DESKTOP = 0.985;
+const MAP_FILL_MOBILE = 1;
 
 /** Fit the chart frame into the window: aspect-correct, centered, framed. */
 function layoutMapFrame(): void {
   const availW = window.innerWidth;
   const availH = window.innerHeight;
-  let w = availW * MAP_FILL;
+  const fill = window.innerWidth <= 820 ? MAP_FILL_MOBILE : MAP_FILL_DESKTOP;
+  let w = availW * fill;
   let h = w / MAP_ASPECT;
-  if (h > availH * MAP_FILL) {
-    h = availH * MAP_FILL;
+  if (h > availH * fill) {
+    h = availH * fill;
     w = h * MAP_ASPECT;
   }
   mapFrame.style.left = `${Math.round((availW - w) / 2)}px`;
@@ -572,6 +598,33 @@ interface LoadItem {
 
 function asset(path: string): string {
   return `${import.meta.env.BASE_URL}${path}`;
+}
+
+async function refreshPublicCycleMonitor(): Promise<void> {
+  try {
+    const manifest = await fetchPublicCycleManifest(asset('data/live/current.json'));
+    const view = buildPublicCycleView(manifest, new Date().toISOString());
+    publicDataMonitorEl.dataset.status = view.status;
+    publicDataHeadlineEl.textContent = view.headline;
+    publicDataCycleEl.textContent = view.cycleLabel;
+    publicDataUpdatedEl.textContent = view.updatedLabel;
+    publicDataSourcesEl.replaceChildren(
+      ...view.sourceRows.map((row) => {
+        const item = document.createElement('li');
+        item.dataset.state = row.state;
+        item.title = row.detail;
+        item.textContent = row.label;
+        return item;
+      }),
+    );
+  } catch (error) {
+    publicDataMonitorEl.dataset.status = 'unavailable';
+    publicDataHeadlineEl.textContent = 'PUBLIC INPUTS · MONITOR UNAVAILABLE';
+    publicDataCycleEl.textContent = 'scheduled source manifest could not be verified';
+    publicDataUpdatedEl.textContent = '';
+    publicDataSourcesEl.replaceChildren();
+    console.warn('[public-cycle] monitor unavailable:', error);
+  }
 }
 
 async function loadSatelliteManifest(): Promise<void> {
@@ -2917,4 +2970,5 @@ void loadSatelliteManifest().then(() => {
     void refreshSatelliteObservation(true);
   }
 });
+void refreshPublicCycleMonitor();
 void loadAll();

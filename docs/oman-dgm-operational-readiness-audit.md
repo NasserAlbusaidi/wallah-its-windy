@@ -109,10 +109,14 @@ The default environment is a 0.5° monthly product:
   member from today's atmosphere.
 - Current Meteosat and RainViewer layers are display-only and never enter the
   model state.
-- The HF-5 live-data types and provider adapters exist, but are not wired into
-  the running application.
-- The project documentation states that live mode remains disabled until a
-  scheduled lawful feed and prospective evidence exist.
+- The HF-5 live-data types and provider adapters do not drive the simulation.
+- A six-hourly public-source monitor added after the audit now normalizes
+  regional GFS atmosphere and OISST and exposes each input gate in the UI. Its
+  seven-field partial environment omits OHC and cannot pass the eight-field
+  forecast contract.
+- RSMC active-advisory parsing, regional three-dimensional upper-ocean data,
+  GEFS normalization, issuance, and prospective evidence remain absent, so live
+  forecast mode stays disabled.
 
 This is climate-sensitivity data, not weather initialisation. NOAA describes
 [OISST](https://www.ncei.noaa.gov/products/optimum-interpolation-sst) as a daily
@@ -130,8 +134,11 @@ Local evidence:
   selection and analytic fallback.
 - [`src/live-data.ts`](../src/live-data.ts),
   [`src/live-product.ts`](../src/live-product.ts), and
-  [`src/live-providers.ts`](../src/live-providers.ts), which are currently
-  disconnected from `main.ts`.
+  [`src/live-providers.ts`](../src/live-providers.ts), which remain disconnected
+  from model initialization.
+- [`bake/public_cycle.py`](../bake/public_cycle.py) and
+  [`src/public-cycle.ts`](../src/public-cycle.ts), which acquire and present
+  current source availability without promoting it to forecast forcing.
 
 ### P0.2 — The model could produce an intense, rainless tropical cyclone — core defect remediated 27 July 2026
 

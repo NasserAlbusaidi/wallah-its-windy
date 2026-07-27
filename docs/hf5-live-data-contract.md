@@ -2,8 +2,13 @@
 
 HF-5 establishes a provider-neutral, immutable boundary between operational
 weather products and the simulation core. It does **not** turn Wallah into an
-operational warning system. A continuously scheduled production provider is not
-configured in this repository.
+operational warning system.
+
+As of 27 July 2026, the repository has a scheduled public-source acquisition
+monitor. It normalizes regional NOAA/NCEP GFS atmosphere and NOAA OISST, records
+the RSMC New Delhi bulletin state, and checks RTOFS availability. It is not an
+issued forecast provider: all required gates must pass before live output is
+allowed, and the current acquisition deliberately remains incomplete.
 
 ## Cycle and advisory integrity
 
@@ -42,8 +47,23 @@ and [NOAA ocean-heat-content products](https://www.aoml.noaa.gov/phod/cyclone/in
 or another lawful source without teaching the physics engine provider-specific
 URLs or formats.
 
-The next operational step is external to the scientific core: configure a
-scheduler and lawful provider endpoints, pin their licence/retention terms, and
-archive every cycle before observations arrive. Until that is running and HF-6
-has accumulated prospective cases, the UI must retain “experimental forecast
-companion” language.
+## Public acquisition boundary
+
+`bake/public_cycle.py` is scheduled every six hours in the Pages workflow. It
+writes a browser manifest and a seven-field WIWB environment containing GFS
+steering/shear/humidity plus OISST. OHC is intentionally absent, so this partial
+artifact cannot pass the existing eight-field forecast contract. Raw responses,
+the normalized artifact, and the manifest are also written with non-overwriting
+semantics and retained as a uniquely named Actions artifact.
+
+Current gates remain closed for:
+
+- a parsed, cycle-matched active RSMC advisory;
+- a usable regional three-dimensional upper-ocean analysis;
+- a normalized atmospheric ensemble; and
+- prospective forecast issuance and verification.
+
+The next step is to implement those missing inputs, move snapshots to durable
+multi-season retention, and issue immutable official/baseline/experimental
+guidance only when every freshness and compatibility check passes. Until then,
+the application remains a climatology sandbox and source-availability monitor.

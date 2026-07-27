@@ -49,8 +49,11 @@ large input and generated scorecard carries a SHA-256 manifest.
 - HF-4 improved intensity CRPS on legacy validation, yet its cone overcovered
   and 48-hour mean Brier skill was negative. Probability language was not
   promoted.
-- HF-5 provider normalization and immutable issuance are implemented, while a
-  continuously scheduled lawful live feed is not configured.
+- HF-5 provider normalization and immutable issuance are implemented. A
+  six-hourly public-source monitor now normalizes regional GFS atmosphere and
+  OISST and snapshots advisory/ocean availability. Forecast output remains
+  disabled because active-advisory, three-dimensional upper-ocean, and ensemble
+  gates are incomplete.
 - HF-6 broadens the catalogue and outcome audit. Its untouched 8-storm,
   16-initialization first look found positive track skill against persistence at
   12/24/48 hours (0.344/0.386/0.535), but negative 48-hour wind and pressure

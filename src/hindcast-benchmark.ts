@@ -13,6 +13,7 @@ import { eventSpawn, type BenchmarkPartition, type Scenario } from './scenarios'
 import {
   createSimEngine,
   type IntensityParameters,
+  type PhysicsProfile,
   type TrackParameters,
 } from './sim';
 import type {
@@ -119,6 +120,9 @@ export function runDetailedHindcastCase(
   motionInitialization?: { u: number; v: number },
   pressureWindSampler?: PressureWindSampler,
   trackParameters?: Partial<TrackParameters>,
+  // Preserve the sealed HF-2/HF-6 replay contract by default. Product drift
+  // gates opt into the browser's shipped profile explicitly.
+  physicsProfile: PhysicsProfile = 'hf2-experimental',
 ): DetailedHindcastCaseResult {
   const { scenario, environment, track } = benchmarkCase;
   if (!scenario.hindcast || !scenario.benchmarkPartition) {
@@ -134,7 +138,7 @@ export function runDetailedHindcastCase(
   const engine = createSimEngine({
     env: sampler,
     isLand,
-    physicsProfile: 'hf2-experimental',
+    physicsProfile,
     terrainHeightM: (lat, lon) =>
       elevation ? sampleLayerBilinear(elevation, 0, lat, lon) : 0,
     intensityParameters,
@@ -213,11 +217,18 @@ export function runHindcastCase(
   benchmarkCase: HindcastCase,
   terrain: ParsedBin,
   intensityParameters?: Partial<IntensityParameters>,
+  physicsProfile?: PhysicsProfile,
 ): HindcastCaseResult {
   return runDetailedHindcastCase(
     benchmarkCase,
     terrain,
     intensityParameters,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    physicsProfile,
   ).result;
 }
 
@@ -225,8 +236,9 @@ export function evaluateHindcastCases(
   cases: readonly HindcastCase[],
   terrain: ParsedBin,
   intensityParameters?: Partial<IntensityParameters>,
+  physicsProfile?: PhysicsProfile,
 ): HindcastCaseResult[] {
   return cases.map((benchmarkCase) =>
-    runHindcastCase(benchmarkCase, terrain, intensityParameters),
+    runHindcastCase(benchmarkCase, terrain, intensityParameters, physicsProfile),
   );
 }

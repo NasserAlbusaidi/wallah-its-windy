@@ -286,7 +286,7 @@ if (calibrationCases.length !== 7 || validationCases.length !== 3) {
   );
 }
 
-const baselineAll = evaluateHindcastCases(cases, terrain, BASELINE);
+const baselineAll = evaluateHindcastCases(cases, terrain, BASELINE, 'shipped');
 const baselineCalibration = baselineAll.filter(
   ({ partition }) => partition === 'calibration',
 );
@@ -298,7 +298,12 @@ let bestCalibration = aggregateHindcasts(baselineCalibration);
 let evaluatedCandidates = 0;
 for (const parameters of candidates()) {
   evaluatedCandidates += 1;
-  const results = evaluateHindcastCases(calibrationCases, terrain, parameters);
+  const results = evaluateHindcastCases(
+    calibrationCases,
+    terrain,
+    parameters,
+    'shipped',
+  );
   const aggregate = aggregateHindcasts(results);
   if (
     aggregate.objective !== null &&
@@ -310,7 +315,12 @@ for (const parameters of candidates()) {
   }
 }
 
-const proposedAll = evaluateHindcastCases(cases, terrain, bestParameters);
+const proposedAll = evaluateHindcastCases(
+  cases,
+  terrain,
+  bestParameters,
+  'shipped',
+);
 const proposedValidation = proposedAll.filter(
   ({ partition }) => partition === 'validation',
 );

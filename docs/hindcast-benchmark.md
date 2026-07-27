@@ -5,12 +5,12 @@
 
 ## Verdict
 
-**REJECTED.** The calibration winner failed at least one untouched gate (improvement 3.4%, worst wind-MAE regression 0.4 kt, pressure regression -2.7 hPa, track regression 1.04 km).
+**REJECTED.** The calibration winner failed at least one untouched gate (improvement 2.8%, worst wind-MAE regression 0.4 kt, pressure regression -2.8 hPa, track regression 1.03 km).
 
 Seven complete storms were used for the constrained parameter search. Kyarr
 2019, Shaheen 2021, and Biparjoy 2023 remained untouched until the candidate was
 chosen. The held-out equal-storm objective changed by
-**3.4%**.
+**2.8%**.
 
 ## Protocol
 
@@ -38,21 +38,21 @@ plus WOA23. These are hindcasts, not operational forecasts.
 
 | Storm | Split | Track MAE km | Wind MAE kt | Pressure MAE hPa | Peak bias kt | Deployed wind MAE kt |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| gonu 2007 | calibration | 52.5 | 34.5 → 15.7 | 27.1 → 13.4 | -53.4 → -32.9 | 34.5 |
-| phet 2010 | calibration | 189.9 | 27.6 → 22.5 | 20.4 → 17.2 | -41.9 → -35.9 | 27.6 |
-| nilofar 2014 | calibration | 70.3 | 17.7 → 11.2 | 8.9 → 6.5 | -19.3 → -16.5 | 17.7 |
-| ashobaa 2015 | calibration | 50.4 | 2.8 → 3.8 | 6.8 → 6.5 | 2.0 → 4.2 | 2.8 |
-| mekunu 2018 | calibration | 23.5 | 24.8 → 17.6 | 16.3 → 13.3 | 4.5 → 8.6 | 24.8 |
+| gonu 2007 | calibration | 55.5 | 26.8 → 13.5 | 23.1 → 12.2 | -45.0 → -27.3 | 26.8 |
+| phet 2010 | calibration | 184.5 | 21.8 → 17.2 | 17.5 → 13.8 | -33.9 → -25.8 | 21.8 |
+| nilofar 2014 | calibration | 70.3 | 16.8 → 10.6 | 9.3 → 7.2 | -19.1 → -16.4 | 16.8 |
+| ashobaa 2015 | calibration | 51.6 | 4.3 → 3.6 | 7.9 → 6.7 | 2.5 → 5.1 | 4.3 |
+| mekunu 2018 | calibration | 23.5 | 24.4 → 17.4 | 16.3 → 13.3 | 7.1 → 10.9 | 24.4 |
 | hikaa 2019 | calibration | 20.8 | 20.9 → 18.9 | 13.1 → 12.0 | -31.8 → -28.2 | 20.9 |
-| vayu 2019 | calibration | 70.6 | 18.2 → 20.8 | 14.2 → 16.6 | 15.9 → 27.4 | 18.2 |
-| kyarr 2019 | validation | 25.4 | 47.9 → 41.1 | 39.1 → 32.3 | -19.9 → -19.2 | 47.9 |
-| shaheen 2021 | validation | 51.2 | 12.0 → 9.1 | 8.9 → 7.0 | 3.1 → 17.2 | 12.0 |
-| biparjoy 2023 | validation | 48.3 | 21.6 → 22.0 | 16.6 → 17.1 | -9.1 → -10.3 | 21.6 |
+| vayu 2019 | calibration | 70.6 | 18.7 → 25.1 | 14.1 → 18.7 | 25.1 → 35.8 | 18.7 |
+| kyarr 2019 | validation | 25.3 | 46.4 → 38.0 | 39.2 → 31.4 | -19.9 → -19.2 | 46.4 |
+| shaheen 2021 | validation | 51.2 | 11.1 → 9.7 | 8.7 → 7.9 | 22.7 → 37.6 | 11.1 |
+| biparjoy 2023 | validation | 48.2 | 19.4 → 19.7 | 15.6 → 15.8 | -7.9 → -9.4 | 19.4 |
 
-Held-out aggregate: baseline wind MAE **27.2 kt**,
-proposed **24.1 kt**;
-baseline pressure MAE **21.5 hPa**,
-proposed **18.8 hPa**.
+Held-out aggregate: baseline wind MAE **25.6 kt**,
+proposed **22.5 kt**;
+baseline pressure MAE **21.2 hPa**,
+proposed **18.4 hPa**.
 
 ## Parameters
 
@@ -65,7 +65,7 @@ proposed **18.8 hPa**.
 | `organizationRecoveryH` | 30 | 30 | 30 |
 | `organizationDisruptionH` | 10 | 10 | 10 |
 | `ohcMpiWeight` | 0.28 | 0.2 | 0.28 |
-| `organizationIntensification` | 0.5 | 0.6 | 0.5 |
+| `organizationIntensification` | 0.5 | 0.55 | 0.5 |
 
 The search evaluated 185 bounded candidates.
 The live defaults exactly match the deployed decision:

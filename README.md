@@ -50,6 +50,10 @@ simulator and retrospective forecast-companion prototype, not a replacement for
 official guidance. The consolidated **[HF-1–HF-6 findings](docs/findings-hf1-hf6.md)**
 explain what improved, what failed, and which claims the evidence supports.
 
+For a strict, full-surface assessment of suitability for Oman’s Directorate
+General of Meteorology, see the
+**[Oman DGM operational-readiness audit](docs/oman-dgm-operational-readiness-audit.md)**.
+
 ## Stack
 
 Vite + vanilla TypeScript + WebGL2, **zero runtime dependencies** (dev-only:

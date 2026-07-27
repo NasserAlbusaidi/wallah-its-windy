@@ -27,6 +27,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run calibrate:check
+      # Sealed HF-6 cohort must stay in sync with the runtime it certifies.
+      # Omitting these let a037c4a change src/hindcast-benchmark.ts without
+      # re-sealing, leaving the reproduction command broken while CI stayed green.
+      # gate:check is not redundant: hf6-acceptance.json hashes the sealed file,
+      # so re-sealing without re-running the gate fails here and only here.
+      - run: npm run hf6:verify:check
+      - run: npm run hf6:gate:check
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

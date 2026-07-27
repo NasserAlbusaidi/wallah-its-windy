@@ -97,8 +97,13 @@ export async function fetchIssuedLiveRun(
   const response = await fetchImpl(url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`live cycle: HTTP ${response.status}`);
   const expected = Number(response.headers.get('content-length'));
+  const encoding = response.headers.get('content-encoding')?.toLowerCase();
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (Number.isFinite(expected) && bytes.byteLength !== expected) {
+  if (
+    (!encoding || encoding === 'identity')
+    && Number.isFinite(expected)
+    && bytes.byteLength !== expected
+  ) {
     throw new Error(`live cycle: partial response ${bytes.byteLength}/${expected}`);
   }
   const run = JSON.parse(new TextDecoder().decode(bytes)) as ArchivedForecastRun;

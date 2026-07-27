@@ -67,8 +67,8 @@ These experiments are deterministic simulator tests, not forecasts.
 | Experiment | Result | Audit conclusion |
 | --- | --- | --- |
 | Default May demonstration | Peak approximately 102 kt; six-day life; passed over land | Visually convincing, but not tied to a real forecast cycle |
-| October controlled storm at 20.34°N, 63.25°E | Initial RH 10%; peak 41.6 kt; Oman landfall around 40 kt; **0 mm land rainfall** | Physical contradiction |
-| Same genesis and seed, May environment | Peak 104.8 kt; landfall near 100 kt; **0 mm land rainfall** | Critical contradiction: an intense landfalling cyclone with no rain |
+| October controlled storm at 20.34°N, 63.25°E | Initial RH 10%; peak 41.6 kt; Oman landfall around 40 kt; **0 mm land rainfall** | Physical contradiction reproduced before the 27 July remediation |
+| Same genesis and seed, May environment | Peak 104.8 kt; landfall near 100 kt; **0 mm land rainfall** | Critical contradiction reproduced before the 27 July remediation |
 | 20-member October ensemble | Peak p10–p90 38–44 kt; 100% landfall member frequency | Spread is implausibly narrow; ensemble verification was rejected |
 | Very favourable sensitivity run | +2°C SST, +20% RH, −8 m/s shear, and OHC ×1.5 produced only +8.9 kt peak and +1 hour of life | Useful educational experiment, not calibrated forecast sensitivity |
 | Shaheen 2021 hindcast | Track MAE 51 km; intensity MAE 11.5 kt; pressure MAE 8.7 hPa; peak bias +5 kt | A reasonable single track result, but not evidence of operational skill |
@@ -133,19 +133,20 @@ Local evidence:
   [`src/live-providers.ts`](../src/live-providers.ts), which are currently
   disconnected from `main.ts`.
 
-### P0.2 — The model can produce an intense, rainless tropical cyclone
+### P0.2 — The model could produce an intense, rainless tropical cyclone — core defect remediated 27 July 2026
 
-**Implementation defect.** This is the most serious one found.
+**Implementation defect — core contradiction resolved; observational QPF
+verification remains open.** This was the most serious code defect found.
 
-In [`src/sim.ts`](../src/sim.ts), every rainfall component is multiplied by:
+At audit time, [`src/sim.ts`](../src/sim.ts) multiplied every rainfall
+component by:
 
 ```text
 clamp((mid-level RH − 30) / 50)
 ```
 
-RH at or below 30% therefore produces exactly zero eyewall, rainband, and
-orographic rainfall. This multiplier is unconditional — it applies under every
-physics profile.
+RH at or below 30% therefore produced exactly zero eyewall, rainband, and
+orographic rainfall. The multiplier was unconditional across physics profiles.
 
 At the same time, the shipped intensity profile lets low-shear dry air exert no
 direct intensity penalty because dry-air exposure is multiplied by a shear
@@ -183,8 +184,20 @@ minimum around 7.5%. A tropical cyclone cannot be represented by applying a
 static monthly environmental RH directly to precipitation without moisture
 convergence, storm-scale moistening, and forecast QPF.
 
-Rain and cold-wake behaviour have never been scored against precipitation or
-ocean observations. See [the hindcast benchmark](./hindcast-benchmark.md).
+The core contradiction was remediated on 27 July 2026. Rain moisture support
+now combines environmental moisture with a bounded storm-scale
+convergence/recycling term that exists only when a real circulation and an
+organised convective core coexist. Regression tests prove that a 105 kt,
+organised vortex at 10% environmental RH produces non-zero eyewall, rainband,
+and orographic rates, while a weak, disorganised dry disturbance retains zero
+rain rather than receiving an arbitrary visible floor. Radar and accumulation
+surfaces now carry a permanent `MODEL RAIN PROXY` identity.
+
+This is an internal-consistency repair, not QPF certification. Rain and
+cold-wake behaviour still have not been scored against independent
+precipitation or ocean observations. That verification work remains tracked in
+[issue 18](https://github.com/NasserAlbusaidi/wallah-its-windy/issues/18).
+See also [the hindcast benchmark](./hindcast-benchmark.md).
 
 ### P0.3 — Retrospective track skill is not prospective forecast skill
 
@@ -224,11 +237,12 @@ response, radar, satellite, gauges, and soil saturation. The application must
 not display operational-looking flash-flood categories until integrated with
 DGM's basin guidance.
 
-### P0.5 — Wind classification is ambiguous for the region
+### P0.5 — Wind classification was ambiguous for the region — product ambiguity remediated 27 July 2026
 
-**Implementation defect.**
+**Implementation defect — research-product ambiguity resolved; full operational
+wind metadata remains open.**
 
-The interface uses Saffir–Simpson categories without prominently stating
+At audit time, the interface used Saffir–Simpson categories without prominently stating
 whether winds are 1-, 3-, or 10-minute sustained. Verification data use
 USA/JTWC one-minute winds.
 
@@ -242,6 +256,21 @@ For DGM use, every wind value must declare averaging period, height and
 exposure, sustained versus gust, source agency, and any conversion applied.
 Saffir–Simpson categories may remain a secondary comparison but cannot be the
 only operational vocabulary.
+
+The product now uses a typed wind-convention contract and North Indian Ocean
+classification table. UI chips, timelines, impacts, probes, and exports
+identify simulator winds as one-minute sustained; the permanent convention
+note declares 10 m over-sea exposure and the USA/JTWC calibration convention.
+RSMC New Delhi terms are primary. Because no validated one-to-three-minute
+conversion is applied, each regional band carries an asterisk and the word
+“indicative”; the Saffir–Simpson table remains only as a secondary colour
+comparison.
+
+This resolves the misleading category presentation but not every operational
+requirement in [issue 21](https://github.com/NasserAlbusaidi/wallah-its-windy/issues/21):
+ingested observations still need convention metadata carried end-to-end, and
+wind/shear products still need direction, vertical levels, valid time, and
+uncertainty.
 
 ### P0.6 — Scientific verification is rejected
 
@@ -326,11 +355,12 @@ gate passed; the project deliberately records the HF-6 result as rejected.
 Re-sealing restores reproducibility of the rejected result — it does not and
 must not alter that verdict.
 
-### P0.8 — Observation and simulation times can be mixed
+### P0.8 — Observation and simulation times could be mixed — accidental mixing boundary remediated 27 July 2026
 
-**Implementation defect.**
+**Implementation defect — accidental mixing resolved; wider operational product
+identity remains open.**
 
-Recent wall-clock RainViewer radar and Meteosat observations can be displayed
+At audit time, recent wall-clock RainViewer radar and Meteosat observations could be displayed
 while a climatological or accelerated simulated storm remains on the map.
 Although the workbenches label providers and times, this compositing encourages
 users to infer a relationship that does not exist.
@@ -338,17 +368,33 @@ users to infer a relationship that does not exist.
 Observation, analysis, forecast, hindcast, and climatology modes require
 separate visual identities and synchronized valid-time controls.
 
+The application now has a permanent, tested product-identity bar. Climatology
+shows elapsed model time and explicitly has no UTC valid time. Historical
+hindcast and counterfactual clocks derive UTC model time from their frozen
+scenario origins. Selecting observed radar or satellite pixels on an active
+run requires acknowledgement; the permanent bar then reports the observation
+as valid-time pending, time-matched, or `UNSYNCED OBS OVERLAY`. A new spawn or
+mode transition returns the display to simulation-only. Synthetic storms now
+use neutral `SIM-…` identifiers, and the methodology control remains available
+below 600 px.
+
+The larger operational surface in
+[issue 24](https://github.com/NasserAlbusaidi/wallah-its-windy/issues/24)
+remains open: issue/cycle/configuration manifests, Arabic/RTL, full accessibility
+and device qualification, full-screen map ergonomics, and issuance/governance
+workflows are not provided by this remediation.
+
 ## Layer-by-layer audit
 
 | Layer | Finding | Required improvement |
 | --- | --- | --- |
-| Wind | Attractive particle rendering, but it combines environmental steering and a synthetic vortex. No wind direction vectors, averaging period, level, valid time, or uncertainty | Separate analysed/model wind and vortex products; add barbs or streamlines, issue/valid time, and wind-period metadata |
-| Simulated radar | White opaque spirals did not resemble the stated reflectivity palette and can be mistaken for radar | Use a quantitative dBZ scale and permanent `MODEL RAIN PROXY` watermark; preferably replace with NWP QPF |
-| Observed radar | Provider, age, and missing-data hatching are honest. Coverage was only 29%, and the hatch dominated most of Oman | Ingest DGM radar mosaics and quality flags; synchronize valid time; do not overlay an unrelated simulated storm by default |
-| Satellite IR | Meteosat time and product attribution are good. Enhanced rendering lacks a quantitative brightness-temperature scale | Add Kelvin/°C ticks, enhancement table, navigation quality, and observation/model separation |
-| Accumulation | 1/3/6/24-hour controls work, but the product inherits the zero-rain defect and uses a fixed 0.1° parametric ledger | Replace with verified forecast QPF plus radar/gauge correction and duration-specific scales |
+| Wind | Attractive particles; one-minute convention and indicative regional band are now explicit, but the layer still combines environmental steering and a synthetic vortex and lacks direction vectors, vertical level, issue time, and uncertainty | Separate analysed/model wind and vortex products; add barbs or streamlines, issue/valid time, and full wind metadata |
+| Simulated radar | Permanent `MODEL RAIN PROXY` identity now prevents an observed-radar claim, but white opaque spirals still lack a quantitative reflectivity contract | Add a quantitative model-rain scale; preferably replace with verified NWP QPF |
+| Observed radar | Provider, age, missing-data hatching, and sync/mismatch state are honest. Coverage was only 29%, and the hatch dominated most of Oman | Ingest DGM radar mosaics and quality flags; offer synchronized time navigation |
+| Satellite IR | Meteosat time, product attribution, and observation/model time state are explicit. Enhanced rendering lacks a quantitative brightness-temperature scale | Add Kelvin/°C ticks, enhancement table, and navigation quality |
+| Accumulation | 1/3/6/24-hour controls and permanent model-proxy identity work; the zero-rain contradiction is repaired, but output remains a fixed 0.1° parametric ledger | Replace with verified forecast QPF plus radar/gauge correction and duration-specific scales |
 | SST | Smooth and readable, but monthly climatology looks like a current analysis | Display source date, analysis age, anomaly, 26°C isotherm, and uncertainty; use daily operational SST |
-| Humidity | Shows 600/700-hPa mean RH, but it is static monthly forcing and is critically misused by the rain model | Use forecast profiles and storm-relative ventilation diagnostics |
+| Humidity | Shows 600/700-hPa mean RH. It is no longer the sole precipitation gate, but remains static monthly environmental forcing | Use forecast profiles and storm-relative ventilation diagnostics |
 | OHC | A useful conceptual layer, but WOA monthly climate cannot represent current warm-core eddies | Use an operational ocean analysis with depth, TCHP/OHC definition, and valid time |
 | Shear | Magnitude only; vector components and storm-relative direction are hidden | Add shear arrows, magnitude, pressure levels, and downshear quadrants |
 | Terrain | Attractive hillshade but no numeric elevation/depth contours, tidal datum, surge, or basin overlays | Add elevations, bathymetric contours, wadis, catchments, exposure, and flood/surge layers |
@@ -366,16 +412,16 @@ The desktop disclaimer and methodology dialog are strong. Limitations,
 observations, simplifications, and non-assimilation are explained more honestly
 than in many research applications.
 
-At widths below 600 px, the generic quiet button—including methodology—is
-hidden by [`src/style.css`](../src/style.css). Safety limitations must become
-more prominent on a small screen, not disappear.
+The 27 July remediation keeps methodology visible below 600 px and adds a
+permanent product-mode/valid-time identity bar. The 390 × 844 browser check
+confirmed both remain visible without overlapping the timeline.
 
 ### Run environment
 
 Month, scenario, and hindcast/counterfactual separation are clear for research.
-The controls need a stronger run identity containing mode, provider, model,
-cycle, issue time, valid time, lead, configuration/data hashes, and wind
-convention.
+The permanent identity now adds mode, model-valid time, and observation-sync
+state. A future operational identity still needs provider/model cycle, issue
+time, lead, configuration/data hashes, and machine-readable wind convention.
 
 ### Map and camera
 
@@ -386,18 +432,17 @@ close coastal analysis.
 
 ### Storm identity and naming
 
-The code explicitly marks generated names as simulated, which is responsible.
-However, it assigns real WMO/ESCAP roster names deterministically in
-[`src/storm-names.ts`](../src/storm-names.ts). This still risks confusion inside
-an operational organisation. Use neutral identifiers such as `SIM-2026-0042`;
-historical hindcasts may use the actual historical name.
+Synthetic product runs now use stable neutral `SIM-…` identifiers. Historical
+hindcasts retain the actual historical event name. The WMO/ESCAP roster remains
+in [`src/storm-names.ts`](../src/storm-names.ts) as catalogue data but is no
+longer used to name a running synthetic storm.
 
 ### Point probe
 
-The point probe is one of the strongest surfaces. It exposes model wind, SST,
-RH, shear, OHC, rain, and provenance. It needs valid-time and pressure-level
-selection, observation/model comparison, quality/uncertainty flags, coordinates,
-and value-copy support.
+The point probe is one of the strongest surfaces. It exposes coordinates,
+model wind, SST, RH, shear, OHC, rain, provenance, and the run's exact
+model-valid-time contract. It still needs pressure-level selection,
+observation/model comparison, quality/uncertainty flags, and value-copy support.
 
 ### City impacts
 
@@ -440,12 +485,10 @@ Brier-skill, rank-histogram, and strike-probability verification.
 ### Historical hindcasts
 
 Observed-initialisation and counterfactual modes are well separated, and the UI
-states that no track nudging occurs. Historical runs should carry a permanent:
-
-> RETROSPECTIVE REANALYSIS — NOT A FORECAST
-
-label. Future-valid reanalysis makes these physics hindcasts, not archived
-real-time forecasts.
+states that no track nudging occurs. Historical runs now carry a permanent
+`RETROSPECTIVE REANALYSIS HINDCAST` identity alongside the global
+non-operational guidance label. Future-valid reanalysis still makes these
+physics hindcasts, not archived real-time forecasts.
 
 ### Export surfaces
 
@@ -474,7 +517,6 @@ status regions, reduced-motion support, and touch-specific interaction logic.
 Problems include:
 
 - The map becomes too small after the flight recorder opens.
-- Methodology disappears below 600 px.
 - Timeline milestones collide.
 - Run controls and labels clip.
 - Forecast-lab controls compete with the recorder.
@@ -493,6 +535,7 @@ Problems include:
 - Source hashes and scientific gate infrastructure.
 - Model cards that openly record rejected experiments.
 - Good unit and integration test coverage.
+- Permanent product-mode, model-time, and observation-sync identity.
 - Worker-based ensemble execution.
 - Research comparison and sensitivity tools.
 - Desktop visual quality and storm-physics explanation.
@@ -604,8 +647,11 @@ Operational deployment remains blocked until all of the following are true:
 - [ ] A lawful, monitored, scheduled current-data feed exists.
 - [ ] Every product displays cycle, issue time, valid time, lead, source, age,
       units, and quality status.
-- [ ] Wind averaging conventions are explicit and regionally compatible.
-- [ ] Observation and simulation times cannot be mixed accidentally.
+- [x] Simulator wind averaging, height/exposure, and no-conversion semantics are
+      explicit; regional terms are primary and incompatible one-minute bands
+      are visibly marked indicative.
+- [x] Observation and simulation times cannot be mixed accidentally; overlays
+      require acknowledgement and retain a permanent sync/mismatch state.
 - [ ] Analytic fallback cannot masquerade as an operational forecast.
 - [x] Sealed verification reproduces byte-for-byte.
 - [ ] Prospective archives contain sufficient independent storms and seasons.
@@ -632,15 +678,17 @@ Preserve it as:
 3. A diagnostic visualisation client.
 4. A foundation for a future DGM-controlled operational visualisation shell.
 
-Sealed reproducibility was restored after the audit and is now protected by CI.
-The remaining immediate order of work should be:
+Sealed reproducibility, the rain/dry-air contradiction, regional wind
+presentation, and the accidental observation/simulation mixing boundary were
+remediated on 27 July 2026. The remaining immediate order of work should be:
 
-1. Fix the rain/dry-air contradiction.
-2. Add live-cycle data and strict valid-time separation.
-3. Adopt regional wind and classification semantics.
-4. Integrate storm surge, waves, tides, and DGM flash-flood guidance.
-5. Begin immutable prospective archiving.
-6. Rebuild the interface for bilingual operational situational awareness.
+1. Add a lawful live-cycle data plane and complete product metadata.
+2. Validate rain and cold-wake behaviour against independent observations.
+3. Integrate storm surge, waves, tides, and DGM flash-flood guidance.
+4. Begin immutable prospective archiving.
+5. Rebuild the interface for bilingual operational situational awareness.
+6. Add signed issuance, approval, retraction, audit, failover, and continuity
+   workflows.
 
 Until those steps and their verification gates are complete, all outputs must
 remain explicitly non-operational.

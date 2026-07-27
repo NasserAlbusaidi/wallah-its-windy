@@ -24,7 +24,10 @@
 import { DOMAIN, greatCircleKm } from './grid';
 import { latLonToCell, cellToLatLon } from './grid';
 import { hollandWindSpeedKt } from './structure';
-import { stormCategory } from './category';
+import {
+  SIMULATED_WIND_CONVENTION,
+  northIndianOceanClassification,
+} from './wind-conventions';
 import type { BinLayer, LatLon, RainAccumView, StormState } from './types';
 import {
   DEFAULT_RAIN_ACCUMULATION_WINDOW,
@@ -423,15 +426,15 @@ function maxRadius(storm: StormState): number {
 }
 
 /**
- * Chip-ready phrase for a city's experienced wind, e.g. "cat 1 winds".
- * Marine-scale bands inside the TS range: gale force is 34-47 kt, storm
- * force 48-63 kt — calling a 40 kt exposure "storm-force" would overstate it.
+ * Regional phrase for a city's modeled sustained wind. Simulator values retain
+ * their one-minute convention; the phrase is an indicative RSMC band, not an
+ * averaging-period conversion or a gust/damage forecast.
  */
 export function experiencedWindPhrase(peakWindKt: number): string {
   if (peakWindKt < 20) return 'light winds';
-  if (peakWindKt < 34) return 'gusty winds';
-  if (peakWindKt < 48) return 'gale-force winds';
-  const category = stormCategory(peakWindKt);
-  if (category.id === 'ts') return 'storm-force winds';
-  return `${category.chip.toLowerCase()} winds`;
+  const { category } = northIndianOceanClassification(
+    peakWindKt,
+    SIMULATED_WIND_CONVENTION.averagingMinutes,
+  );
+  return `${category.name} winds (indicative)`;
 }

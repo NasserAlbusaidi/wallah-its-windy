@@ -1,10 +1,15 @@
 /**
  * storm-tag.ts — pure copy for the map chip pinned to the simulated eye.
  *
- * Category vocabulary comes from the shared SSHS table; this module only
- * formats the two compact lines and classifies the instantaneous wind trend.
+ * Regional vocabulary comes from the North Indian Ocean table. The asterisk
+ * remains important: simulator wind is one-minute sustained, so the RSMC
+ * three-minute band is indicative and no conversion is implied.
  */
-import { stormCategory } from './category';
+import {
+  SIMULATED_WIND_CONVENTION,
+  northIndianOceanClassification,
+  regionalCategoryChip,
+} from './wind-conventions';
 
 export interface StormTagInput {
   label: string;
@@ -19,7 +24,12 @@ export interface StormTagCopy {
 }
 
 export function formatStormTag(input: StormTagInput): StormTagCopy {
-  const category = stormCategory(input.vKt).chip.toLowerCase();
+  const category = regionalCategoryChip(
+    northIndianOceanClassification(
+      input.vKt,
+      SIMULATED_WIND_CONVENTION.averagingMinutes,
+    ),
+  ).toLowerCase();
   const trend =
     input.trendKtPerH >= 0.5
       ? 'intensifying'
@@ -28,7 +38,8 @@ export function formatStormTag(input: StormTagInput): StormTagCopy {
         : 'steady';
 
   return {
-    line1: `${input.label.trim().toUpperCase()} · ${Math.round(input.vKt)} kt`,
+    line1:
+      `${input.label.trim().toUpperCase()} · ${Math.round(input.vKt)} kt 1-min`,
     line2: `${category} · ${trend} · ${Math.round(input.hPa)} hPa`,
   };
 }

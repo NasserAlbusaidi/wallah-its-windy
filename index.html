@@ -46,7 +46,7 @@
             <button id="point-probe-pin" type="button" aria-pressed="false">pin</button>
           </header>
           <dl>
-            <div><dt>modeled wind</dt><dd id="point-probe-wind">—</dd></div>
+            <div><dt>modeled wind · 1-min</dt><dd id="point-probe-wind">—</dd></div>
             <div><dt>sst</dt><dd id="point-probe-sst">—</dd></div>
             <div><dt>mid rh</dt><dd id="point-probe-rh">—</dd></div>
             <div><dt>shear</dt><dd id="point-probe-shear">—</dd></div>
@@ -73,6 +73,18 @@
       <p id="guidance-chip" class="chrome">
         experimental forecast companion — not official guidance
       </p>
+      <section
+        id="product-identity"
+        class="chrome"
+        data-mode="climatology-sandbox"
+        data-observation-state="simulation-only"
+        aria-label="Product mode and valid time"
+        aria-live="polite"
+      >
+        <strong id="product-mode">CLIMATOLOGY SANDBOX</strong>
+        <span id="product-valid-time">MODEL +0.0 H · NO UTC VALID TIME</span>
+        <span id="product-source-state">SIMULATION ONLY</span>
+      </section>
 
       <section id="month-picker" class="chrome" aria-label="Run environment">
         <header>
@@ -204,7 +216,7 @@
             </div>
           </div>
           <output id="radar-status" data-tone="simulated">
-            generated from storm rain rates · no observed pixels
+            MODEL RAIN PROXY · generated from storm rain rates · no observed pixels
           </output>
           <a
             id="radar-attribution"
@@ -232,7 +244,7 @@
             </div>
           </div>
           <output id="accum-status" data-tone="simulated">
-            fixed-step integral · parametric rain · no radar assimilation
+            MODEL RAIN PROXY · fixed-step integral · no radar assimilation
           </output>
         </section>
         <footer class="rail-footer">
@@ -264,23 +276,27 @@
           <span>Waiting for the first physics step.</span>
         </p>
 
-        <!-- Category scale: where the storm sits now (bright needle) and how
-             far the current ocean could still take it (hollow MPI needle). -->
+        <!-- Regional reference scale: the simulator retains one-minute wind, so
+             RSMC New Delhi three-minute bands are explicitly indicative. -->
         <div id="intensity-scale" aria-label="Current intensity and potential">
           <div class="scale-bar" aria-hidden="true">
             <div id="scale-needle-now" class="scale-needle now"></div>
             <div id="scale-needle-potential" class="scale-needle potential"></div>
           </div>
           <div class="scale-ticks" aria-hidden="true">
-            <span style="left: 0%">td</span>
-            <span style="left: 21.25%">ts</span>
-            <span style="left: 40%">1</span>
-            <span style="left: 51.9%">2</span>
-            <span style="left: 60%">3</span>
-            <span style="left: 70.6%">4</span>
-            <span style="left: 85.6%">5</span>
+            <span style="left: 10.625%">D</span>
+            <span style="left: 17.5%">DD</span>
+            <span style="left: 21.25%">CS</span>
+            <span style="left: 30%">SCS</span>
+            <span style="left: 40%">VSCS</span>
+            <span style="left: 56.25%">ESCS</span>
+            <span style="left: 75%">SuCS</span>
           </div>
           <p id="intensity-note">—</p>
+          <p id="wind-convention">
+            * indicative RSMC band · simulated USA/JTWC 1-minute sustained wind
+            · 10 m over sea · no averaging-period or gust conversion
+          </p>
         </div>
 
         <div
@@ -291,12 +307,13 @@
         >
           <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
             <g class="sparkline-thresholds">
+              <line data-kt="17" x1="0" x2="100"></line>
+              <line data-kt="28" x1="0" x2="100"></line>
               <line data-kt="34" x1="0" x2="100"></line>
+              <line data-kt="48" x1="0" x2="100"></line>
               <line data-kt="64" x1="0" x2="100"></line>
-              <line data-kt="83" x1="0" x2="100"></line>
-              <line data-kt="96" x1="0" x2="100"></line>
-              <line data-kt="113" x1="0" x2="100"></line>
-              <line data-kt="137" x1="0" x2="100"></line>
+              <line data-kt="90" x1="0" x2="100"></line>
+              <line data-kt="120" x1="0" x2="100"></line>
             </g>
             <path id="intensity-sparkline-path"></path>
             <line id="intensity-sparkline-cursor" y1="0" y2="32"></line>
@@ -615,6 +632,19 @@
           </p>
         </section>
         <section>
+          <h3>Product mode and valid time</h3>
+          <p>
+            The permanent identity bar separates the climatology sandbox,
+            historical hindcasts, and historical counterfactuals. Climatology
+            has model elapsed time but no UTC valid time. Event runs derive UTC
+            model time from their frozen event or hindcast origin. Synthetic
+            storms use neutral SIM identifiers, never official cyclone names.
+            Observed imagery is display-only and requires confirmation on an
+            active run; the bar marks it time-matched, pending, or unsynced
+            against the model clock.
+          </p>
+        </section>
+        <section>
           <h3>Weather views</h3>
           <p>
             SST, humidity, ocean heat, and shear show the exact baked field being
@@ -638,11 +668,15 @@
         <section>
           <h3>Category and impact</h3>
           <p>
-            The category chip and coloured track use the Saffir–Simpson wind
-            scale on the simulated 1-minute sustained wind. "Potential" marks
-            the model's DeMaria–Kaplan maximum potential intensity for the
-            water under the storm — a ceiling, not a forecast. City winds come
-            from the parametric wind profile at each city's range and bearing;
+            The primary chip uses North Indian Ocean terminology from RSMC New
+            Delhi's three-minute scale. Because the simulator remains calibrated
+            to USA/JTWC one-minute sustained wind, its regional band carries an
+            asterisk and is indicative only; no averaging-period or gust
+            conversion is applied. Track colour remains a secondary
+            Saffir–Simpson comparison palette. "Potential" marks the model's
+            DeMaria–Kaplan maximum potential intensity for the water under the
+            storm — a ceiling, not a forecast. City winds come from the
+            parametric wind profile at each city's range and bearing;
             flash-flood risk is a threshold proxy on parametric storm-total
             rain, not a discharge or inundation model.
           </p>

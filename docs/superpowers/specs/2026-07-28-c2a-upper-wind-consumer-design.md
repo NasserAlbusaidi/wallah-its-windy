@@ -62,10 +62,15 @@ mechanics, verified against code, are:
   the mapping is currently inline in the untested composition root, which is
   why a broken Digit0 would ship green. Tests pin Digit9→`upper`,
   Digit0→`terrain`, hint(9)→"0".
-- Two user-visible captions advertise "keys 1–9" and are off the obvious
-  file map: `index.html:264` (`<span>keys 1–9</span>`) and `index.html:683`
-  ("Keys 1–9 switch layers."). Both update to name the 0 key. The comment at
-  `index.html:143` mirrors the same claim and updates with them.
+- Three user-visible surfaces advertise "keys 1–9" and are off the obvious
+  file map (gate round-3 correction — the earlier sweep found two):
+  `index.html:264` (`<span>keys 1–9</span>`), `index.html:683` ("Keys 1–9
+  switch layers."), and `README.md:98-100`, which carries BOTH the stale key
+  hint ("or press 1–9") and a prose enumeration of the nine layers that
+  must gain `upper`. All three update to name the 0 key. The comments at
+  `index.html:143`, `main.ts:2089` ("Digit1..Digit9 key hint"), and
+  `main.ts:2112` ("Digit1-9 shortcuts") mirror the same claim and update
+  with them.
 
 **Probe.** `PointProbeReading` (`src/point-probe.ts`) gains optional
 upper-wind fields (speed m/s + direction) rendered as extra probe rows only
@@ -203,7 +208,12 @@ accessor `main.ts` already threads to the probe and renderer (`main.ts:433,
   through `ui.ts` `showPointProbe` (`ui.ts:553`) into the probe `<dl>` in
   `index.html` (the `point-probe-*` nodes near `index.html:50-54`) — both
   join the touched-file set; naming `point-probe.ts` alone under-specified
-  the render path.
+  the render path. **Gate correction (round 3):** `showPointProbe` positions
+  the card with a hardcoded `cardHeight = 104` (`ui.ts:558`) used in the
+  bottom-edge clamp. The upper rows appear on every climatology probe (not
+  only when the upper layer is active), so the card grows and the constant
+  must grow or be derived with it — otherwise the new rows clip at the
+  viewport bottom.
 
 **Files that must NOT change** (gate correction — the hashed set is ten
 files, not two): the sealed verifiers hash `ensemble.ts`,
@@ -307,9 +317,13 @@ already covered by the degraded table.
   `upper: null`. (Whatever seam the existing scenario tests use; at minimum
   the pure state transition is pinned.)
 - Catalogue tests: `upper` present with the exact honest label,
-  `simulated: false`, rail order shear→upper→terrain (the existing
-  length-9 / last-is-terrain assertions in `test/weather-layers.test.ts`
-  update deliberately, not as collateral).
+  `simulated: false`, rail order shear→upper→terrain. The deliberate update
+  in `test/weather-layers.test.ts` covers every nine-flavoured detail, not
+  just the length assertion: the `toHaveLength(9)` and Set-size `toBe(9)`
+  (`:11-12`), and the description strings "ships nine unique operational
+  views" (`:10`) and "keys 1-9 stay in catalogue order" (`:26`) — a partial
+  edit leaving `toBe(9)` beside `toHaveLength(10)`, or a title that lies
+  about the count, is the failure mode being named.
 - Integration: a real-bytes smoke test — `sampleUpperWind` over the
   committed `public/data/upper.bin` returns finite values inside the domain
   for every season month (extends the existing upper.bin describe block's

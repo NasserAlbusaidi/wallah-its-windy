@@ -95,12 +95,31 @@ is a parameterization of `render/wind.ts` or a sibling `render/upper-wind.ts`
 is an implementation choice for the plan — the constraint is no duplicated
 palette/fade constants and no vortex import in the upper path.
 
+**Gate correction (round 2) — the storm-spiral vortex swarm must be
+excluded from the upper draw path.** The composed draw at
+`render/index.ts:321-329` routes `wind` to its own trails and then draws
+`this.particles.draw(ctx)` — the 8k-particle **Holland-vortex storm
+spiral** — for every other layer except `infrared`/observed-radar/reduced.
+A new `upper` layer satisfies that `else if` unmodified, so the fabricated
+upper-level storm circulation this spec forbids would render on top of the
+upper fill, past `tsc` and past the finiteness smoke test. The spec's "no
+vortex import in the new module" constraint does not cover this shared
+branch. Required: `render/index.ts`'s draw composition joins the touched
+set; `upper` routes like `wind` to its own trails-only draw and is excluded
+from the storm-spiral branch. If the trails ship as a sibling module, it
+threads the same lifecycle points the wind layer uses (init / resize /
+dispose / budget) **and** the trail-clear on layer switch
+(`render/index.ts:384`) so stale upper trails cannot persist across a
+toggle.
+
 **Gate correction — the fill is NOT a free ride on the existing pipeline.**
-Adding `'upper'` to `WeatherLayerId` reaches four exhaustive
-`Record<WeatherLayerId, …>` surfaces: `LAYER_ICONS` (`main.ts:1557`), the
-catalogue `iconSvg`, and `MODE` / `PALETTE` in `render/env.ts:410,428`.
-`tsc` fails loud on all four (the type is a union), but two constraints are
-not type-checkable and must be stated:
+Adding `'upper'` to `WeatherLayerId` reaches three exhaustive
+`Record<WeatherLayerId, …>` surfaces — `LAYER_ICONS` (`main.ts:1557`) and
+`MODE` / `PALETTE` (`render/env.ts:410,428`) — where `tsc` fails loud, plus
+the catalogue itself, which is a plain `readonly WeatherLayerDefinition[]`
+(`weather-layers.ts:77`): a missing `upper` entry **compiles clean** and is
+caught only by the catalogue tests. Two further constraints are not
+type-checkable and must be stated:
 
 - `MODE['upper']` needs a **new** `u_mode` branch in the env fragment shader
   (`render/env.ts:547` selects by mode number) that samples newly-bound
@@ -170,8 +189,21 @@ accessor `main.ts` already threads to the probe and renderer (`main.ts:433,
 - `RenderResources` (`render/index.ts:93-102`) gains
   `upper: ParsedBin | null`; the facade builds the fill texture pair and an
   `upperAt` closure (shape of the existing `steeringAt`) from it.
-- The probe input assembly passes an optional `UpperWindSample` from the
-  sampler at the probed point.
+  **Gate correction (round 2):** `main.ts` keeps its own structural mirror
+  of that type — `RenderResourcesLike` (`main.ts:2886`) and the
+  `emptyResources` literal (`main.ts:505`) — both gain `upper` in lockstep,
+  and all **three** `setResources` call sites are edited deliberately:
+  boot/climatology (`main.ts:820`) and return-to-climatology
+  (`main.ts:1266`) pass the loaded bin; the event site (`main.ts:1228`)
+  passes `upper: null` (see Modes below).
+- The probe input (`PointProbeInput`) gains
+  `upper?: UpperWindSample | null`; the reading gains
+  `upperSpeedMs: number | null` and `upperDirDeg: number | null`
+  (null = rows hidden). **Gate correction (round 2):** the rows render
+  through `ui.ts` `showPointProbe` (`ui.ts:553`) into the probe `<dl>` in
+  `index.html` (the `point-probe-*` nodes near `index.html:50-54`) — both
+  join the touched-file set; naming `point-probe.ts` alone under-specified
+  the render path.
 
 **Files that must NOT change** (gate correction — the hashed set is ten
 files, not two): the sealed verifiers hash `ensemble.ts`,
@@ -214,6 +246,23 @@ no URL-hash change. Shared URLs replay byte-identical before and after C2a.
 | Event-timeline mode | disabled, caption "no aligned upper-level analysis for this event" | hidden | — (by-design absence, not degradation) |
 | upper.bin missing / unparseable | disabled, caption "upper-wind data unavailable" | hidden | `degradedInputs` gains "upper winds: unavailable" |
 
+**Gate correction (round 2) — "disabled in event mode" must be wired, not
+stated.** Nothing today disables a layer per-mode, and `applyEventEnv`
+(`main.ts:1206-1233`) neither touches `activeWeatherLayer` nor passes new
+resources beyond `terrain/env/genesis/tracks` — so without explicit wiring
+the upper fill would keep drawing climatology winds under an event storm.
+The executable contract:
+
+- The event `setResources` site (`main.ts:1228`) passes `upper: null`; the
+  climatology sites (`main.ts:820, 1266`) pass the loaded bin. The facade
+  therefore has nothing to draw in event mode even if asked.
+- `applyEventEnv` force-switches `activeWeatherLayer` off `upper` (to
+  `DEFAULT_WEATHER_LAYER`) when it is active, and the upper rail button is
+  disabled with the caption while a scenario is active; returning to
+  climatology re-enables it.
+- Both layers of defense exist on purpose: the resource null makes the
+  wrong render impossible, the layer switch makes the UI state honest.
+
 The identity-bar entry uses the existing `degradedInputs` mechanism
 (`src/product-identity.ts:109-112`, the A-workstream pattern). Event mode is
 deliberately NOT a degraded input: event bins never carried upper data, so
@@ -248,8 +297,15 @@ already covered by the degraded table.
 - Digit-mapping tests on the new pure helpers: Digit9 → `upper` index,
   Digit0 → `terrain` index, non-digit codes → null, hint(index 9) → "0",
   hints for indices 0–8 unchanged.
-- `point-probe` tests: reading carries upper fields when supplied, omits
-  them when absent; existing assertions untouched.
+- `point-probe` tests: reading carries `upperSpeedMs`/`upperDirDeg` when an
+  `upper` sample is supplied, nulls when absent; existing assertions
+  untouched. The DOM row rendering in `ui.ts` has no unit-test seam (no
+  `ui.test.ts` exists) — it is covered by the rendered QA pass, stated
+  honestly rather than implied tested.
+- Event-mode wiring tests: entering a scenario with `upper` active
+  force-switches the layer; the event `setResources` payload carries
+  `upper: null`. (Whatever seam the existing scenario tests use; at minimum
+  the pure state transition is pinned.)
 - Catalogue tests: `upper` present with the exact honest label,
   `simulated: false`, rail order shear→upper→terrain (the existing
   length-9 / last-is-terrain assertions in `test/weather-layers.test.ts`

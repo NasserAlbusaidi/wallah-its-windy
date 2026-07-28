@@ -44,8 +44,28 @@ slots after `shear` (the two environmental wind fields sit together) taking
 Digit9; `terrain` keeps its deliberate rail-closing position and moves to
 Digit0. Accepted trade-off (user-approved): terrain's shortcut changes; the
 alternative — appending `upper` after terrain — would break the "terrain
-closes the list as the plain base chart" convention instead. Every hint
-string that advertises the Digit mapping is updated with the reorder.
+closes the list as the plain base chart" convention instead.
+
+**Gate correction — "update the hint strings" was not executable.** The
+mechanics, verified against code, are:
+
+- The dispatch at `main.ts:2437` is `/^Digit[1-9]$/` with `index = digit − 1`
+  — Digit0 can never fire. It becomes `/^Digit[0-9]$/` with
+  `index = (digit + 9) % 10` (Digit1→0 … Digit9→8, Digit0→9).
+- The rail badge at `main.ts:2107` is `String(index + 1)` — the 10th button
+  would read "10", a key that does not exist. It becomes
+  `String((index + 1) % 10)` so the terrain badge reads "0".
+- Both edits move into a pure exported helper pair in `weather-layers.ts`
+  (next to the catalogue whose order they mirror), e.g.
+  `layerIndexForDigitCode(code: string): number | null` and
+  `digitHintForLayerIndex(index: number): string`, consumed by `main.ts` —
+  the mapping is currently inline in the untested composition root, which is
+  why a broken Digit0 would ship green. Tests pin Digit9→`upper`,
+  Digit0→`terrain`, hint(9)→"0".
+- Two user-visible captions advertise "keys 1–9" and are off the obvious
+  file map: `index.html:264` (`<span>keys 1–9</span>`) and `index.html:683`
+  ("Keys 1–9 switch layers."). Both update to name the 0 key. The comment at
+  `index.html:143` mirrors the same claim and updates with them.
 
 **Probe.** `PointProbeReading` (`src/point-probe.ts`) gains optional
 upper-wind fields (speed m/s + direction) rendered as extra probe rows only
@@ -75,6 +95,26 @@ is a parameterization of `render/wind.ts` or a sibling `render/upper-wind.ts`
 is an implementation choice for the plan — the constraint is no duplicated
 palette/fade constants and no vortex import in the upper path.
 
+**Gate correction — the fill is NOT a free ride on the existing pipeline.**
+Adding `'upper'` to `WeatherLayerId` reaches four exhaustive
+`Record<WeatherLayerId, …>` surfaces: `LAYER_ICONS` (`main.ts:1557`), the
+catalogue `iconSvg`, and `MODE` / `PALETTE` in `render/env.ts:410,428`.
+`tsc` fails loud on all four (the type is a union), but two constraints are
+not type-checkable and must be stated:
+
+- `MODE['upper']` needs a **new** `u_mode` branch in the env fragment shader
+  (`render/env.ts:547` selects by mode number) that samples newly-bound
+  u200/v200 textures and colours by speed magnitude. Assigning an existing
+  mode number to satisfy `tsc` would silently render the wrong field — the
+  planned integration smoke checks finiteness, not identity, so only the
+  shader-branch requirement here prevents it.
+- The legend gradient bar is styled per layer id
+  (`#weather-legend[data-layer='<id>'] .weather-scale`,
+  `src/style.css:717-787`); without a new `upper` rule the base
+  `.weather-scale` fallback (`style.css:710`) renders an SST-style ramp
+  under the "m/s · 200 hPa" label. `style.css` therefore joins the touched
+  files, with the gradient derived from the `--wind-*` token variables only.
+
 ## Architecture
 
 **New module `src/upper-sampler.ts`** (~100 lines, pure) — the ONE place
@@ -93,9 +133,20 @@ export function sampleUpperWind(
   lat: number,
   lon: number,
   monthIndex: number,
-  plane: number,
+  mode: EnvSamplingMode,
 ): UpperWindSample | null;
 ```
+
+**Gate correction — the signature takes the sampling MODE, not a bare
+plane.** A `plane: number` parameter invites a caller passing `plane: 0` in
+event mode, silently rendering plane-0 climatology upper winds under an
+event storm — exactly the cross-vintage mix the plane-coherence section
+forbids. Taking `EnvSamplingMode` (`types.ts:148-150`) makes that
+inexpressible: the sampler returns `null` unless
+`mode.kind === 'synoptic-plane'`, and reads the plane from the mode object.
+Callers obtain the mode only from `envSampler.getSamplingMode()` — the
+accessor `main.ts` already threads to the probe and renderer (`main.ts:433,
+1478, 2234`) — never by constructing one.
 
 - Month resolution IMPORTS `envMonthSuffix` (exported,
   `env-sampler.ts:41`) — importing is not editing, and it prevents a third
@@ -111,8 +162,9 @@ export function sampleUpperWind(
 
 **Wiring (`main.ts`).**
 
-- `upper.bin` joins `CORE_ASSETS` next to the `env.bin` entry
-  (`main.ts:650`): kind `bin`, key `upper`, small weight. 404 or parse
+- `upper.bin` joins the `MANIFEST` load list next to the `env.bin` entry
+  (`main.ts:648-650` — gate correction: the array is named `MANIFEST`, not
+  `CORE_ASSETS`): kind `bin`, key `upper`, small weight. 404 or parse
   failure → null; boot proceeds — a missing sidecar must not brick the demo,
   matching the env.bin failure philosophy.
 - `RenderResources` (`render/index.ts:93-102`) gains
@@ -121,13 +173,20 @@ export function sampleUpperWind(
 - The probe input assembly passes an optional `UpperWindSample` from the
   sampler at the probed point.
 
-**Files that must NOT change:** `src/sim.ts` and `src/upper-ocean.ts` (the
-two runtime sources HF-4/HF-6 hash — `calibration/hf4-verify.mjs:23,26`,
-`hf6-verify.mjs:17,19`), `src/env-sampler.ts` (frozen runners ssrLoad it;
-the sim-facing `EnvSample` seam stays closed), `src/loader.ts` (upper.bin is
-standard WIWB; the existing parser already reads it — integration tests
-prove this today), `bake/**`, and every file under `public/data/`
-(C2a ships no data change; `assets:check` diff must be empty).
+**Files that must NOT change** (gate correction — the hashed set is ten
+files, not two): the sealed verifiers hash `ensemble.ts`,
+`ensemble-verification.ts`, `sim.ts`, `rng.ts`, `steering.ts`,
+`upper-ocean.ts`, `ventilation.ts` (`calibration/hf4-verify.mjs:21-27`) and
+`sim.ts`, `steering.ts`, `upper-ocean.ts`, `ventilation.ts`,
+`structure.ts`, `coastal-exposure.ts`, `hindcast-benchmark.ts`
+(`hf6-verify.mjs:17-23`) — the union of ten `src/` files is off-limits;
+`hf6:verify:check` is the backstop that catches an accidental edit. Also
+unchanged: `src/env-sampler.ts` (frozen runners ssrLoad it; the sim-facing
+`EnvSample` seam stays closed — importing its exports is fine, editing is
+not), `src/loader.ts` (upper.bin is standard WIWB; the existing parser
+already reads it — integration tests prove this today), `bake/**`, and
+every file under `public/data/` (C2a ships no data change; `assets:check`
+diff must be empty).
 
 ## Determinism and plane coherence
 
@@ -160,6 +219,12 @@ The identity-bar entry uses the existing `degradedInputs` mechanism
 deliberately NOT a degraded input: event bins never carried upper data, so
 its absence there is contract, not failure.
 
+The render facade's degraded self-sourcing path (mode B) either adds
+`upper.bin` to its own fetch list or leaves `upper` unavailable there; the
+plan picks one explicitly — what is not acceptable is mode B reaching a
+different plane or vintage than mode A would. Unavailable-under-mode-B is
+already covered by the degraded table.
+
 ## Error handling
 
 - Fetch/parse failure of `upper.bin`: logged through the existing asset-load
@@ -175,14 +240,20 @@ its absence there is contract, not failure.
 
 - `test/upper-sampler.test.ts`: month-suffix clamp behaviour (03→04, 11→10),
   plane selection, bilinear correctness against a synthetic two-plane bin,
-  null on missing layer, dirDeg/speed math, finite guards.
-- Plane-coherence pin: for a fixed seed in climatology mode, the plane index
-  reaching `sampleUpperWind` equals the env sampler's active synoptic plane.
+  null on missing layer, **null on `event-timeline` mode** (the
+  vintage-mixing guard), dirDeg/speed math, finite guards.
+- Plane-coherence pin: for a fixed seed in climatology mode, the mode object
+  reaching `sampleUpperWind` is the env sampler's active sampling mode (same
+  accessor, same plane).
+- Digit-mapping tests on the new pure helpers: Digit9 → `upper` index,
+  Digit0 → `terrain` index, non-digit codes → null, hint(index 9) → "0",
+  hints for indices 0–8 unchanged.
 - `point-probe` tests: reading carries upper fields when supplied, omits
   them when absent; existing assertions untouched.
 - Catalogue tests: `upper` present with the exact honest label,
-  `simulated: false`, rail order shear→upper→terrain; keyboard-hint strings
-  match the new Digit mapping.
+  `simulated: false`, rail order shear→upper→terrain (the existing
+  length-9 / last-is-terrain assertions in `test/weather-layers.test.ts`
+  update deliberately, not as collateral).
 - Integration: a real-bytes smoke test — `sampleUpperWind` over the
   committed `public/data/upper.bin` returns finite values inside the domain
   for every season month (extends the existing upper.bin describe block's

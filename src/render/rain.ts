@@ -36,10 +36,27 @@ import {
   latLonToClip,
   offsetKm,
 } from '../grid';
-import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
-import { bindTex, makeProgram, makeQuadVao, makeRenderTarget, disposeRenderTarget } from './gl-utils';
-import type { GlCaps, RenderTarget } from './gl-utils';
+import {
+  EYEWALL_WIDTH_Q,
+  RAINBAND_AZIMUTHAL_MEAN,
+  RAINBAND_INNER_FULL_Q,
+  RAINBAND_INNER_Q,
+  RAINBAND_OUTER_FADE_Q,
+  RAINBAND_OUTER_Q,
+  RAINBAND_SPIRAL_AMPLITUDE,
+  RAINBAND_SPIRAL_ARMS,
+  RAINBAND_SPIRAL_PITCH,
+} from '../rainband-profile';
 import type { DrawCtx, GpuTextures } from './context';
+import {
+  bindTex,
+  disposeRenderTarget,
+  makeProgram,
+  makeQuadVao,
+  makeRenderTarget,
+} from './gl-utils';
+import type { GlCaps, RenderTarget } from './gl-utils';
+import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
 
 /** Per-frame decay multiply — THE knob (eng task T5, valid 0.90–1.00). */
 const RAIN_DECAY_PER_H = 0.72;
@@ -146,12 +163,21 @@ void main() {
   vec2 radial = vec2((cell.x - u_center.x) * u_metricX, cell.y - u_center.y);
   float radius = length(radial);
   float q = radius / max(0.006, u_rMax);
-  float eyewall = exp(-pow((q - 1.0) / 0.38, 2.0));
+  float eyewall = exp(-pow((q - 1.0) / ${EYEWALL_WIDTH_Q}, 2.0));
   float bandEnvelope =
-    smoothstep(1.45, 2.0, q) * (1.0 - smoothstep(6.0, 8.0, q));
+    smoothstep(${RAINBAND_INNER_Q}, ${RAINBAND_INNER_FULL_Q.toFixed(1)}, q) *
+    (1.0 - smoothstep(
+      ${RAINBAND_OUTER_FADE_Q.toFixed(1)},
+      ${RAINBAND_OUTER_Q.toFixed(1)},
+      q
+    ));
   float azimuth = atan(radial.y, radial.x);
-  float spiral = 0.68 + 0.32 * sin(3.0 * azimuth - 1.35 * q);
-  float rainband = bandEnvelope * max(0.18, spiral);
+  float spiral = ${RAINBAND_AZIMUTHAL_MEAN} +
+    ${RAINBAND_SPIRAL_AMPLITUDE} * sin(
+      ${RAINBAND_SPIRAL_ARMS.toFixed(1)} * azimuth -
+        ${RAINBAND_SPIRAL_PITCH} * q
+    );
+  float rainband = bandEnvelope * spiral;
   float orographic = u_orographicRain * clamp(upslope * u_gain, 0.0, 2.0);
   float rainRateMmH =
     u_eyewallRain * eyewall +

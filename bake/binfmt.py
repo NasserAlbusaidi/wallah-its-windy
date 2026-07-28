@@ -152,6 +152,10 @@ def _iter_records(blob: bytes):
     for _ in range(layer_count):
         name = blob[at : at + 8].split(b"\x00", 1)[0].decode("ascii")
         dtype, quant, _r = struct.unpack_from("<BBH", blob, at + 8)
+        if dtype not in _CODE_ELEM_BYTES:
+            raise ValueError(f"{name}: unsupported dtype code {dtype}")
+        if quant not in (0, 1):
+            raise ValueError(f"{name}: invalid quant flag {quant}, expected 0 or 1")
         nx, ny, nt = struct.unpack_from("<III", blob, at + 12)
         bbox = struct.unpack_from("<dddd", blob, at + 24)
         scale, offset = struct.unpack_from("<dd", blob, at + 56)

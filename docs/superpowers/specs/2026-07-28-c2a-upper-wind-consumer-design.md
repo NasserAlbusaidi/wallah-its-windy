@@ -71,6 +71,14 @@ mechanics, verified against code, are:
   `index.html:143`, `main.ts:2089` ("Digit1..Digit9 key hint"), and
   `main.ts:2112` ("Digit1-9 shortcuts") mirror the same claim and update
   with them.
+- Gate round-4 sweep — stale nine/Digit counts beyond the captions:
+  `README.md:471` ("nine map-product labels"), `docs/architecture.md:161`
+  ("Digit1..9 keyboard mapping"), the `weather-layers.ts:5` file docstring,
+  and the `ui.ts:445` comment ("all nine rows" — the logic at `ui.ts:441`
+  uses `WEATHER_LAYERS.length` and is count-robust; only the comment lies).
+  All update. `docs/oman-dgm-operational-readiness-audit.md:46` ("All nine
+  weather-map layers") stays untouched deliberately — it is a dated audit
+  record, and editing it would falsify history.
 
 **Probe.** `PointProbeReading` (`src/point-probe.ts`) gains optional
 upper-wind fields (speed m/s + direction) rendered as extra probe rows only
@@ -116,6 +124,24 @@ threads the same lifecycle points the wind layer uses (init / resize /
 dispose / budget) **and** the trail-clear on layer switch
 (`render/index.ts:384`) so stale upper trails cannot persist across a
 toggle.
+
+**Gate correction (round 4) — two lifecycle traps in that routing:**
+
+- *Reduced motion is gated inside the module, not the facade.* The facade's
+  wind branch (`render/index.ts:321`) has no `!ctx.reduced`; the sole gate
+  is `wind.ts`'s own early-return (`render/wind.ts:267`) — and the
+  `wind.ts:16` header comment claiming "the facade gates it" is factually
+  wrong (correct it in passing). The upper trails module must carry the
+  same `ctx.reduced` early-return itself, or reduced-motion users get
+  animated 200-hPa trails.
+- *The fill texture pair has a lifecycle too.* The u200/v200 R8 pair
+  backing `MODE['upper']` joins the env-texture lifecycle exactly like the
+  `steerU`/`steerV` slots — uploaded in `applyEnv` keyed to
+  `frame.envSamplingMode.plane` (the `syncEnvPlane` path,
+  `render/index.ts:854`), disposed with the rest, rebuilt on context
+  restore. Uploading it anywhere else (e.g. once in `setResources`) would
+  pin plane 0 under a different-plane sim — mixed vintages with no failing
+  test — and skipping disposal leaks a texture per plane/month switch.
 
 **Gate correction — the fill is NOT a free ride on the existing pipeline.**
 Adding `'upper'` to `WeatherLayerId` reaches three exhaustive
@@ -274,9 +300,14 @@ The executable contract:
   wrong render impossible, the layer switch makes the UI state honest.
 
 The identity-bar entry uses the existing `degradedInputs` mechanism
-(`src/product-identity.ts:109-112`, the A-workstream pattern). Event mode is
-deliberately NOT a degraded input: event bins never carried upper data, so
-its absence there is contract, not failure.
+(`src/product-identity.ts:109-112`, the A-workstream pattern). Concretely
+(gate round-4): `ProductIdentityInput` gains a flag mirroring
+`oceanMissingSourceFlag`, `buildProductIdentity` pushes
+"upper winds: unavailable" from it, the caller at `main.ts:1491` passes it,
+and the `product-identity` table tests gain the row — so
+`product-identity.ts` is a touched file with a named edit, not an implied
+one. Event mode is deliberately NOT a degraded input: event bins never
+carried upper data, so its absence there is contract, not failure.
 
 The render facade's degraded self-sourcing path (mode B) either adds
 `upper.bin` to its own fetch list or leaves `upper` unavailable there; the
@@ -303,7 +334,11 @@ already covered by the degraded table.
   vintage-mixing guard), dirDeg/speed math, finite guards.
 - Plane-coherence pin: for a fixed seed in climatology mode, the mode object
   reaching `sampleUpperWind` is the env sampler's active sampling mode (same
-  accessor, same plane).
+  accessor, same plane). **Gate round-4 addition — the render path needs its
+  own pin:** the probe test does not cover the fill; a render-path assertion
+  pins that the plane the u200/v200 textures are uploaded for equals
+  `frame.envSamplingMode.plane` (at whatever seam `applyEnv`/`syncEnvPlane`
+  exposes — the existing `render-textures` tests are the precedent).
 - Digit-mapping tests on the new pure helpers: Digit9 → `upper` index,
   Digit0 → `terrain` index, non-digit codes → null, hint(index 9) → "0",
   hints for indices 0–8 unchanged.
@@ -350,3 +385,17 @@ The layer is labeled as ERA5 climatology sample data at 200 hPa; it never
 implies a modeled storm outflow. Degraded states are visible, never silent.
 Ensemble/probability language is unaffected. All existing labels stay
 intact.
+
+## Gate record
+
+Four rounds of the ship-gate loop (two fresh-context Opus reviewers per
+round — rubric + orthogonal-axis adversary, mutually isolated), findings
+applied between rounds and every reviewer citation re-verified against live
+code before being written in:
+
+| Round | Union | P1s |
+|---|---|---|
+| 1 | 2 P1 / 6 P2-P3 | Digit0 dispatch/badge mechanics; stale `index.html` "keys 1–9" captions |
+| 2 | 2 P1 / 5 P2-P3 | event-mode disable unwired (`setResources`/layer forcing); storm-spiral vortex swarm inherited via the shared draw branch |
+| 3 | 1 P1 / 4 P2-P3 | `README.md:98-100` third "keys 1–9" surface + nine-layer roster |
+| 4 | **0 P1** / 3 P2 / 4 P3 | clean — stop condition met; P2/P3 polish folded in (reduced-motion self-gate, fill-texture lifecycle + render-path plane pin, round-4 stale-count sweep, product-identity concrete edit) |

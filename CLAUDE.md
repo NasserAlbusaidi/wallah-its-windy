@@ -66,10 +66,12 @@ self-describing `.bin` assets the browser loads.
   libm differences cannot desync sealed results; any new number written to the
   fidelity results/reference must pass through it.
 - `src/rainband-profile.ts` is the ONE rainband spatial contract for the three
-  RAIN products (`render/radar.ts`, `render/rain.ts`, `impact.ts`).
-  `render/env.ts` is deliberately NOT a consumer — its band is cloud
-  morphology, not a rain product. The mean is internally consistent, NOT
-  validated against observed rainfall.
+  RAIN products (`render/radar.ts`, `render/rain.ts`, `impact.ts`) and the
+  minimum precipitating-cloud support in `render/env.ts`. The latter shares
+  only the instantaneous rain centre/envelope; its CDO and cirrus remain
+  independent morphology. Only the render paths share `rainCenterClip`;
+  `impact.ts` retains its recorded-output displacement math. The mean is
+  internally consistent, NOT validated against observed rainfall.
 - `rCanopy` in `src/render/storm-radii.ts` has NO `rMax` floor, deliberately.
   Because `structure.ts` clamps `rmwKm` to [12,95] and `outerSizeKm` to
   [60,420], such a floor binds for broad weak storms and re-couples the canopy

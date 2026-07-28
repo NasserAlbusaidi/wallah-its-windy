@@ -15,6 +15,7 @@ import {
 import { TOKENS } from '../tokens';
 import type { DrawCtx, RenderModule } from './context';
 import { makeProgram, makeQuadVao } from './gl-utils';
+import { rainCenterClip } from './precipitating-cloud';
 
 const VS = /* glsl */ `#version 300 es
 in vec2 a_pos;
@@ -115,14 +116,11 @@ export class RadarLayer implements RenderModule {
     gl.bindVertexArray(this.vao);
     const u = (name: string) => gl.getUniformLocation(this.program!, name);
     const latRadians = (storm.lat * Math.PI) / 180;
-    const offsetX =
-      (2 * ctx.structure.rainOffsetEastKm) /
-      (20 * 111 * Math.max(0.2, Math.cos(latRadians)));
-    const offsetY = (2 * ctx.structure.rainOffsetNorthKm) / (12 * 111);
+    const rainCenter = rainCenterClip(ctx.centerClip, ctx.structure);
     gl.uniform2f(
       u('u_center'),
-      ctx.centerClip.x + offsetX,
-      ctx.centerClip.y + offsetY,
+      rainCenter.x,
+      rainCenter.y,
     );
     gl.uniform1f(
       u('u_rMax'),

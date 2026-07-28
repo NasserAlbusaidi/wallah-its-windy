@@ -455,12 +455,19 @@ and precipitation render paths. Keep the eye and eyewall tied to RMW; tie the
 central dense overcast, outer rainbands, and cirrus canopy to independently
 bounded structural radii.
 
-**Remediation status — partially closed on 28 July 2026.** The simulated
+**Remediation status — internally closed on 28 July 2026.** The simulated
 infrared pass now receives separate `rMax` and `rCanopy` scales. Outer size
 controls the central overcast, cirrus canopy, canopy offset, and canopy texture
-space, while the eye and inner core remain tied to RMW. The rainband component
-of the cloud shield still uses the contracting inner-core scale, so the broader
-cloud-shield shrinkage finding is not fully resolved.
+space, while the eye and inner core remain tied to RMW. A separate
+rain-aligned cloud component now shares the renderers' instantaneous rain
+centre, radial envelope, and spiral phase, with a bounded texture floor tied to
+the actual eyewall/rainband rates. The recorded impact ledger retains its
+existing displacement path so recorded output does not move. That support
+prevents modeled radar rain from appearing beneath an empty IR sky without
+forcing the independent CDO and cirrus geometry
+to become quantitative rainfall products. Storm-lifetime accumulation remains
+a historical footprint and is not expected to fit beneath one instantaneous IR
+frame.
 
 #### Instantaneous radar and accumulated rain use different rainband means
 
@@ -487,8 +494,9 @@ intentional product-specific transfer functions.
 **Remediation status — internally closed on 28 July 2026.**
 [`src/rainband-profile.ts`](../src/rainband-profile.ts) now supplies the same
 four radial edges, spiral constants, and 0.68 azimuthal mean to simulated radar,
-land/wadi rain, and the impact ledger. The cloud-morphology band in
-`render/env.ts` is deliberately separate. This removes the cross-product
+land/wadi rain, the impact ledger, and the minimum precipitating-cloud support
+in simulated IR. The CDO, cirrus, and decorative cloud-morphology band in
+`render/env.ts` remain deliberately separate. This removes the cross-product
 contradiction; it does not validate the profile or its mean against observed
 rainfall.
 

@@ -9,10 +9,31 @@
  */
 
 import { TOKENS } from '../tokens';
+import {
+  EYEWALL_WIDTH_Q,
+  RAINBAND_AZIMUTHAL_MEAN,
+  RAINBAND_INNER_FULL_Q,
+  RAINBAND_INNER_Q,
+  RAINBAND_OUTER_FADE_Q,
+  RAINBAND_OUTER_Q,
+  RAINBAND_SPIRAL_AMPLITUDE,
+  RAINBAND_SPIRAL_ARMS,
+  RAINBAND_SPIRAL_PITCH,
+  RAINBAND_SPIRAL_ROTATION_PER_H,
+} from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import { makeProgram, makeQuadVao } from './gl-utils';
+import {
+  PRECIPITATING_CLOUD_BAND_MAX,
+  PRECIPITATING_CLOUD_BAND_FULL_MM_H,
+  PRECIPITATING_CLOUD_EYE_FULL_MM_H,
+  PRECIPITATING_CLOUD_RAIN_START_MM_H,
+  PRECIPITATING_CLOUD_SPIRAL_FLOOR,
+  PRECIPITATING_CLOUD_TEXTURE_FLOOR,
+  rainCenterClip,
+} from './precipitating-cloud';
 import {
   CANOPY_COEFFICIENT_DIVISOR,
   RENDER_RADIUS_FLOOR,
@@ -56,6 +77,7 @@ uniform float u_fade;
 uniform int u_mode;
 uniform float u_hasStorm;
 uniform vec2 u_center;
+uniform vec2 u_rainCenter;
 uniform float u_rMax;
 uniform float u_rCanopy;
 uniform float u_intensity;
@@ -113,6 +135,10 @@ struct CloudField {
 CloudField sampleCloud(float land, float sstC) {
   vec2 cell = vec2(v_uv.x * 2.0 - 1.0, 1.0 - v_uv.y * 2.0);
   vec2 radial = vec2((cell.x - u_center.x) * u_metricX, cell.y - u_center.y);
+  vec2 rainRadial = vec2(
+    (cell.x - u_rainCenter.x) * u_metricX,
+    cell.y - u_rainCenter.y
+  );
   float rMax = max(${RENDER_RADIUS_FLOOR}, u_rMax);
   float rCanopy = max(${RENDER_RADIUS_FLOOR}, u_rCanopy);
   // coreQ: eye and eyewall stay tied to the contracting inner core.
@@ -187,6 +213,53 @@ CloudField sampleCloud(float land, float sstC) {
     0.5 + 0.5 * sin(3.7 * azimuth - 0.88 * bandQ - rotation * 0.5 + fine)
   );
   float convectiveCells = smoothstep(0.36, 0.78, fine * 0.74 + macro * 0.34);
+  // Instantaneous modeled rain must carry visible cloud support. Keep this
+  // distinct from the independent CDO/cirrus morphology above: the shared rain
+  // centre and envelope prevent empty IR sky over radar-visible precipitation.
+  float rainQ = length(rainRadial) / rMax;
+  float rainAzimuth = atan(rainRadial.y, rainRadial.x);
+  float precipEyewall = exp(-pow(
+    (rainQ - 1.0) / ${EYEWALL_WIDTH_Q},
+    2.0
+  ));
+  float precipBandEnvelope =
+    smoothstep(${RAINBAND_INNER_Q}, ${RAINBAND_INNER_FULL_Q.toFixed(1)}, rainQ) *
+    (1.0 - smoothstep(
+      ${RAINBAND_OUTER_FADE_Q.toFixed(1)},
+      ${RAINBAND_OUTER_Q.toFixed(1)},
+      rainQ
+    ));
+  float precipSpiral =
+    ${RAINBAND_AZIMUTHAL_MEAN} +
+    ${RAINBAND_SPIRAL_AMPLITUDE} * sin(
+      ${RAINBAND_SPIRAL_ARMS.toFixed(1)} * rainAzimuth -
+        ${RAINBAND_SPIRAL_PITCH} * rainQ +
+        u_ageH * ${RAINBAND_SPIRAL_ROTATION_PER_H}
+    );
+  float precipSpiralN = clamp(
+    (precipSpiral -
+      ${(RAINBAND_AZIMUTHAL_MEAN - RAINBAND_SPIRAL_AMPLITUDE).toFixed(2)}) /
+      ${(RAINBAND_SPIRAL_AMPLITUDE * 2).toFixed(2)},
+    0.0,
+    1.0
+  );
+  float precipEyeSupport = smoothstep(
+    ${PRECIPITATING_CLOUD_RAIN_START_MM_H},
+    ${PRECIPITATING_CLOUD_EYE_FULL_MM_H.toFixed(1)},
+    u_eyewallRain
+  );
+  float precipBandSupport = smoothstep(
+    ${PRECIPITATING_CLOUD_RAIN_START_MM_H},
+    ${PRECIPITATING_CLOUD_BAND_FULL_MM_H.toFixed(1)},
+    u_rainbandRain
+  );
+  float precipitatingCloud = max(
+    precipEyewall * precipEyeSupport,
+    precipBandEnvelope *
+      mix(${PRECIPITATING_CLOUD_SPIRAL_FLOOR}, 1.0, precipSpiralN) *
+      precipBandSupport *
+      ${PRECIPITATING_CLOUD_BAND_MAX}
+  ) * mix(${PRECIPITATING_CLOUD_TEXTURE_FLOOR}, 1.0, macro);
   float bandCoherence = smoothstep(0.42, 0.78, u_organization) *
     smoothstep(0.12, 0.52, u_intensity);
   float brokenBand = smoothstep(0.28, 0.72, macro * 0.62 + fine * 0.42) *
@@ -227,7 +300,8 @@ CloudField sampleCloud(float land, float sstC) {
     smoothstep(0.62, 0.82, u_organization);
   float eye = 1.0 - smoothstep(0.18, mix(0.46, 0.68, eyeStrength), q);
   float stormCloud = clamp(
-    (coreCloud + eyewallCloud + rainbands + cirrus) * shearErosion,
+    (coreCloud + eyewallCloud + rainbands + cirrus + precipitatingCloud) *
+      shearErosion,
     0.0,
     1.0
   );
@@ -243,7 +317,7 @@ CloudField sampleCloud(float land, float sstC) {
     clamp(0.52 * u_intensity + 0.48 * u_organization, 0.0, 1.0)
   );
   float towerCooling = 13.0 * convectiveCells * rainEnergy *
-    max(eyewall, rainbands);
+    max(max(eyewall, rainbands), precipitatingCloud);
   float brightnessC = mix(surfaceC, ambientTopC, ambientCloud);
   brightnessC = mix(brightnessC, stormTopC - towerCooling, stormCloud);
   brightnessC = mix(brightnessC, surfaceC - 4.0, eye * eyeStrength * u_stormPresence);
@@ -550,6 +624,14 @@ export class EnvLayer implements RenderModule {
       u('u_center'),
       ctx.centerClip?.x ?? 0,
       ctx.centerClip?.y ?? 0,
+    );
+    const rainCenter = ctx.centerClip && ctx.structure
+      ? rainCenterClip(ctx.centerClip, ctx.structure)
+      : ctx.centerClip;
+    gl.uniform2f(
+      u('u_rainCenter'),
+      rainCenter?.x ?? 0,
+      rainCenter?.y ?? 0,
     );
     const renderRadii = ctx.structure
       ? stormRenderRadii(ctx.structure)

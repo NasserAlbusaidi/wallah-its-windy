@@ -33,8 +33,6 @@ import { flowOffsetGlsl, HYDRO_ROUTE_CFL } from '../hydro-routing';
 import {
   DOMAIN,
   clipToLatLon,
-  latLonToClip,
-  offsetKm,
 } from '../grid';
 import {
   EYEWALL_WIDTH_Q,
@@ -56,6 +54,7 @@ import {
   makeRenderTarget,
 } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
+import { rainCenterClip } from './precipitating-cloud';
 import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
 
 /** Per-frame decay multiply — THE knob (eng task T5, valid 0.90–1.00). */
@@ -327,24 +326,7 @@ export class RainLayer {
     gl.uniform1f(u('u_dtH'), ctx.frame.hydroDeltaH);
     const c = ctx.centerClip;
     const structure = ctx.structure;
-    let rainCenter = c;
-    if (c && structure) {
-      const offsetDistanceKm = Math.hypot(
-        structure.rainOffsetEastKm,
-        structure.rainOffsetNorthKm,
-      );
-      if (offsetDistanceKm > 1e-6) {
-        const centreLatLon = clipToLatLon(c.x, c.y, DOMAIN);
-        const shifted = offsetKm(
-          centreLatLon.lat,
-          centreLatLon.lon,
-          structure.rainOffsetEastKm / offsetDistanceKm,
-          structure.rainOffsetNorthKm / offsetDistanceKm,
-          offsetDistanceKm,
-        );
-        rainCenter = latLonToClip(shifted.lat, shifted.lon, DOMAIN);
-      }
-    }
+    const rainCenter = c && structure ? rainCenterClip(c, structure) : c;
     gl.uniform2f(
       u('u_center'),
       rainCenter ? rainCenter.x : 0,

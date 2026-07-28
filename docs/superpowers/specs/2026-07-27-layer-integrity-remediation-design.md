@@ -296,6 +296,20 @@ because "one rainband contract" reads as though it should cover all four
 consumers, and a future reader would otherwise wire it up and flatten cloud
 morphology into rain geometry.
 
+**2026-07-28 amendment — minimum precipitating-cloud support.** The
+`env.ts` no-import boundary above is deliberately relaxed: simulated IR now
+shares the instantaneous rain centre, radial envelope, and spiral constants
+needed to provide minimum cloud support over modeled rain. The original
+morphology boundary remains in force. Its CDO, cirrus, canopy scale, texture
+space, and decorative morphology bands stay independent rather than being
+flattened into quantitative rain geometry.
+
+The shared displacement calculation is renderer-only: `render/env.ts`,
+`render/radar.ts`, and the render-side land/wadi rain accumulator use
+`rainCenterClip`. The recorded impact ledger in `impact.ts` retains its existing
+flat displacement calculation because changing it would move recorded output;
+that path is outside this amendment.
+
 **Review correction — two coordinates, not one substitution.** `rain.ts` feeds
 `u_rMax` into `vortexWind`, which drives orographic rain. Consumers need
 `qCore = r / rMax` for eyewall and vortex alongside any band coordinate; a

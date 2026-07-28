@@ -2,9 +2,11 @@
  * The one rainband spatial contract shared by the three RAIN products:
  * src/render/radar.ts, src/render/rain.ts and src/impact.ts.
  *
- * src/render/env.ts is deliberately NOT a consumer. Its band is cloud
- * morphology, not a quantitative rain product, and it keeps its own
- * development-dependent outer radius and organization-dependent eyewall width.
+ * src/render/env.ts consumes the envelope and spiral only for the minimum cloud
+ * support that must accompany instantaneous modeled rain. Its independent CDO,
+ * cirrus, and morphology bands keep their development-dependent geometry.
+ * Centre displacement is renderer-scoped: env, radar, and rain share
+ * rainCenterClip, while impact.ts retains its recorded-output calculation.
  *
  * These values are INTERNALLY CONSISTENT, NOT VALIDATED against observed
  * rainfall. They exist so three products stop disagreeing, not because 0.68 is

@@ -575,8 +575,12 @@ export class SparseUpperOcean {
     const background: OceanBackgroundSample = {
       sstC: finite(sampled.sstC, 'sampled SST'),
       ohcKjCm2: finite(sampled.ohcKjCm2, 'sampled OHC'),
-      initializationTier: sampled.initializationTier ?? 'analytic-fallback',
-      sourceValidTime: sampled.sourceValidTime,
+      initializationTier: sampled.profile
+        ? (sampled.initializationTier ?? 'analytic-fallback')
+        : 'analytic-fallback',
+      sourceValidTime: sampled.profile
+        ? sampled.sourceValidTime
+        : undefined,
       profile: sampled.profile,
     };
     let profile: OceanProfile;

@@ -64,6 +64,20 @@ function forceAtTimestep(dtMin: number, hours = 12): ReturnType<SparseUpperOcean
 }
 
 describe('upper-ocean fixed physics contract', () => {
+  it('downgrades to analytic-fallback when the background supplies no profile', () => {
+    const ocean = new SparseUpperOcean();
+    ocean.reset(() => ({
+      sstC: 29.5,
+      ohcKjCm2: 65,
+      // A caller claiming climatology while supplying no profile must not be believed.
+      initializationTier: 'climatological-subsurface',
+      sourceValidTime: '2020-06-01T00:00:00Z',
+    }));
+    const diagnostics = ocean.sample(20, 60, 0);
+    expect(diagnostics.initializationTier).toBe('analytic-fallback');
+    expect(diagnostics.sourceValidTime).toBeNull();
+  });
+
   it('implements the locked Large-Pond drag law and high-wind cap', () => {
     expect(dragCoefficient(0)).toBe(1.2e-3);
     expect(dragCoefficient(11)).toBe(1.2e-3);

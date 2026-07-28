@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import type { EnvSample, EnvSampler, SimEngine, SimEvent, SpawnParams } from '../src/types';
 import { DeathReason } from '../src/types';
 import { DOMAIN, inBBox } from '../src/grid';
+import { profileFromSstAndOhc } from '../src/upper-ocean';
 import {
   SIM,
   DEFAULT_INTENSITY_PARAMETERS,
@@ -198,7 +199,10 @@ describe('live storm diagnostics', () => {
     expect(diagnostics.midlevelRhPct).toBe(75);
     expect(diagnostics.ohcKjCm2).toBe(70);
     expect(diagnostics.mpiKt).toBeCloseTo(mpiKt(30), 8);
-    expect(diagnostics.oceanInitializationTier).toBe('climatological-subsurface');
+    // This engine is built with no oceanProfileSampler (see the createSimEngine
+    // call above), so its column is an analytic fabrication. The previous
+    // expectation of 'climatological-subsurface' encoded the provenance bug.
+    expect(diagnostics.oceanInitializationTier).toBe('analytic-fallback');
     expect(diagnostics.oceanMixedLayerDepthM).toBeGreaterThanOrEqual(5);
     expect(diagnostics.oceanActiveColumnCount).toBeGreaterThan(0);
     expect(diagnostics.organization).toBeGreaterThan(0);
@@ -221,6 +225,57 @@ describe('live storm diagnostics', () => {
     expect(state.structure.hollandB).toBeGreaterThan(0);
     expect(Number.isFinite(state.structure.motionUms)).toBe(true);
     expect(Number.isFinite(state.structure.motionVms)).toBe(true);
+  });
+});
+
+describe('ocean provenance tagging', () => {
+  const profile = () => profileFromSstAndOhc(28, 60);
+
+  it('reports analytic-fallback and raises the flag when no profile exists', () => {
+    // No oceanProfileSampler at all: this is the missing-ocean.bin path.
+    const engine = createSimEngine({
+      env: env({ sstC: 30 }),
+      isLand: NO_LAND,
+    });
+    engine.spawn(spawnParams());
+    engine.tick(DT);
+    const { diagnostics } = engine.getState()!;
+    expect(diagnostics.oceanInitializationTier).toBe('analytic-fallback');
+    expect(diagnostics.oceanMissingSourceFlag).toBe(true);
+  });
+
+  it('reports climatological-subsurface when the sampler tags a climatology profile', () => {
+    const engine = createSimEngine({
+      env: env({ sstC: 30 }),
+      isLand: NO_LAND,
+      oceanProfileSampler: () => ({
+        profile: profile(),
+        tier: 'climatological-subsurface' as const,
+      }),
+    });
+    engine.spawn(spawnParams());
+    engine.tick(DT);
+    const { diagnostics } = engine.getState()!;
+    expect(diagnostics.oceanInitializationTier).toBe(
+      'climatological-subsurface',
+    );
+    expect(diagnostics.oceanMissingSourceFlag).toBe(false);
+  });
+
+  it('reports event-analysis only when the sampler says so', () => {
+    const engine = createSimEngine({
+      env: env({ sstC: 30 }),
+      isLand: NO_LAND,
+      oceanProfileSampler: () => ({
+        profile: profile(),
+        tier: 'event-analysis' as const,
+      }),
+    });
+    engine.spawn(spawnParams());
+    engine.tick(DT);
+    expect(engine.getState()!.diagnostics.oceanInitializationTier).toBe(
+      'event-analysis',
+    );
   });
 });
 

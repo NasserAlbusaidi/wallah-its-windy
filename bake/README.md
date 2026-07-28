@@ -192,6 +192,32 @@ files, require a configured CDS API token and accepted Copernicus licence, and
 are safe to resume. WOA23 needs no credentials and is fetched lazily by
 `bake/woa23.py`.
 
+### Upper-level wind sidecar — `bake/bake_upper_winds.py`
+
+`public/data/upper.bin` + `upper.json` carry the absolute 200-hPa monthly
+sample planes (`u200_MM`/`v200_MM`), plane-aligned with env.bin's picked real
+years. Because env.bin is frozen and its sample years were never persisted,
+the bake proves alignment before writing: it re-derives every year-picked
+env.bin layer (`u/v/shr/shu/shv/rh`, all 7 months) from `data/raw/` and
+requires byte-identity with the committed env.bin.
+
+- `npm run data:upper` — gate, then write both files.
+- `npm run data:upper:check` — recompute and byte-diff against the committed
+  files (requires the raw `.nc` files; local-only, not a CI step — CI pins
+  the bytes via the asset manifest instead).
+- Raw prerequisites: `era5_climatology.nc` + `era5_rh_climatology.nc`. Fetch
+  just those two with `node bake/run-python.mjs -u bake/fetch_era5.py
+  era5_climatology.nc era5_rh_climatology.nc` (the fetch script accepts
+  target filenames now; no arguments still fetches everything).
+- **Gate failure protocol:** a mismatch means the fresh CDS download no
+  longer reproduces the frozen env.bin (e.g. converter/packing drift flipping
+  a value at a rounding boundary). Do NOT rebake env.bin and do NOT loosen
+  the comparison — record the printed per-layer diff and escalate; an env.bin
+  refresh is a separate, gated decision.
+
+`test_upper.py` is the offline standalone test for the sidecar bake
+(`node bake/run-python.mjs bake/test_upper.py`).
+
 `bake/fetch_fidelity_benchmark.py` extends that identical request contract to
 the 20 HF-1-only storms. It enforces CDS's queue limit by allowing only one
 active request per dataset while pressure-level and surface requests progress

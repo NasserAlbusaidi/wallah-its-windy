@@ -86,6 +86,11 @@ self-describing `.bin` assets the browser loads.
   work.
 - Dims, bbox, and quantization come from file headers — the runtime hardcodes
   no grid geometry. Do not add a second parser or inline byte offsets.
+- `public/data/upper.bin`'s planes must carry the same picked real years as
+  `env.bin`'s (plane k = same year, both files). `bake/bake_upper_winds.py`
+  enforces this by reconstructing env.bin's year-picked layers byte-for-byte
+  before writing; if that gate fails, STOP — never rebake env.bin to satisfy
+  it. `upper.json` is the persisted plane→year record.
 
 ## Design tokens
 

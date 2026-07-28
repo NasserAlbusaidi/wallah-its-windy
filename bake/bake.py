@@ -93,9 +93,7 @@ def build_env() -> str:
     ELAT, ELON = np.meshgrid(elat, elon, indexing="ij")  # [ny,nx], row0=north
     nx, ny = sources.ENV_NX, sources.ENV_NY
 
-    def q_i16(a: np.ndarray, scale: float, offset: float) -> np.ndarray:
-        raw = np.round((a - offset) / scale)
-        return np.clip(raw, -32768, 32767).astype(np.int16).ravel(order="C")
+    q_i16 = binfmt.quantize_int16
 
     # Synoptic samples (D10): when the source can provide K distinct real years
     # Per month, steering/shear fields ship as nt=K coherent real-year planes.

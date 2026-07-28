@@ -18,9 +18,13 @@ coherent parametric wind-pressure-size structure, continuous coastal exposure,
 and a sparse dynamic upper-ocean column. Because that profile failed its frozen
 acceptance gates, the interactive sandbox retains its previously validated
 shipped profile; research verification opts into the rejected candidates
-explicitly. The ensemble separates initialization, forcing, parameter, and
-unresolved-physics perturbations but remains labelled **perturbation
-frequency**, not calibrated probability.
+explicitly. The annular vector ventilation index is still computed and recorded
+for research diagnostics, but the shipped profile does not consume it in
+organization or intensity; it continues to use scalar deep-layer shear and
+mid-level RH. Only the explicitly selected, rejected HF-2 research profile
+activates vector ventilation. The ensemble separates initialization, forcing,
+parameter, and unresolved-physics perturbations but remains labelled
+**perturbation frequency**, not calibrated probability.
 
 HF-1 used 30 frozen 1980–2024 storms. HF-6 adds an outcome-blind catalogue of
 72 Arabian Sea storms and 144 initializations. The catalogue retains eight

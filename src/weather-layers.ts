@@ -154,7 +154,7 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
   },
   {
     id: 'shear',
-    label: 'deep-layer wind shear',
+    label: 'deep-layer wind shear · vector ventilation diagnostic only',
     shortLabel: 'shear',
     iconSvg: railIcon(
       '<path d="M2 5h9m0 0-2.5-2.5M11 5 8.5 7.5"/><path d="M14 11H5m0 0 2.5-2.5M5 11l2.5 2.5"/>',

@@ -17,6 +17,7 @@ export interface ProductIdentityInput {
   hindcastStartIso?: string | null;
   runMode: EventRunMode;
   ageH: number | null;
+  oceanMissingSourceFlag?: boolean;
   observation?: {
     label: string;
     validTimeIso: string | null;
@@ -30,6 +31,7 @@ export interface ProductIdentity {
   validTimeLabel: string;
   observationState: ObservationTimeState;
   sourceLabel: string;
+  degradedInputs: readonly string[];
 }
 
 const OBSERVATION_MATCH_TOLERANCE_MS = 90 * 60_000;
@@ -104,6 +106,10 @@ export function buildProductIdentity(
   const validTimeLabel = validTimeIso
     ? `MODEL VALID ${formatUtc(validTimeIso)}`
     : `MODEL +${finiteAgeH(input.ageH).toFixed(1)} H · NO UTC VALID TIME`;
+  const degradedInputs: string[] = [];
+  if (input.oceanMissingSourceFlag) {
+    degradedInputs.push('subsurface ocean: analytic fallback');
+  }
 
   if (!input.observation) {
     return {
@@ -113,6 +119,7 @@ export function buildProductIdentity(
       validTimeLabel,
       observationState: 'simulation-only',
       sourceLabel: 'SIMULATION ONLY',
+      degradedInputs,
     };
   }
 
@@ -125,6 +132,7 @@ export function buildProductIdentity(
       validTimeLabel,
       observationState: 'pending',
       sourceLabel: `${input.observation.label.toUpperCase()} · VALID TIME PENDING`,
+      degradedInputs,
     };
   }
   const modelMs = parseIsoMs(validTimeIso);
@@ -139,6 +147,7 @@ export function buildProductIdentity(
       validTimeLabel,
       observationState: 'time-matched',
       sourceLabel: `${input.observation.label.toUpperCase()} · TIME-MATCHED DISPLAY`,
+      degradedInputs,
     };
   }
   return {
@@ -148,6 +157,7 @@ export function buildProductIdentity(
     validTimeLabel,
     observationState: 'unsynced',
     sourceLabel: `${input.observation.label.toUpperCase()} · UNSYNCED OBS OVERLAY`,
+    degradedInputs,
   };
 }
 

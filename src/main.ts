@@ -360,6 +360,10 @@ const productSourceStateEl = must(
   document.getElementById('product-source-state'),
   '#product-source-state',
 );
+const productDegradedStateEl = must(
+  document.getElementById('product-degraded-state'),
+  '#product-degraded-state',
+);
 const publicDataMonitorEl = must(
   document.getElementById('public-data-monitor') as HTMLDetailsElement | null,
   '#public-data-monitor',
@@ -1406,6 +1410,8 @@ function refreshProductIdentity(storm: StormState | null = displayedStorm()): vo
     hindcastStartIso: activeScenario?.hindcast?.startIso,
     runMode: activeRunMode,
     ageH: storm?.ageH ?? null,
+    oceanMissingSourceFlag:
+      storm?.diagnostics.oceanMissingSourceFlag ?? false,
     observation: activeObservationProduct(),
   });
   productIdentityEl.dataset.mode = identity.mode;
@@ -1413,6 +1419,13 @@ function refreshProductIdentity(storm: StormState | null = displayedStorm()): vo
   productModeEl.textContent = identity.modeLabel;
   productValidTimeEl.textContent = identity.validTimeLabel;
   productSourceStateEl.textContent = identity.sourceLabel;
+  const degraded = identity.degradedInputs;
+  const hasDegradedInputs = degraded.length > 0;
+  productIdentityEl.dataset.degraded = hasDegradedInputs ? 'true' : 'false';
+  productDegradedStateEl.hidden = !hasDegradedInputs;
+  productDegradedStateEl.textContent = hasDegradedInputs
+    ? `DEGRADED INPUT · ${degraded.join(' · ')}`
+    : '';
 }
 
 function acknowledgeObservationOverlay(

@@ -23,7 +23,7 @@ import {
 import { DEMO_GENESIS, DEMO_MONTH, DEMO_SEED } from '../src/ui';
 import { createSimEngine, SIM } from '../src/sim';
 import { cellToLatLon, DOMAIN, inBBox, latLonToCell } from '../src/grid';
-import { MUSCAT } from '../src/types';
+import { DType, MUSCAT } from '../src/types';
 import type { BinLayer, ParsedBin, SimEvent } from '../src/types';
 
 // Vitest runs with cwd = repo root, so the baked artifacts resolve relatively.
@@ -185,6 +185,118 @@ describe('env.bin', () => {
       expect(shv.nt).toBe(shr.nt);
       for (let i = 0; i < shr.data.length; i++) {
         expect(Math.hypot(shu.data[i], shv.data[i])).toBeLessThan(120);
+      }
+    }
+  });
+});
+
+describe('upper.bin (200-hPa wind sidecar, C1)', () => {
+  const upper = loadBin('upper.bin');
+  const env = loadBin('env.bin');
+  const meta = JSON.parse(readFileSync(`${DATA_DIR}/upper.json`, 'utf8')) as {
+    version: number;
+    bin: string;
+    fields: string[];
+    ntSemantics: string;
+    quant: { dtype: string; scale: number; offset: number };
+    grid: { nx: number; ny: number; bbox: number[] };
+    months: Record<string, { nt: number; years: number[] }>;
+    alignment: {
+      envBin: string;
+      envBinSha256: string;
+      verifiedLayers: string[];
+    };
+  };
+
+  it('carries u200/v200 for every season month, plane-shaped like env.bin', () => {
+    expect([...upper.layers.keys()].sort()).toEqual(
+      SEASON.flatMap((m) => {
+        const mm = envMonthSuffix(m);
+        return [`u200_${mm}`, `v200_${mm}`];
+      }).sort(),
+    );
+    for (const m of SEASON) {
+      const mm = envMonthSuffix(m);
+      const u200 = upper.layers.get(`u200_${mm}`);
+      const v200 = upper.layers.get(`v200_${mm}`);
+      const envU = env.layers.get(`u_${mm}`)!;
+      expect(u200, `u200_${mm}`).toBeDefined();
+      expect(v200, `v200_${mm}`).toBeDefined();
+      // Plane-for-plane alignment contract: same plane count, same grid.
+      expect(u200!.nt).toBe(envU.nt);
+      expect(v200!.nt).toBe(envU.nt);
+      expect(u200!.nx).toBe(envU.nx);
+      expect(u200!.ny).toBe(envU.ny);
+      expect(u200!.bbox).toEqual(envU.bbox);
+      expect(v200!.nx).toBe(envU.nx);
+      expect(v200!.ny).toBe(envU.ny);
+      expect(v200!.bbox).toEqual(envU.bbox);
+      expect(allFinite(u200!.data)).toBe(true);
+      expect(allFinite(v200!.data)).toBe(true);
+      for (const layer of [u200!, v200!]) {
+        expect(layer.dtype).toBe(DType.int16);
+        expect(layer.quantized).toBe(true);
+        expect(layer.scale).toBe(0.01);
+        expect(layer.offset).toBe(0);
+        const r = range(layer.data);
+        expect(Math.max(Math.abs(r.min), Math.abs(r.max))).toBeLessThan(100);
+      }
+      // Planes are distinct real years, not copies (same guard as env.bin).
+      const planeSize = u200!.nx * u200!.ny;
+      for (let p = 0; p + 1 < u200!.nt; p++) {
+        let diff = 0;
+        const a = p * planeSize;
+        const b = (p + 1) * planeSize;
+        for (let i = 0; i < planeSize; i++) {
+          diff += Math.abs(u200!.data[a + i] - u200!.data[b + i]);
+        }
+        expect(diff / planeSize, `u200_${mm} plane${p} vs ${p + 1}`).toBeGreaterThan(0.1);
+      }
+    }
+  });
+
+  it('upper.json pins plane->year metadata and the env.bin it aligned against', () => {
+    const manifest = JSON.parse(
+      readFileSync('calibration/asset-manifest.json', 'utf8'),
+    ) as { files: Record<string, string> };
+    expect(meta.version).toBe(1);
+    // The claimed alignment target must be the PINNED env.bin, hash-for-hash,
+    // and the sidecar pair itself must be pinned by the manifest too.
+    expect(meta.alignment.envBinSha256).toBe(manifest.files['env.bin']);
+    expect(manifest.files['upper.bin']).toBeDefined();
+    expect(manifest.files['upper.json']).toBeDefined();
+    // The metadata's declared contract must match the bin it describes.
+    expect(meta.bin).toBe('data/upper.bin');
+    expect(meta.fields).toEqual(['u200', 'v200']);
+    expect(meta.ntSemantics).toBe('synoptic-plane');
+    expect(meta.quant).toEqual({ dtype: 'int16', scale: 0.01, offset: 0 });
+    expect(meta.alignment.envBin).toBe('data/env.bin');
+    expect(meta.alignment.verifiedLayers).toEqual(
+      SEASON.flatMap((m) => {
+        const mm = envMonthSuffix(m);
+        return ['u', 'v', 'shr', 'shu', 'shv', 'rh'].map((field) => `${field}_${mm}`);
+      }).sort(),
+    );
+    const anyLayer = upper.layers.get('u200_04')!;
+    expect(meta.grid.nx).toBe(anyLayer.nx);
+    expect(meta.grid.ny).toBe(anyLayer.ny);
+    expect(meta.grid.bbox).toEqual([
+      anyLayer.bbox.lonMin, anyLayer.bbox.lonMax,
+      anyLayer.bbox.latMin, anyLayer.bbox.latMax,
+    ]);
+    expect(Object.keys(meta.months).sort()).toEqual(
+      SEASON.map((m) => envMonthSuffix(m)),
+    );
+    for (const m of SEASON) {
+      const mm = envMonthSuffix(m);
+      const info = meta.months[mm];
+      const u200 = upper.layers.get(`u200_${mm}`)!;
+      expect(info.nt).toBe(u200.nt);
+      expect(info.years).toHaveLength(u200.nt);
+      for (const y of info.years) {
+        expect(Number.isInteger(y)).toBe(true);
+        expect(y).toBeGreaterThanOrEqual(1991);
+        expect(y).toBeLessThanOrEqual(2020);
       }
     }
   });

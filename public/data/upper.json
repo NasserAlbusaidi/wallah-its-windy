@@ -1,0 +1,138 @@
+{
+  "alignment": {
+    "envBin": "data/env.bin",
+    "envBinSha256": "0187b9395aef98bd615fcd7fecc320e017dbc43129016de035bb90e458135f77",
+    "verifiedLayers": [
+      "rh_04",
+      "rh_05",
+      "rh_06",
+      "rh_07",
+      "rh_08",
+      "rh_09",
+      "rh_10",
+      "shr_04",
+      "shr_05",
+      "shr_06",
+      "shr_07",
+      "shr_08",
+      "shr_09",
+      "shr_10",
+      "shu_04",
+      "shu_05",
+      "shu_06",
+      "shu_07",
+      "shu_08",
+      "shu_09",
+      "shu_10",
+      "shv_04",
+      "shv_05",
+      "shv_06",
+      "shv_07",
+      "shv_08",
+      "shv_09",
+      "shv_10",
+      "u_04",
+      "u_05",
+      "u_06",
+      "u_07",
+      "u_08",
+      "u_09",
+      "u_10",
+      "v_04",
+      "v_05",
+      "v_06",
+      "v_07",
+      "v_08",
+      "v_09",
+      "v_10"
+    ]
+  },
+  "bin": "data/upper.bin",
+  "fields": [
+    "u200",
+    "v200"
+  ],
+  "grid": {
+    "bbox": [
+      50.0,
+      70.0,
+      15.0,
+      27.0
+    ],
+    "nx": 40,
+    "ny": 24
+  },
+  "months": {
+    "04": {
+      "nt": 4,
+      "years": [
+        1993,
+        2000,
+        1997,
+        2006
+      ]
+    },
+    "05": {
+      "nt": 4,
+      "years": [
+        2000,
+        2009,
+        2013,
+        1997
+      ]
+    },
+    "06": {
+      "nt": 4,
+      "years": [
+        2011,
+        2015,
+        2020,
+        2003
+      ]
+    },
+    "07": {
+      "nt": 4,
+      "years": [
+        2012,
+        1998,
+        2020,
+        2006
+      ]
+    },
+    "08": {
+      "nt": 4,
+      "years": [
+        1996,
+        2019,
+        1994,
+        2017
+      ]
+    },
+    "09": {
+      "nt": 4,
+      "years": [
+        1995,
+        1997,
+        2018,
+        2017
+      ]
+    },
+    "10": {
+      "nt": 4,
+      "years": [
+        2004,
+        1997,
+        2011,
+        2015
+      ]
+    }
+  },
+  "ntSemantics": "synoptic-plane",
+  "quant": {
+    "dtype": "int16",
+    "offset": 0.0,
+    "scale": 0.01
+  },
+  "source": "ERA5 monthly-mean pressure-level winds 1991-2020 (reanalysis-era5-pressure-levels-monthly-means), 200 hPa u/v; the same CDS request that feeds env.bin (bake/fetch_era5.py)",
+  "version": 1
+}

@@ -418,6 +418,14 @@ the committed runtime, shaders, bake scripts, and binary artefacts. They do not
 change the no-go decision, but they sharpen the distinction between display
 defects and limits imposed by the shipped data.
 
+#### Static replay assets were not byte-pinned
+
+**Remediated on 28 July 2026.** A recursive SHA-256 manifest now pins every
+committed static replay file under `public/data/`, and CI fails on drift,
+addition, or removal. The only prefix exclusions are `live/` and `satellite/`.
+Those volatile live-cycle and observed-satellite assets are validated by their
+cycle/provider manifests instead of being frozen to committed bytes.
+
 #### Storm clouds use the inner-core radius as their only size scale
 
 **Implementation defect.** The apparent shrinking of the simulated infrared
@@ -447,6 +455,13 @@ and precipitation render paths. Keep the eye and eyewall tied to RMW; tie the
 central dense overcast, outer rainbands, and cirrus canopy to independently
 bounded structural radii.
 
+**Remediation status — partially closed on 28 July 2026.** The simulated
+infrared pass now receives separate `rMax` and `rCanopy` scales. Outer size
+controls the central overcast, cirrus canopy, canopy offset, and canopy texture
+space, while the eye and inner core remain tied to RMW. The rainband component
+of the cloud shield still uses the contracting inner-core scale, so the broader
+cloud-shield shrinkage finding is not fully resolved.
+
 #### Instantaneous radar and accumulated rain use different rainband means
 
 **Implementation defect.** The simulated radar shader in
@@ -468,6 +483,14 @@ the user-facing simulated radar.
 Required remedy: define one shared rainband spatial contract for radar, impact
 accumulation, and land/wadi forcing, or explicitly document and validate any
 intentional product-specific transfer functions.
+
+**Remediation status — internally closed on 28 July 2026.**
+[`src/rainband-profile.ts`](../src/rainband-profile.ts) now supplies the same
+four radial edges, spiral constants, and 0.68 azimuthal mean to simulated radar,
+land/wadi rain, and the impact ledger. The cloud-morphology band in
+`render/env.ts` is deliberately separate. This removes the cross-product
+contradiction; it does not validate the profile or its mean against observed
+rainfall.
 
 #### Missing `ocean.bin` is assigned the wrong provenance tier
 
@@ -491,6 +514,14 @@ Required remedy: sample the profile first and derive `initializationTier` from
 the result. A missing or malformed climatological profile must set
 `analytic-fallback`, raise `missingSourceFlag`, and produce a visible degraded
 data-state indication.
+
+**Remediation status — closed on 28 July 2026.** Ocean profile samplers now
+return a tagged profile-and-provenance sample or `null`; the simulation derives
+the tier and source time only from the branch that actually returned data.
+The upper-ocean model defensively downgrades a claimed tier when no profile is
+present. A missing source raises the diagnostic and displays
+`DEGRADED INPUT · subsurface ocean: analytic fallback` in the permanent product
+identity bar.
 
 #### Vector ventilation is diagnostic, not shipped intensity physics
 

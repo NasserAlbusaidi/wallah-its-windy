@@ -29,6 +29,7 @@ One line per document. Classes:
 | [`hf6-scorecard.md`](hf6-scorecard.md) | **GENERATED** — `npm run hf6:gate` | Versioned HF-6 gate scorecard (implementation, sealed first look, prospective evidence). |
 | [`hindcast-benchmark.md`](hindcast-benchmark.md) | **GENERATED** — `npm run calibrate:intensity` | Ten-storm historical hindcast benchmark report. |
 | [`model-card-hf6.md`](model-card-hf6.md) | — | Model card for the HF-6 reduced-order model: intended use, data, evaluation, limitations. Hand-written; `npm run hf6:gate` checks that it exists. |
+| [`adr/2026-07-28-hf4-node-runtime-migration.md`](adr/2026-07-28-hf4-node-runtime-migration.md) | — | Accepted decision pinning sealed reproduction to Node 24.18.0 and authorizing one adjacent-rounding HF-4 metric refresh after the original interpreter was retired. |
 | [`satellite-cloud-validation.md`](satellite-cloud-validation.md) | — | Qualitative cloud-morphology screen with an explicit claim boundary; not a forecast-skill score. |
 | [`structure-calibration.md`](structure-calibration.md) | **GENERATED** — `npm run calibrate:structure` | North Indian Ocean physical-structure calibration report. |
 
@@ -42,6 +43,7 @@ history once merged.
 | [`superpowers/specs/2026-07-26-windy-grade-reskin-design.md`](superpowers/specs/2026-07-26-windy-grade-reskin-design.md) | — | Design spec for the windy-grade UI reskin: glass panel chrome, type scale, icon layer rail, storm tag pinned to the eye, category-coloured timeline. UI-only; explicitly excludes physics, calibration, data-format, and URL-hash changes. |
 | [`superpowers/plans/2026-07-26-windy-grade-reskin.md`](superpowers/plans/2026-07-26-windy-grade-reskin.md) | — | Eight-task implementation plan for the reskin spec; delivered in PR #11 (merge `89f1539`), retained as the execution record. |
 | [`superpowers/specs/2026-07-27-layer-integrity-remediation-design.md`](superpowers/specs/2026-07-27-layer-integrity-remediation-design.md) | — | Design spec answering the 27 July layer-integrity addendum: cloud-shield canopy scale, one rainband contract, ocean provenance tagging, asset-byte pinning, upper-level sidecar bin, and the governance path for Emanuel PI. Records two adversarial review passes inline. |
+| [`superpowers/plans/2026-07-27-layer-integrity-e-and-a.md`](superpowers/plans/2026-07-27-layer-integrity-e-and-a.md) | — | Nine-task implementation plan for the layer-integrity E and A workstreams: static asset hashes, separate canopy scale, one rainband contract, truthful ocean provenance, and visible degraded-input reporting. |
 
 ## Pipelines
 

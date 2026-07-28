@@ -61,7 +61,9 @@ _cache: dict[
     tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
 ] | None = None
 # Per-year fields for synoptic sampling:
-# month -> (years[n], steerU, steerV, shearMagnitude, shearU, shearV).
+# month -> (
+#   years[n], steerU, steerV, shearMagnitude, shearU, shearV, u200, v200
+# ).
 _yearly: dict[
     int,
     tuple[
@@ -71,9 +73,12 @@ _yearly: dict[
         np.ndarray,
         np.ndarray,
         np.ndarray,
+        np.ndarray,
+        np.ndarray,
     ],
 ] | None = None
 _axes: tuple[np.ndarray, np.ndarray] | None = None  # (lat ascending, lon ascending)
+_picks: dict[int, list[int]] = {}
 
 
 def available() -> bool:
@@ -174,6 +179,8 @@ def _load() -> None:
             np.ndarray,
             np.ndarray,
             np.ndarray,
+            np.ndarray,
+            np.ndarray,
         ],
     ] = {}
     for cal_month in sorted(set(months.tolist())):
@@ -184,8 +191,19 @@ def _load() -> None:
         shear_u_y = flip(u[sel][:, i200] - u[sel][:, i850])
         shear_v_y = flip(v[sel][:, i200] - v[sel][:, i850])
         shear_y = np.hypot(shear_u_y, shear_v_y)
+        u200_y = flip(u[sel][:, i200])
+        v200_y = flip(v[sel][:, i200])
         m0 = cal_month - 1  # store 0-indexed like SEASON_MONTHS
-        yearly[m0] = (yr, u_y, v_y, shear_y, shear_u_y, shear_v_y)
+        yearly[m0] = (
+            yr,
+            u_y,
+            v_y,
+            shear_y,
+            shear_u_y,
+            shear_v_y,
+            u200_y,
+            v200_y,
+        )
         cache[m0] = (
             u_y.mean(axis=0),
             v_y.mean(axis=0),
@@ -314,6 +332,39 @@ def _to_env_grid(field: np.ndarray, elat: np.ndarray, elon: np.ndarray) -> np.nd
     return interp(pts).reshape(elat.shape).astype(np.float64)
 
 
+def _month_pick_indices(month: int) -> list[int]:
+    """Deterministic per-month sample-year indices, cached so every extractor
+    (steering/shear, RH pairing via bake.py, absolute 200-hPa winds) sees the
+    IDENTICAL pick order. Plane k of every layer is the same real year."""
+    _load()
+    assert _yearly is not None
+    cached = _picks.get(month)
+    if cached is not None:
+        return list(cached)  # copy: a caller mutation must not poison alignment
+    yr, u_y, v_y, shear_y, _su, _sv, _u200, _v200 = _yearly[month]
+    idx = _pick_sample_years(u_y, v_y, shear_y, SAMPLES_PER_MONTH)
+    if month == 10:
+        idx = _post_monsoon_thermodynamic_rescue(yr, shear_y, idx)
+    _picks[month] = list(idx)
+    return list(idx)
+
+
+def upper_level_samples_vector(
+    elat: np.ndarray, elon: np.ndarray, month: int
+) -> tuple[np.ndarray, np.ndarray, list[int]]:
+    """K coherent real-year ABSOLUTE 200-hPa wind fields on the env grid,
+    plane-for-plane aligned with steering_shear_samples_vector (C1)."""
+    _load()
+    assert _yearly is not None
+    if month not in _yearly:
+        raise KeyError(f"month {month} not in ERA5 climatology (has {sorted(_yearly)})")
+    yr, _u, _v, _s, _su, _sv, u200_y, v200_y = _yearly[month]
+    idx = _month_pick_indices(month)
+    u200 = np.stack([_to_env_grid(u200_y[i], elat, elon) for i in idx])
+    v200 = np.stack([_to_env_grid(v200_y[i], elat, elon) for i in idx])
+    return u200, v200, [int(yr[i]) for i in idx]
+
+
 def steering_shear(
     elat: np.ndarray, elon: np.ndarray, month: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -367,10 +418,8 @@ def steering_shear_samples_vector(
     assert _yearly is not None
     if month not in _yearly:
         raise KeyError(f"month {month} not in ERA5 climatology (has {sorted(_yearly)})")
-    yr, u_y, v_y, shear_y, shear_u_y, shear_v_y = _yearly[month]
-    idx = _pick_sample_years(u_y, v_y, shear_y, SAMPLES_PER_MONTH)
-    if month == 10:
-        idx = _post_monsoon_thermodynamic_rescue(yr, shear_y, idx)
+    yr, u_y, v_y, shear_y, shear_u_y, shear_v_y, _u200, _v200 = _yearly[month]
+    idx = _month_pick_indices(month)
     u = np.stack([_to_env_grid(u_y[i], elat, elon) for i in idx])
     v = np.stack([_to_env_grid(v_y[i], elat, elon) for i in idx])
     s = np.stack([_to_env_grid(shear_y[i], elat, elon) for i in idx])

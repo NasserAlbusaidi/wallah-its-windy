@@ -11,9 +11,14 @@
 import { TOKENS } from '../tokens';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
 import { cloudNoiseBytes } from './cloud-noise';
-import { SST_MAX_C, SST_MIN_C } from './textures';
-import { makeProgram, makeQuadVao } from './gl-utils';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
+import { makeProgram, makeQuadVao } from './gl-utils';
+import {
+  CANOPY_COEFFICIENT_DIVISOR,
+  RENDER_RADIUS_FLOOR,
+  stormRenderRadii,
+} from './storm-radii';
+import { SST_MAX_C, SST_MIN_C } from './textures';
 
 const VS = /* glsl */ `#version 300 es
 in vec2 a_pos;
@@ -52,6 +57,7 @@ uniform int u_mode;
 uniform float u_hasStorm;
 uniform vec2 u_center;
 uniform float u_rMax;
+uniform float u_rCanopy;
 uniform float u_intensity;
 uniform float u_organization;
 uniform float u_ageH;
@@ -107,7 +113,9 @@ struct CloudField {
 CloudField sampleCloud(float land, float sstC) {
   vec2 cell = vec2(v_uv.x * 2.0 - 1.0, 1.0 - v_uv.y * 2.0);
   vec2 radial = vec2((cell.x - u_center.x) * u_metricX, cell.y - u_center.y);
-  float rMax = max(0.008, u_rMax);
+  float rMax = max(${RENDER_RADIUS_FLOOR}, u_rMax);
+  float rCanopy = max(${RENDER_RADIUS_FLOOR}, u_rCanopy);
+  // coreQ: eye and eyewall stay tied to the contracting inner core.
   float q = length(radial) / rMax;
 
   // The cold canopy drifts downshear while the eye and eyewall remain tied to
@@ -116,8 +124,12 @@ CloudField sampleCloud(float land, float sstC) {
     ? normalize(u_shearVector)
     : vec2(0.78, 0.62);
   float shearN = smoothstep(7.0, 27.0, u_shearAtStorm);
-  vec2 canopyRadial = radial - shearDir * rMax * shearN * 0.82;
-  float canopyQ = length(canopyRadial) / rMax;
+  vec2 canopyRadial = radial - shearDir * rCanopy * shearN *
+    (${0.82 / CANOPY_COEFFICIENT_DIVISOR});
+  // canopyQ drives the overcast and cirrus; bandQ keeps the rainbands on the
+  // inner core so they stay consistent with radar, rain and the impact ledger.
+  float canopyQ = length(canopyRadial) / rCanopy;
+  float bandQ = length(canopyRadial) / rMax;
   float azimuth = atan(canopyRadial.y, canopyRadial.x);
   float rotation = u_ageH * 0.028;
 
@@ -126,7 +138,7 @@ CloudField sampleCloud(float land, float sstC) {
   // than a second four-octave field.
   float seed = u_cloudSeed;
   float twist = 0.72 * log(1.0 + canopyQ) - rotation;
-  vec2 spiralSpace = rotate2(twist) * (canopyRadial / rMax);
+  vec2 spiralSpace = rotate2(twist) * (canopyRadial / rCanopy);
   vec2 drift = vec2(u_ageH * 0.012, -u_ageH * 0.007) + shearDir * u_ageH * 0.005;
   float macro = cloudNoise(spiralSpace * 0.62 + drift + seed * 11.0);
   float fine = u_cloudDetail > 0.5
@@ -147,7 +159,11 @@ CloudField sampleCloud(float land, float sstC) {
   float moisture = clamp((u_midlevelRh - 0.25) / 0.62, 0.0, 1.0);
   float rainEnergy = clamp((u_eyewallRain + 0.7 * u_rainbandRain) / 28.0, 0.0, 1.0);
   float development = clamp(0.56 * u_organization + 0.44 * u_intensity, 0.0, 1.0);
-  float coreRadius = mix(2.25, 3.55, development) * mix(1.0, 0.86, shearN);
+  float coreRadius = mix(
+    ${2.25 / CANOPY_COEFFICIENT_DIVISOR},
+    ${3.55 / CANOPY_COEFFICIENT_DIVISOR},
+    development
+  ) * mix(1.0, 0.86, shearN);
   // Incipient and sheared systems form a lopsided, ragged CDO rather than a
   // mathematically circular disc. Mature organization gradually suppresses
   // that radial perturbation without removing the underlying cloud texture.
@@ -160,15 +176,15 @@ CloudField sampleCloud(float land, float sstC) {
   float centralOvercast = exp(-pow(canopyQ / irregularCoreRadius, 2.0));
   float eyewall = exp(-pow((q - 1.0) / mix(0.46, 0.27, u_organization), 2.0));
   float outerBandRadius = mix(6.35, 8.8, smoothstep(0.30, 0.84, development));
-  float bandEnvelope = smoothstep(1.25, 1.85, canopyQ) *
-    (1.0 - smoothstep(outerBandRadius - 2.6, outerBandRadius, canopyQ));
+  float bandEnvelope = smoothstep(1.25, 1.85, bandQ) *
+    (1.0 - smoothstep(outerBandRadius - 2.6, outerBandRadius, bandQ));
   float bandPhase =
-    2.35 * azimuth - 1.52 * canopyQ + rotation + (macro - 0.5) * 4.6;
+    2.35 * azimuth - 1.52 * bandQ + rotation + (macro - 0.5) * 4.6;
   float primaryBand = smoothstep(0.18, 0.76, 0.5 + 0.5 * sin(bandPhase));
   float secondaryBand = smoothstep(
     0.30,
     0.82,
-    0.5 + 0.5 * sin(3.7 * azimuth - 0.88 * canopyQ - rotation * 0.5 + fine)
+    0.5 + 0.5 * sin(3.7 * azimuth - 0.88 * bandQ - rotation * 0.5 + fine)
   );
   float convectiveCells = smoothstep(0.36, 0.78, fine * 0.74 + macro * 0.34);
   float bandCoherence = smoothstep(0.42, 0.78, u_organization) *
@@ -189,7 +205,7 @@ CloudField sampleCloud(float land, float sstC) {
     mix(0.46, 1.0, convectiveCells) *
     mix(0.62, 1.0, development);
 
-  vec2 canopyDir = canopyQ > 0.001 ? canopyRadial / (canopyQ * rMax) : shearDir;
+  vec2 canopyDir = canopyQ > 0.001 ? canopyRadial / (canopyQ * rCanopy) : shearDir;
   float upshear = max(0.0, dot(canopyDir, -shearDir));
   float shearErosion = 1.0 - shearN * upshear * mix(0.28, 0.62, 1.0 - moisture);
   float cirrusTexture = smoothstep(
@@ -201,7 +217,10 @@ CloudField sampleCloud(float land, float sstC) {
            dot(spiralSpace, shearDir) * 0.011) + drift * 0.018
     ).b
   );
-  float cirrus = exp(-pow(canopyQ / 5.8, 1.55)) * cirrusTexture *
+  float cirrus = exp(-pow(
+    canopyQ / (${5.8 / CANOPY_COEFFICIENT_DIVISOR}),
+    1.55
+  )) * cirrusTexture *
     mix(0.16, 0.38, u_organization) * mix(0.82, 1.16, shearN);
 
   float eyeStrength = smoothstep(0.18, 0.56, u_intensity * u_organization) *
@@ -532,10 +551,11 @@ export class EnvLayer implements RenderModule {
       ctx.centerClip?.x ?? 0,
       ctx.centerClip?.y ?? 0,
     );
-    gl.uniform1f(
-      u('u_rMax'),
-      ctx.structure ? Math.max(0.008, ctx.structure.rmwKm / 666) : 0.04,
-    );
+    const renderRadii = ctx.structure
+      ? stormRenderRadii(ctx.structure)
+      : { rMax: 0.04, rCanopy: 0.18 };
+    gl.uniform1f(u('u_rMax'), renderRadii.rMax);
+    gl.uniform1f(u('u_rCanopy'), renderRadii.rCanopy);
     gl.uniform1f(u('u_intensity'), ctx.intensity01);
     gl.uniform1f(
       u('u_organization'),

@@ -29,6 +29,13 @@ describe('weather layer catalogue', () => {
     expect(WEATHER_LAYERS[WEATHER_LAYERS.length - 1].id).toBe('terrain');
   });
 
+  it('labels vector ventilation as diagnostic-only without hiding the shear field', () => {
+    const shear = weatherLayerDefinition('shear');
+    expect(shear.label).toContain('vector ventilation diagnostic only');
+    expect(shear.shortLabel).toBe('shear');
+    expect(shear.unit).toBe('m/s · 200–850 hPa');
+  });
+
   it('every layer carries an inline svg icon', () => {
     for (const layer of WEATHER_LAYERS) {
       expect(layer.iconSvg).toContain('<svg');

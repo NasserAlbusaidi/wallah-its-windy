@@ -498,27 +498,31 @@ async function dynamicStorm({
       { kind: 'event-timeline' },
     );
     if (!sampled) throw new Error(`${scenario.id}: ocean initialization failed`);
+    const eventSampleRaw = eventProfile
+      ? sampleEventOceanProfileBin(
+          eventOceanProfiles,
+          lat,
+          lon,
+          eventProfile.layerIndex,
+        )
+      : null;
+    const eventSample = eventSampleRaw && eventProfile
+      ? { ...eventSampleRaw, sourceValidTime: eventProfile.sourceMonth }
+      : null;
+    const climatologySample = sampleOceanProfileBin(
+      oceanProfiles,
+      lat,
+      lon,
+      scenario.monthIndex,
+    );
+    const selectedSample = eventSample ?? climatologySample;
     return {
       sstC: pixel?.backgroundSstC ?? sampled.sstC,
       ohcKjCm2: sampled.ohcKjCm2,
-      initializationTier: eventProfile ? 'event-analysis' : 'climatological-subsurface',
-      sourceValidTime: eventProfile?.sourceMonth ?? scenario.hindcast.startIso,
-      profile:
-        (eventProfile
-          ? sampleEventOceanProfileBin(
-              eventOceanProfiles,
-              lat,
-              lon,
-              eventProfile.layerIndex,
-            )
-          : null) ??
-        sampleOceanProfileBin(
-          oceanProfiles,
-          lat,
-          lon,
-          scenario.monthIndex,
-        ) ??
-        undefined,
+      // Every provenance field comes from the same branch that supplied data.
+      initializationTier: selectedSample?.tier ?? 'analytic-fallback',
+      sourceValidTime: selectedSample?.sourceValidTime,
+      profile: selectedSample?.profile,
     };
   });
 

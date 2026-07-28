@@ -8,21 +8,42 @@ import {
   type OceanProfile,
 } from './upper-ocean';
 
+/** A profile plus the provenance of whatever actually supplied it. */
+export interface OceanProfileSample {
+  profile: OceanProfile;
+  tier: 'event-analysis' | 'climatological-subsurface';
+  sourceValidTime?: string;
+}
+
+/**
+ * `null` means no profile was available. That is the ONLY state from which
+ * 'analytic-fallback' may be inferred — a bare profile carries no provenance,
+ * so the tier must travel with the data that justifies it.
+ */
 export type OceanProfileSampler = (
   lat: number,
   lon: number,
   monthIndex: number,
-) => OceanProfile | null;
+) => OceanProfileSample | null;
 
 export function sampleOceanProfileBin(
   bin: ParsedBin | null,
   lat: number,
   lon: number,
   monthIndex: number,
-): OceanProfile | null {
+): OceanProfileSample | null {
   if (!bin) return null;
   const suffix = envMonthSuffix(monthIndex);
-  return sampleProfileLayers(bin, `temp_${suffix}`, `salt_${suffix}`, lat, lon);
+  const profile = sampleProfileLayers(
+    bin,
+    `temp_${suffix}`,
+    `salt_${suffix}`,
+    lat,
+    lon,
+  );
+  return profile
+    ? { profile, tier: 'climatological-subsurface' }
+    : null;
 }
 
 export function sampleEventOceanProfileBin(
@@ -30,12 +51,19 @@ export function sampleEventOceanProfileBin(
   lat: number,
   lon: number,
   layerIndex: number,
-): OceanProfile | null {
+): OceanProfileSample | null {
   if (!bin || !Number.isInteger(layerIndex) || layerIndex < 0 || layerIndex > 999) {
     return null;
   }
   const suffix = layerIndex.toString().padStart(3, '0');
-  return sampleProfileLayers(bin, `t${suffix}`, `s${suffix}`, lat, lon);
+  const profile = sampleProfileLayers(
+    bin,
+    `t${suffix}`,
+    `s${suffix}`,
+    lat,
+    lon,
+  );
+  return profile ? { profile, tier: 'event-analysis' } : null;
 }
 
 function sampleProfileLayers(

@@ -20,7 +20,7 @@ self-describing `.bin` assets the browser loads.
 - HF-6 checks: `npm run hf6:verify:check`, `hf6:gate:check`,
   `hf6:prospective:check`, `data:hf6:catalog:check` — sealed-cohort
   verification; must pass untouched after any model change.
-- CI deploy gate (`.github/workflows/deploy.yml`, Node 22): `npm ci`,
+- CI deploy gate (`.github/workflows/deploy.yml`, Node 24.18.0): `npm ci`,
   `npm test`, `npm run calibrate:check`, the three HF-6 checks, then
   `npm run build`. Breaking any of these blocks the GitHub Pages deploy.
 - Runtime `.ts` reaches the offline scripts two ways: most `calibration/*.mjs`
@@ -65,6 +65,15 @@ self-describing `.bin` assets the browser loads.
   / `RESULT_DECIMAL_PLACES` in `calibration/fidelity.mjs`) so ARM64 vs x86_64
   libm differences cannot desync sealed results; any new number written to the
   fidelity results/reference must pass through it.
+- `src/rainband-profile.ts` is the ONE rainband spatial contract for the three
+  RAIN products (`render/radar.ts`, `render/rain.ts`, `impact.ts`).
+  `render/env.ts` is deliberately NOT a consumer — its band is cloud
+  morphology, not a rain product. The mean is internally consistent, NOT
+  validated against observed rainfall.
+- `rCanopy` in `src/render/storm-radii.ts` has NO `rMax` floor, deliberately.
+  Because `structure.ts` clamps `rmwKm` to [12,95] and `outerSizeKm` to
+  [60,420], such a floor binds for broad weak storms and re-couples the canopy
+  to the contracting core — the exact bug it appears to prevent.
 
 ## Binary data pipeline
 
@@ -77,6 +86,11 @@ self-describing `.bin` assets the browser loads.
   work.
 - Dims, bbox, and quantization come from file headers — the runtime hardcodes
   no grid geometry. Do not add a second parser or inline byte offsets.
+- `public/data/upper.bin`'s planes must carry the same picked real years as
+  `env.bin`'s (plane k = same year, both files). `bake/bake_upper_winds.py`
+  enforces this by reconstructing env.bin's year-picked layers byte-for-byte
+  before writing; if that gate fails, STOP — never rebake env.bin to satisfy
+  it. `upper.json` is the persisted plane→year record.
 
 ## Design tokens
 

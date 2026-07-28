@@ -23,17 +23,25 @@
 
 import { DOMAIN, greatCircleKm } from './grid';
 import { latLonToCell, cellToLatLon } from './grid';
-import { hollandWindSpeedKt } from './structure';
 import {
-  SIMULATED_WIND_CONVENTION,
-  northIndianOceanClassification,
-} from './wind-conventions';
-import type { BinLayer, LatLon, RainAccumView, StormState } from './types';
+  EYEWALL_WIDTH_Q,
+  RAINBAND_AZIMUTHAL_MEAN,
+  RAINBAND_INNER_FULL_Q,
+  RAINBAND_INNER_Q,
+  RAINBAND_OUTER_FADE_Q,
+  RAINBAND_OUTER_Q,
+} from './rainband-profile';
 import {
   DEFAULT_RAIN_ACCUMULATION_WINDOW,
   rainAccumulationDefinition,
   type RainAccumulationWindow,
 } from './rain-accumulation';
+import { hollandWindSpeedKt } from './structure';
+import type { BinLayer, LatLon, RainAccumView, StormState } from './types';
+import {
+  SIMULATED_WIND_CONVENTION,
+  northIndianOceanClassification,
+} from './wind-conventions';
 
 /** Grid resolution: 0.1° (~11 km) — impact bookkeeping, not a weather model. */
 const GRID_NX = 200;
@@ -41,10 +49,6 @@ const GRID_NY = 120;
 /** The simulation's fixed 15-minute rain-ledger cadence. */
 const HISTORY_STEP_H = 0.25;
 const HISTORY_CAPACITY = 24 / HISTORY_STEP_H;
-
-/** Rainband spatial envelope bounds in RMW multiples (mirror of rain.ts). */
-const BAND_INNER_Q = 1.45;
-const BAND_OUTER_Q = 8;
 
 /** Coastal cities a storm in this domain can matter to. */
 export interface ImpactCity extends LatLon {
@@ -221,7 +225,7 @@ export class ImpactTracker {
       s.rainOffsetEastKm /
         (111 * Math.max(0.2, Math.cos((storm.lat * Math.PI) / 180)));
     const rmwKm = Math.max(8, s.rmwKm);
-    const outerKm = Math.min(500, rmwKm * BAND_OUTER_Q);
+    const outerKm = Math.min(500, rmwKm * RAINBAND_OUTER_Q);
 
     // Cell footprint in grid units around the rain centre.
     const kmPerRow = ((DOMAIN.latMax - DOMAIN.latMin) * 111) / this.ny;
@@ -246,16 +250,18 @@ export class ImpactTracker {
           const dxKm = (col - centre.col) * kmPerCol;
           const radiusKm = Math.hypot(dxKm, dyKm);
           const q = radiusKm / rmwKm;
-          const eyewall = Math.exp(-(((q - 1) / 0.38) ** 2));
+          const eyewall = Math.exp(-(((q - 1) / EYEWALL_WIDTH_Q) ** 2));
           const bandEnvelope =
-            smoothstep(BAND_INNER_Q, 2.0, q) *
-            (1 - smoothstep(6.0, BAND_OUTER_Q, q));
-          // Azimuthal mean of the shader's 0.68+0.32·sin spiral is 0.68.
+            smoothstep(RAINBAND_INNER_Q, RAINBAND_INNER_FULL_Q, q) *
+            (1 -
+              smoothstep(RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, q));
           const index = row * this.nx + col;
           const onLand = this.land[index] === 1;
           const rateMmH =
             d.eyewallRainMmH * eyewall +
-            d.rainbandRainMmH * bandEnvelope * 0.68 +
+            d.rainbandRainMmH *
+              bandEnvelope *
+              RAINBAND_AZIMUTHAL_MEAN +
             (onLand ? d.orographicRainMmH * bandEnvelope : 0);
           if (rateMmH <= 0.01) continue;
           const deposited = rateMmH * dtH;

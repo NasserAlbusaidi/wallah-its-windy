@@ -7,7 +7,7 @@ Prereqs (one-time, human):
   2. Accept the "Licence to use Copernicus Products" once on either ERA5 dataset
      page (the API errors with the licence URL if not accepted).
 
-Run: bake/.venv/bin/python bake/fetch_era5.py
+Run: node bake/run-python.mjs -u bake/fetch_era5.py [target-filename ...]
 CDS queues can take minutes to hours; the script blocks per request until each
 file lands in data/raw/. Re-running skips files that already exist.
 
@@ -27,8 +27,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-
-import cdsapi
 
 RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
 AREA = [27, 50, 15, 70]  # N, W, S, E
@@ -181,11 +179,31 @@ SHAHEEN_DAYS = {
 }
 
 
-def main() -> int:
+def select_requests(
+    requests: list[tuple[str, str, dict]], names: list[str]
+) -> list[tuple[str, str, dict]]:
+    """Filter requests to target filenames, preserving request-list order."""
+    if not names:
+        return list(requests)
+    known = {filename for filename, _dataset, _spec in requests}
+    unknown = sorted(set(names) - known)
+    if unknown:
+        raise SystemExit(
+            f"unknown request file(s): {', '.join(unknown)}; have {sorted(known)}"
+        )
+    wanted = set(names)
+    return [request for request in requests if request[0] in wanted]
+
+
+def main(names: list[str]) -> int:
+    selected = select_requests(REQUESTS, names)
+
+    import cdsapi
+
     RAW.mkdir(parents=True, exist_ok=True)
     client = cdsapi.Client()
     failures = 0
-    for filename, dataset, spec in REQUESTS:
+    for filename, dataset, spec in selected:
         target = RAW / filename
         if target.exists() and target.stat().st_size > 0:
             print(f"[skip] {filename} already present ({target.stat().st_size / 1e6:.1f} MB)")
@@ -226,4 +244,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

@@ -1,8 +1,20 @@
 /** Reflectivity-style display of the simulated eyewall and spiral rainbands. */
 
+import {
+  EYEWALL_WIDTH_Q,
+  RAINBAND_AZIMUTHAL_MEAN,
+  RAINBAND_INNER_FULL_Q,
+  RAINBAND_INNER_Q,
+  RAINBAND_OUTER_FADE_Q,
+  RAINBAND_OUTER_Q,
+  RAINBAND_SPIRAL_AMPLITUDE,
+  RAINBAND_SPIRAL_ARMS,
+  RAINBAND_SPIRAL_PITCH,
+  RAINBAND_SPIRAL_ROTATION_PER_H,
+} from '../rainband-profile';
 import { TOKENS } from '../tokens';
-import { makeProgram, makeQuadVao } from './gl-utils';
 import type { DrawCtx, RenderModule } from './context';
+import { makeProgram, makeQuadVao } from './gl-utils';
 
 const VS = /* glsl */ `#version 300 es
 in vec2 a_pos;
@@ -46,13 +58,20 @@ void main() {
     cell.y - u_center.y
   );
   float q = length(radial) / max(0.008, u_rMax);
-  float eyewall = exp(-pow((q - 1.0) / 0.34, 2.0));
+  float eyewall = exp(-pow((q - 1.0) / ${EYEWALL_WIDTH_Q}, 2.0));
   float envelope =
-    smoothstep(1.4, 2.0, q) * (1.0 - smoothstep(6.0, 8.0, q));
+    smoothstep(${RAINBAND_INNER_Q}, ${RAINBAND_INNER_FULL_Q.toFixed(1)}, q) *
+    (1.0 - smoothstep(
+      ${RAINBAND_OUTER_FADE_Q.toFixed(1)},
+      ${RAINBAND_OUTER_Q.toFixed(1)},
+      q
+    ));
   float azimuth = atan(radial.y, radial.x);
-  float spiral = max(0.08, 0.54 + 0.46 * sin(
-    3.0 * azimuth - 1.35 * q + u_ageH * 0.035
-  ));
+  float spiral = ${RAINBAND_AZIMUTHAL_MEAN} + ${RAINBAND_SPIRAL_AMPLITUDE} * sin(
+    ${RAINBAND_SPIRAL_ARMS.toFixed(1)} * azimuth -
+      ${RAINBAND_SPIRAL_PITCH} * q +
+      u_ageH * ${RAINBAND_SPIRAL_ROTATION_PER_H}
+  );
   float rainRate = u_eyeRate * eyewall + u_bandRate * envelope * spiral;
   // Marshall–Palmer-style reflectivity proxy: Z=200 R^1.6, rendered in dBZ.
   float dbz = rainRate > 0.01

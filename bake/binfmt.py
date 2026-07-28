@@ -135,10 +135,8 @@ class ParsedLayer:
     data: np.ndarray  # dequantized float32
 
 
-def parse_bin(blob: bytes) -> dict[str, ParsedLayer]:
-    """Reference parser mirroring src/loader.ts parseBin. Dequantizes every layer
-    to float32 via value = raw*scale + offset. Raises on bad magic/version so the
-    roundtrip assert catches any writer drift loudly."""
+def _iter_records(blob: bytes):
+    """Yield each layer record's fields; shared by parse_bin/parse_bin_raw."""
     if len(blob) < HEADER_PREFIX_BYTES:
         raise ValueError("blob too small for header")
     if blob[0:4] != MAGIC:
@@ -146,28 +144,100 @@ def parse_bin(blob: bytes) -> dict[str, ParsedLayer]:
     version, layer_count, _reserved = struct.unpack_from("<BBH", blob, 4)
     if version != VERSION:
         raise ValueError(f"unsupported version {version}, expected {VERSION}")
-
-    out: dict[str, ParsedLayer] = {}
+    if HEADER_PREFIX_BYTES + LAYER_RECORD_BYTES * layer_count > len(blob):
+        raise ValueError(
+            f"record table for {layer_count} layers runs past end of file"
+        )
     at = HEADER_PREFIX_BYTES
     for _ in range(layer_count):
         name = blob[at : at + 8].split(b"\x00", 1)[0].decode("ascii")
         dtype, quant, _r = struct.unpack_from("<BBH", blob, at + 8)
+        if dtype not in _CODE_ELEM_BYTES:
+            raise ValueError(f"{name}: unsupported dtype code {dtype}")
+        if quant not in (0, 1):
+            raise ValueError(f"{name}: invalid quant flag {quant}, expected 0 or 1")
         nx, ny, nt = struct.unpack_from("<III", blob, at + 12)
-        lon_min, lon_max, lat_min, lat_max = struct.unpack_from("<dddd", blob, at + 24)
+        bbox = struct.unpack_from("<dddd", blob, at + 24)
         scale, offset = struct.unpack_from("<dd", blob, at + 56)
         byte_off, byte_len = struct.unpack_from("<QQ", blob, at + 72)
+        yield (
+            name, dtype, quant, nx, ny, nt, bbox, scale, offset,
+            byte_off, byte_len,
+        )
+        at += LAYER_RECORD_BYTES
+
+
+@dataclass
+class RawLayer:
+    name: str
+    dtype: int
+    quantized: bool
+    nx: int
+    ny: int
+    nt: int
+    bbox: tuple[float, float, float, float]
+    scale: float
+    offset: float
+    payload: bytes  # exact stored bytes, never dequantized
+
+
+def parse_bin_raw(blob: bytes) -> dict[str, RawLayer]:
+    """Records + UNDECODED payload bytes, for byte-level alignment gates
+    (bake_upper_winds.py). parse_bin dequantizes to float32 and is lossy for
+    byte comparison; this accessor exists so no other module re-walks the
+    header layout."""
+    out: dict[str, RawLayer] = {}
+    for (
+        name, dtype, quant, nx, ny, nt, bbox, scale, offset, off, length
+    ) in _iter_records(blob):
+        expect = nx * ny * nt * _CODE_ELEM_BYTES[dtype]
+        if length != expect:
+            raise ValueError(f"{name}: byteLength {length} != {expect}")
+        if off + length > len(blob):
+            raise ValueError(
+                f"{name}: data [{off},{off + length}) runs past end of file"
+            )
+        if name in out:
+            raise ValueError(f"duplicate layer name {name!r}")
+        out[name] = RawLayer(
+            name, dtype, bool(quant), nx, ny, nt, bbox, scale, offset,
+            blob[off : off + length],
+        )
+    return out
+
+
+def quantize_int16(a: np.ndarray, scale: float, offset: float) -> np.ndarray:
+    """The int16 quantization contract (inverse of value = raw*scale + offset).
+    Extracted from bake.py's build_env closure so every bake — env.bin and the
+    sidecars verified against it — quantizes with the same expression."""
+    raw = np.round((a - offset) / scale)
+    return np.clip(raw, -32768, 32767).astype(np.int16).ravel(order="C")
+
+
+def parse_bin(blob: bytes) -> dict[str, ParsedLayer]:
+    """Reference parser mirroring src/loader.ts parseBin. Dequantizes every layer
+    to float32 via value = raw*scale + offset. Raises on bad magic/version so the
+    roundtrip assert catches any writer drift loudly."""
+    out: dict[str, ParsedLayer] = {}
+    for (
+        name, dtype, quant, nx, ny, nt, bbox, scale, offset, byte_off, byte_len
+    ) in _iter_records(blob):
 
         count = nx * ny * nt
         expect = count * _CODE_ELEM_BYTES[dtype]
         if byte_len != expect:
             raise ValueError(f"{name}: byteLength {byte_len} != {expect}")
+        if byte_off + byte_len > len(blob):
+            raise ValueError(
+                f"{name}: data [{byte_off},{byte_off + byte_len}) "
+                "runs past end of file"
+            )
         raw = np.frombuffer(blob, dtype=_CODE_TO_NP[dtype], count=count, offset=byte_off)
         data = raw.astype(np.float32) * np.float32(scale) + np.float32(offset)
         out[name] = ParsedLayer(
             name, dtype, bool(quant), nx, ny, nt,
-            (lon_min, lon_max, lat_min, lat_max), scale, offset, data,
+            bbox, scale, offset, data,
         )
-        at += LAYER_RECORD_BYTES
     return out
 
 

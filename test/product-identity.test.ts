@@ -4,7 +4,37 @@ import {
   modelValidTimeIso,
   productMode,
   requiresObservationAcknowledgement,
+  type ProductIdentityInput,
 } from '../src/product-identity';
+
+const BASE: ProductIdentityInput = {
+  runMode: 'hindcast',
+  ageH: 12,
+  scenarioLabel: null,
+  scenarioStartIso: null,
+  hindcastStartIso: '2007-06-01T00:00:00Z',
+  observation: null,
+};
+
+describe('degraded input reporting', () => {
+  it('names the degraded subsurface when the ocean profile is absent', () => {
+    const identity = buildProductIdentity({
+      ...BASE,
+      oceanMissingSourceFlag: true,
+    });
+    expect(identity.degradedInputs).toContain(
+      'subsurface ocean: analytic fallback',
+    );
+  });
+
+  it('reports no degraded inputs when every source is present', () => {
+    const identity = buildProductIdentity({
+      ...BASE,
+      oceanMissingSourceFlag: false,
+    });
+    expect(identity.degradedInputs).toEqual([]);
+  });
+});
 
 describe('product identity and valid-time boundary', () => {
   it('never assigns a UTC valid time to a climatology sandbox', () => {

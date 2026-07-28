@@ -1025,20 +1025,22 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     rising = false;
     prevOverLand = isLand(lat, lon);
     const initialTFrac = clamp01(tFracOffsetH / tFracHorizonH);
-    const samplingMode = (
-      env as EnvSampler & { getSamplingMode?: () => { kind: string } }
-    ).getSamplingMode?.();
     upperOcean.reset((oceanLat, oceanLon) => {
       const sample = sampleEnv(oceanLat, oceanLon, initialTFrac);
+      // Sample FIRST, then derive provenance from what came back. Assigning the
+      // tier before the sampler returns is how a missing ocean.bin used to be
+      // labelled as WOA23 climatology.
+      const profileSample = deps.oceanProfileSampler?.(
+        oceanLat,
+        oceanLon,
+        monthIndex,
+      );
       return {
         sstC: sample.sstC,
         ohcKjCm2: sample.ohcKjCm2,
-        initializationTier:
-          samplingMode?.kind === 'event-timeline'
-            ? 'event-analysis'
-            : 'climatological-subsurface',
-        profile:
-          deps.oceanProfileSampler?.(oceanLat, oceanLon, monthIndex) ?? undefined,
+        initializationTier: profileSample?.tier ?? 'analytic-fallback',
+        sourceValidTime: profileSample?.sourceValidTime,
+        profile: profileSample?.profile,
       };
     });
     const initialEnv = sampleEnv(lat, lon, initialTFrac);

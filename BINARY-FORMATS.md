@@ -6,15 +6,15 @@ quantization scale is read from the file header. A version byte lets a stale
 cached file be **rejected loudly** instead of rendering as garbage.
 
 - Writer: `bake/binfmt.py` (`write_bin`), called by `bake/bake.py` and the
-  sibling bake scripts (`bake_ocean_profiles.py`, `bake_event_ocean_profiles.py`,
-  and — via `era5_event.py` — `bake_hf3_steering.py`,
+  sibling bake scripts (`bake_upper_winds.py`, `bake_ocean_profiles.py`,
+  `bake_event_ocean_profiles.py`, and — via `era5_event.py` — `bake_hf3_steering.py`,
   `bake_fidelity_benchmark.py`, `bake_hf6_benchmark.py`). None ship to the
   browser.
 - Reader: `src/loader.ts` (`parseBin`). This is the only reader; do not parse
   these bytes anywhere else.
 - Tiny, human-inspectable assets ship as JSON instead of binary: `genesis.json`,
-  `scenarios.json`, `tracks.json`, `ocean.json`, the satellite manifest. See the
-  end.
+  `scenarios.json`, `tracks.json`, `ocean.json`, `upper.json`, the satellite
+  manifest. See the end.
 
 All multi-byte fields are **little-endian**.
 
@@ -283,6 +283,29 @@ mutate the frozen HF-1/HF-2 env bins. The full 30-storm set lives under
 catalogue events get byte-identical copies at `public/data/steering_<event>.bin`,
 which the runtime locates by replacing `env_` with `steering_` in the scenario's
 bin path.
+
+---
+
+## `upper.bin` upper-level wind sidecar + `upper.json`
+
+`bake/bake_upper_winds.py` bakes the absolute 200-hPa wind the climatology
+fetch always downloaded but env.bin discarded (only `V200 − V850` survived):
+layers `u200_MM` / `v200_MM` for each season month (`04`..`10`), int16 quant
+scale 0.01 offset 0, on the 40×24 env grid. **`nt` is mode-1 synoptic
+samples** — plane k is the same picked real year as env.bin's `u_MM`/`v_MM`
+plane k. That alignment is not assumed: the bake refuses to write unless every
+year-picked env.bin layer (`u/v/shr/shu/shv/rh` × 7 months) reconstructs
+byte-identically from the current raw ERA5 files, and `upper.json` persists
+the per-month plane→year map plus the sha256 of the env.bin it was proven
+against (`alignment.envBinSha256`, cross-checked to
+`calibration/asset-manifest.json` by `test/integration-bins.test.ts`).
+Separate bytes on purpose: `env.bin` is frozen by the URL-replay contract and
+`bake.py` has no append mode. `npm run data:upper` bakes;
+`npm run data:upper:check` verifies the committed bytes reproduce. No runtime
+consumer reads it yet (C1 ships data + contract only; C2-class work consumes
+it) — when one arrives it must parse via `src/loader.ts` and gets
+integration-test coverage for the month-suffixed names, like every other
+layer.
 
 ---
 

@@ -103,6 +103,15 @@ describe('ImpactTracker', () => {
     expect(karachi.rainMm).toBe(0);
   });
 
+  it('deposits an unchanged rain total after the constant extraction', () => {
+    const tracker = new ImpactTracker();
+    const stationary = storm(22, 60, 80);
+    for (let i = 0; i < 24; i++) tracker.record(stationary, 0.25);
+    const total = tracker.rainView().mm.reduce((sum, mm) => sum + mm, 0);
+    // Pinned before extracting the shared constants; this value must not move.
+    expect(total).toBeCloseTo(41814.37573713064, 9);
+  });
+
   it('is deterministic: identical tick sequences give identical summaries', () => {
     const run = () => {
       const tracker = new ImpactTracker();

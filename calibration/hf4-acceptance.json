@@ -6,7 +6,7 @@
   "decision": "Rejected without changing thresholds: the cone is overdispersed, 48 h mean Brier skill is negative, and the device matrix is incomplete. Keep perturbation-frequency labeling.",
   "manifests": {
     "contractSha256": "4ab3147410f2e6158ef597cf0608a45a05149fa528f6733a79d67c88eb74d58b",
-    "verificationSha256": "5f8c70ea8179daa8ff2f10cec33610e8d93b1d4d610bcc111b38351ac37998fd",
+    "verificationSha256": "c1054ea69f0e18bc1d0653e0a25db69ff5d3a2029cc4a09f1d4833ff07c330e8",
     "performanceSha256": "f0408f71dfa71ca5f10504e6b32592f75cab0aadc1b97613f56c13b116d3a9a6"
   },
   "checks": [
@@ -104,7 +104,7 @@
       "pass": true,
       "actual": {
         "12": 16.825968216,
-        "24": 23.860182716,
+        "24": 23.860182715,
         "48": 25.999428369,
         "72": 20.074339588
       }

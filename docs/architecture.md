@@ -111,7 +111,8 @@ Notes verified in code:
 | `rng.ts` | Seeded determinism + the shareable-storm URL hash. Never `Math.random()` in sim code. | `mulberry32`, `makeRng`, `randomSeed`, `readHash`/`encodeHash`/`writeHash` |
 | `category.ts` | Secondary Saffir–Simpson comparison palette for legacy diagnostics and track colours. | `CATEGORIES`, `stormCategory`, `categoryRgba`, `intensityFraction` |
 | `wind-conventions.ts` | North Indian Ocean regional classes plus explicit simulator wind averaging, height, exposure, measure, source, and conversion metadata. | `SIMULATED_WIND_CONVENTION`, `NORTH_INDIAN_OCEAN_CATEGORIES`, `northIndianOceanClassification` |
-| `product-identity.ts` | Pure product-mode, model-valid-time, and observation-sync boundary used by the permanent UI identity. | `buildProductIdentity`, `modelValidTimeIso`, `requiresObservationAcknowledgement` |
+| `product-identity.ts` | Pure product-mode, model-valid-time, observation-sync, and degraded-input boundary used by the permanent UI identity. | `buildProductIdentity`, `modelValidTimeIso`, `requiresObservationAcknowledgement` |
+| `rainband-profile.ts` | The one spatial contract for the three rain products: simulated radar, land/wadi rain rendering, and the impact ledger. Its 0.68 mean is an internal-consistency value, not observational validation. | `rainbandSpiral`, `RAINBAND_AZIMUTHAL_MEAN`, envelope/spiral constants |
 | `tokens.ts` | The ONE design-token source: map palette + windy-grade chrome tokens (panel glass, radii, typography colours) mirrored as CSS custom properties and normalized Float32 shader uniforms. | `TOKENS`, `uniform`, `injectCssVars`, `SPACING_UNIT`, `RADIUS`, `PANEL_GLASS` |
 
 ### src/ — data loading and sampling
@@ -121,7 +122,7 @@ Notes verified in code:
 | `loader.ts` | Parser for the self-describing WIWB `.bin` format; the ONLY reader. Validates magic + version loudly, dequantizes to Float32. | `parseBin`, `layerGridSpec`, `FORMAT_MAGIC`, `FORMAT_VERSION` |
 | `raster-sampler.ts` | Bilinear CPU sampling of one decoded raster plane, clamped to edges. | `sampleLayerBilinear` |
 | `env-sampler.ts` | Builds the `EnvSampler` the sim runs on: prefers baked `env.bin`, falls back to analytic climatology on 404. Owns synoptic-plane vs event-timeline selection. | `makeEnvSampler`, `sampleEnvBin`, `envMonthSuffix`, `synopticCount` |
-| `ocean-profile-sampler.ts` | Bilinear reader for the WOA23 temperature/salinity profile bin (`ocean.bin` and event ocean bins). | `sampleOceanProfileBin`, `sampleEventOceanProfileBin` |
+| `ocean-profile-sampler.ts` | Bilinear reader for the WOA23 temperature/salinity profile bin (`ocean.bin` and event ocean bins); returns the profile and the provenance tier as one tagged sample or `null`. | `OceanProfileSample`, `sampleOceanProfileBin`, `sampleEventOceanProfileBin` |
 
 ### src/ — physics core
 
@@ -209,6 +210,7 @@ Notes verified in code:
 | `context.ts` | Internal seam: the facade derives a richer `DrawCtx` (interpolated centre in clip space, env at storm, aftermath fade, texture bundle) once per frame for the layer modules. Not exported to other builders. | `DrawCtx`, `GpuTextures`, `RenderModule`, `EnvAtStorm` |
 | `gl-utils.ts` | Thin WebGL2 helpers: program compile/link with loud errors, fullscreen quad VAO, render targets with half-float → UNSIGNED_BYTE fallback. | `makeProgram`, `makeQuadVao`, `makeRenderTarget`, `probeCaps` |
 | `textures.ts` | Turns decoded `BinLayer`s into R8/R16F GPU textures; resolves layer names via candidate lists; plane interpolation helpers. | `buildElevationTex`, `buildR8Tex`, `pickLayer`, `planeOf`, `environmentPlaneInterpolation`, `SST_MIN_C`/`SST_MAX_C` |
+| `storm-radii.ts` | Derives separate render scales from storm structure: inner-core `rMax` from RMW and cloud-canopy `rCanopy` from outer size alone. Consumed by the simulated-infrared environment pass. | `stormRenderRadii`, `StormRenderRadii`, `RENDER_RADIUS_FLOOR` |
 | `terrain.ts` | Opaque instrument base: hillshaded land + ocean depth tint, fullscreen pass, all colours token uniforms. | `TerrainLayer` |
 | `env.ts` | GPU weather-map pass: SST glow, scalar env modes, simulated infrared (explicitly a proxy, not satellite data), rain-mode base darkening. Mode/palette tables per `WeatherLayerId`. | `EnvLayer` |
 | `satellite.ts` | Observed satellite image pass; pixels stay isolated from model physics. | `ObservedSatelliteLayer` |

@@ -20,7 +20,7 @@ self-describing `.bin` assets the browser loads.
 - HF-6 checks: `npm run hf6:verify:check`, `hf6:gate:check`,
   `hf6:prospective:check`, `data:hf6:catalog:check` — sealed-cohort
   verification; must pass untouched after any model change.
-- CI deploy gate (`.github/workflows/deploy.yml`, Node 22): `npm ci`,
+- CI deploy gate (`.github/workflows/deploy.yml`, Node 24.18.0): `npm ci`,
   `npm test`, `npm run calibrate:check`, the three HF-6 checks, then
   `npm run build`. Breaking any of these blocks the GitHub Pages deploy.
 - Runtime `.ts` reaches the offline scripts two ways: most `calibration/*.mjs`

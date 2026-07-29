@@ -13,8 +13,9 @@
  * and the target composites to screen with additive blending. Everything here
  * is decorative — no physics reads it; the RNG is a fixed private seed.
  *
- * prefers-reduced-motion never draws this layer (the facade gates it); the
- * wind-speed fill in env.ts still communicates the field without motion.
+ * prefers-reduced-motion is gated here in the module; the wind-speed fill in
+ * env.ts still communicates either field without motion. The parameterized upper
+ * path advects through upperAt only and never superposes the Holland vortex.
  */
 
 import { TOKENS } from '../tokens';
@@ -144,8 +145,12 @@ export class WindLayer implements RenderModule {
   private life = new Float32Array(this.count);
   /** Two line vertices per particle: (x, y, speed01, alpha) each. */
   private verts = new Float32Array(this.count * 8);
-  private rng: Rng = makeRng(0x7717d);
+  private rng: Rng;
   private seeded = false;
+
+  constructor(private readonly fieldKind: 'surface' | 'upper' = 'surface') {
+    this.rng = makeRng(fieldKind === 'upper' ? 0x2007717 : 0x7717d);
+  }
 
   setBudget(stormParticleBudget: number): void {
     // Scale with the device profile's storm-swarm budget, bounded sanely.
@@ -221,6 +226,11 @@ export class WindLayer implements RenderModule {
     y: number,
     ctx: DrawCtx,
   ): { u: number; v: number } {
+    if (this.fieldKind === 'upper') {
+      if (!ctx.upperAt) return { u: 0, v: 0 };
+      const { lat, lon } = clipToLatLon(x, y, DOMAIN);
+      return ctx.upperAt(lat, lon);
+    }
     let u = 0;
     let v = 0;
     if (ctx.steeringAt) {
@@ -264,7 +274,12 @@ export class WindLayer implements RenderModule {
 
   draw(ctx: DrawCtx): void {
     const gl = this.gl;
-    if (!this.lineProg || !this.trails || ctx.reduced) return;
+    if (
+      !this.lineProg ||
+      !this.trails ||
+      ctx.reduced ||
+      (this.fieldKind === 'upper' && !ctx.upperAt)
+    ) return;
     if (!this.seeded) this.seedAll();
     const dt = Math.max(0.001, ctx.dtSec);
 

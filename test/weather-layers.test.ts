@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_WEATHER_LAYER,
+  digitHintForLayerIndex,
   isWeatherLayerId,
+  layerIndexForDigitCode,
   WEATHER_LAYERS,
   weatherLayerDefinition,
 } from '../src/weather-layers';
 
 describe('weather layer catalogue', () => {
-  it('ships nine unique operational views with honest provenance labels', () => {
-    expect(WEATHER_LAYERS).toHaveLength(9);
-    expect(new Set(WEATHER_LAYERS.map(({ id }) => id)).size).toBe(9);
+  it('ships ten unique operational views with honest provenance labels', () => {
+    expect(WEATHER_LAYERS).toHaveLength(10);
+    expect(new Set(WEATHER_LAYERS.map(({ id }) => id)).size).toBe(10);
     expect(weatherLayerDefinition('infrared').simulated).toBe(true);
     expect(weatherLayerDefinition('rain').simulated).toBe(true);
     // The wind view mixes real steering with the parametric vortex, and the
@@ -23,10 +25,31 @@ describe('weather layer catalogue', () => {
     }
   });
 
-  it('opens on the wind view and keys 1-9 stay in catalogue order', () => {
+  it('opens on the wind view and keys 1-0 stay in catalogue order', () => {
     expect(DEFAULT_WEATHER_LAYER).toBe('wind');
     expect(WEATHER_LAYERS[0].id).toBe('wind');
     expect(WEATHER_LAYERS[WEATHER_LAYERS.length - 1].id).toBe('terrain');
+  });
+
+  it('places the honest ERA5 upper-wind product between shear and terrain', () => {
+    const ids = WEATHER_LAYERS.map(({ id }) => id);
+    expect(ids.slice(-3)).toEqual(['shear', 'upper', 'terrain']);
+    expect(weatherLayerDefinition('upper')).toMatchObject({
+      label: '200-hPa upper winds · ERA5 climatology sample',
+      unit: 'm/s · 200 hPa · ERA5',
+      simulated: false,
+    });
+  });
+
+  it('maps Digit9 to upper, Digit0 to terrain, and emits matching hints', () => {
+    expect(WEATHER_LAYERS[layerIndexForDigitCode('Digit9')!].id).toBe('upper');
+    expect(WEATHER_LAYERS[layerIndexForDigitCode('Digit0')!].id).toBe('terrain');
+    expect(layerIndexForDigitCode('DigitA')).toBeNull();
+    expect(layerIndexForDigitCode('Numpad0')).toBeNull();
+    expect(digitHintForLayerIndex(9)).toBe('0');
+    for (let index = 0; index < 9; index += 1) {
+      expect(digitHintForLayerIndex(index)).toBe(String(index + 1));
+    }
   });
 
   it('labels vector ventilation as diagnostic-only without hiding the shear field', () => {

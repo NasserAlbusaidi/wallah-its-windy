@@ -3,6 +3,7 @@ import {
   environmentPlaneInterpolation,
   hasTimedFlowRouting,
   normalizeLoggedFlowAccumulation,
+  upperWindTexturePlane,
 } from '../src/render/textures';
 import { DType } from '../src/types';
 import type { BinLayer } from '../src/types';
@@ -39,6 +40,15 @@ describe('flow-accumulation texture contract', () => {
     expect(hasTimedFlowRouting(emptyDirections, emptyTravel)).toBe(false);
     expect(hasTimedFlowRouting(directions, emptyTravel)).toBe(false);
     expect(hasTimedFlowRouting(null, travel)).toBe(false);
+  });
+
+  it('uploads upper-wind textures from the frame synoptic plane only', () => {
+    expect(
+      upperWindTexturePlane(4, { kind: 'synoptic-plane', plane: 2 }),
+    ).toBe(2);
+    expect(
+      upperWindTexturePlane(4, { kind: 'event-timeline' }),
+    ).toBeNull();
   });
 });
 

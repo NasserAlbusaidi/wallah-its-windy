@@ -652,6 +652,10 @@ dd,
     color 140ms ease,
     background-color 140ms ease;
 }
+.layer-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 .layer-button svg {
   width: 15px;
   height: 15px;
@@ -774,6 +778,7 @@ dd,
     var(--radar-5)
   );
 }
+#weather-legend[data-layer='upper'] .weather-scale,
 #weather-legend[data-layer='wind'] .weather-scale {
   background: linear-gradient(
     90deg,

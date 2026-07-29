@@ -27,10 +27,19 @@ describe('degraded input reporting', () => {
     );
   });
 
+  it('names unavailable upper winds as a degraded climatology input', () => {
+    const identity = buildProductIdentity({
+      ...BASE,
+      upperWindMissingSourceFlag: true,
+    });
+    expect(identity.degradedInputs).toContain('upper winds: unavailable');
+  });
+
   it('reports no degraded inputs when every source is present', () => {
     const identity = buildProductIdentity({
       ...BASE,
       oceanMissingSourceFlag: false,
+      upperWindMissingSourceFlag: false,
     });
     expect(identity.degradedInputs).toEqual([]);
   });

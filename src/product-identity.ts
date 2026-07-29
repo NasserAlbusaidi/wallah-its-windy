@@ -18,6 +18,7 @@ export interface ProductIdentityInput {
   runMode: EventRunMode;
   ageH: number | null;
   oceanMissingSourceFlag?: boolean;
+  upperWindMissingSourceFlag?: boolean;
   observation?: {
     label: string;
     validTimeIso: string | null;
@@ -109,6 +110,9 @@ export function buildProductIdentity(
   const degradedInputs: string[] = [];
   if (input.oceanMissingSourceFlag) {
     degradedInputs.push('subsurface ocean: analytic fallback');
+  }
+  if (input.upperWindMissingSourceFlag) {
+    degradedInputs.push('upper winds: unavailable');
   }
 
   if (!input.observation) {

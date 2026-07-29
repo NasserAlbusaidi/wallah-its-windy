@@ -65,10 +65,12 @@ uniform sampler2D u_steerU;
 uniform sampler2D u_steerUNext;
 uniform sampler2D u_steerV;
 uniform sampler2D u_steerVNext;
+uniform sampler2D u_upperUV;
 uniform sampler2D u_rainTotal;
 uniform sampler2D u_land;
 uniform sampler2D u_cloudNoise;
 uniform float u_hasSteer;
+uniform float u_hasUpper;
 uniform float u_hasAccum;
 uniform float u_planeBlend;
 uniform vec2 u_sstRange;
@@ -460,6 +462,19 @@ void main() {
     return;
   }
 
+  // Plane-coherent environmental 200-hPa flow only. No storm vortex is
+  // synthesized at this level; trails provide direction over this magnitude fill.
+  if (u_mode == 9) {
+    vec2 upper = u_hasUpper * (texture(u_upperUV, v_uv).rg * 100.0 - vec2(50.0));
+    float speedN = clamp(length(upper) / 50.0, 0.0, 1.0);
+    vec3 color = fiveStop(
+      speedN,
+      u_palette0, u_palette1, u_palette2, u_palette3, u_palette4
+    );
+    o = vec4(color, u_hasUpper * (0.22 + 0.5 * speedN) * u_fade);
+    return;
+  }
+
   // Fixed-window or storm-total rainfall. The CPU ledger maps each window's
   // physical mm breaks onto 0..1 before this texture reaches the shader.
   if (u_mode == 8) {
@@ -491,6 +506,7 @@ const MODE: Record<WeatherLayerId, number> = {
   rain: 6,
   wind: 7,
   accum: 8,
+  upper: 9,
 };
 
 const SATELLITE_PALETTE_MODE: Record<SatellitePaletteId, number> = {
@@ -515,6 +531,7 @@ const PALETTE: Record<WeatherLayerId, readonly [
   rain: ['radar0', 'radar1', 'radar2', 'radar3', 'radar4'],
   wind: ['wind0', 'wind1', 'wind2', 'wind3', 'wind4'],
   accum: ['precip0', 'precip1', 'precip2', 'precip3', 'precip4'],
+  upper: ['wind0', 'wind1', 'wind2', 'wind3', 'wind4'],
 };
 
 export class EnvLayer implements RenderModule {
@@ -612,7 +629,13 @@ export class EnvLayer implements RenderModule {
     bind(12, gpu.steerVNext ?? gpu.land, 'u_steerVNext');
     bind(13, gpu.rainAccum ?? gpu.land, 'u_rainTotal');
     bind(14, this.cloudNoise, 'u_cloudNoise');
+    // 16 fragment texture units is the WebGL2 guaranteed minimum and this
+    // program now uses exactly 16 (units 0-15). A new sampled field must pack
+    // into a free channel of an existing texture, never add a 17th sampler.
+    const hasUpper = Boolean(gpu.upperUV);
+    bind(15, gpu.upperUV ?? gpu.land, 'u_upperUV');
     gl.uniform1f(u('u_hasSteer'), hasSteer ? 1 : 0);
+    gl.uniform1f(u('u_hasUpper'), hasUpper ? 1 : 0);
     gl.uniform1f(u('u_hasAccum'), gpu.rainAccum ? 1 : 0);
     gl.uniform1f(u('u_planeBlend'), gpu.envBlend);
     gl.uniform2f(u('u_sstRange'), SST_MIN_C, SST_MAX_C);

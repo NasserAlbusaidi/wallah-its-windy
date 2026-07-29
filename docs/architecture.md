@@ -158,7 +158,7 @@ Notes verified in code:
 |---|---|---|
 | `scenarios.ts` | Historic-event catalogue validation + the pure decisions of a scenario switch (env mode, spawn); DOM-free half of the scenario runtime. Malformed JSON degrades to null, never throws. | `parseScenarios`, `Scenario`, `eventSpawn`, `samplingModeForSpawn`, `validateEventBinForScenario` |
 | `tracks.ts` | IBTrACS historic-track parsing + ghost polyline projection + label anchoring; DOM-free, degrades to null on bad shape. | `parseTracks`, `StormTrack`, `toGhostPolylines`, `computeLabelAnchors` |
-| `weather-layers.ts` | User-facing weather-map layer catalogue + legends + per-layer rail icon SVG (`iconSvg`, required on every entry). Array order is load-bearing: it is the layer rail order AND the Digit1..9 keyboard mapping. | `WEATHER_LAYERS`, `WeatherLayerId`, `SATELLITE_PALETTES`, `DEFAULT_WEATHER_LAYER` |
+| `weather-layers.ts` | User-facing weather-map layer catalogue + legends + per-layer rail icon SVG (`iconSvg`, required on every entry). Array order is load-bearing: it is the layer rail order AND the Digit1..0 keyboard mapping. | `WEATHER_LAYERS`, `WeatherLayerId`, `SATELLITE_PALETTES`, `DEFAULT_WEATHER_LAYER` |
 | `satellite-observations.ts` | Observed satellite frame manifest parsing, timestamp slot matching, Meteosat/INSAT URL builders, image loading. | `parseSatelliteManifest`, `matchObservedFrame`, `acquisitionSlotIso`, `loadObservedFrameImage` |
 | `radar-observations.ts` | Wall-clock observed-radar boundary: validates RainViewer's public manifest, caps the recent loop, builds provider tile URLs, and reprojects six-tile Web-Mercator mosaics onto the fixed app domain. Pixels never enter model state. | `parseRadarTimeline`, `recentRadarFrames`, `loadRadarMosaic`, `loadRadarCoverageFraction` |
 
@@ -286,7 +286,7 @@ terminates the worker.
 
 | task | files (verified) |
 |---|---|
-| Add a weather-map layer | `src/weather-layers.ts` (catalogue; array order = rail order + Digit1..9 keys), `src/render/env.ts` (`MODE`/`PALETTE` tables) or a new `src/render/` module, composition in `src/render/index.ts` `draw()`, rail built in `src/main.ts` from `WEATHER_LAYERS`. A rail icon is required in TWO type-enforced places: `iconSvg` in the catalogue entry (the icon that actually ships — `src/ui.ts` `installLayerRailIcons` swaps it in) and `LAYER_ICONS` in `src/main.ts` (initial mount) |
+| Add a weather-map layer | `src/weather-layers.ts` (catalogue; array order = rail order + Digit1..0 keys), `src/render/env.ts` (`MODE`/`PALETTE` tables) or a new `src/render/` module, composition in `src/render/index.ts` `draw()`, rail built in `src/main.ts` from `WEATHER_LAYERS`. A rail icon is required in TWO type-enforced places: `iconSvg` in the catalogue entry (the icon that actually ships — `src/ui.ts` `installLayerRailIcons` swaps it in) and `LAYER_ICONS` in `src/main.ts` (initial mount) |
 | Tune intensity physics | `src/sim.ts` — `SIM` constants, `IntensityParameters`, `intensityRateKtPerH`; verify with `npm run calibrate:intensity:check` |
 | Tune storm structure (RMW, Holland B, wind radii) | `src/structure.ts`; calibration gate in `src/structure-validation.ts` via `npm run calibrate:structure` |
 | Tune track/steering behaviour | `src/sim.ts` (`TrackParameters`, `betaDriftMs`), `src/steering.ts` |

@@ -2,7 +2,7 @@
  * User-facing weather-map layer catalogue and scientific legend contracts.
  *
  * Order is load-bearing: it is the layer rail's top-to-bottom order AND the
- * Digit1..Digit9 keyboard mapping. Wind leads (the Windy-style default view);
+ * Digit1..Digit0 keyboard mapping. Wind leads (the Windy-style default view);
  * the terrain instrument closes the list as the plain base chart.
  */
 
@@ -15,6 +15,7 @@ export type WeatherLayerId =
   | 'humidity'
   | 'ohc'
   | 'shear'
+  | 'upper'
   | 'terrain';
 
 /** Rendering choices for both the simulated and observed satellite workspace. */
@@ -164,6 +165,17 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     simulated: false,
   },
   {
+    id: 'upper',
+    label: '200-hPa upper winds · ERA5 climatology sample',
+    shortLabel: 'upper winds',
+    iconSvg: railIcon(
+      '<path d="M1.5 4.5h9a2 2 0 1 0-2-2.5"/><path d="M1.5 8h12"/><path d="M1.5 11.5h7a2 2 0 1 1-2 2"/>',
+    ),
+    legend: '0 · 12 · 25 · 38 · 50+',
+    unit: 'm/s · 200 hPa · ERA5',
+    simulated: false,
+  },
+  {
     id: 'terrain',
     label: 'terrain instrument',
     shortLabel: 'terrain',
@@ -185,6 +197,18 @@ const IDS = new Set<WeatherLayerId>(
 
 export function isWeatherLayerId(value: string): value is WeatherLayerId {
   return IDS.has(value as WeatherLayerId);
+}
+
+/** Digit1→0 … Digit9→8, Digit0→9 for the ten-entry catalogue. */
+export function layerIndexForDigitCode(code: string): number | null {
+  if (!/^Digit[0-9]$/.test(code)) return null;
+  const digit = Number(code.slice(-1));
+  return (digit + 9) % 10;
+}
+
+/** Keyboard badge for a catalogue index; the tenth layer is reached by 0. */
+export function digitHintForLayerIndex(index: number): string {
+  return String((index + 1) % 10);
 }
 
 export function weatherLayerDefinition(

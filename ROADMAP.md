@@ -73,14 +73,16 @@ boundary-side with no physics or calibration change:
   wind/pressure cluster, icon layer rail, eye-pinned storm tag, and a wind
   palette retune. UI-only; determinism, loader, and calibration untouched.
 
-**The deploy gate is red.** Every main push since 2026-07-21 has failed CI at
-`npm run calibrate:check`: the HF-6 merge (`ba275f8`) rewrote model internals
-without resealing the hindcast calibration results, so the check fails with
-`[hindcast-calibration] FAIL results=false report=false liveParameters=false`
-(structure calibration passes; the fidelity re-check never runs because the
-chain stops at hindcast). The GitHub Pages site is frozen at the 2026-07-21
-build, so none of the product work above — including the merged reskin — is
-publicly visible. Repairing this gate is step 0 of the execution order below.
+**Deploy-gate incident (2026-07-21; repaired 2026-07-27 by `a037c4a`).** The
+HF-6 merge (`ba275f8`) rewrote model internals without resealing the hindcast
+calibration results, leaving `npm run calibrate:check` red and the Pages site
+frozen at the 2026-07-21 build. Commit `a037c4a` resealed
+`calibration/hindcast-results.json` and `calibration/fidelity-results.json` and
+regenerated `docs/hindcast-benchmark.md` and `docs/fidelity-benchmark.md`
+through the documented flow, with no physics-core edits (`src/sim.ts` and
+`src/structure.ts` were untouched). The deploy workflow has been green since
+its first successful push run at 04:18 UTC on 2026-07-27, and Pages publishes
+current main.
 
 ## Rules that apply to every phase
 
@@ -531,21 +533,15 @@ honesty.
 
 ### Now
 
-0. **Repair the deploy gate.** Reseal the drifted hindcast baselines through
-   the documented flow (`npm run calibrate:intensity`, which also regenerates
-   `docs/hindcast-benchmark.md`), then let `npm run fidelity` re-verify or
-   reseal the fidelity results, with **zero physics edits riding along**.
-   Verify `npm run calibrate:check` locally, push, and confirm the Pages
-   deploy publishes the merged reskin. This step records what the
-   already-shipped HF-6 model actually computes — it does not touch any frozen
-   acceptance verdict, storm split, or threshold. Known wrinkle from the
-   2026-07-26 diagnosis: the November C6 fidelity case needs its replay
-   timeout bumped.
-1. **Ship visibly.** Once the deploy is green, the reskinned simulator is the
-   public face — share the Pages URL. Working-but-local (or in this case
-   merged-but-undeployed) is the trap.
+1. **Ship visibly.** The reskinned simulator is the public face — share the
+   Pages URL. Working-but-local is the trap.
 
 ### Done — kept visible as the record
+
+**Complete (2026-07-27): deploy-gate repair.** Commit `a037c4a` completed the
+documented reseal flow with zero physics-core edits; the November C6
+replay-timeout wrinkle from the 2026-07-26 diagnosis remains part of the
+incident record.
 
 2. **Complete:** product-depth slice (probe, cities, names, analog, sparkline).
 3. **Complete:** HF-2 through HF-4 physical, track, and ensemble experiments;
@@ -583,5 +579,5 @@ honesty.
 HF-6 is finished as an implementation and evidence package. It does **not**
 finish prospective validation, turn the simulator into an operational model, or
 authorize stronger probability language. Pan/zoom remains the selected UX big
-bet; prospective archiving is the long-running scientific lane. Until step 0
-lands, nothing merged after 2026-07-21 is visible to anyone but this repo.
+bet; prospective archiving is the long-running scientific lane. The deploy
+publishes current main, so merged work is publicly visible.

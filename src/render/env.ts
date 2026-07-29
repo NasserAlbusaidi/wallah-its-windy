@@ -11,7 +11,7 @@
 import { TOKENS } from '../tokens';
 import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
-import { CLOUD_BAND_REFERENCE_Q, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
+import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import { makeProgram, makeQuadVao } from './gl-utils';
@@ -132,6 +132,7 @@ CloudField sampleCloud(float land, float sstC) {
   float rCanopy = max(${RENDER_RADIUS_FLOOR}, u_rCanopy);
   // coreQ: eye and eyewall stay tied to the contracting inner core.
   float q = length(radial) / rMax;
+${CLOUD_CORE_GLSL.wobble}
 
   // The cold canopy drifts downshear while the eye and eyewall remain tied to
   // the surface vortex. This creates the asymmetric shield visible in real IR.
@@ -222,7 +223,7 @@ CloudField sampleCloud(float land, float sstC) {
     macro
   );
   float centralOvercast = exp(-pow(canopyQ / irregularCoreRadius, 2.0));
-  float eyewall = exp(-pow((q - 1.0) / mix(0.46, 0.27, u_organization), 2.0));
+  float eyewall = exp(-pow((qCore - 1.0) / mix(0.46, 0.27, u_organization), 2.0));
   float outerBandRadius = mix(6.35, 8.8, smoothstep(0.30, 0.84, development));
   float bandEnvelope = smoothstep(1.25, 1.85, bandQ) *
     (1.0 - smoothstep(outerBandRadius - 2.6, outerBandRadius, bandQ));
@@ -303,21 +304,20 @@ CloudField sampleCloud(float land, float sstC) {
     mix(0.48, 1.0, primaryBand);
   float bandShape = mix(brokenBand, max(primaryBand, secondaryBand * 0.58), bandCoherence);
 
-  float coreCloud = centralOvercast *
-    mix(0.70, 1.0, development) * mix(0.88, 1.0, macro);
+  vec2 canopyDir = canopyQ > 0.001 ? canopyRadial / (canopyQ * rCanopy) : shearDir;
+  float upshear = max(0.0, dot(canopyDir, -shearDir));
+  float shearErosion = 1.0 - shearN * upshear * mix(0.28, 0.62, 1.0 - moisture);
   float eyewallMaturity = smoothstep(0.30, 0.68, u_intensity) *
     smoothstep(0.40, 0.72, u_organization);
-  float eyewallCloud = eyewall * eyewallMaturity * mix(0.48, 1.0, rainEnergy) *
-    mix(0.68, 1.0, convectiveCells);
+  float coreCloud = centralOvercast *
+    mix(0.70, 1.0, development) * mix(0.88, 1.0, macro);
+${CLOUD_CORE_GLSL.eyewall}
   float rainbands = bandEnvelope *
     bandShape *
     mix(0.42, 0.96, moisture) *
     mix(0.46, 1.0, convectiveCells) *
     mix(0.62, 1.0, development);
 
-  vec2 canopyDir = canopyQ > 0.001 ? canopyRadial / (canopyQ * rCanopy) : shearDir;
-  float upshear = max(0.0, dot(canopyDir, -shearDir));
-  float shearErosion = 1.0 - shearN * upshear * mix(0.28, 0.62, 1.0 - moisture);
   // Cirrus streams along the shear axis (outflow proxy -- pure translation of
   // REPEAT noise: zero distortion, zero extra lookups; see plan note).
   // Reduced motion freezes the stream, keeping only the legacy slow drift.
@@ -339,7 +339,7 @@ CloudField sampleCloud(float land, float sstC) {
 
   float eyeStrength = smoothstep(0.18, 0.56, u_intensity * u_organization) *
     smoothstep(0.62, 0.82, u_organization);
-  float eye = 1.0 - smoothstep(0.18, mix(0.46, 0.68, eyeStrength), q);
+  float eye = 1.0 - smoothstep(0.18, mix(0.46, 0.68, eyeStrength), qCore);
   float stormCloud = clamp(
     (coreCloud + eyewallCloud + rainbands + cirrus + precipitatingCloud) *
       shearErosion,

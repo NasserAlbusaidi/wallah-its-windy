@@ -134,6 +134,43 @@ float cloudOmega(float rUnits) {
 `;
 
 /**
+ * GLSL for inner-core irregularity, split across two documented sampleCloud()
+ * splice points so env.ts stays below its 800-line cap:
+ * - wobble: immediately after `float q = length(radial) / rMax;`; defines
+ *   coreAzimuth and qCore for the later eyewall and eye terms.
+ * - eyewall: immediately after coreCloud, once moisture, rainEnergy,
+ *   convectiveCells, eyewallMaturity, canopyDir, shearDir, and shearN are in
+ *   scope; defines the final mesovortex/shear-modulated eyewallCloud consumed
+ *   by the cloud-top presence ladder.
+ */
+export const CLOUD_CORE_GLSL = {
+  wobble: /* glsl */ `
+  // Azimuthal wobble: sin-composed pseudo-noise (zero texture cost, periodic
+  // by construction). Weak/organizing storms are ragged; mature storms round.
+  float coreAzimuth = atan(radial.y, radial.x);
+  float wobble = 0.6 * sin(3.0 * coreAzimuth + u_cloudSeed * 37.7) +
+    0.4 * sin(5.0 * coreAzimuth + u_cloudSeed * 61.3);
+  float wobbleAmp = mix(0.20, 0.05, smoothstep(0.38, 0.85, u_organization));
+  float qCore = q * (1.0 + wobbleAmp * wobble);
+`,
+  eyewall: /* glsl */ `
+  // Mesovortex lumps churn at the capped core rate; static under reduced
+  // motion. Wavenumber 5 sits in the observed 4-6 range.
+  float mesoTheta = animGate * ${CLOUD_ROTATION_CAP_RAD_PER_H} * u_cloudAgeH;
+  float meso = 1.0 + 0.24 * eyewallMaturity *
+    sin(5.0 * (coreAzimuth - mesoTheta) + u_cloudSeed * 17.9);
+  // Downshear-left enhancement (documented wavenumber-1 structure). Gated off
+  // when the shear vector is too weak to define a direction -- the fallback
+  // shearDir is decorative and must not masquerade as a physical signal.
+  float hasShearDir = step(0.05, length(u_shearVector));
+  float dsl = max(0.0, dot(canopyDir, vec2(-shearDir.y, shearDir.x)));
+  float dslBoost = 1.0 + 0.22 * shearN * hasShearDir * dsl;
+  float eyewallCloud = eyewall * meso * dslBoost * eyewallMaturity *
+    mix(0.48, 1.0, rainEnergy) * mix(0.68, 1.0, convectiveCells);
+`,
+} as const;
+
+/**
  * GLSL for component-graded cloud tops and deterministic overshooting-top
  * pulses. env.ts must splice this inside sampleCloud() immediately after the
  * surfaceC/ambientTopC declarations: it intentionally references that

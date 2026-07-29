@@ -59,6 +59,26 @@ screen does **not** mean the cloud geometry, brightness temperatures, or rain
 rates are accurate. A multi-case calibration set and radiometrically decoded
 IR temperatures would be required before tightening the thresholds.
 
+## Currency note (2026-07-29)
+
+The sealed result above documents the renderer as it existed when the screen
+was frozen. Two later render changes (the rain/IR alignment fix and the C2a
+upper-wind merge) and the 2026-07-29 cloud-motion work all altered the
+simulated cloud output without this screen being re-run, and the original
+simulated-capture protocol (viewport, canvas isolation, fade state) was never
+recorded, so the sealed numbers are not reproducible by re-capture.
+
+A controlled A/B on 2026-07-29 — one pinned pipeline (WMS re-fetch of the same
+observed frame; scenario `shaheen` hindcast scrubbed to frame 10 = 2.5 h;
+grayscale; UI hidden; `#gl-canvas` element capture), renderer as the only
+variable — measured: pre-cloud-motion main fails `centroid_vector_within_1_5deg`
+(1.66 > 1.5, quadrant MAE 0.195); the cloud-motion branch fails
+`quadrant_distribution_plausible` (MAE 0.205 > 0.20) while restoring the
+centroid vector to 1.43 (passing). The cloud-motion branch was accepted on
+that relative evidence. Re-sealing this screen with a documented, automated
+capture protocol is tracked as a follow-up issue; the thresholds themselves
+remain untouched.
+
 ## Observed-frame sources
 
 ### Meteosat

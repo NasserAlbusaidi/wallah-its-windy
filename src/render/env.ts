@@ -11,7 +11,7 @@
 import { TOKENS } from '../tokens';
 import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
-import { CLOUD_BAND_REFERENCE_Q, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
+import { CLOUD_BAND_REFERENCE_Q, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import { makeProgram, makeQuadVao } from './gl-utils';
@@ -351,16 +351,7 @@ CloudField sampleCloud(float land, float sstC) {
 
   float surfaceC = mix(sstC, 34.0, smoothstep(0.35, 0.65, land));
   float ambientTopC = mix(-8.0, -42.0, synopticNoise * localRh);
-  float stormTopC = mix(
-    -35.0,
-    -82.0,
-    clamp(0.52 * u_intensity + 0.48 * u_organization, 0.0, 1.0)
-  );
-  float towerCooling = 13.0 * convectiveCells * rainEnergy *
-    max(max(eyewall, rainbands), precipitatingCloud);
-  float brightnessC = mix(surfaceC, ambientTopC, ambientCloud);
-  brightnessC = mix(brightnessC, stormTopC - towerCooling, stormCloud);
-  brightnessC = mix(brightnessC, surfaceC - 4.0, eye * eyeStrength * u_stormPresence);
+${CLOUD_TOPS_GLSL}
   return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells);
 }
 

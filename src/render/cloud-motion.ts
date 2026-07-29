@@ -132,3 +132,52 @@ float cloudOmega(float rUnits) {
   return min(3.6 * vMs / rKm, ${CLOUD_ROTATION_CAP_RAD_PER_H});
 }
 `;
+
+/**
+ * GLSL for component-graded cloud tops and deterministic overshooting-top
+ * pulses. env.ts must splice this inside sampleCloud() immediately after the
+ * surfaceC/ambientTopC declarations: it intentionally references that
+ * function's Task 2 motion locals and cloud-component geometry in place.
+ */
+export const CLOUD_TOPS_GLSL = /* glsl */ `
+  // Component-graded cloud tops: warmest first, coldest mixed last so a cold
+  // tower is never averaged back toward a warmer underlying band.
+  float cdoTopC = mix(-65.0, -82.0, development);
+  float bandTopC = mix(-45.0, -62.0, development);
+  float cirrusTopC = mix(-35.0, -48.0, u_organization);
+
+  // Overshooting tops: deterministic per-cell pulses. Cell identity comes from
+  // the advected storm-relative coordinate + seed; the lifecycle reads the
+  // interpolated cloud age, never wall time. Each cell's cycle is offset so
+  // cells never reseed together, and the sin^2 envelope is zero at both
+  // lifecycle boundaries, so reseeds cannot pop.
+  vec2 otCell = floor(pA * 6.0);
+  float otOffset = hash21(otCell * 1.73 + seed * 291.7);
+  float otCycle = u_cloudAgeH / ${CLOUD_PULSE_PERIOD_H.toFixed(1)} + otOffset;
+  float otStrength = hash21(otCell * 2.61 + floor(otCycle) * 7.31);
+  float otEnv = sin(3.14159265 * fract(otCycle));
+  otEnv *= otEnv;
+  // Reduced motion: no transient cycling -- hold a constant mid-envelope.
+  otEnv = mix(0.5, otEnv, animGate);
+  float overshootC = mix(8.0, 14.0, otStrength) * otEnv *
+    smoothstep(0.55, 0.80, convectiveCells) *
+    smoothstep(0.30, 0.80, rainEnergy);
+
+  // Presence ladder (tuning constants: how strongly each component claims the
+  // column before opacity compositing).
+  float cirrusPresence = clamp(cirrus * 2.6, 0.0, 1.0);
+  float bandPresence = clamp(max(rainbands, precipitatingCloud) * 1.6, 0.0, 1.0);
+  float corePresence = clamp(coreCloud * 1.4, 0.0, 1.0);
+  float towerPresence = clamp(max(eyewallCloud, precipitatingCloud) * 1.2, 0.0, 1.0) *
+    smoothstep(0.55, 0.80, convectiveCells);
+
+  float topC = ambientTopC;
+  topC = mix(topC, cirrusTopC, cirrusPresence);
+  topC = mix(topC, bandTopC, bandPresence);
+  topC = mix(topC, cdoTopC, corePresence);
+  topC = mix(topC, min(topC, cdoTopC) - overshootC, towerPresence);
+
+  float brightnessC = mix(surfaceC, ambientTopC, ambientCloud);
+  brightnessC = mix(brightnessC, topC, stormCloud);
+  brightnessC = mix(brightnessC, surfaceC - 4.0, eye * eyeStrength * u_stormPresence);
+`;

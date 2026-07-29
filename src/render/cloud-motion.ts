@@ -181,3 +181,38 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
   brightnessC = mix(brightnessC, topC, stormCloud);
   brightnessC = mix(brightnessC, surfaceC - 4.0, eye * eyeStrength * u_stormPresence);
 `;
+
+/**
+ * GLSL for visible-palette relief shading. env.ts must splice this inside
+ * sampleCloud() immediately after CLOUD_TOPS_GLSL and before the CloudField
+ * constructor: it intentionally references that function's advected noise and
+ * CDO-envelope locals in place.
+ */
+export const CLOUD_RELIEF_GLSL = /* glsl */ `
+  // Visible-palette relief: Lambert shading from a height proxy. Two raw
+  // broad-channel taps give the noise gradient; the CDO envelope derivative
+  // is analytic. Detail tier + visible palette only (budget: +2 lookups).
+  float relief = 1.0;
+  if (u_mode == 1 && u_satellitePalette == 2 && u_cloudDetail > 0.5) {
+    vec2 noiseP = (pA * 0.62 + drift + seed * 11.0) * 0.10;
+    float e = 0.012;
+    // Two raw taps; macro stands in for the centre height (its broad .r term
+    // dominates, and the bias is absorbed by the gradient gain + mix range).
+    // A third centre tap would break the +2 relief budget.
+    float hx = texture(u_cloudNoise, noiseP + vec2(e, 0.0)).r;
+    float hy = texture(u_cloudNoise, noiseP + vec2(0.0, e)).r;
+    vec2 noiseGrad = (vec2(hx, hy) - macro) * 6.0;
+    // Analytic CDO envelope slope, outward-negative (the dome falls off).
+    float envSlope = -2.0 * (canopyQ / (irregularCoreRadius * irregularCoreRadius)) *
+      centralOvercast;
+    vec2 radialDir = canopyQ > 0.001
+      ? canopyRadial / (canopyQ * rCanopy)
+      : vec2(0.0, 1.0);
+    vec2 grad = noiseGrad + radialDir * envSlope * 0.8;
+    // Standard height-field normal, lit by a fixed NW sun in east/north space.
+    vec3 normal = normalize(vec3(-grad, 1.4));
+    vec3 sunDir = normalize(vec3(-0.707, 0.707, 1.2));
+    float lambert = clamp(dot(normal, sunDir), 0.0, 1.0);
+    relief = mix(0.74, 1.18, lambert);
+  }
+`;

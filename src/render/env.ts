@@ -11,7 +11,7 @@
 import { TOKENS } from '../tokens';
 import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
-import { CLOUD_BAND_REFERENCE_Q, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
+import { CLOUD_BAND_REFERENCE_Q, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import { makeProgram, makeQuadVao } from './gl-utils';
@@ -118,6 +118,7 @@ struct CloudField {
   float ambientCloud;
   float brightnessC;
   float convectiveCells;
+  float relief;
 };
 
 CloudField sampleCloud(float land, float sstC) {
@@ -352,7 +353,8 @@ CloudField sampleCloud(float land, float sstC) {
   float surfaceC = mix(sstC, 34.0, smoothstep(0.35, 0.65, land));
   float ambientTopC = mix(-8.0, -42.0, synopticNoise * localRh);
 ${CLOUD_TOPS_GLSL}
-  return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells);
+${CLOUD_RELIEF_GLSL}
+  return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells, relief);
 }
 
 vec4 addCloudContext(vec3 baseColor, float baseAlpha, CloudField field, float strength) {
@@ -391,7 +393,8 @@ void main() {
       color = vec3(pow(enhanced, 0.82));
     } else if (u_satellitePalette == 2) {
       vec3 surface = mix(vec3(0.025, 0.075, 0.105), vec3(0.22, 0.19, 0.14), land);
-      vec3 litCloud = mix(vec3(0.64, 0.67, 0.67), vec3(0.98), field.convectiveCells);
+      vec3 litCloud = mix(vec3(0.64, 0.67, 0.67), vec3(0.98), field.convectiveCells) *
+        field.relief;
       color = mix(surface, litCloud, pow(field.cloud, 0.70));
     } else {
       color = fiveStop(

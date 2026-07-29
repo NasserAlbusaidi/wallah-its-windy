@@ -8,7 +8,7 @@
  * separate contract and deliberately not touched here.
  */
 
-import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
+import { HALF_DOMAIN_HEIGHT_KM, RENDER_RADIUS_FLOOR } from './storm-radii';
 
 /**
  * Display cap on cloud angular velocity, rad/sim-hour. PERCEPTION CAP, NOT
@@ -110,3 +110,25 @@ export function flowPhaseState(cloudAgeH: number): {
   const weightA = 1 - Math.abs(2 * phaseA - 1);
   return { phaseA, phaseB, weightA, weightB: 1 - weightA };
 }
+
+/**
+ * GLSL for the motion model, embedded by env.ts's fragment shader. Lives here
+ * so the constants, their CPU mirrors, and the shader code cannot drift apart
+ * (and so env.ts stays under the 800-line cap).
+ */
+export const CLOUD_MOTION_GLSL = /* glsl */ `
+float hash21(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+// Holland-profile angular rate at a metric-clip radius, rad/sim-hour, capped
+// for display. Mirrors cloudAngularRateRadPerH in cloud-motion.ts exactly.
+float cloudOmega(float rUnits) {
+  float rKm = max(rUnits * ${HALF_DOMAIN_HEIGHT_KM}.0, 1.0);
+  float rmwKm = max(u_rMax, ${RENDER_RADIUS_FLOOR}) * ${HALF_DOMAIN_HEIGHT_KM}.0;
+  float x = min(80.0, pow(max(rmwKm, 1.0) / rKm, u_hollandB));
+  float vMs = u_vmaxMs * sqrt(max(0.0, x * exp(1.0 - x)));
+  // 3.6: m/s -> km/h. min(): perception cap, not physics -- see cloud-motion.ts.
+  return min(3.6 * vMs / rKm, ${CLOUD_ROTATION_CAP_RAD_PER_H});
+}
+`;

@@ -7,6 +7,8 @@
 
 **[Open the live demo →](https://nasseralbusaidi.github.io/wallah-its-windy/)**
 
+[![The demo storm mid-life over the Arabian Sea: wind-trail spiral, historical ghost tracks, layer rail, and the flight timeline](docs/media/hero.png)](https://nasseralbusaidi.github.io/wallah-its-windy/)
+
 Click the sea to spawn a storm, then **let it take course** — sea-surface
 temperature, upper-ocean heat content, mid-level humidity, steering, wind
 shear, and terrain decide its fate. When a storm makes landfall on the Omani

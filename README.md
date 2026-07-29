@@ -1,62 +1,50 @@
 # Wallah It's Windy
 
-An Arabian Sea tropical-cyclone sandbox that runs in the browser. Click the sea
-to spawn a storm, then **let it take course** — sea-surface temperature,
-upper-ocean heat content, mid-level humidity, steering, wind shear, and terrain
-decide its fate. When a storm makes landfall on the Omani coast, the Hajar
-mountains wring out the rain and the wadis light up.
+### An interactive, reproducible Arabian Sea cyclone laboratory
+
+[![Deploy to GitHub Pages](https://github.com/NasserAlbusaidi/wallah-its-windy/actions/workflows/deploy.yml/badge.svg)](https://github.com/NasserAlbusaidi/wallah-its-windy/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+**[Open the live demo →](https://nasseralbusaidi.github.io/wallah-its-windy/)**
+
+[![The demo storm mid-life over the Arabian Sea: wind-trail spiral, historical ghost tracks, layer rail, and the flight timeline](docs/media/hero.png)](https://nasseralbusaidi.github.io/wallah-its-windy/)
+
+Click the sea to spawn a storm, then **let it take course** — sea-surface
+temperature, upper-ocean heat content, mid-level humidity, steering, wind
+shear, and terrain decide its fate. When a storm makes landfall on the Omani
+coast, the Hajar mountains wring out the rain and the wadis light up.
 
 No joystick, no dragging the storm: you author it, physics finishes it.
 
-> Status: **playable**. A deterministic storm forms, drifts, intensifies and dies
-> on real baked climate data. Its Holland-style structure carries parametric
-> central pressure, radius of maximum wind, persistent outer-core size,
-> shear/motion asymmetry, displaced rainfall, and quadrant 34/50/64-kt wind
-> radii, rendered as a dark nautical instrument under Windy-style glass
-> chrome. A fixed-seed
-> demo storm opens mid-life on first load. Compare June vs October at one click;
-> share any storm by its URL. User storms carry a live flight recorder that
-> explains each intensity change in numbers and plain language, then becomes a
-> debrief, controlled-comparison lab, export station, and replay timeline. Each
-> user storm receives a deterministic, explicitly simulated WMO/ESCAP name; the
-> tape adds an exact intensity sparkline and a geometric historical analog.
-> Ten featured historical environments also have deterministic,
-> observed-initialization hindcasts with honest track/intensity/pressure
-> scoring and a separate counterfactual mode. A separate frozen 30-storm
-> observational benchmark measures the exact runtime at 12/24/48/72 hours
-> against a no-future-information persistence baseline. The map can switch
-> among terrain, wind, deterministic rain products, environmental fields, a
-> timestamped observed-radar loop, and a satellite desk with simulated or
-> timestamp-matched observed imagery. A worker-run
-> forecast laboratory adds deterministic ensembles, track member-frequency fields,
-> and same-storm sensitivity experiments without blocking the map.
+- **Deterministic and shareable.** A storm is a pure function of
+  (spawn point, month, seed); its URL replays it byte-identically on any
+  machine. A fixed-seed demo storm opens mid-life on first load.
+- **Real data underneath.** ERA5, NOAA OISST and WOA23, IBTrACS, GMRT, and
+  HydroSHEDS, baked offline into self-describing binary assets the browser
+  loads directly.
+- **A laboratory, not just a demo.** Historical hindcasts with honest
+  track/intensity/pressure scoring, counterfactuals, a per-storm flight
+  recorder with replay and debrief, controlled comparisons, worker-run
+  ensembles and sensitivity experiments, simulated and observed
+  satellite/radar desks, and PNG/video export.
+- **A simulator and research prototype — not official forecast guidance.**
 
-The current scientific and product sequence is maintained in
-**[ROADMAP.md](ROADMAP.md)**. The
-**[locked HF-2A specification](docs/hf2a-dynamic-upper-ocean-spec.md)** and the
-phase artifacts under `calibration/` preserve every scientific gate. HF-2,
-HF-3, and HF-4 are implemented but rejected by their frozen acceptance rules;
-the app does not promote their ensemble output to calibrated probability. HF-5
-implements provider-neutral normalization and immutable forecast issuance. A
-scheduled public-source monitor now acquires and normalizes regional GFS
-atmosphere and near-real-time OISST, snapshots the RSMC New Delhi bulletin
-state, and checks RTOFS availability. It deliberately keeps forecast output
-disabled because no normalized active advisory, regional three-dimensional
-upper-ocean field, or GEFS ensemble is yet available. HF-6 is
-implementation-complete: it
-expands the audit to 72 storms and 144 initializations, and the untouched
-eight-storm/16-initialization sealed first look has been scored. Track skill was
-positive against persistence at 12/24/48 hours, but the frozen intensity and
-pressure gates failed; the sealed result is therefore **rejected** and the
-prospective registry remains at zero matured forecasts. See the
-**[HF-6 model card](docs/model-card-hf6.md)** and generated
-**[HF-6 scorecard](docs/hf6-scorecard.md)**. The project remains an experimental
-simulator and retrospective forecast-companion prototype, not a replacement for
-official guidance. The consolidated **[HF-1–HF-6 findings](docs/findings-hf1-hf6.md)**
-explain what improved, what failed, and which claims the evidence supports.
+## Scientific status
 
-For a strict, full-surface assessment of suitability for Oman’s Directorate
-General of Meteorology, see the
+| Surface | Verdict |
+|---|---|
+| Shipped simulator profile (structure, hindcast, and fidelity calibrations) | Sealed and accepted; replayed in CI by `npm run calibrate:check` |
+| HF-2 dynamic upper ocean · HF-3 track experiments · HF-4 ensemble calibration | Implemented, **rejected** by their frozen acceptance gates |
+| HF-5 live-forecast infrastructure | Built; current-forecast output deliberately disabled |
+| HF-6 sealed first look (8 storms / 16 initializations of the 72-storm audit) | Track skill positive vs persistence at 12/24/48 h; intensity and pressure gates failed → **rejected** |
+
+Gates are frozen before scoring and never retuned after; rejected stays
+rejected, and the prospective registry sits at zero matured forecasts.
+Ensemble output is perturbation frequency, never calibrated probability. The
+full record: **[ROADMAP.md](ROADMAP.md)**, the consolidated
+**[HF-1–HF-6 findings](docs/findings-hf1-hf6.md)**, the
+**[HF-6 model card](docs/model-card-hf6.md)**, the generated
+**[HF-6 scorecard](docs/hf6-scorecard.md)**, and the
 **[Oman DGM operational-readiness audit](docs/oman-dgm-operational-readiness-audit.md)**.
 
 ## Stack

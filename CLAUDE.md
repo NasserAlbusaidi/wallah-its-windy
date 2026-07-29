@@ -159,8 +159,13 @@ self-describing `.bin` assets the browser loads.
 - Ensemble output is perturbation frequency, NOT calibrated probability —
   HF-4's gate rejected the calibration claim (docs/model-card-hf6.md). Never
   rename it to "probability" or add %-chance framing in UI or docs.
-- Live product copy stays "experimental forecast companion — not official
-  guidance" (`src/live-product.ts`).
+- The masthead chip (`index.html` `#guidance-chip`) stays "interactive cyclone
+  simulator · research prototype — not official guidance" — the product is a
+  simulator and must not call itself a forecast product while no live forecast
+  mode ships. The gated live-run status label in `src/live-product.ts` keeps
+  "experimental forecast companion — not official guidance" for the day an
+  issued live run actually renders. Neither disclaimer is ever dropped or
+  truncated to clean up the UI.
 
 ## Pointers
 

@@ -3379,10 +3379,9 @@ html[data-compact='true'] .ghost-label:not(.active) {
   }
 
   #app #guidance-chip {
+    /* Wrap, never ellipsize: truncation would cut "not official guidance",
+       the one clause that must always be visible. */
     max-width: calc(100vw - 16px);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   #hint-chips #interaction-guide {

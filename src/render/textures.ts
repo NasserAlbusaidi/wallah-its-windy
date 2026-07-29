@@ -43,6 +43,16 @@ export function environmentPlaneInterpolation(
   };
 }
 
+/** Plane uploaded for the upper-wind pair; event bins have no aligned sidecar. */
+export function upperWindTexturePlane(
+  nt: number,
+  mode: EnvSamplingMode,
+): number | null {
+  if (mode.kind !== 'synoptic-plane') return null;
+  const last = Math.max(0, Math.floor(nt) - 1);
+  return Math.max(0, Math.min(last, Math.floor(mode.plane)));
+}
+
 /**
  * flowacc.bin already stores log10(1 + upstream-cell-count). Normalize that
  * baked logarithmic value linearly; applying another logarithm would distort
@@ -136,6 +146,41 @@ export function buildR8Tex(
   // cannot silently raise GL_INVALID_OPERATION and render the layer black.
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, layer.nx, layer.ny, 0, gl.RED, gl.UNSIGNED_BYTE, bytes);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return tex;
+}
+
+/** Pack normalized upper-wind u/v components into the R/G channels of one texture. */
+export function buildUpperWindRG8Tex(
+  gl: WebGL2RenderingContext,
+  uLayer: BinLayer,
+  vLayer: BinLayer,
+  t: number,
+  norm: (v: number) => number,
+): WebGLTexture {
+  const uPlane = planeOf(uLayer, t);
+  const vPlane = planeOf(vLayer, t);
+  const bytes = new Uint8Array(uPlane.length * 2);
+  for (let i = 0; i < uPlane.length; i++) {
+    const u = norm(uPlane[i]);
+    const v = norm(vPlane[i]);
+    bytes[i * 2] = u <= 0 ? 0 : u >= 1 ? 255 : Math.round(u * 255);
+    bytes[i * 2 + 1] = v <= 0 ? 0 : v >= 1 ? 255 : Math.round(v * 255);
+  }
+  const tex = newTex(gl, gl.LINEAR);
+  // RG8 rows are 2*nx bytes; force alignment 1 for odd-width grids.
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RG8,
+    uLayer.nx,
+    uLayer.ny,
+    0,
+    gl.RG,
+    gl.UNSIGNED_BYTE,
+    bytes,
+  );
   gl.bindTexture(gl.TEXTURE_2D, null);
   return tex;
 }

@@ -442,7 +442,7 @@ export class UiController {
     };
 
     // main.ts mounts the static rail after the controller is constructed.
-    // Observe that one child-list change, decorate all nine rows, then detach.
+    // Observe that one child-list change, decorate all ten rows, then detach.
     observer = new MutationObserver(decorate);
     observer.observe(root, { childList: true });
     decorate();
@@ -555,21 +555,8 @@ export class UiController {
     placement: PointProbePlacement,
   ): void {
     const cardWidth = Math.min(220, Math.max(0, placement.widthPx - 16));
-    const cardHeight = 104;
-    const preferredLeft =
-      placement.xPx + 12 + cardWidth <= placement.widthPx
-        ? placement.xPx + 12
-        : placement.xPx - cardWidth - 12;
-    const preferredTop =
-      placement.yPx + 12 + cardHeight <= placement.heightPx
-        ? placement.yPx + 12
-        : placement.yPx - cardHeight - 12;
     this.pointProbe.hidden = false;
     this.pointProbe.style.width = `${cardWidth}px`;
-    this.pointProbe.style.left =
-      `${Math.max(8, Math.min(placement.widthPx - cardWidth - 8, preferredLeft))}px`;
-    this.pointProbe.style.top =
-      `${Math.max(8, Math.min(placement.heightPx - cardHeight - 8, preferredTop))}px`;
     this.pointProbePin.setAttribute('aria-pressed', String(placement.pinned));
     this.pointProbePin.textContent = placement.pinned ? 'pinned' : 'pin';
     dom('point-probe-coords').textContent =
@@ -582,6 +569,16 @@ export class UiController {
     dom('point-probe-rh').textContent = `${reading.midlevelRhPct.toFixed(0)}%`;
     dom('point-probe-shear').textContent = `${reading.shearMs.toFixed(1)} m/s`;
     dom('point-probe-ohc').textContent = `${reading.ohcKjCm2.toFixed(0)} kJ/cm²`;
+    const upperAvailable =
+      reading.upperSpeedMs !== null && reading.upperDirDeg !== null;
+    dom('point-probe-upper-speed-row').hidden = !upperAvailable;
+    dom('point-probe-upper-dir-row').hidden = !upperAvailable;
+    dom('point-probe-upper-speed').textContent = upperAvailable
+      ? `${reading.upperSpeedMs!.toFixed(1)} m/s`
+      : '—';
+    dom('point-probe-upper-dir').textContent = upperAvailable
+      ? `${reading.upperDirDeg!.toFixed(0)}° from`
+      : '—';
     dom('point-probe-rain-label').textContent =
       `model rain · ${reading.simulatedRainWindowLabel}`;
     dom('point-probe-rain').textContent =
@@ -590,7 +587,20 @@ export class UiController {
         : `${reading.simulatedRainMm.toFixed(1)} mm`;
     dom('point-probe-source').textContent =
       `${reading.environmentKind} · ${reading.environmentLabel} · ` +
-      `${reading.validTimeLabel} · wind + rain are simulated`;
+      `${reading.validTimeLabel} · surface wind + rain are simulated`;
+    const cardHeight = this.pointProbe.offsetHeight;
+    const preferredLeft =
+      placement.xPx + 12 + cardWidth <= placement.widthPx
+        ? placement.xPx + 12
+        : placement.xPx - cardWidth - 12;
+    const preferredTop =
+      placement.yPx + 12 + cardHeight <= placement.heightPx
+        ? placement.yPx + 12
+        : placement.yPx - cardHeight - 12;
+    this.pointProbe.style.left =
+      `${Math.max(8, Math.min(placement.widthPx - cardWidth - 8, preferredLeft))}px`;
+    this.pointProbe.style.top =
+      `${Math.max(8, Math.min(placement.heightPx - cardHeight - 8, preferredTop))}px`;
   }
 
   hidePointProbe(): void {

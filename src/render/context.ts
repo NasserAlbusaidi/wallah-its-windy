@@ -63,6 +63,8 @@ export interface GpuTextures {
   steerUNext: WebGLTexture | null;
   steerV: WebGLTexture | null;
   steerVNext: WebGLTexture | null;
+  /** Plane-coherent 200-hPa environmental wind components, normalized RG8. */
+  upperUV: WebGLTexture | null;
   /** Storm-total rain grid (impact tracker), re-uploaded on version change. */
   rainAccum: WebGLTexture | null;
   /** Fractional interpolation from each current texture to its next texture. */
@@ -109,6 +111,8 @@ export interface DrawCtx {
    * point, current env plane), or null before env.bin lands.
    */
   steeringAt: ((lat: number, lon: number) => { u: number; v: number }) | null;
+  /** Environmental 200-hPa wind sampler for the upper-wind trails. */
+  upperAt: ((lat: number, lon: number) => { u: number; v: number }) | null;
 }
 
 /** Lifecycle shared by every internal layer module. Draw signatures vary. */

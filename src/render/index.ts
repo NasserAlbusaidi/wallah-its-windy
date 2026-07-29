@@ -53,6 +53,7 @@ import {
   buildBasinRG8Tex,
   buildElevationTex,
   buildR8Tex,
+  buildUpperWindRG8Tex,
   environmentPlaneInterpolation,
   hasTimedFlowRouting,
   pickLayer,
@@ -60,8 +61,10 @@ import {
   normalizeLoggedFlowAccumulation,
   SST_MAX_C,
   SST_MIN_C,
+  upperWindTexturePlane,
 } from './textures';
 import { sampleEnvBin } from '../env-sampler';
+import { upperWindLayers } from '../upper-sampler';
 import { sampleLayerBilinear } from '../raster-sampler';
 import type { DrawCtx, EnvAtStorm, GpuTextures } from './context';
 import { TerrainLayer } from './terrain';
@@ -95,6 +98,8 @@ export interface RenderResources {
   terrain: ParsedBin | null;
   /** env.bin: sst/steering/shear magnitude+vector layers (MM = 04..10). */
   env: ParsedBin | null;
+  /** upper.bin: plane-aligned ERA5 u200/v200 climatology sidecar. */
+  upper: ParsedBin | null;
   /** genesis.json points (historic genesis zones). */
   genesis: LatLon[];
   /** tracks.json historic-storm polylines (ghost tracks, C7). Empty when absent. */
@@ -169,6 +174,7 @@ function emptyGpu(): GpuTextures {
     steerUNext: null,
     steerV: null,
     steerVNext: null,
+    upperUV: null,
     rainAccum: null,
     envBlend: 0,
     genesisClip: null,
@@ -188,7 +194,7 @@ export class RenderPipeline implements RenderLayer {
   private gl: WebGL2RenderingContext | null = null;
   private overlay: CanvasRenderingContext2D | null = null;
   private caps: GlCaps = { colorBufferFloat: false, floatLinear: false };
-  private res: RenderResources = { terrain: null, env: null, genesis: [], tracks: [] };
+  private res: RenderResources = { terrain: null, env: null, upper: null, genesis: [], tracks: [] };
   private gpu: GpuTextures = emptyGpu();
   private monthIndex = 5;
   private weatherLayer: WeatherLayerId = 'terrain';
@@ -199,6 +205,7 @@ export class RenderPipeline implements RenderLayer {
   private envPlane = -1;
   private envNextPlane = -1;
   private envPlaneMode = '';
+  private upperPlane: number | null = null;
   private injected = false;
 
   // Self-source (mode B) holders.
@@ -212,6 +219,7 @@ export class RenderPipeline implements RenderLayer {
   private observedRadar = new ObservedRadarLayer();
   private particles = new ParticleLayer();
   private wind = new WindLayer();
+  private upperWind = new WindLayer('upper');
   private rain = new RainLayer();
   private radar = new RadarLayer();
   private ghosts = new GhostLayer();
@@ -261,6 +269,7 @@ export class RenderPipeline implements RenderLayer {
     this.observedRadar.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.wind.resize(this.width, this.height);
+    this.upperWind.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
     this.radar.resize(this.width, this.height);
     this.ghosts.resize(this.width, this.height);
@@ -320,6 +329,8 @@ export class RenderPipeline implements RenderLayer {
     // top would turn the satellite texture back into an illustrative spiral.
     if (ctx.weatherLayer === 'wind') {
       this.wind.draw(ctx);
+    } else if (ctx.weatherLayer === 'upper') {
+      this.upperWind.draw(ctx);
     } else if (
       ctx.weatherLayer !== 'infrared' &&
       !observedRadar &&
@@ -351,6 +362,7 @@ export class RenderPipeline implements RenderLayer {
     this.observedRadar.dispose();
     this.particles.dispose();
     this.wind.dispose();
+    this.upperWind.dispose();
     this.rain.dispose();
     this.radar.dispose();
     this.ghosts.dispose();
@@ -377,11 +389,16 @@ export class RenderPipeline implements RenderLayer {
     this.monthIndex = monthIndex;
     this.envPlane = -1;
     this.envNextPlane = -1;
-    this.applyEnv(0, 0);
+    this.envPlaneMode = '';
+    this.upperPlane = null;
+    this.applyEnv(0, 0, null);
   }
 
   setWeatherLayer(layer: WeatherLayerId): void {
-    if (layer !== this.weatherLayer) this.wind.clearTrails();
+    if (layer !== this.weatherLayer) {
+      this.wind.clearTrails();
+      this.upperWind.clearTrails();
+    }
     this.weatherLayer = layer;
   }
 
@@ -426,6 +443,7 @@ export class RenderPipeline implements RenderLayer {
   setParticleBudget(count: number): void {
     this.particles.setBudget(count);
     this.wind.setBudget(count);
+    this.upperWind.setBudget(count);
   }
 
   /** Highlight one ghost polyline (~2x alpha) as the active scenario; null clears
@@ -454,7 +472,9 @@ export class RenderPipeline implements RenderLayer {
     if (this.monthSelect) this.monthIndex = Number(this.monthSelect.value) || 5;
     this.envPlane = -1;
     this.envNextPlane = -1;
-    this.applyEnv(0, 0);
+    this.envPlaneMode = '';
+    this.upperPlane = null;
+    this.applyEnv(0, 0, null);
   };
 
   private assetUrl(path: string): string {
@@ -473,6 +493,8 @@ export class RenderPipeline implements RenderLayer {
   }
 
   private async selfLoad(): Promise<void> {
+    // Deliberate degraded mode-B boundary: upper.bin is not self-fetched here.
+    // Mode A is the product path and injects its plane-aligned sidecar from main.
     await Promise.all([
       this.fetchBin('data/terrain.bin').then((b) => {
         this.terrBin = b;
@@ -487,7 +509,9 @@ export class RenderPipeline implements RenderLayer {
           this.res.env = b;
           this.envPlane = -1;
           this.envNextPlane = -1;
-          this.applyEnv(0, 0);
+          this.envPlaneMode = '';
+          this.upperPlane = null;
+          this.applyEnv(0, 0, null);
         }
       }),
       this.loadGenesis().then((pts) => {
@@ -549,6 +573,7 @@ export class RenderPipeline implements RenderLayer {
     this.satellite.setPalette(this.satellitePalette);
     this.particles.init(gl);
     this.wind.init(gl, this.caps);
+    this.upperWind.init(gl, this.caps);
     this.rain.init(gl, this.caps);
     this.radar.init(gl);
     if (this.overlay) {
@@ -559,6 +584,7 @@ export class RenderPipeline implements RenderLayer {
     this.satellite.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.wind.resize(this.width, this.height);
+    this.upperWind.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
     this.radar.resize(this.width, this.height);
     this.ghosts.resize(this.width, this.height);
@@ -586,7 +612,9 @@ export class RenderPipeline implements RenderLayer {
     this.applyTerrain();
     this.envPlane = -1;
     this.envNextPlane = -1;
-    this.applyEnv(0, 0);
+    this.envPlaneMode = '';
+    this.upperPlane = null;
+    this.applyEnv(0, 0, null);
     this.applyGenesis();
   }
 
@@ -661,7 +689,11 @@ export class RenderPipeline implements RenderLayer {
     if ((this.gpu.elev || this.gpu.land) && this.terrainReadyMs < 0) this.terrainReadyMs = performance.now();
   }
 
-  private applyEnv(plane: number, nextPlane: number): void {
+  private applyEnv(
+    plane: number,
+    nextPlane: number,
+    upperPlane: number | null,
+  ): void {
     const gl = this.gl;
     const bin = this.res.env;
     if (!gl || !bin) return;
@@ -672,6 +704,7 @@ export class RenderPipeline implements RenderLayer {
     const shearL = pickLayer(bin, [n.shr, 'shear', 'shr']);
     const steerUL = pickLayer(bin, [n.u, 'u']);
     const steerVL = pickLayer(bin, [n.v, 'v']);
+    const upper = upperWindLayers(this.res.upper, this.monthIndex);
     for (const texture of [
       this.gpu.sst,
       this.gpu.sstNext,
@@ -685,6 +718,7 @@ export class RenderPipeline implements RenderLayer {
       this.gpu.steerUNext,
       this.gpu.steerV,
       this.gpu.steerVNext,
+      this.gpu.upperUV,
     ]) {
       if (texture) gl.deleteTexture(texture);
     }
@@ -700,6 +734,7 @@ export class RenderPipeline implements RenderLayer {
     this.gpu.steerUNext = null;
     this.gpu.steerV = null;
     this.gpu.steerVNext = null;
+    this.gpu.upperUV = null;
     if (sstL) {
       this.gpu.envGrid = { nx: sstL.nx, ny: sstL.ny, bbox: sstL.bbox };
       this.gpu.sst = buildR8Tex(
@@ -798,8 +833,19 @@ export class RenderPipeline implements RenderLayer {
         gl.LINEAR,
       );
     }
+    if (upper && upperPlane !== null) {
+      const upperNorm = (value: number) => (value + 50) / 100;
+      this.gpu.upperUV = buildUpperWindRG8Tex(
+        gl,
+        upper.u,
+        upper.v,
+        upperPlane,
+        upperNorm,
+      );
+    }
     this.envPlane = plane;
     this.envNextPlane = nextPlane;
+    this.upperPlane = upperPlane;
   }
 
   /**
@@ -863,6 +909,10 @@ export class RenderPipeline implements RenderLayer {
       frame.envTFrac,
     );
     const plane = interpolation.current;
+    const upper = upperWindLayers(this.res.upper, this.monthIndex);
+    const requestedUpperPlane = upper
+      ? upperWindTexturePlane(upper.u.nt, frame.envSamplingMode)
+      : null;
     const nextPlane = interpolation.next;
     this.gpu.envBlend = interpolation.blend;
     const modeKey =
@@ -872,10 +922,11 @@ export class RenderPipeline implements RenderLayer {
     if (
       plane !== this.envPlane ||
       nextPlane !== this.envNextPlane ||
-      modeKey !== this.envPlaneMode
+      modeKey !== this.envPlaneMode ||
+      requestedUpperPlane !== this.upperPlane
     ) {
       this.envPlaneMode = modeKey;
-      this.applyEnv(plane, nextPlane);
+      this.applyEnv(plane, nextPlane, requestedUpperPlane);
     }
   }
 
@@ -918,6 +969,7 @@ export class RenderPipeline implements RenderLayer {
       g.steerUNext,
       g.steerV,
       g.steerVNext,
+      g.upperUV,
       g.rainAccum,
     ]) {
       if (t) gl.deleteTexture(t);
@@ -1031,6 +1083,7 @@ export class RenderPipeline implements RenderLayer {
       env,
       weatherLayer: this.weatherLayer,
       steeringAt: this.buildSteeringSampler(),
+      upperAt: this.buildUpperSampler(),
     };
   }
 
@@ -1072,6 +1125,23 @@ export class RenderPipeline implements RenderLayer {
       u: read(uL, lat, lon),
       v: read(vL, lat, lon),
     });
+  }
+
+  /** CPU upper-wind sampler from the same frame-selected plane as the fill. */
+  private buildUpperSampler():
+    | ((lat: number, lon: number) => { u: number; v: number })
+    | null {
+    const upper = upperWindLayers(this.res.upper, this.monthIndex);
+    const plane = this.upperPlane;
+    if (!upper || plane === null) return null;
+    return (lat: number, lon: number) => {
+      const u = sampleLayerBilinear(upper.u, plane, lat, lon);
+      const v = sampleLayerBilinear(upper.v, plane, lat, lon);
+      if (!Number.isFinite(u) || !Number.isFinite(v)) {
+        throw new Error('render: upper-wind sample must be finite');
+      }
+      return { u, v };
+    };
   }
 
   private fadeSince(readyMs: number, nowMs: number): number {

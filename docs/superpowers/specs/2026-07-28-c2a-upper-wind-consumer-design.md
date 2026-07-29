@@ -102,6 +102,11 @@ differences:
    layer uses today (motion gated, fill still communicates the field,
    `render/wind.ts:16-17`).
 
+**Implementation deviation (2026-07-29).** Rendered QA found that the R8
+texture pair overflowed `MAX_TEXTURE_IMAGE_UNITS(16)` on min-spec WebGL2 and
+prevented the env program from linking. The two components therefore ship
+packed into one RG8 texture; everything else in this section stands.
+
 Colours come only from existing wind-palette tokens in `src/tokens.ts`; no
 new literals in shaders or CSS (design-token rule). Whether the trails module
 is a parameterization of `render/wind.ts` or a sibling `render/upper-wind.ts`

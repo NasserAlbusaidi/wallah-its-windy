@@ -74,6 +74,8 @@ import { scoreHindcast, type HindcastScore } from './hindcast';
 import {
   DEFAULT_SATELLITE_PALETTE,
   DEFAULT_WEATHER_LAYER,
+  digitHintForLayerIndex,
+  layerIndexForDigitCode,
   SATELLITE_PALETTES,
   satellitePaletteDefinition,
   weatherLayerDefinition,
@@ -116,6 +118,8 @@ import {
   type RadarTimelineFrame,
 } from './radar-observations';
 import { createPointProbeReading } from './point-probe';
+import { sampleUpperWind, upperWindLayers } from './upper-sampler';
+import { resolveUpperWindMode } from './upper-runtime';
 import { neutralSimulatedStormName } from './storm-names';
 import { findHistoricalAnalog, type HistoricalAnalog } from './historical-analog';
 import {
@@ -423,6 +427,7 @@ const impact = new ImpactTracker();
 // returning from an event restores it.
 let envBin: ParsedBin | null = null;
 let climatologyBin: ParsedBin | null = null;
+let upperBin: ParsedBin | null = null;
 let oceanBin: ParsedBin | null = null;
 let steeringBin: ParsedBin | null = null;
 /** Merged terrain+flowacc bin, retained so a scenario switch can re-inject it. */
@@ -502,7 +507,7 @@ try {
   const acquired = acquireRender(gl);
   layers = acquired.layers;
   renderCtrl = acquired.ctrl;
-  const emptyResources: RenderResourcesLike = { terrain: null, env: null, genesis: [], tracks: [] };
+  const emptyResources: RenderResourcesLike = { terrain: null, env: null, upper: null, genesis: [], tracks: [] };
   for (const layer of layers) {
     try {
       if (layer === renderCtrl) {
@@ -648,6 +653,7 @@ async function loadSatelliteManifest(): Promise<void> {
 const MANIFEST: LoadItem[] = [
   { url: asset('data/terrain.bin'), label: 'terrain', kind: 'bin', key: 'terrain', weight: 3 },
   { url: asset('data/env.bin'), label: 'environment', kind: 'bin', key: 'env', weight: 2 },
+  { url: asset('data/upper.bin'), label: 'upper winds', kind: 'bin', key: 'upper', weight: 1 },
   { url: asset('data/ocean.bin'), label: 'upper ocean', kind: 'bin', key: 'ocean', weight: 2 },
   { url: asset('data/flowacc.bin'), label: 'wadi network', kind: 'bin', key: 'flowacc', weight: 2 },
   { url: asset('data/genesis.json'), label: 'genesis zones', kind: 'json', key: 'genesis', weight: 1 },
@@ -800,6 +806,7 @@ async function loadAll(): Promise<void> {
   ui.setGenesis(genesisPoints);
   climatologyBin = bins.get('env') ?? null;
   envBin = climatologyBin;
+  upperBin = bins.get('upper') ?? null;
   oceanBin = bins.get('ocean') ?? null;
 
   // Ghost tracks (C7): the facade draws the polylines; ui owns the DOM labels.
@@ -817,7 +824,8 @@ async function loadAll(): Promise<void> {
   // Inject the single parsed copy into the render facade (mode A): the exact
   // bytes main just loaded feed BOTH the sim sampler and the GPU textures, so no
   // URL is fetched twice and no bin is dequantized twice (the double-load seam).
-  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: envBin, genesis: genesisPoints, tracks: ghostTracks });
+  const upperState = updateUpperWindLayerState();
+  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: envBin, upper: upperState.upper, genesis: genesisPoints, tracks: ghostTracks });
 
   // First storm. A shared storm from the URL hash replays exactly; if it carries a
   // known scenario key, fetch that event bin BEFORE the first spawn so the replay
@@ -1225,7 +1233,8 @@ function applyEventEnv(
   scenarioModeSelect.value = canHindcast ? mode : 'counterfactual';
   monthSelect.value = String(scenario.monthIndex);
   monthSelect.disabled = true; // a historic event is pinned to its real month
-  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: bin, genesis: genesisPoints, tracks: ghostTracks });
+  const upperState = updateUpperWindLayerState(scenario.monthIndex);
+  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: bin, upper: upperState.upper, genesis: genesisPoints, tracks: ghostTracks });
   renderCtrl?.setMonth?.(scenario.monthIndex);
   renderCtrl?.setActiveGhost?.(scenario.ghostId);
   ui.highlightGhost(scenario.ghostId);
@@ -1266,6 +1275,7 @@ function applyClimatologyEnv(month: number): void {
   renderCtrl?.setResources?.({
     terrain: mergedTerrainBin,
     env: climatologyBin,
+    upper: updateUpperWindLayerState(month).upper,
     genesis: genesisPoints,
     tracks: ghostTracks,
   });
@@ -1412,6 +1422,8 @@ function refreshProductIdentity(storm: StormState | null = displayedStorm()): vo
     ageH: storm?.ageH ?? null,
     oceanMissingSourceFlag:
       storm?.diagnostics.oceanMissingSourceFlag ?? false,
+    upperWindMissingSourceFlag:
+      activeScenario === null && availableUpperBin(readPickerMonth()) === null,
     observation: activeObservationProduct(),
   });
   productIdentityEl.dataset.mode = identity.mode;
@@ -1480,6 +1492,16 @@ function pointProbeReadingAt(point: LatLon, storm: StormState | null) {
     : null;
   const environment =
     direct ?? envSampler.sample(point.lat, point.lon, monthIndex, tFrac);
+  const upper =
+    climatologyBin && upperBin
+      ? sampleUpperWind(
+          upperBin,
+          point.lat,
+          point.lon,
+          monthIndex,
+          envSampler.getSamplingMode(),
+        )
+      : null;
   const monthLabel = Array.from(monthSelect.options).find(
     (option) => Number(option.value) === monthIndex,
   )?.textContent;
@@ -1499,6 +1521,7 @@ function pointProbeReadingAt(point: LatLon, storm: StormState | null) {
     ...point,
     environment,
     storm,
+    upper,
     environmentKind,
     environmentLabel: activeScenario
       ? `${activeScenario.label} event fields`
@@ -1567,6 +1590,8 @@ const LAYER_ICONS: Record<WeatherLayerId, string> = {
   ohc: '<path d="M2 10.5q1.5-1.5 3 0t3 0t3 0t3 0M2 13q1.5-1.5 3 0t3 0t3 0t3 0"/><path d="M6 3q1 1.2 0 2.4q-1 1.2 0 2.4M10 3q1 1.2 0 2.4q-1 1.2 0 2.4"/>',
   shear:
     '<path d="M2 5.5h9M11 5.5 8.8 3.3M11 5.5 8.8 7.7M14 10.5H5M5 10.5l2.2-2.2M5 10.5l2.2 2.2"/>',
+  upper:
+    '<path d="M1.5 4.5h9a2 2 0 1 0-2-2.5M1.5 8h12M1.5 11.5h7a2 2 0 1 1-2 2"/>',
   terrain: '<path d="M1.5 12.5 6 5l2.4 4 2.1-3 4 6.5Z"/>',
 };
 
@@ -2067,6 +2092,10 @@ function setSatelliteProvider(provider: SatelliteProviderId): void {
 }
 
 function setWeatherLayer(layer: WeatherLayerId): void {
+  if (
+    layer === 'upper' &&
+    resolveUpperWindMode(layer, availableUpperBin(readPickerMonth()), activeScenario !== null).disabled
+  ) return;
   activeWeatherLayer = layer;
   renderCtrl?.setWeatherLayer?.(layer);
   satelliteWorkbench.hidden = layer !== 'infrared';
@@ -2085,8 +2114,39 @@ function setWeatherLayer(layer: WeatherLayerId): void {
   }
 }
 
+function availableUpperBin(monthIndex: number): ParsedBin | null {
+  if (!climatologyBin || !upperBin) return null;
+  return upperWindLayers(upperBin, monthIndex) ? upperBin : null;
+}
+
+function updateUpperWindLayerState(monthIndex = readPickerMonth()) {
+  const state = resolveUpperWindMode(
+    activeWeatherLayer,
+    availableUpperBin(monthIndex),
+    activeScenario !== null,
+  );
+  if (state.activeLayer !== activeWeatherLayer) {
+    setWeatherLayer(state.activeLayer);
+  }
+  const button = layerButtons.querySelector<HTMLButtonElement>(
+    '.layer-button[data-layer="upper"]',
+  );
+  if (button) {
+    const definition = weatherLayerDefinition('upper');
+    button.disabled = state.disabled;
+    button.title = state.caption ?? definition.label;
+    button.setAttribute(
+      'aria-label',
+      state.caption ? definition.label + ' · ' + state.caption : definition.label,
+    );
+    const label = button.querySelector<HTMLElement>('.label');
+    if (label) label.textContent = state.caption ?? definition.shortLabel;
+  }
+  return state;
+}
+
 // Build the Windy-style rail: one button per catalogue layer, in order, with
-// the Digit1..Digit9 key hint the keyboard handler mirrors.
+// the Digit1..Digit0 key hint the keyboard handler mirrors.
 layerButtons.replaceChildren(
   ...WEATHER_LAYERS.map((definition, index) => {
     const button = document.createElement('button');
@@ -2104,17 +2164,18 @@ layerButtons.replaceChildren(
     label.textContent = definition.shortLabel;
     const key = document.createElement('span');
     key.className = 'key';
-    key.textContent = String(index + 1);
+    key.textContent = digitHintForLayerIndex(index);
     button.append(label, key);
     button.addEventListener('click', () => {
       setWeatherLayer(definition.id);
       // Drop focus so the keydown form-control guard doesn't eat the very
-      // Digit1-9 shortcuts this button advertises in its key hint.
+      // Digit1-0 shortcuts this button advertises in its key hint.
       button.blur();
     });
     return button;
   }),
 );
+updateUpperWindLayerState();
 for (const button of satelliteSourceControls.querySelectorAll<HTMLButtonElement>('button[data-source]')) {
   button.addEventListener('click', () => {
     const source = button.dataset.source;
@@ -2434,8 +2495,9 @@ window.addEventListener('keydown', (e) => {
   ) {
     return;
   }
-  if (/^Digit[1-9]$/.test(e.code)) {
-    const index = Number(e.code.slice(-1)) - 1;
+  const digitIndex = layerIndexForDigitCode(e.code);
+  if (digitIndex !== null) {
+    const index = digitIndex;
     const definition = WEATHER_LAYERS[index];
     if (definition) {
       e.preventDefault();
@@ -2886,6 +2948,7 @@ function isRenderLayer(v: unknown): v is RenderLayer {
 interface RenderResourcesLike {
   terrain: ParsedBin | null;
   env: ParsedBin | null;
+  upper: ParsedBin | null;
   genesis: LatLon[];
   tracks: GhostPolyline[];
 }

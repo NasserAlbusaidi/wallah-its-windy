@@ -22,6 +22,7 @@ import {
 } from '../src/env-sampler';
 import { DEMO_GENESIS, DEMO_MONTH, DEMO_SEED } from '../src/ui';
 import { createSimEngine, SIM } from '../src/sim';
+import { sampleUpperWind } from '../src/upper-sampler';
 import { cellToLatLon, DOMAIN, inBBox, latLonToCell } from '../src/grid';
 import { DType, MUSCAT } from '../src/types';
 import type { BinLayer, ParsedBin, SimEvent } from '../src/types';
@@ -251,6 +252,25 @@ describe('upper.bin (200-hPa wind sidecar, C1)', () => {
           diff += Math.abs(u200!.data[a + i] - u200!.data[b + i]);
         }
         expect(diff / planeSize, `u200_${mm} plane${p} vs ${p + 1}`).toBeGreaterThan(0.1);
+      }
+    }
+  });
+
+  it('runtime-samples finite real bytes for every season month', () => {
+    for (const monthIndex of SEASON) {
+      const planeCount = upper.layers.get(
+        `u200_${envMonthSuffix(monthIndex)}`,
+      )!.nt;
+      for (let plane = 0; plane < planeCount; plane += 1) {
+        const sample = sampleUpperWind(
+          upper,
+          20,
+          60,
+          monthIndex,
+          { kind: 'synoptic-plane', plane },
+        );
+        expect(sample).not.toBeNull();
+        expect(Object.values(sample!).every(Number.isFinite)).toBe(true);
       }
     }
   });

@@ -78,6 +78,7 @@ describe('point probe', () => {
       validTimeLabel: '+24 h',
       simulatedRainMm: 42.75,
       simulatedRainWindowLabel: '6 h',
+      upper: { uMs: 3, vMs: 4, speedMs: 5, dirDeg: 216.86989764584402 },
     });
     expect(reading).toMatchObject({
       sstC: 29.25,
@@ -87,6 +88,8 @@ describe('point probe', () => {
       environmentKind: 'analysis',
       simulatedRainMm: 42.75,
       simulatedRainWindowLabel: '6 h',
+      upperSpeedMs: 5,
+      upperDirDeg: 216.86989764584402,
     });
     expect(reading.modeledWindKt).toBe(windAtPointKt(active, point));
   });
@@ -103,5 +106,7 @@ describe('point probe', () => {
     });
     expect(reading.modeledWindKt).toBeNull();
     expect(reading.simulatedRainMm).toBeNull();
+    expect(reading.upperSpeedMs).toBeNull();
+    expect(reading.upperDirDeg).toBeNull();
   });
 });

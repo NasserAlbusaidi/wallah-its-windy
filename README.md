@@ -86,8 +86,8 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
 ## Controls
 
 - Click open water to spawn a storm.
-- Hover the chart for modeled surface wind, SST, humidity, shear, and OHC at the
-  cursor, plus exact millimetres from the selected simulated-rain window. Use
+- Hover the chart for modeled surface wind, SST, humidity, shear, OHC, and
+  plane-aligned ERA5 200-hPa upper wind at the cursor, plus exact millimetres from the selected simulated-rain window. Use
   **pin** to hold the reading; on touch, long-press the chart. The card identifies
   analysis, climatology, or fallback fields and always labels vortex wind and
   rain as simulated. Rain is withheld while scrubbing replay because the ledger
@@ -95,9 +95,9 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
 - Eight coastal-city markers open exact current/run impact readings. A marker
   glows amber only while the same Holland profile used by the impact report
   puts that city at or above 34 kt.
-- Pick a layer on the right-edge rail (or press 1–9): wind flow, radar,
-  simulated infrared, rain accumulation, SST, humidity, OHC, shear, and the
-  terrain instrument. The radar desk switches between the model's
+- Pick a layer on the right-edge rail (or press 1–0): wind flow, radar,
+  simulated infrared, rain accumulation, SST, humidity, OHC, shear, ERA5
+  200-hPa upper winds, and the terrain instrument. The radar desk switches between the model's
   reflectivity-style proxy and a timestamped eight-frame RainViewer past-radar
   loop. Observed pixels are display-only, carry provider/time/age/coverage
   provenance, and are never assimilated. The accumulation desk exposes fixed
@@ -468,7 +468,7 @@ src/
   satellite-observations.ts observed-frame manifest, matching, WMS URLs
   radar-observations.ts bounded RainViewer timeline, tiles + reprojection
   rain-accumulation.ts deterministic display windows, scales + normalization
-  weather-layers.ts   nine map-product labels, provenance, and legends
+  weather-layers.ts   ten map-product labels, provenance, and legends
   category.ts         secondary Saffir–Simpson comparison palette
   wind-conventions.ts RSMC regional classes + explicit wind metadata
   impact.ts           fixed-window/storm rain ledger + per-city impact proxy

@@ -51,20 +51,29 @@ state — nothing exists that *could* diverge from its reconstruction.
 ### 1. State definition and determinism contract
 
 - **Field:** two channels — cloud density and debris age — in an earth-fixed
-  texture over the same clip domain env renders. RGBA8. Resolution is a
-  render trait set per performance tier (named constants,
-  `CLOUD_MEMORY_SIZE_DETAIL = 512`, `CLOUD_MEMORY_SIZE_MOBILE = 256`), like
-  dprCap: per-device, never read by physics or recorded output.
+  texture over the same clip domain env renders. Fixed RGBA8: `makeRenderTarget`
+  in gl-utils.ts prefers RGBA16F when `EXT_color_buffer_float` is present, so
+  it gains a force-RGBA8 option for these targets (fixed format keeps the
+  encoding identical across devices and cheap on mobile). Both channels are
+  normalized [0,1]: density directly; debris age as `ageN`, incremented by
+  `dt / W` per step and clamped — raw hours would saturate an 8-bit channel
+  after one step — and decoded by ×W at display. Resolution is a render trait
+  set per performance tier (named constants, `CLOUD_MEMORY_SIZE_DETAIL = 512`,
+  `CLOUD_MEMORY_SIZE_MOBILE = 256`), like dprCap: per-device, never read by
+  physics or recorded output.
 - **Timeline:** memory boundaries at integer multiples of
   `CLOUD_MEMORY_DT_H = 1` sim-hour. Window `CLOUD_MEMORY_WINDOW_H = 18`
   sim-hours → `N = 18` update steps per boundary state.
 - **Definition:** `state(k)` = start from a **zero field** at boundary
   `k − N`, apply N update steps; step j reads storm history at boundary time
   `(k − N + j) · dt` from the flight-recorder tape. Zero init (not seeded
-  noise) means state(k) and state(k+1) share all overlapping source history
-  exactly and differ only by the single oldest/newest step — no init-mismatch
-  shimmer to crossfade away. The seed still enters through `u_cloudNoise`
-  source texturing.
+  noise) removes any init-noise mismatch between adjacent boundary states:
+  their *source inputs* over the shared window are identical, and they differ
+  by the oldest/newest injection plus one extra advect/decay step applied to
+  every retained contribution. That per-step evolution is small by
+  construction (bounded displacement, `exp(−1/6)` decay), and the display
+  crossfade carries the remaining continuity. The seed still enters through
+  `u_cloudNoise` source texturing.
 - **Truncation is definitional, not approximate.** A parcel lives at most W
   sim-hours by definition. `W / τ ≥ 3` (see decay below) so the oldest parcel
   leaves the window at ≤ ~5 % amplitude; the display crossfade absorbs the
@@ -94,12 +103,30 @@ One small fragment program ping-pongs two work textures; per step, per texel:
 
 1. **Advect** — semi-Lagrangian single-tap backtrace: sample the previous
    step at `pos − v · dt`. The velocity field is the *display* flow, for
-   coherence with the shipped motion layer: capped `cloudOmega` rotation
-   (same GLSL/CPU mirror as cloud-motion.ts) around that boundary's storm
-   center, the shipped outward outflow drift near the storm, and the ambient
-   steering drift far-field. Storm translation is implicit — the field is
-   earth-fixed and the source moves. The rotation cap bounds the backtrace to
-   ~3.5 texels/step at 512², safe for a single tap.
+   coherence with the shipped motion layer, and has exactly two terms:
+   - Capped `cloudOmega` rotation (same GLSL/CPU mirror as cloud-motion.ts)
+     around that boundary's storm center, **under the same reduced-motion
+     policy as the display path**: with reduced motion active the update pass
+     uses `LEGACY_CLOUD_ROTATION_RAD_PER_H` instead of the capped Holland
+     rate, exactly as env's animGate does. The reduced-motion flag is thereby
+     a state-definition input — a render trait like tier — and toggling it
+     invalidates the state cache.
+   - A **new** radial outflow term (nothing shipped provides one — the
+     decorative field's drift is shear-aligned, a recorded deviation from the
+     prior spec): magnitude `CLOUD_MEMORY_OUTFLOW_KMH` (~12, named constant
+     with WHY), ramping 0→full over `1.2×RMW → 2.5×RMW` via smoothstep,
+     constant beyond. Debris therefore spreads outward and is left behind by
+     the moving source; no steering term — translation is implicit in the
+     earth-fixed frame.
+   Worst-case backtrace: the cap bounds *angular* rate, so linear
+   displacement peaks at `0.3 rad/h × 95 km` (the structure model's RMW
+   clamp) ≈ 28.5 km ≈ **11 texels** per step at 512² (2.6 km/texel), plus
+   the bounded outflow term. Semi-Lagrangian backtracing is unconditionally
+   stable at any displacement; the cost of a long tap is smearing, not
+   blow-up. If browser QA shows swirl artifacts near large-RMW cores, a
+   named substep constant (`CLOUD_MEMORY_SUBSTEPS`) divides the step — it is
+   part of the state definition, so changing it is a visual retune, never a
+   replay break.
 2. **Decay** — density × `exp(−dt / CLOUD_MEMORY_DECAY_TAU_H)`,
    `τ = 6` sim-hours; the debris-age channel increments by dt where density
    is present.
@@ -116,9 +143,13 @@ named GLSL/TS constants with WHY comments; CPU mirrors are vitest-pinned.
 
 - **Packing:** `state(k)` in RG, `state(k+1)` in BA of one RGBA texture, so
   env reads both boundary states in **one** `texture()` call and crossfades
-  with `frac(u_cloudAgeH / CLOUD_MEMORY_DT_H)` — a pure function of the
-  already-shipped interpolated cloud age. Pause freezes it; the same replay
-  frame reproduces the same pixels.
+  with `frac(u_cloudAgeH / CLOUD_MEMORY_DT_H)` — consuming the *same*
+  `interpolatedCloudAgeH` value env already computes for `u_cloudAgeH`, one
+  age source, no second path. In replay both navigation entry points pin
+  alpha to 0 and prev to the tape's previous frame, so `u_cloudAgeH` — and
+  therefore the boundary pair and fraction — is a pure function of the
+  selected frame index. Pause freezes it; the same replay frame reproduces
+  the same pixels.
 - **Sampler budget:** the env program currently uses all 16 guaranteed
   fragment texture units. The OHC month pair (`u_ohc`/`u_ohcNext`, blended
   once with `u_planeBlend`) is pre-blended into a single texture by a tiny
@@ -145,11 +176,12 @@ named GLSL/TS constants with WHY comments; CPU mirrors are vitest-pinned.
 - **Coverage:** everywhere the storm cloud field renders — IR palettes and
   the faint cloud context under terrain/wind/accum/rain-plate modes — on both
   tiers, so the wake never vanishes on a layer switch.
-- **Reduced motion:** the memory field stays active. It evolves at the
-  storm-translation speed class, which the shipped reduced-motion contract
-  already permits for morphology; no fast circulation or pulsing is added by
-  this feature. The existing animGate behavior of other components is
-  unchanged.
+- **Reduced motion:** the memory field stays active, but its update-pass
+  rotation follows the same gate as the display path (legacy slow rate — see
+  the advection term above), so the wake neither rotates fast internally nor
+  adds pulsing. What remains evolves at the storm-translation speed class,
+  which the shipped reduced-motion contract already permits for morphology.
+  The existing animGate behavior of other components is unchanged.
 - **Rainband contract:** `precipitatingCloud` support stays on
   `rainCenterClip` / `RAINBAND_SPIRAL_ROTATION_PER_H`, untouched. Memory is
   decorative morphology only and must not move the minimum rain-support floor.
@@ -160,11 +192,14 @@ named GLSL/TS constants with WHY comments; CPU mirrors are vitest-pinned.
   mirrors, GLSL strings — the cloud-motion.ts pattern.
 - The render loop ensures `state(k)`/`state(k+1)` exist before the env draw.
   Storm history comes through a read-only accessor over the flight-recorder
-  tape with nearest-frame-at-or-before-age semantics (frames are per fixed
-  tick, boundaries land on tick ages except across stationary-frame dedup).
-  The accessor observes; the recorder's recording path is untouched.
+  tape with nearest-frame-at-or-before-age semantics. Frames always advance
+  `ageH` while the storm lives (dedup requires equal `ageH`, which only ever
+  matches on identical post-death records), so 1-hour boundaries land exactly
+  on tick ages; boundary times beyond the last frame clamp to it. The
+  accessor observes; the recorder's recording path is untouched.
 - Expected product diff: `src/render/cloud-memory.ts`, `src/render/env.ts`,
   `src/render/cloud-motion.ts` (shared constants if needed),
+  `src/render/gl-utils.ts` (force-RGBA8 option on `makeRenderTarget`),
   `src/render/index.ts`, `src/main.ts` (accessor wiring),
   `src/flight-recorder.ts` (read-only accessor only),
   `test/cloud-memory.test.ts`, the regenerated morphology artefacts, this
@@ -189,14 +224,18 @@ boundary. No new product claims, no label changes, no probability framing.
 
 - **Vitest (no GL harness; GLSL is browser-verified):** boundary index/frac
   math from cloudAgeH; window clamp at spawn; nearest-≤ tape lookup including
-  the dedup gap case; velocity mirror reuse of `cloudAngularRateRadPerH`;
-  cache keying and run-identity invalidation; OHC pre-blend selection logic;
-  W/τ ≥ 3 pinned as a relation test so retuning one constant cannot silently
-  break the tail contract.
+  clamping beyond the last frame; normalized debris-age encode/decode
+  round-trip; velocity mirror reuse of `cloudAngularRateRadPerH` including
+  the reduced-motion legacy-rate branch; cache keying, run-identity
+  invalidation, and reduced-motion-toggle invalidation; OHC pre-blend
+  selection logic; W/τ ≥ 3 pinned as a relation test so retuning one
+  constant cannot silently break the tail contract.
 - **Browser QA (Playwright; console/WebGL errors are failures):**
-  1. *Scrub equivalence (the new critical check):* play forward to a frame,
-     capture; cold-scrub away and back to the same frame, capture →
-     byte-identical. Repeat across a memory-boundary crossing.
+  1. *Scrub equivalence (the new critical check):* play forward and pause at
+     a frame, capture; cold-scrub away and back to the same frame, capture →
+     byte-identical. (Pausing and replay navigation both pin alpha to 0, so
+     the paused-live and replay views agree by construction.) Repeat across a
+     memory-boundary crossing.
   2. Paused-frame and same-replay-frame captures byte-identical (shipped
      check, now exercising the memory path).
   3. Wake: a moving mature storm shows a decaying debris deck along its
@@ -238,4 +277,39 @@ task is committed from this seat. Gate failures surface as decision briefs.
 
 ## Gate record
 
-Pending — to be appended after review rounds.
+Independent adversarial review by a second model (fresh context per round),
+findings verified against code before acceptance.
+
+- **Round 1** (full scope): reviewer stalled past its time budget before
+  completing, but its partial trace flagged the post-death timeline. Verified
+  against `sim.ts` `tick()` (returns immediately when not alive): the spec's
+  original "wake outlives the storm" claim and QA check were contradicted by
+  code — **1 P1, accepted and fixed** (frozen-final-frame stance).
+- **Round 2a** (determinism/timeline/tape scope): 1 P1, 2 P2.
+  - P1 "replay cloud age depends on scrub history" — **refuted with
+    evidence**: both replay navigation entry points reset the fixed-step
+    accumulator (alpha ≡ 0 in replay) and `storm-session.ts` derives
+    prev from the tape (`stormAt(i−1)`), so `u_cloudAgeH` is a pure function
+    of the selected frame index. The reviewer had not read
+    `storm-session.ts`. Kernel kept: QA wording now says "pause at a frame",
+    and the spec states the single-age-source rule explicitly.
+  - P2 dedup-gap claim — accepted: dedup requires equal `ageH`; no age gaps
+    exist while alive. Accessor claim simplified, test case replaced.
+  - P2 zero-init "exactly" overclaim — accepted: reworded to identical
+    source inputs + one-step evolution + crossfade continuity.
+- **Round 2b** (GL/budget/render-contract scope): 4 P1, 1 P2, all accepted.
+  - RGBA8 age saturation → normalized `ageN += dt/W` encoding.
+  - `makeRenderTarget` RGBA16F preference → force-RGBA8 option; gl-utils.ts
+    added to the permitted diff.
+  - Texel-bound arithmetic → corrected to ~11 texels worst case
+    (cap × 95 km RMW clamp); named substep constant as the QA fallback.
+  - Reduced-motion conflict → update pass adopts the display path's gate;
+    the flag is a state-definition input; toggle invalidates the cache.
+  - P2 outflow provenance → specified as a new named term with formula; the
+    shipped drift is shear-aligned (recorded prior-spec deviation), not
+    radial.
+  - Explicitly verified as holding: 16-sampler accounting and OHC pre-blend,
+    RG/BA one-call packing, presence-ladder ordering, sealed +2 relief taps,
+    `rainCenterClip` support, per-tier resolution as a legitimate render
+    trait, header-sized OHC blit.
+- **Round 3**: pending — re-review of the amended spec targeting zero P1.

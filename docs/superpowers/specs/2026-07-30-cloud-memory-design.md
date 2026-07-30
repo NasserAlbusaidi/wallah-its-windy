@@ -144,11 +144,29 @@ One small fragment program ping-pongs two work textures; per step, per texel:
    the frame's `structure` radii (rmw, outer size), textured by seeded
    `u_cloudNoise` cells so injection is patchy, not a stamp.
 3. **Decay** — after injection: density × `exp(−dt / CLOUD_MEMORY_DECAY_TAU_H)`,
-   `τ = 6` sim-hours; the normalized debris-age channel increments by
-   `dt / W` where density persists. Source-before-decay is deliberate: every
-   contribution, the newest included, decays at least once, and the oldest
-   injection in the window decays exactly N times — the tail contract is
-   `exp(−N·dt/τ) = exp(−3) ≈ 4.98 %` with no off-by-one.
+   `τ = 6` sim-hours. Source-before-decay is deliberate: every contribution,
+   the newest included, decays at least once, and the oldest injection in
+   the window decays exactly N times. Because the state is stored RGBA8, the
+   **tail contract is defined in encoded space**: a CPU mirror runs the
+   byte-quantized recurrence (per-step ×`exp(−1/6)`, round to nearest of
+   255ths) for N steps from a unit injection and asserts the final byte
+   ≤ 13 (13/255 ≈ 5.1 %; the unquantized `exp(−3) ≈ 4.98 %` encodes to that
+   same byte). The relation test pins this recurrence, not the float
+   exponent, so format, order, or constant changes cannot silently pass in
+   float while failing in the rendered state.
+
+Sealed combine rules (each a formula, not a choice left to the implementer):
+
+- Density after source: `min(1, advectedDensity + sourceDensity)` — additive
+  convection with saturation; a sustained CDO core saturating to 1.0 is the
+  intended look.
+- Debris age after source:
+  `advectedAge × advectedDensity / max(advectedDensity + sourceDensity, ε)` —
+  density-weighted, so fresh convection smoothly rejuvenates the column
+  toward age 0 with no threshold pop.
+- Age then increments by `dt / W` (clamped to 1) where the decayed density
+  still encodes nonzero (≥ 1/255); where density encodes to zero, age resets
+  to 0 — no cloud, no age.
 
 The update program binds exactly **2 samplers** (previous state,
 `u_cloudNoise`) — its own budget, independent of env's. All constants are
@@ -214,8 +232,10 @@ named GLSL/TS constants with WHY comments; CPU mirrors are vitest-pinned.
   tape with nearest-frame-at-or-before-age semantics. Frames always advance
   `ageH` while the storm lives (dedup requires equal `ageH`, which only ever
   matches on identical post-death records), so 1-hour boundaries land exactly
-  on tick ages; boundary times beyond the last frame clamp to it. The
-  accessor observes; the recorder's recording path is untouched.
+  on tick ages. Because the causality seal (§1) bounds every lookup to
+  frames at `k − N … k − 1`, a lookup can never run past the tape; a missing
+  frame throws — there is no clamp and no fallback. The accessor observes;
+  the recorder's recording path is untouched.
 - Expected product diff: `src/render/cloud-memory.ts`, `src/render/env.ts`,
   `src/render/cloud-motion.ts` (shared constants if needed),
   `src/render/gl-utils.ts` (force-RGBA8 option on `makeRenderTarget`),
@@ -249,9 +269,12 @@ boundary. No new product claims, no label changes, no probability framing.
   cap; velocity mirror reuse of `cloudAngularRateRadPerH` including the
   reduced-motion legacy-rate branch; cache keying, run-identity
   invalidation, and reduced-motion-toggle invalidation; OHC pre-blend
-  selection logic; the tail contract pinned as a relation test on the
-  Advect→Source→Decay order: `exp(−(W/dt)·dt/τ) ≤ 5 %`, so retuning one
-  constant or reordering steps cannot silently break it.
+  selection logic; the sealed combine rules (density additive-saturating,
+  density-weighted age, encoded-zero age reset) as CPU mirrors; the tail
+  contract pinned as the byte-quantized recurrence test — final byte ≤ 13
+  after N steps from a unit injection under the Advect→Source→Decay order —
+  so retuning a constant, reordering steps, or changing the storage format
+  cannot silently pass in float while failing in the rendered state.
 - **Browser QA (Playwright; console/WebGL errors are failures):**
   1. *Scrub equivalence (the new critical check), within replay mode:*
      scrub to a frame, capture; scrub far away (forcing cold recomputes);
@@ -259,8 +282,10 @@ boundary. No new product claims, no label changes, no probability framing.
      memory-boundary crossing. Separately, a paused live frame captured twice
      is byte-identical. No cross-mode (paused-live vs replay) equality is
      claimed — the shipped `u_cloudAgeH` paths differ there by construction.
-  2. Paused-frame and same-replay-frame captures byte-identical (shipped
-     check, now exercising the memory path).
+  2. Two separate within-mode repeat checks (shipped checks, now exercising
+     the memory path): a paused live frame captured twice → byte-identical;
+     the same replay frame selected twice → byte-identical. These are
+     independent checks; no equality across the two modes is asserted.
   3. Wake: a moving mature storm shows a decaying debris deck along its
      track; after death the wake remains visible in the frozen final frame
      (sim time stops at death — there is no post-death decay to observe); no
@@ -367,4 +392,17 @@ findings verified against code before acceptance.
     targeting, reduced-motion cache input, outflow provenance, 16-sampler
     accounting, RG/BA packing, relief/rain-support preservation, tier/header
     sizing.
-- **Round 4**: pending — re-review targeting zero P1.
+- **Round 4** (full scope, amended spec): 3 P1, 1 P2, all accepted. Two P1s
+  were editing errors from earlier amendment passes, not design flaws: the
+  §4 accessor still carried the beyond-last-frame clamp the round-3
+  causality seal had deleted (now removed), and QA item 2 still read as a
+  cross-mode equality check (now two explicit within-mode repeat checks).
+  The third P1: `exp(−3)·255 = 12.696` encodes as byte 13 = 5.098 %, so a
+  float ≤ 5 % relation test passes while the RGBA8 state fails — the tail
+  contract is now defined and tested in encoded space (byte-quantized
+  recurrence, final byte ≤ 13). P2 accepted: the source/density and
+  debris-age combine rules are now sealed formulas (additive-saturating
+  density, density-weighted age rejuvenation, encoded-zero age reset).
+  Verified as holding: the 13-texel bound arithmetic and the
+  Advect→Source→Decay decay-count fix.
+- **Round 5**: pending — re-review targeting zero P1.

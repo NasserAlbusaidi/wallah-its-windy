@@ -70,10 +70,13 @@ state — nothing exists that *could* diverge from its reconstruction.
   leaves the window at ≤ ~5 % amplitude; the display crossfade absorbs the
   residual at the wake tail. Tail-pop is a named QA watch item.
 - **Storm edges:** boundaries before spawn contribute nothing (window clamps
-  to spawn). After death the source is off and the field keeps decaying — the
-  wake outlives the storm, which is the desired signature. A run-identity
-  change (new seed/spawn/environment) invalidates all cached states, matching
-  `interpolatedCloudAgeH`'s respawn snap semantics.
+  to spawn). Sim time stops at death — `sim.ts` `tick()` returns immediately
+  once the storm is not alive — so no post-death timeline exists on the tape
+  or anywhere else. The final frame, wake included, freezes on screen and is
+  the last replayable frame; post-death decay is explicitly out of scope for
+  this render-only change. A run-identity change (new seed/spawn/environment)
+  invalidates all cached states, matching `interpolatedCloudAgeH`'s respawn
+  snap semantics.
 - **Caching:** computed states are cached per boundary index k in a small LRU
   (k and k+1 for playback, plus recently scrubbed entries). The cache is a
   pure memoization of the definition — eviction can only cost recompute time,
@@ -197,7 +200,9 @@ boundary. No new product claims, no label changes, no probability framing.
   2. Paused-frame and same-replay-frame captures byte-identical (shipped
      check, now exercising the memory path).
   3. Wake: a moving mature storm shows a decaying debris deck along its
-     track; the deck persists and decays after storm death; no tail-pop at
+     track; after death the wake remains visible in the frozen final frame
+     (sim time stops at death — there is no post-death decay to observe); no
+     tail-pop at
      boundary crossings (two captures 0.15 s apart straddling a boundary).
   4. Layer-switch: wake present in IR (all three palettes) and in the faint
      cloud context modes.

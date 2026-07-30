@@ -4,6 +4,10 @@ Prereqs: same as bake/fetch_era5.py (~/.cdsapirc + accepted CDS licence).
 Run: node bake/run-python.mjs -u bake/fetch_realism_era5.py
 Seasons 2019/2021/2023, May-Nov, 00/06/12/18 UTC, 50-70E/15-27N, 0.5 deg —
 the same domain and grid as env.bin. Re-running skips files that already exist.
+
+NOTE: Pressure-level requests are split per-month (21 total requests across 3 years × 7 months)
+due to CDS cost-limit rejections on yearly requests (observed 2026-07-30). SST requests remain
+yearly (3 total) and are accepted by CDS.
 """
 
 from __future__ import annotations
@@ -23,19 +27,22 @@ TIMES = ["00:00", "06:00", "12:00", "18:00"]
 def requests() -> list[tuple[str, str, dict]]:
     out: list[tuple[str, str, dict]] = []
     for year in YEARS:
-        out.append((
-            f"era5_realism_plev_{year}.nc",
-            "reanalysis-era5-pressure-levels",
-            {
-                "product_type": "reanalysis",
-                "variable": ["u_component_of_wind", "v_component_of_wind",
-                             "relative_humidity"],
-                "pressure_level": ["200", "600", "700", "850"],
-                "year": year, "month": MONTHS, "day": DAYS, "time": TIMES,
-                "area": AREA, "grid": GRID,
-                "data_format": "netcdf", "download_format": "unarchived",
-            },
-        ))
+        # Pressure-level requests: one per month (CDS cost limit)
+        for month in MONTHS:
+            out.append((
+                f"era5_realism_plev_{year}_{month}.nc",
+                "reanalysis-era5-pressure-levels",
+                {
+                    "product_type": "reanalysis",
+                    "variable": ["u_component_of_wind", "v_component_of_wind",
+                                 "relative_humidity"],
+                    "pressure_level": ["200", "600", "700", "850"],
+                    "year": year, "month": month, "day": DAYS, "time": TIMES,
+                    "area": AREA, "grid": GRID,
+                    "data_format": "netcdf", "download_format": "unarchived",
+                },
+            ))
+        # SST requests: yearly (CDS accepts these)
         out.append((
             f"era5_realism_sst_{year}.nc",
             "reanalysis-era5-single-levels",

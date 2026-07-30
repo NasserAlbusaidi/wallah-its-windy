@@ -89,9 +89,17 @@ export interface RenderTarget {
  * Create an RGBA render target at (w,h). Tries RGBA16F when EXT_color_buffer_float
  * is present and falls back to RGBA8 if unavailable or the FBO is incomplete —
  * the accumulation maths clamp to [0,1] either way, so 8-bit degrades gracefully.
+ * Cloud-memory requires 8-bit unorm storage because its tail and age-reset
+ * contracts are defined on stored bytes (spec section 2).
  */
-export function makeRenderTarget(gl: WebGL2RenderingContext, w: number, h: number, caps: GlCaps): RenderTarget {
-  const wantFloat = caps.colorBufferFloat;
+export function makeRenderTarget(
+  gl: WebGL2RenderingContext,
+  w: number,
+  h: number,
+  caps: GlCaps,
+  forceRgba8 = false,
+): RenderTarget {
+  const wantFloat = caps.colorBufferFloat && !forceRgba8;
   // LINEAR upsamples the half-res accumulation smoothly. RGBA16F is texture-
   // FILTERABLE in core WebGL2 (OES_texture_float_linear only gates 32-bit float
   // filtering), and the RGBA8 fallback filters linearly too — so LINEAR is always

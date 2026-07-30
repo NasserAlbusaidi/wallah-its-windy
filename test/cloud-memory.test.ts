@@ -12,6 +12,7 @@ import {
   encodeDebrisAge,
   memoryAdvectSpeedKmH,
   memoryBoundaryPair,
+  planEnsure,
   quantizeByte,
   sourceBoundaries,
   tailResidualByte,
@@ -250,5 +251,13 @@ describe('flight-recorder: cloud-memory tape accessor', () => {
 
   it('runKey is null before the first start', () => {
     expect(new FlightRecorder().runKey()).toBeNull();
+  });
+});
+
+describe('cloud-memory: ensure planner', () => {
+  it('requests only uncached boundaries of the display pair', () => {
+    expect(planEnsure(7.3, () => false)).toEqual([7, 8]);
+    expect(planEnsure(7.3, (k) => k === 7)).toEqual([8]);
+    expect(planEnsure(7.3, () => true)).toEqual([]);
   });
 });

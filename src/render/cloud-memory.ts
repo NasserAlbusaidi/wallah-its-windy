@@ -10,10 +10,28 @@
  * Spec: docs/superpowers/specs/2026-07-30-cloud-memory-design.md
  */
 
+import type { FlightFrame } from '../flight-recorder';
+import { DOMAIN, latLonToClip } from '../grid';
+import type { RenderModule } from './context';
 import {
+  bindTex,
+  disposeRenderTarget,
+  makeProgram,
+  makeQuadVao,
+  makeRenderTarget,
+  probeCaps,
+} from './gl-utils';
+import type { GlCaps, RenderTarget } from './gl-utils';
+import {
+  CLOUD_ROTATION_CAP_RAD_PER_H,
   LEGACY_CLOUD_ROTATION_RAD_PER_H,
   cloudAngularRateRadPerH,
 } from './cloud-motion';
+import {
+  HALF_DOMAIN_HEIGHT_KM,
+  RENDER_RADIUS_FLOOR,
+  stormRenderRadii,
+} from './storm-radii';
 
 /** Memory boundary spacing, sim-hours. The crossfade denominator in env. */
 export const CLOUD_MEMORY_DT_H = 1;
@@ -170,5 +188,407 @@ export class CloudMemoryLru<T> {
     const evicted = this.map.get(oldest) as T;
     this.map.delete(oldest);
     return evicted;
+  }
+}
+
+/** Boundary indices of the display pair that need computing, in order. */
+export function planEnsure(
+  cloudAgeH: number,
+  cached: (k: number) => boolean,
+): number[] {
+  const { k } = memoryBoundaryPair(cloudAgeH);
+  return [k, k + 1].filter((boundary) => !cached(boundary));
+}
+
+/** Read-only flight-recorder surface consumed by the render pass. */
+export interface CloudTape {
+  frameAtOrBeforeAge(ageH: number): FlightFrame | null;
+  runKey(): string | null;
+}
+
+const CLOUD_MEMORY_VS = /* glsl */ `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+const CLOUD_MEMORY_UPDATE_FS = /* glsl */ `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 o;
+
+uniform sampler2D u_prev;
+uniform sampler2D u_cloudNoise;
+uniform vec2 u_center;
+uniform float u_metricX;
+uniform float u_rMax;
+uniform float u_rCanopy;
+uniform float u_vmaxMs;
+uniform float u_hollandB;
+uniform float u_development;
+uniform float u_seed;
+uniform float u_reducedMotion;
+
+// Holland-profile angular rate at rKm, rad/sim-hour, display-capped.
+// Mirrors memoryAdvectSpeedKmH's rotating component exactly.
+float cloudOmegaMem(float rKm) {
+  float rmwKm = max(u_rMax, ${RENDER_RADIUS_FLOOR}) *
+    ${HALF_DOMAIN_HEIGHT_KM}.0;
+  float x = min(80.0, pow(max(rmwKm, 1.0) / rKm, u_hollandB));
+  float vMs = u_vmaxMs * sqrt(max(0.0, x * exp(1.0 - x)));
+  // 3.6: m/s -> km/h. min(): perception cap, not physics.
+  return min(3.6 * vMs / rKm, ${CLOUD_ROTATION_CAP_RAD_PER_H});
+}
+
+void main() {
+  // clip coords of this texel (same uv convention as env.ts VS)
+  vec2 cell = vec2(v_uv.x * 2.0 - 1.0, 1.0 - v_uv.y * 2.0);
+  vec2 radial = vec2((cell.x - u_center.x) * u_metricX, cell.y - u_center.y);
+  float rKm = max(length(radial) * ${HALF_DOMAIN_HEIGHT_KM}.0, 1.0);
+
+  // -- advect: display-coherent capped rotation under the reduced-motion
+  //    policy, then the linear debris cap (see memoryAdvectSpeedKmH mirror).
+  float omega = mix(cloudOmegaMem(rKm), ${LEGACY_CLOUD_ROTATION_RAD_PER_H}, u_reducedMotion);
+  float tangential = min(omega * rKm, ${CLOUD_MEMORY_MAX_ADVECT_KMH}.0);
+  // -- new radial outflow, ramping 0->full over 1.2..2.5 x RMW
+  float rmwKm = max(u_rMax, 0.001) * ${HALF_DOMAIN_HEIGHT_KM}.0;
+  float outflow = ${CLOUD_MEMORY_OUTFLOW_KMH}.0 *
+    smoothstep(1.2 * rmwKm, 2.5 * rmwKm, rKm);
+  // CCW tangential + outward radial, in metric km/h
+  vec2 tangentialDir = length(radial) > 1e-5
+    ? normalize(vec2(-radial.y, radial.x))
+    : vec2(0.0);
+  vec2 radialDir = length(radial) > 1e-5 ? normalize(radial) : vec2(0.0);
+  vec2 velocityKmH = tangentialDir * tangential + radialDir * outflow;
+  // km -> clip -> uv backtrace over dt (x undoes metricX; uv y is flipped)
+  vec2 dispClip = velocityKmH * ${CLOUD_MEMORY_DT_H}.0 / ${HALF_DOMAIN_HEIGHT_KM}.0;
+  dispClip.x /= max(u_metricX, 1e-5);
+  vec2 backUv = v_uv - vec2(dispClip.x * 0.5, -dispClip.y * 0.5);
+  vec2 prev = texture(u_prev, backUv).rg;
+
+  // -- source: analytic convection envelope at this boundary's storm,
+  //    patchy via the shared cloud noise (seeded; no wall-clock input).
+  float q = length(radial) / max(u_rMax, 0.001);
+  float envelope = u_development * exp(-pow(q / 2.6, 2.0));
+  float cells = smoothstep(0.35, 0.8,
+    texture(u_cloudNoise, radial * 2.1 + u_seed * 13.0).r);
+  float source = envelope * mix(0.35, 1.0, cells) * 0.55;
+
+  // -- sealed combine rules (Task 1 CPU mirrors), then decay
+  float density = min(1.0, prev.r + source);
+  float age = prev.g * prev.r / max(prev.r + source, 1e-5);
+  density *= ${Math.exp(-CLOUD_MEMORY_DT_H / CLOUD_MEMORY_DECAY_TAU_H)};
+  // age-reset reads the STORED byte: emulate the quantized zero test
+  age = density < (0.5 / 255.0) ? 0.0 : min(1.0, age + ${CLOUD_MEMORY_DT_H / CLOUD_MEMORY_WINDOW_H});
+  o = vec4(density, age, 0.0, 0.0);
+}`;
+
+const CLOUD_MEMORY_PACK_FS = /* glsl */ `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 o;
+uniform sampler2D u_stateA;
+uniform sampler2D u_stateB;
+void main() {
+  o = vec4(texture(u_stateA, v_uv).rg, texture(u_stateB, v_uv).rg);
+}`;
+
+/** Stateful offscreen reconstruction and display-pair packing pass. */
+export class CloudMemoryPass implements RenderModule {
+  private gl: WebGL2RenderingContext | null = null;
+  private caps: GlCaps | null = null;
+  private updateProgram: WebGLProgram | null = null;
+  private updateVao: WebGLVertexArrayObject | null = null;
+  private packProgram: WebGLProgram | null = null;
+  private packVao: WebGLVertexArrayObject | null = null;
+  private work: [RenderTarget | null, RenderTarget | null] = [null, null];
+  private packed: RenderTarget | null = null;
+  private packedKey: string | null = null;
+  private tape: CloudTape | null = null;
+  private lru = new CloudMemoryLru<RenderTarget>(6);
+  private cachedTargets = new Set<RenderTarget>();
+  private width = 1;
+  private height = 1;
+  private sizePx = CLOUD_MEMORY_SIZE_MOBILE;
+
+  init(gl: WebGL2RenderingContext): void {
+    if (this.gl) this.dispose();
+    this.gl = gl;
+    this.caps = probeCaps(gl);
+    this.updateProgram = makeProgram(gl, CLOUD_MEMORY_VS, CLOUD_MEMORY_UPDATE_FS);
+    this.updateVao = makeQuadVao(gl, this.updateProgram);
+    this.packProgram = makeProgram(gl, CLOUD_MEMORY_VS, CLOUD_MEMORY_PACK_FS);
+    this.packVao = makeQuadVao(gl, this.packProgram);
+  }
+
+  resize(width: number, height: number): void {
+    this.width = Math.max(1, width);
+    this.height = Math.max(1, height);
+    if (!this.gl || !this.caps) return;
+
+    // main.ts publishes the exact chooseRenderProfile().compact decision before
+    // resizing layers. Dimensions are only the non-DOM fallback for this module.
+    const compactTrait = typeof document === 'undefined'
+      ? null
+      : document.documentElement.dataset.compact;
+    const compact = compactTrait === null || compactTrait === undefined
+      ? Math.min(this.width, this.height) <= 820
+      : compactTrait === 'true';
+    const nextSize = compact
+      ? CLOUD_MEMORY_SIZE_MOBILE
+      : CLOUD_MEMORY_SIZE_DETAIL;
+    if (
+      nextSize === this.sizePx &&
+      this.work[0] &&
+      this.work[1] &&
+      this.packed
+    ) {
+      return;
+    }
+
+    const gl = this.gl;
+    disposeRenderTarget(gl, this.work[0]);
+    disposeRenderTarget(gl, this.work[1]);
+    disposeRenderTarget(gl, this.packed);
+    this.sizePx = nextSize;
+    this.work = [
+      makeRenderTarget(gl, this.sizePx, this.sizePx, this.caps, true),
+      makeRenderTarget(gl, this.sizePx, this.sizePx, this.caps, true),
+    ];
+    this.packed = makeRenderTarget(
+      gl,
+      this.sizePx,
+      this.sizePx,
+      this.caps,
+      true,
+    );
+    this.packedKey = null;
+    for (const target of [...this.work, this.packed]) {
+      if (!target) continue;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+      gl.viewport(0, 0, this.sizePx, this.sizePx);
+      gl.disable(gl.BLEND);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    this.restoreScreenTarget();
+  }
+
+  setTape(tape: CloudTape | null): void {
+    if (this.tape !== tape) this.packedKey = null;
+    this.tape = tape;
+  }
+
+  ensure(
+    cloudAgeH: number,
+    reducedMotion: boolean,
+    metricX: number,
+    cloudNoiseTex: WebGLTexture | null,
+    cloudSeed: number,
+  ): void {
+    if (
+      !this.gl ||
+      !this.tape ||
+      !cloudNoiseTex ||
+      !this.updateProgram ||
+      !this.updateVao ||
+      !this.packProgram ||
+      !this.packVao ||
+      !this.work[0] ||
+      !this.work[1] ||
+      !this.packed
+    ) {
+      return;
+    }
+    const runKey = this.tape.runKey();
+    if (runKey === null) {
+      this.packedKey = null;
+      return;
+    }
+
+    const need = planEnsure(
+      cloudAgeH,
+      (k) => this.lru.get(
+        this.lru.keyFor(runKey, k, this.sizePx, reducedMotion),
+      ) !== null,
+    );
+    for (const k of need) {
+      this.computeState(
+        k,
+        runKey,
+        reducedMotion,
+        metricX,
+        cloudNoiseTex,
+        cloudSeed,
+      );
+    }
+
+    const { k } = memoryBoundaryPair(cloudAgeH);
+    const keyA = this.lru.keyFor(runKey, k, this.sizePx, reducedMotion);
+    const keyB = this.lru.keyFor(runKey, k + 1, this.sizePx, reducedMotion);
+    const stateA = this.lru.get(keyA);
+    const stateB = this.lru.get(keyB);
+    if (!stateA || !stateB) {
+      throw new Error('cloud-memory: display pair missing after ensure');
+    }
+    const pairKey = keyA + '>' + keyB;
+    if (pairKey !== this.packedKey) {
+      this.packDisplay(stateA, stateB);
+      this.packedKey = pairKey;
+    }
+  }
+
+  get texture(): WebGLTexture | null {
+    return this.packedKey === null ? null : (this.packed?.tex ?? null);
+  }
+
+  private computeState(
+    k: number,
+    runKey: string,
+    reducedMotion: boolean,
+    metricX: number,
+    cloudNoiseTex: WebGLTexture,
+    cloudSeed: number,
+  ): void {
+    const gl = this.gl;
+    const caps = this.caps;
+    const tape = this.tape;
+    const updateProgram = this.updateProgram;
+    const workA = this.work[0];
+    const workB = this.work[1];
+    if (!gl || !caps || !tape || !updateProgram || !workA || !workB) return;
+
+    const frames = sourceBoundaries(k).map((boundary) => {
+      const frame = tape.frameAtOrBeforeAge(boundary * CLOUD_MEMORY_DT_H);
+      if (!frame) {
+        throw new Error('cloud-memory: no tape frame at boundary ' + boundary);
+      }
+      return frame;
+    });
+    const cached = makeRenderTarget(
+      gl,
+      this.sizePx,
+      this.sizePx,
+      caps,
+      true,
+    );
+
+    try {
+      gl.disable(gl.BLEND);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, workA.fbo);
+      gl.viewport(0, 0, this.sizePx, this.sizePx);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      if (frames.length === 0) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, cached.fbo);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      } else {
+        gl.useProgram(updateProgram);
+        gl.bindVertexArray(this.updateVao);
+        const u = (name: string) => gl.getUniformLocation(updateProgram, name);
+        let source = workA;
+        let workIndex = 0;
+        for (let step = 0; step < frames.length; step++) {
+          const frame = frames[step];
+          const last = step === frames.length - 1;
+          const destination = last
+            ? cached
+            : (workIndex === 0 ? workB : workA);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, destination.fbo);
+          bindTex(gl, 0, source.tex, u('u_prev'));
+          bindTex(gl, 1, cloudNoiseTex, u('u_cloudNoise'));
+
+          const center = latLonToClip(frame.lat, frame.lon, DOMAIN);
+          const radii = stormRenderRadii(frame.structure);
+          const intensity01 = Math.min(1, Math.max(0, (frame.vKt - 20) / 100));
+          const development = Math.min(
+            1,
+            Math.max(0, 0.56 * frame.organization + 0.44 * intensity01),
+          );
+          gl.uniform2f(u('u_center'), center.x, center.y);
+          gl.uniform1f(u('u_metricX'), metricX);
+          gl.uniform1f(u('u_rMax'), radii.rMax);
+          gl.uniform1f(u('u_rCanopy'), radii.rCanopy);
+          gl.uniform1f(
+            u('u_vmaxMs'),
+            frame.structure.maximumWindKt * 0.514444,
+          );
+          gl.uniform1f(u('u_hollandB'), frame.structure.hollandB);
+          gl.uniform1f(u('u_development'), development);
+          gl.uniform1f(u('u_seed'), cloudSeed);
+          gl.uniform1f(u('u_reducedMotion'), reducedMotion ? 1 : 0);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+          source = destination;
+          if (!last) workIndex = 1 - workIndex;
+        }
+      }
+    } catch (error) {
+      disposeRenderTarget(gl, cached);
+      throw error;
+    } finally {
+      gl.bindVertexArray(null);
+      this.restoreScreenTarget();
+    }
+
+    this.cachedTargets.add(cached);
+    const key = this.lru.keyFor(runKey, k, this.sizePx, reducedMotion);
+    const evicted = this.lru.set(key, cached);
+    if (evicted) {
+      this.cachedTargets.delete(evicted);
+      disposeRenderTarget(gl, evicted);
+    }
+  }
+
+  private packDisplay(stateA: RenderTarget, stateB: RenderTarget): void {
+    const gl = this.gl;
+    if (!gl || !this.packProgram || !this.packVao || !this.packed) return;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.packed.fbo);
+    gl.viewport(0, 0, this.sizePx, this.sizePx);
+    gl.disable(gl.BLEND);
+    gl.useProgram(this.packProgram);
+    gl.bindVertexArray(this.packVao);
+    const u = (name: string) => gl.getUniformLocation(this.packProgram!, name);
+    bindTex(gl, 0, stateA.tex, u('u_stateA'));
+    bindTex(gl, 1, stateB.tex, u('u_stateB'));
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindVertexArray(null);
+    this.restoreScreenTarget();
+  }
+
+  private restoreScreenTarget(): void {
+    if (!this.gl) return;
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+    this.gl.viewport(0, 0, this.width, this.height);
+  }
+
+  dispose(): void {
+    const gl = this.gl;
+    if (gl) {
+      if (this.updateProgram) gl.deleteProgram(this.updateProgram);
+      if (this.packProgram) gl.deleteProgram(this.packProgram);
+      if (this.updateVao) gl.deleteVertexArray(this.updateVao);
+      if (this.packVao) gl.deleteVertexArray(this.packVao);
+      disposeRenderTarget(gl, this.work[0]);
+      disposeRenderTarget(gl, this.work[1]);
+      disposeRenderTarget(gl, this.packed);
+      for (const target of this.cachedTargets) {
+        disposeRenderTarget(gl, target);
+      }
+    }
+    this.updateProgram = null;
+    this.updateVao = null;
+    this.packProgram = null;
+    this.packVao = null;
+    this.work = [null, null];
+    this.packed = null;
+    this.packedKey = null;
+    this.cachedTargets.clear();
+    this.lru = new CloudMemoryLru<RenderTarget>(6);
+    this.caps = null;
+    this.gl = null;
   }
 }

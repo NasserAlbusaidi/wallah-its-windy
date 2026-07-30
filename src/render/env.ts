@@ -14,7 +14,14 @@ import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
 import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
-import { makeProgram, makeQuadVao } from './gl-utils';
+import {
+  disposeRenderTarget,
+  makeProgram,
+  makeQuadVao,
+  makeRenderTarget,
+  probeCaps,
+} from './gl-utils';
+import type { GlCaps, RenderTarget } from './gl-utils';
 import { PRECIPITATING_CLOUD_BAND_MAX, PRECIPITATING_CLOUD_BAND_FULL_MM_H, PRECIPITATING_CLOUD_EYE_FULL_MM_H, PRECIPITATING_CLOUD_RAIN_START_MM_H, PRECIPITATING_CLOUD_SPIRAL_FLOOR, PRECIPITATING_CLOUD_TEXTURE_FLOOR, rainCenterClip } from './precipitating-cloud';
 import {
   CANOPY_COEFFICIENT_DIVISOR,
@@ -31,6 +38,17 @@ void main() {
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
 
+const OHC_BLEND_FS = /* glsl */ `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 o;
+uniform sampler2D u_a;
+uniform sampler2D u_b;
+uniform float u_blend;
+void main() {
+  o = vec4(mix(texture(u_a, v_uv).r, texture(u_b, v_uv).r, u_blend), 0.0, 0.0, 1.0);
+}`;
+
 const FS = /* glsl */ `#version 300 es
 precision highp float;
 in vec2 v_uv;
@@ -39,8 +57,7 @@ uniform sampler2D u_sst;
 uniform sampler2D u_sstNext;
 uniform sampler2D u_rh;
 uniform sampler2D u_rhNext;
-uniform sampler2D u_ohc;
-uniform sampler2D u_ohcNext;
+uniform sampler2D u_ohcBlend;
 uniform sampler2D u_shear;
 uniform sampler2D u_shearNext;
 uniform sampler2D u_steerU;
@@ -431,11 +448,7 @@ void main() {
   }
 
   if (u_mode == 4) {
-    float value = mix(
-      texture(u_ohc, v_uv).r,
-      texture(u_ohcNext, v_uv).r,
-      u_planeBlend
-    );
+    float value = texture(u_ohcBlend, v_uv).r;
     vec3 color = fiveStop(
       value,
       u_palette0, u_palette1, u_palette2, u_palette3, u_palette4
@@ -568,7 +581,12 @@ const PALETTE: Record<WeatherLayerId, readonly [
 
 export class EnvLayer implements RenderModule {
   private gl!: WebGL2RenderingContext;
+  private caps!: GlCaps;
   private prog: WebGLProgram | null = null;
+  private ohcBlendProg: WebGLProgram | null = null;
+  private ohcBlendTarget: RenderTarget | null = null;
+  private ohcBlendWidth = 0;
+  private ohcBlendHeight = 0;
   private vao: WebGLVertexArrayObject | null = null;
   private cloudNoise: WebGLTexture | null = null;
   private satellitePalette: SatellitePaletteId = 'enhanced';
@@ -579,9 +597,30 @@ export class EnvLayer implements RenderModule {
 
   init(gl: WebGL2RenderingContext): void {
     this.gl = gl;
+    this.caps = probeCaps(gl);
     this.prog = makeProgram(gl, VS, FS);
+    this.ohcBlendProg = makeProgram(gl, VS, OHC_BLEND_FS);
     this.vao = makeQuadVao(gl, this.prog);
     this.cloudNoise = this.createCloudNoiseTexture();
+  }
+
+  private ensureOhcBlendTarget(width: number, height: number): RenderTarget {
+    if (
+      this.ohcBlendTarget &&
+      this.ohcBlendWidth === width &&
+      this.ohcBlendHeight === height
+    ) {
+      return this.ohcBlendTarget;
+    }
+    disposeRenderTarget(this.gl, this.ohcBlendTarget);
+    this.ohcBlendTarget = null;
+    this.ohcBlendWidth = 0;
+    this.ohcBlendHeight = 0;
+    const target = makeRenderTarget(this.gl, width, height, this.caps, true);
+    this.ohcBlendTarget = target;
+    this.ohcBlendWidth = width;
+    this.ohcBlendHeight = height;
+    return target;
   }
 
   private createCloudNoiseTexture(): WebGLTexture | null {
@@ -631,6 +670,27 @@ export class EnvLayer implements RenderModule {
     ) {
       return;
     }
+    if (gpu.ohc && gpu.ohcNext && gpu.envGrid) {
+      const target = this.ensureOhcBlendTarget(gpu.envGrid.nx, gpu.envGrid.ny);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+      gl.viewport(0, 0, gpu.envGrid.nx, gpu.envGrid.ny);
+      gl.disable(gl.BLEND);
+      gl.useProgram(this.ohcBlendProg);
+      gl.bindVertexArray(this.vao);
+      const blendU = (name: string) =>
+        gl.getUniformLocation(this.ohcBlendProg!, name);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, gpu.ohc);
+      gl.uniform1i(blendU('u_a'), 0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, gpu.ohcNext);
+      gl.uniform1i(blendU('u_b'), 1);
+      gl.uniform1f(blendU('u_blend'), gpu.envBlend);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.bindVertexArray(null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, ctx.width, ctx.height);
+    }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(this.prog);
@@ -645,8 +705,7 @@ export class EnvLayer implements RenderModule {
     bind(1, gpu.sstNext, 'u_sstNext');
     bind(2, gpu.humidity, 'u_rh');
     bind(3, gpu.humidityNext, 'u_rhNext');
-    bind(4, gpu.ohc, 'u_ohc');
-    bind(5, gpu.ohcNext, 'u_ohcNext');
+    bind(4, this.ohcBlendTarget?.tex ?? gpu.land, 'u_ohcBlend');
     bind(6, gpu.shear, 'u_shear');
     bind(7, gpu.shearNext, 'u_shearNext');
     bind(8, gpu.land, 'u_land');
@@ -662,8 +721,7 @@ export class EnvLayer implements RenderModule {
     bind(13, gpu.rainAccum ?? gpu.land, 'u_rainTotal');
     bind(14, this.cloudNoise, 'u_cloudNoise');
     // 16 fragment texture units is the WebGL2 guaranteed minimum and this
-    // program now uses exactly 16 (units 0-15). A new sampled field must pack
-    // into a free channel of an existing texture, never add a 17th sampler.
+    // program now uses 15, leaving unit 5 free for the cloud-memory field.
     const hasUpper = Boolean(gpu.upperUV);
     bind(15, gpu.upperUV ?? gpu.land, 'u_upperUV');
     gl.uniform1f(u('u_hasSteer'), hasSteer ? 1 : 0);
@@ -784,9 +842,15 @@ export class EnvLayer implements RenderModule {
   dispose(): void {
     const gl = this.gl;
     if (this.prog) gl.deleteProgram(this.prog);
+    if (this.ohcBlendProg) gl.deleteProgram(this.ohcBlendProg);
     if (this.vao) gl.deleteVertexArray(this.vao);
     if (this.cloudNoise) gl.deleteTexture(this.cloudNoise);
+    disposeRenderTarget(gl, this.ohcBlendTarget);
     this.prog = null;
+    this.ohcBlendProg = null;
+    this.ohcBlendTarget = null;
+    this.ohcBlendWidth = 0;
+    this.ohcBlendHeight = 0;
     this.vao = null;
     this.cloudNoise = null;
   }

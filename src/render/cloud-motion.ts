@@ -13,10 +13,11 @@ import { HALF_DOMAIN_HEIGHT_KM, RENDER_RADIUS_FLOOR } from './storm-radii';
 /**
  * Display cap on cloud angular velocity, rad/sim-hour. PERCEPTION CAP, NOT
  * PHYSICS: a real eyewall (~4-5 rad/sim-h) at the 3 h/s playback timescale
- * would display above two revolutions per second and alias into blur. 0.6
- * gives an eyewall lap of ~3.5 screen-seconds.
+ * would display above two revolutions per second and alias into blur. 0.3
+ * gives an eyewall lap of ~7 screen-seconds — halved from the design's 0.6
+ * after hardware-GL review judged that lap rate too fast to read as clouds.
  */
-export const CLOUD_ROTATION_CAP_RAD_PER_H = 0.6;
+export const CLOUD_ROTATION_CAP_RAD_PER_H = 0.3;
 
 /**
  * Flow-map sawtooth period, sim-hours. Bounds differential twist per phase to

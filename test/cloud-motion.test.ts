@@ -37,12 +37,13 @@ describe('cloudAngularRateRadPerH', () => {
   });
 
   test('returns the true Holland rate where it falls below the cap', () => {
-    // r=200 km, rmw=30 km, vmax=40 m/s, B=1.35 — recompute in closed form
-    const x = Math.min(80, (30 / 200) ** 1.35);
+    // r=300 km, rmw=30 km, vmax=40 m/s, B=1.35 — recompute in closed form
+    // (the radius sits outside the capped core for the 0.3 rad/h display cap)
+    const x = Math.min(80, (30 / 300) ** 1.35);
     const v = 40 * Math.sqrt(Math.max(0, x * Math.exp(1 - x)));
-    const expected = (3.6 * v) / 200;
+    const expected = (3.6 * v) / 300;
     expect(expected).toBeLessThan(CLOUD_ROTATION_CAP_RAD_PER_H);
-    expect(cloudAngularRateRadPerH(200, 30, 40, 1.35)).toBeCloseTo(expected, 12);
+    expect(cloudAngularRateRadPerH(300, 30, 40, 1.35)).toBeCloseTo(expected, 12);
   });
 
   test('guards the r=0 singularity', () => {

@@ -9,31 +9,13 @@
  */
 
 import { TOKENS } from '../tokens';
-import {
-  EYEWALL_WIDTH_Q,
-  RAINBAND_AZIMUTHAL_MEAN,
-  RAINBAND_INNER_FULL_Q,
-  RAINBAND_INNER_Q,
-  RAINBAND_OUTER_FADE_Q,
-  RAINBAND_OUTER_Q,
-  RAINBAND_SPIRAL_AMPLITUDE,
-  RAINBAND_SPIRAL_ARMS,
-  RAINBAND_SPIRAL_PITCH,
-  RAINBAND_SPIRAL_ROTATION_PER_H,
-} from '../rainband-profile';
+import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
+import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import { makeProgram, makeQuadVao } from './gl-utils';
-import {
-  PRECIPITATING_CLOUD_BAND_MAX,
-  PRECIPITATING_CLOUD_BAND_FULL_MM_H,
-  PRECIPITATING_CLOUD_EYE_FULL_MM_H,
-  PRECIPITATING_CLOUD_RAIN_START_MM_H,
-  PRECIPITATING_CLOUD_SPIRAL_FLOOR,
-  PRECIPITATING_CLOUD_TEXTURE_FLOOR,
-  rainCenterClip,
-} from './precipitating-cloud';
+import { PRECIPITATING_CLOUD_BAND_MAX, PRECIPITATING_CLOUD_BAND_FULL_MM_H, PRECIPITATING_CLOUD_EYE_FULL_MM_H, PRECIPITATING_CLOUD_RAIN_START_MM_H, PRECIPITATING_CLOUD_SPIRAL_FLOOR, PRECIPITATING_CLOUD_TEXTURE_FLOOR, rainCenterClip } from './precipitating-cloud';
 import {
   CANOPY_COEFFICIENT_DIVISOR,
   RENDER_RADIUS_FLOOR,
@@ -97,6 +79,8 @@ uniform float u_eyewallRain;
 uniform float u_rainbandRain;
 uniform float u_cloudDetail;
 uniform float u_cloudSeed;
+uniform float u_cloudAgeH;
+uniform float u_reducedMotion;
 uniform int u_satellitePalette;
 uniform vec3 u_palette0;
 uniform vec3 u_palette1;
@@ -126,12 +110,15 @@ mat2 rotate2(float angle) {
   return mat2(c, -s, s, c);
 }
 
+${CLOUD_MOTION_GLSL}
+
 struct CloudField {
   float cloud;
   float stormCloud;
   float ambientCloud;
   float brightnessC;
   float convectiveCells;
+  float relief;
 };
 
 CloudField sampleCloud(float land, float sstC) {
@@ -145,6 +132,7 @@ CloudField sampleCloud(float land, float sstC) {
   float rCanopy = max(${RENDER_RADIUS_FLOOR}, u_rCanopy);
   // coreQ: eye and eyewall stay tied to the contracting inner core.
   float q = length(radial) / rMax;
+${CLOUD_CORE_GLSL.wobble}
 
   // The cold canopy drifts downshear while the eye and eyewall remain tied to
   // the surface vortex. This creates the asymmetric shield visible in real IR.
@@ -159,20 +147,53 @@ CloudField sampleCloud(float land, float sstC) {
   float canopyQ = length(canopyRadial) / rCanopy;
   float bandQ = length(canopyRadial) / rMax;
   float azimuth = atan(canopyRadial.y, canopyRadial.x);
-  float rotation = u_ageH * 0.028;
+  // ---- decorative motion (independent of the rain-aligned geometry) ----
+  // animGate 0 under prefers-reduced-motion: fall back to the legacy
+  // imperceptible solid-body drift so morphology survives without animation.
+  float animGate = 1.0 - u_reducedMotion;
+  float legacyRotation = u_ageH * ${LEGACY_CLOUD_ROTATION_RAD_PER_H};
+  float omegaHere = cloudOmega(length(canopyRadial));
 
-  // Domain-warped, storm-relative noise keeps clouds spatially coherent as
-  // the vortex moves. The lower mobile tier uses one fine noise sample rather
-  // than a second four-octave field.
+  // Two phase-staggered advection samples on a sawtooth, triangle-crossfaded:
+  // each phase accumulates at most cap*period (~0.45 rad) of differential
+  // twist before resetting with zero weight, so the noise never filaments.
+  float tCycle = u_cloudAgeH / ${CLOUD_CROSSFADE_PERIOD_H};
+  float phaseA = fract(tCycle);
+  float phaseB = fract(tCycle + 0.5);
+  float weightA = mix(1.0, 1.0 - abs(2.0 * phaseA - 1.0), animGate);
+  float weightB = 1.0 - weightA;
+
   float seed = u_cloudSeed;
-  float twist = 0.72 * log(1.0 + canopyQ) - rotation;
-  vec2 spiralSpace = rotate2(twist) * (canopyRadial / rCanopy);
-  vec2 drift = vec2(u_ageH * 0.012, -u_ageH * 0.007) + shearDir * u_ageH * 0.005;
-  float macro = cloudNoise(spiralSpace * 0.62 + drift + seed * 11.0);
-  float fine = u_cloudDetail > 0.5
-    ? cloudNoise(spiralSpace * 1.95 - drift * 1.8 + vec2(macro * 2.4, seed * 5.0))
-    : texture(u_cloudNoise, spiralSpace * 0.022 - drift * 0.018 + seed).g;
+  // Static log-spiral shaping; the time-dependent term moved into the phases.
+  float twist = 0.72 * log(1.0 + canopyQ) - legacyRotation * (1.0 - animGate);
+  vec2 spiralBase = rotate2(twist) * (canopyRadial / rCanopy);
+  // CCW apparent motion: rotate2 is CW, inverse mapping needs +theta here.
+  // (Single sign-flip point if browser QA shows clockwise motion.)
+  float thetaA = animGate * omegaHere * phaseA * ${CLOUD_CROSSFADE_PERIOD_H};
+  float thetaB = animGate * omegaHere * phaseB * ${CLOUD_CROSSFADE_PERIOD_H};
+  vec2 pA = rotate2(thetaA) * spiralBase;
+  vec2 pB = rotate2(thetaB) * spiralBase;
 
+  vec2 drift = vec2(u_ageH * 0.012, -u_ageH * 0.007) + shearDir * u_ageH * 0.005;
+  float macro = mix(
+    cloudNoise(pB * 0.62 + drift + seed * 11.0),
+    cloudNoise(pA * 0.62 + drift + seed * 11.0),
+    weightA
+  );
+  float fine;
+  if (u_cloudDetail > 0.5) {
+    fine = mix(
+      cloudNoise(pB * 1.95 - drift * 1.8 + vec2(macro * 2.4, seed * 5.0)),
+      cloudNoise(pA * 1.95 - drift * 1.8 + vec2(macro * 2.4, seed * 5.0)),
+      weightA
+    );
+  } else {
+    fine = mix(
+      texture(u_cloudNoise, pB * 0.022 - drift * 0.018 + seed).g,
+      texture(u_cloudNoise, pA * 0.022 - drift * 0.018 + seed).g,
+      weightA
+    );
+  }
   // A faint synoptic deck prevents the ocean outside the cyclone from
   // becoming an implausibly empty plate. It follows the exact baked humidity
   // plane and advects with the sampled steering vector.
@@ -202,17 +223,32 @@ CloudField sampleCloud(float land, float sstC) {
     macro
   );
   float centralOvercast = exp(-pow(canopyQ / irregularCoreRadius, 2.0));
-  float eyewall = exp(-pow((q - 1.0) / mix(0.46, 0.27, u_organization), 2.0));
+  float eyewall = exp(-pow((qCore - 1.0) / mix(0.46, 0.27, u_organization), 2.0));
   float outerBandRadius = mix(6.35, 8.8, smoothstep(0.30, 0.84, development));
   float bandEnvelope = smoothstep(1.25, 1.85, bandQ) *
     (1.0 - smoothstep(outerBandRadius - 2.6, outerBandRadius, bandQ));
+  // Band pattern rotates solid-body at the capped rate of one reference
+  // radius; differential streaming lives in the noise, not the sine phase,
+  // so the pattern never winds up. k*(azimuth - theta) keeps sign and rate
+  // correct for CCW motion. Reduced motion keeps the legacy phase verbatim.
+  float omegaBand = cloudOmega(${CLOUD_BAND_REFERENCE_Q} * rMax);
+  float thetaBand = mix(
+    -legacyRotation / 2.35,
+    omegaBand * u_cloudAgeH,
+    animGate
+  );
+  float thetaBand2 = mix(
+    legacyRotation / 7.4,
+    omegaBand * u_cloudAgeH,
+    animGate
+  );
   float bandPhase =
-    2.35 * azimuth - 1.52 * bandQ + rotation + (macro - 0.5) * 4.6;
+    2.35 * (azimuth - thetaBand) - 1.52 * bandQ + (macro - 0.5) * 4.6;
   float primaryBand = smoothstep(0.18, 0.76, 0.5 + 0.5 * sin(bandPhase));
   float secondaryBand = smoothstep(
     0.30,
     0.82,
-    0.5 + 0.5 * sin(3.7 * azimuth - 0.88 * bandQ - rotation * 0.5 + fine)
+    0.5 + 0.5 * sin(3.7 * (azimuth - thetaBand2) - 0.88 * bandQ + fine)
   );
   float convectiveCells = smoothstep(0.36, 0.78, fine * 0.74 + macro * 0.34);
   // Instantaneous modeled rain must carry visible cloud support. Keep this
@@ -268,28 +304,31 @@ CloudField sampleCloud(float land, float sstC) {
     mix(0.48, 1.0, primaryBand);
   float bandShape = mix(brokenBand, max(primaryBand, secondaryBand * 0.58), bandCoherence);
 
-  float coreCloud = centralOvercast *
-    mix(0.70, 1.0, development) * mix(0.88, 1.0, macro);
+  vec2 canopyDir = canopyQ > 0.001 ? canopyRadial / (canopyQ * rCanopy) : shearDir;
+  float upshear = max(0.0, dot(canopyDir, -shearDir));
+  float shearErosion = 1.0 - shearN * upshear * mix(0.28, 0.62, 1.0 - moisture);
   float eyewallMaturity = smoothstep(0.30, 0.68, u_intensity) *
     smoothstep(0.40, 0.72, u_organization);
-  float eyewallCloud = eyewall * eyewallMaturity * mix(0.48, 1.0, rainEnergy) *
-    mix(0.68, 1.0, convectiveCells);
+  float coreCloud = centralOvercast *
+    mix(0.70, 1.0, development) * mix(0.88, 1.0, macro);
+${CLOUD_CORE_GLSL.eyewall}
   float rainbands = bandEnvelope *
     bandShape *
     mix(0.42, 0.96, moisture) *
     mix(0.46, 1.0, convectiveCells) *
     mix(0.62, 1.0, development);
 
-  vec2 canopyDir = canopyQ > 0.001 ? canopyRadial / (canopyQ * rCanopy) : shearDir;
-  float upshear = max(0.0, dot(canopyDir, -shearDir));
-  float shearErosion = 1.0 - shearN * upshear * mix(0.28, 0.62, 1.0 - moisture);
+  // Cirrus streams along the shear axis (outflow proxy -- pure translation of
+  // REPEAT noise: zero distortion, zero extra lookups; see plan note).
+  // Reduced motion freezes the stream, keeping only the legacy slow drift.
+  float cirrusStream = animGate * u_cloudAgeH * 0.06;
   float cirrusTexture = smoothstep(
     0.24,
     0.74,
     texture(
       u_cloudNoise,
-      vec2(dot(spiralSpace, vec2(-shearDir.y, shearDir.x)) * 0.029,
-           dot(spiralSpace, shearDir) * 0.011) + drift * 0.018
+      vec2(dot(spiralBase, vec2(-shearDir.y, shearDir.x)) * 0.029,
+           dot(spiralBase, shearDir) * 0.011 - cirrusStream) + drift * 0.018
     ).b
   );
   float cirrus = exp(-pow(
@@ -300,7 +339,7 @@ CloudField sampleCloud(float land, float sstC) {
 
   float eyeStrength = smoothstep(0.18, 0.56, u_intensity * u_organization) *
     smoothstep(0.62, 0.82, u_organization);
-  float eye = 1.0 - smoothstep(0.18, mix(0.46, 0.68, eyeStrength), q);
+  float eye = 1.0 - smoothstep(0.18, mix(0.46, 0.68, eyeStrength), qCore);
   float stormCloud = clamp(
     (coreCloud + eyewallCloud + rainbands + cirrus + precipitatingCloud) *
       shearErosion,
@@ -313,17 +352,9 @@ CloudField sampleCloud(float land, float sstC) {
 
   float surfaceC = mix(sstC, 34.0, smoothstep(0.35, 0.65, land));
   float ambientTopC = mix(-8.0, -42.0, synopticNoise * localRh);
-  float stormTopC = mix(
-    -35.0,
-    -82.0,
-    clamp(0.52 * u_intensity + 0.48 * u_organization, 0.0, 1.0)
-  );
-  float towerCooling = 13.0 * convectiveCells * rainEnergy *
-    max(max(eyewall, rainbands), precipitatingCloud);
-  float brightnessC = mix(surfaceC, ambientTopC, ambientCloud);
-  brightnessC = mix(brightnessC, stormTopC - towerCooling, stormCloud);
-  brightnessC = mix(brightnessC, surfaceC - 4.0, eye * eyeStrength * u_stormPresence);
-  return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells);
+${CLOUD_TOPS_GLSL}
+${CLOUD_RELIEF_GLSL}
+  return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells, relief);
 }
 
 vec4 addCloudContext(vec3 baseColor, float baseAlpha, CloudField field, float strength) {
@@ -362,7 +393,8 @@ void main() {
       color = vec3(pow(enhanced, 0.82));
     } else if (u_satellitePalette == 2) {
       vec3 surface = mix(vec3(0.025, 0.075, 0.105), vec3(0.22, 0.19, 0.14), land);
-      vec3 litCloud = mix(vec3(0.64, 0.67, 0.67), vec3(0.98), field.convectiveCells);
+      vec3 litCloud = mix(vec3(0.64, 0.67, 0.67), vec3(0.98), field.convectiveCells) *
+        field.relief;
       color = mix(surface, litCloud, pow(field.cloud, 0.70));
     } else {
       color = fiveStop(
@@ -667,6 +699,15 @@ export class EnvLayer implements RenderModule {
       ctx.frame.storm?.organization ?? 0,
     );
     gl.uniform1f(u('u_ageH'), ctx.frame.storm?.ageH ?? 0);
+    gl.uniform1f(
+      u('u_cloudAgeH'),
+      interpolatedCloudAgeH(
+        ctx.frame.prevStorm?.ageH ?? null,
+        ctx.frame.storm?.ageH ?? 0,
+        ctx.frame.alpha,
+      ),
+    );
+    gl.uniform1f(u('u_reducedMotion'), ctx.reduced ? 1 : 0);
     gl.uniform1f(u('u_vmaxMs'), (ctx.structure?.maximumWindKt ?? 0) * 0.514444);
     gl.uniform1f(u('u_hollandB'), ctx.structure?.hollandB ?? 1.35);
     gl.uniform1f(

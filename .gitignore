@@ -9,3 +9,7 @@ tmp/
 *.log
 .DS_Store
 .gstack/
+
+# Browser-QA and SDD session artifacts
+.playwright-mcp/
+.superpowers/

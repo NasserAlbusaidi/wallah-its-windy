@@ -79,6 +79,17 @@ that relative evidence. Re-sealing this screen with a documented, automated
 capture protocol is tracked as a follow-up issue; the thresholds themselves
 remain untouched.
 
+A second controlled A/B on 2026-07-30 re-ran the identical pinned pipeline
+(WMS re-fetch confirmed "METEOSAT OBSERVED · TIME-MATCHED DISPLAY"; same
+shaheen hindcast frame 10; grayscale; UI hidden; pixel-exact `#gl-canvas`
+readback at 1082x694) for the cloud-memory branch. Baseline `origin/main`
+reproduced its documented state — 4/5 checks pass, `quadrant_distribution_plausible`
+fails at MAE 0.2015, centroid vector 1.4319. The cloud-memory candidate passes
+the same four checks and fails the same one, with both key metrics marginally
+improved: centroid vector 1.4287, quadrant MAE 0.2013. Relative acceptance
+(candidate passes at least the checks the baseline passes) is met; thresholds
+untouched.
+
 ## Observed-frame sources
 
 ### Meteosat

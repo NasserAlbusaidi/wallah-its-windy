@@ -47,7 +47,12 @@ uniform sampler2D u_a;
 uniform sampler2D u_b;
 uniform float u_blend;
 void main() {
-  o = vec4(mix(texture(u_a, v_uv).r, texture(u_b, v_uv).r, u_blend), 0.0, 0.0, 1.0);
+  // Identity blit: undo the shared VS's y-flip. The OHC sources are top-down
+  // image uploads; sampling them at the flipped v_uv would write a bottom-up
+  // copy, and the main pass's own flipped read would then mirror the field
+  // north-south (QA item 7 caught exactly this).
+  vec2 suv = vec2(v_uv.x, 1.0 - v_uv.y);
+  o = vec4(mix(texture(u_a, suv).r, texture(u_b, suv).r, u_blend), 0.0, 0.0, 1.0);
 }`;
 
 const FS = /* glsl */ `#version 300 es

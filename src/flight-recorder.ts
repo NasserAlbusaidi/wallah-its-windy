@@ -125,9 +125,11 @@ export class FlightRecorder {
   private landfall: FlightLandfall | null = null;
   private death: StormDeath | null = null;
   private intensityCache: readonly FlightIntensityPoint[] = [];
+  private startCounter = 0; // initialize alongside the other privates
 
   start(meta: FlightRunMeta, initial: StormState): void {
     this.meta = { ...meta, spawn: { ...meta.spawn } };
+    this.startCounter += 1;
     this.frames = [frameOf(initial)];
     this.intensityCache = [];
     this.landfall = null;
@@ -270,5 +272,31 @@ export class FlightRecorder {
       landfall: this.landfall?.frameIndex ?? null,
       end: this.frames.length - 1,
     };
+  }
+
+  /**
+   * Latest frame at or before ageH (binary search), or null. Read-only tape
+   * observation for the render-side cloud-memory pass; boundaries land on
+   * exact tick ages, and the caller (causality seal) never asks past the
+   * tape — asking past the last frame still answers, but the cloud-memory
+   * enumerator treats a null as a thrown error at its own layer.
+   */
+  frameAtOrBeforeAge(ageH: number): FlightFrame | null {
+    if (this.frames.length === 0) return null;
+    if (ageH < this.frames[0].ageH) return null;
+    let lo = 0;
+    let hi = this.frames.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (this.frames[mid].ageH <= ageH) lo = mid;
+      else hi = mid - 1;
+    }
+    return this.frames[lo];
+  }
+
+  /** Opaque per-run cache key; changes on every start(), null before one. */
+  runKey(): string | null {
+    if (!this.meta) return null;
+    return `${this.startCounter}:${this.meta.seed}:${this.meta.environmentId}:${this.meta.monthIndex}`;
   }
 }

@@ -17,6 +17,11 @@ import {
   tailResidualByte,
 } from '../src/render/cloud-memory';
 import { cloudAngularRateRadPerH } from '../src/render/cloud-motion';
+import {
+  FlightRecorder,
+  type FlightRunMeta,
+} from '../src/flight-recorder';
+import type { StormState } from '../src/types';
 
 describe('cloud-memory: boundary math', () => {
   it('splits cloud age into boundary index and fraction', () => {
@@ -129,5 +134,121 @@ describe('cloud-memory: LRU', () => {
     expect(lru.get('a')).toBe(1); // refresh a
     expect(lru.set('c', 3)).toBe(2); // b evicted
     expect(lru.get('b')).toBeNull();
+  });
+});
+
+function makeStormState(overrides: Partial<StormState> = {}): StormState {
+  return {
+    lat: 18,
+    lon: 62,
+    vKt: 40,
+    ageH: 0,
+    alive: true,
+    organization: 0.7,
+    coldWakeC: 0,
+    diagnostics: {
+      sstC: 29,
+      effectiveSstC: 29,
+      midlevelRhPct: 70,
+      ohcKjCm2: 60,
+      organization: 0.7,
+      organizationTarget: 0.8,
+      coldWakeC: 0,
+      mpiKt: 120,
+      steerU: -2,
+      steerV: 3,
+      shearMs: 8,
+      shearUms: 6,
+      shearVms: 5,
+      overLand: false,
+      oceanKtPerH: 1,
+      shearKtPerH: 0,
+      landKtPerH: 0,
+      dryAirKtPerH: 0,
+      netKtPerH: 1,
+      eyewallRainMmH: 10,
+      rainbandRainMmH: 4,
+      orographicRainMmH: 2,
+      totalRainMmH: 16,
+    },
+    structure: {
+      maximumWindKt: 40,
+      centralPressureHpa: 990,
+      environmentalPressureHpa: 1010,
+      rmwKm: 30,
+      outerSizeKm: 180,
+      outerWindScale: 1,
+      outerBlendStartWindKt: 34,
+      outerBlendFullWindKt: 64,
+      hollandB: 1.35,
+      motionUms: -2,
+      motionVms: 3,
+      translationAsymmetryKt: 0,
+      shearUms: 6,
+      shearVms: 5,
+      shearAsymmetryFraction: 0,
+      rainOffsetEastKm: 0,
+      rainOffsetNorthKm: 0,
+      r34Km: { ne: 100, se: 100, sw: 100, nw: 100 },
+      r50Km: { ne: 60, se: 60, sw: 60, nw: 60 },
+      r64Km: { ne: 30, se: 30, sw: 30, nw: 30 },
+    },
+    trackPoints: [],
+    isDemo: false,
+    ...overrides,
+  };
+}
+
+function makeMeta(): FlightRunMeta {
+  return {
+    spawn: {
+      lat: 18,
+      lon: 62,
+      monthIndex: 5,
+      seed: 42,
+      isDemo: false,
+    },
+    environmentId: 'climatology',
+    monthIndex: 5,
+    seed: 42,
+    isDemo: false,
+    label: 'cloud-memory accessor fixture',
+    counterfactual: false,
+  };
+}
+
+describe('flight-recorder: cloud-memory tape accessor', () => {
+  function makeRecorder(): FlightRecorder {
+    const recorder = new FlightRecorder();
+    const base = makeStormState({ ageH: 0 });
+    recorder.start(makeMeta(), base);
+    for (const ageH of [0.25, 0.5, 0.75, 1.0, 1.25, 1.5]) {
+      recorder.record(makeStormState({ ageH }), []);
+    }
+    return recorder;
+  }
+
+  it('returns the latest frame at or before the requested age', () => {
+    const recorder = makeRecorder();
+    expect(recorder.frameAtOrBeforeAge(1.0)?.ageH).toBe(1.0);
+    expect(recorder.frameAtOrBeforeAge(1.1)?.ageH).toBe(1.0);
+    expect(recorder.frameAtOrBeforeAge(0)?.ageH).toBe(0);
+  });
+
+  it('returns null before any frame and before start', () => {
+    expect(new FlightRecorder().frameAtOrBeforeAge(5)).toBeNull();
+    expect(makeRecorder().frameAtOrBeforeAge(-0.5)).toBeNull();
+  });
+
+  it('runKey is stable within a run and changes across starts', () => {
+    const recorder = makeRecorder();
+    const key = recorder.runKey();
+    expect(key).toBe(recorder.runKey());
+    recorder.start(makeMeta(), makeStormState({ ageH: 0 }));
+    expect(recorder.runKey()).not.toBe(key);
+  });
+
+  it('runKey is null before the first start', () => {
+    expect(new FlightRecorder().runKey()).toBeNull();
   });
 });

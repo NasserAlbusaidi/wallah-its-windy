@@ -94,10 +94,14 @@ state — nothing exists that *could* diverge from its reconstruction.
   this render-only change. A run-identity change (new seed/spawn/environment)
   invalidates all cached states, matching `interpolatedCloudAgeH`'s respawn
   snap semantics.
-- **Caching:** computed states are cached per boundary index k in a small LRU
-  (k and k+1 for playback, plus recently scrubbed entries). The cache is a
-  pure memoization of the definition — eviction can only cost recompute time,
-  never change pixels.
+- **Caching:** each boundary state is cached **individually** per index k in
+  a small LRU (k and k+1 for playback, plus recently scrubbed entries); a
+  separate packing blit — one memory-resolution pass, two taps — combines
+  the cached states into the RG/BA display texture once per boundary
+  crossing and after any cold scrub. Individual caching means advancing
+  k → k+1 recomputes exactly one new state, and a cold scrub recomputes at
+  most two. The cache is a pure memoization of the definition — eviction can
+  only cost recompute time, never change pixels.
 - **Determinism boundary:** same device, same viewport/tier → byte-identical
   pixels for the same (seed, replay frame), exactly the shipped browser-QA
   contract. Cross-device pixel identity is not claimed (it never was for any
@@ -164,9 +168,11 @@ Sealed combine rules (each a formula, not a choice left to the implementer):
   `advectedAge × advectedDensity / max(advectedDensity + sourceDensity, ε)` —
   density-weighted, so fresh convection smoothly rejuvenates the column
   toward age 0 with no threshold pop.
-- Age then increments by `dt / W` (clamped to 1) where the decayed density
-  still encodes nonzero (≥ 1/255); where density encodes to zero, age resets
-  to 0 — no cloud, no age.
+- Age then increments by `dt / W` (clamped to 1) where the decayed density's
+  **stored byte after quantization** is ≥ 1; where the stored byte is 0, age
+  resets to 0 — no cloud, no age. The test reads the encoded value, never the
+  pre-quantization float (round-to-nearest can encode raw `0.5/255` as
+  byte 1, so the float and byte tests genuinely differ).
 
 The update program binds exactly **2 samplers** (previous state,
 `u_cloudNoise`) — its own budget, independent of env's. All constants are
@@ -247,8 +253,9 @@ named GLSL/TS constants with WHY comments; CPU mirrors are vitest-pinned.
 ### 5. Cost model
 
 - Steady-state playback: one N-pass recompute per boundary crossing (~3/s at
-  normal speed, 1/s slow-mo; each pass ≤ 512² with ~4 taps) plus the
-  per-frame OHC blit. Display adds +1 texture lookup per env fragment.
+  normal speed, 1/s slow-mo; each pass ≤ 512² with ~4 taps) plus one
+  two-tap packing blit per boundary crossing and the per-frame OHC blit.
+  Display adds +1 texture lookup per env fragment.
 - Cold scrub: one bounded recompute per landed boundary; budget under one
   desktop frame (16.7 ms) on the detail tier, measured not assumed.
   Scrubber dragging hits the per-k cache.
@@ -301,6 +308,10 @@ boundary. No new product claims, no label changes, no probability framing.
      `u_planeBlend` at 0, 0.5, and 1 — the pre-blended path must match the
      direct two-sampler mix within quantization (the blend intermediate is
      8-bit; a visible difference is a failure).
+  8. Format assertion: a one-time debug readback confirms the memory render
+     target's implementation-reported format is 8-bit unorm RGBA — CPU
+     mirrors cannot see the GL side, so the force-RGBA8 path is asserted in
+     the browser, mechanically.
 - **Performance:** same sealed protocol as the IR round — same machine,
   viewport, tier, storm frame, 300-frame window; candidate p95 main-thread
   frame work ≤ baseline + max(20 %, 1 ms); missed-frame fraction rise ≤ 5 pp.
@@ -405,4 +416,14 @@ findings verified against code before acceptance.
   density, density-weighted age rejuvenation, encoded-zero age reset).
   Verified as holding: the 13-texel bound arithmetic and the
   Advect→Source→Decay decay-count fix.
-- **Round 5**: pending — re-review targeting zero P1.
+- **Round 5** (full scope, amended spec): **ZERO P1 FINDINGS.** The reviewer
+  explicitly confirmed the round-4 fixes effective: no end-clamping in the
+  accessor, within-mode QA comparisons, the 18-step byte recurrence ending
+  at 13, and explicit combine rules. Three P2 advisories, all accepted into
+  the spec: the age-reset test reads the stored byte after quantization; a
+  browser readback asserts the RGBA8 target format; per-boundary caching
+  plus a budgeted two-tap packing blit are sealed (cold scrub recomputes at
+  most two states).
+
+**GATE SEALED 2026-07-30 — round 5 clean. This seals the design boundary
+only; implementation has not started.**

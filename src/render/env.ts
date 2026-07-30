@@ -11,10 +11,18 @@
 import { TOKENS } from '../tokens';
 import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
-import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
+import { CLOUD_MEMORY_DT_H, CLOUD_MEMORY_MACRO_GAIN, DEBRIS_MAX_CLOUD } from './cloud-memory';
+import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, cloudMetricX, cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
-import { makeProgram, makeQuadVao } from './gl-utils';
+import {
+  disposeRenderTarget,
+  makeProgram,
+  makeQuadVao,
+  makeRenderTarget,
+  probeCaps,
+} from './gl-utils';
+import type { GlCaps, RenderTarget } from './gl-utils';
 import { PRECIPITATING_CLOUD_BAND_MAX, PRECIPITATING_CLOUD_BAND_FULL_MM_H, PRECIPITATING_CLOUD_EYE_FULL_MM_H, PRECIPITATING_CLOUD_RAIN_START_MM_H, PRECIPITATING_CLOUD_SPIRAL_FLOOR, PRECIPITATING_CLOUD_TEXTURE_FLOOR, rainCenterClip } from './precipitating-cloud';
 import {
   CANOPY_COEFFICIENT_DIVISOR,
@@ -31,6 +39,22 @@ void main() {
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
 
+const OHC_BLEND_FS = /* glsl */ `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 o;
+uniform sampler2D u_a;
+uniform sampler2D u_b;
+uniform float u_blend;
+void main() {
+  // Identity blit: undo the shared VS's y-flip. The OHC sources are top-down
+  // image uploads; sampling them at the flipped v_uv would write a bottom-up
+  // copy, and the main pass's own flipped read would then mirror the field
+  // north-south (QA item 7 caught exactly this).
+  vec2 suv = vec2(v_uv.x, 1.0 - v_uv.y);
+  o = vec4(mix(texture(u_a, suv).r, texture(u_b, suv).r, u_blend), 0.0, 0.0, 1.0);
+}`;
+
 const FS = /* glsl */ `#version 300 es
 precision highp float;
 in vec2 v_uv;
@@ -39,8 +63,8 @@ uniform sampler2D u_sst;
 uniform sampler2D u_sstNext;
 uniform sampler2D u_rh;
 uniform sampler2D u_rhNext;
-uniform sampler2D u_ohc;
-uniform sampler2D u_ohcNext;
+uniform sampler2D u_ohcBlend;
+uniform sampler2D u_cloudMemory;
 uniform sampler2D u_shear;
 uniform sampler2D u_shearNext;
 uniform sampler2D u_steerU;
@@ -54,6 +78,7 @@ uniform sampler2D u_cloudNoise;
 uniform float u_hasSteer;
 uniform float u_hasUpper;
 uniform float u_hasAccum;
+uniform float u_hasCloudMemory;
 uniform float u_planeBlend;
 uniform vec2 u_sstRange;
 uniform vec4 u_warm;
@@ -112,6 +137,8 @@ mat2 rotate2(float angle) {
 
 ${CLOUD_MOTION_GLSL}
 
+// Keep constructor member order: composite, storm, ambient, brightness,
+// convection, relief, then the memory-only debris contribution.
 struct CloudField {
   float cloud;
   float stormCloud;
@@ -119,6 +146,7 @@ struct CloudField {
   float brightnessC;
   float convectiveCells;
   float relief;
+  float debris;
 };
 
 CloudField sampleCloud(float land, float sstC) {
@@ -180,6 +208,15 @@ ${CLOUD_CORE_GLSL.wobble}
     cloudNoise(pA * 0.62 + drift + seed * 11.0),
     weightA
   );
+  // ---- cloud memory: earth-fixed advected state, crossfaded RG/BA ----
+  vec4 memoryPacked = texture(u_cloudMemory, v_uv);
+  float memFrac = fract(u_cloudAgeH / ${CLOUD_MEMORY_DT_H}.0);
+  float memDensity = mix(memoryPacked.r, memoryPacked.b, memFrac) * u_hasCloudMemory;
+  float memAge = mix(memoryPacked.g, memoryPacked.a, memFrac);
+  // Enhancement-only gain: gain(0) = 1 exactly — an empty field reproduces
+  // the shipped look pixel-for-pixel (spec, gate-sealed).
+  macro = clamp(macro * (1.0 + ${CLOUD_MEMORY_MACRO_GAIN} *
+    smoothstep(0.15, 0.85, memDensity)), 0.0, 1.0);
   float fine;
   if (u_cloudDetail > 0.5) {
     fine = mix(
@@ -349,12 +386,17 @@ ${CLOUD_CORE_GLSL.eyewall}
   stormCloud *= 1.0 - eye * eyeStrength * 0.97;
   stormCloud *= u_stormPresence;
   float cloud = max(ambientCloud * (1.0 - centralOvercast * u_stormPresence), stormCloud);
+  // Debris: decaying stratiform deck the storm leaves behind. Deliberately
+  // outside stormCloud so shear erosion and storm presence cannot erase the
+  // wake the storm already shed.
+  float debris = memDensity * (1.0 - 0.55 * memAge) * ${DEBRIS_MAX_CLOUD};
+  cloud = max(cloud, debris);
 
   float surfaceC = mix(sstC, 34.0, smoothstep(0.35, 0.65, land));
   float ambientTopC = mix(-8.0, -42.0, synopticNoise * localRh);
 ${CLOUD_TOPS_GLSL}
 ${CLOUD_RELIEF_GLSL}
-  return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells, relief);
+  return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells, relief, debris);
 }
 
 vec4 addCloudContext(vec3 baseColor, float baseAlpha, CloudField field, float strength) {
@@ -431,11 +473,7 @@ void main() {
   }
 
   if (u_mode == 4) {
-    float value = mix(
-      texture(u_ohc, v_uv).r,
-      texture(u_ohcNext, v_uv).r,
-      u_planeBlend
-    );
+    float value = texture(u_ohcBlend, v_uv).r;
     vec3 color = fiveStop(
       value,
       u_palette0, u_palette1, u_palette2, u_palette3, u_palette4
@@ -568,7 +606,12 @@ const PALETTE: Record<WeatherLayerId, readonly [
 
 export class EnvLayer implements RenderModule {
   private gl!: WebGL2RenderingContext;
+  private caps!: GlCaps;
   private prog: WebGLProgram | null = null;
+  private ohcBlendProg: WebGLProgram | null = null;
+  private ohcBlendTarget: RenderTarget | null = null;
+  private ohcBlendWidth = 0;
+  private ohcBlendHeight = 0;
   private vao: WebGLVertexArrayObject | null = null;
   private cloudNoise: WebGLTexture | null = null;
   private satellitePalette: SatellitePaletteId = 'enhanced';
@@ -577,11 +620,36 @@ export class EnvLayer implements RenderModule {
     this.satellitePalette = palette;
   }
 
+  get cloudNoiseTexture(): WebGLTexture | null {
+    return this.cloudNoise;
+  }
+
   init(gl: WebGL2RenderingContext): void {
     this.gl = gl;
+    this.caps = probeCaps(gl);
     this.prog = makeProgram(gl, VS, FS);
+    this.ohcBlendProg = makeProgram(gl, VS, OHC_BLEND_FS);
     this.vao = makeQuadVao(gl, this.prog);
     this.cloudNoise = this.createCloudNoiseTexture();
+  }
+
+  private ensureOhcBlendTarget(width: number, height: number): RenderTarget {
+    if (
+      this.ohcBlendTarget &&
+      this.ohcBlendWidth === width &&
+      this.ohcBlendHeight === height
+    ) {
+      return this.ohcBlendTarget;
+    }
+    disposeRenderTarget(this.gl, this.ohcBlendTarget);
+    this.ohcBlendTarget = null;
+    this.ohcBlendWidth = 0;
+    this.ohcBlendHeight = 0;
+    const target = makeRenderTarget(this.gl, width, height, this.caps, true);
+    this.ohcBlendTarget = target;
+    this.ohcBlendWidth = width;
+    this.ohcBlendHeight = height;
+    return target;
   }
 
   private createCloudNoiseTexture(): WebGLTexture | null {
@@ -614,7 +682,12 @@ export class EnvLayer implements RenderModule {
     /* fullscreen pass */
   }
 
-  draw(ctx: DrawCtx, gpu: GpuTextures, fade: number): void {
+  draw(
+    ctx: DrawCtx,
+    gpu: GpuTextures,
+    fade: number,
+    memoryTex: WebGLTexture | null = null,
+  ): void {
     const gl = this.gl;
     if (
       !this.prog ||
@@ -631,6 +704,27 @@ export class EnvLayer implements RenderModule {
     ) {
       return;
     }
+    if (gpu.ohc && gpu.ohcNext && gpu.envGrid) {
+      const target = this.ensureOhcBlendTarget(gpu.envGrid.nx, gpu.envGrid.ny);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+      gl.viewport(0, 0, gpu.envGrid.nx, gpu.envGrid.ny);
+      gl.disable(gl.BLEND);
+      gl.useProgram(this.ohcBlendProg);
+      gl.bindVertexArray(this.vao);
+      const blendU = (name: string) =>
+        gl.getUniformLocation(this.ohcBlendProg!, name);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, gpu.ohc);
+      gl.uniform1i(blendU('u_a'), 0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, gpu.ohcNext);
+      gl.uniform1i(blendU('u_b'), 1);
+      gl.uniform1f(blendU('u_blend'), gpu.envBlend);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.bindVertexArray(null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, ctx.width, ctx.height);
+    }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(this.prog);
@@ -645,8 +739,8 @@ export class EnvLayer implements RenderModule {
     bind(1, gpu.sstNext, 'u_sstNext');
     bind(2, gpu.humidity, 'u_rh');
     bind(3, gpu.humidityNext, 'u_rhNext');
-    bind(4, gpu.ohc, 'u_ohc');
-    bind(5, gpu.ohcNext, 'u_ohcNext');
+    bind(4, this.ohcBlendTarget?.tex ?? gpu.land, 'u_ohcBlend');
+    bind(5, memoryTex ?? gpu.land, 'u_cloudMemory');
     bind(6, gpu.shear, 'u_shear');
     bind(7, gpu.shearNext, 'u_shearNext');
     bind(8, gpu.land, 'u_land');
@@ -669,6 +763,7 @@ export class EnvLayer implements RenderModule {
     gl.uniform1f(u('u_hasSteer'), hasSteer ? 1 : 0);
     gl.uniform1f(u('u_hasUpper'), hasUpper ? 1 : 0);
     gl.uniform1f(u('u_hasAccum'), gpu.rainAccum ? 1 : 0);
+    gl.uniform1f(u('u_hasCloudMemory'), memoryTex ? 1 : 0);
     gl.uniform1f(u('u_planeBlend'), gpu.envBlend);
     gl.uniform2f(u('u_sstRange'), SST_MIN_C, SST_MAX_C);
     gl.uniform4fv(u('u_warm'), TOKENS.sstWarm.rgba01);
@@ -752,11 +847,7 @@ export class EnvLayer implements RenderModule {
       u('u_cloudDetail'),
       !ctx.reduced && ctx.width >= 720 ? 1 : 0,
     );
-    const genesis = ctx.track?.[0];
-    const seedWave = genesis
-      ? Math.sin(genesis.lon * 12.9898 + genesis.lat * 78.233) * 43758.5453
-      : 0.417;
-    gl.uniform1f(u('u_cloudSeed'), seedWave - Math.floor(seedWave));
+    gl.uniform1f(u('u_cloudSeed'), cloudSeedFromGenesis(ctx.track?.[0]));
     gl.uniform1i(
       u('u_satellitePalette'),
       SATELLITE_PALETTE_MODE[this.satellitePalette],
@@ -772,11 +863,7 @@ export class EnvLayer implements RenderModule {
       u('u_rainPlate'),
       TOKENS.rainPlate.rgba01.subarray(0, 3),
     );
-    const latitude = ctx.frame.storm?.lat ?? 21;
-    gl.uniform1f(
-      u('u_metricX'),
-      (20 * Math.cos((latitude * Math.PI) / 180)) / 12,
-    );
+    gl.uniform1f(u('u_metricX'), cloudMetricX(ctx.frame.storm?.lat ?? 21));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
   }
@@ -784,9 +871,15 @@ export class EnvLayer implements RenderModule {
   dispose(): void {
     const gl = this.gl;
     if (this.prog) gl.deleteProgram(this.prog);
+    if (this.ohcBlendProg) gl.deleteProgram(this.ohcBlendProg);
     if (this.vao) gl.deleteVertexArray(this.vao);
     if (this.cloudNoise) gl.deleteTexture(this.cloudNoise);
+    disposeRenderTarget(gl, this.ohcBlendTarget);
     this.prog = null;
+    this.ohcBlendProg = null;
+    this.ohcBlendTarget = null;
+    this.ohcBlendWidth = 0;
+    this.ohcBlendHeight = 0;
     this.vao = null;
     this.cloudNoise = null;
   }

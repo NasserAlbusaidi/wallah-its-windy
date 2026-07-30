@@ -40,6 +40,10 @@ export const CLOUD_PULSE_PERIOD_H = 2;
 /** Pre-change solid-body rate, kept verbatim for the reduced-motion path. */
 export const LEGACY_CLOUD_ROTATION_RAD_PER_H = 0.028;
 
+/** Debris cloud-top grading, deg C — warmer than fresh bands (-45..-62). */
+export const DEBRIS_TOP_WARM_C = -28;
+export const DEBRIS_TOP_COLD_C = -45;
+
 /**
  * Interpolated decorative cloud age for u_cloudAgeH. Raw fixed-frame ageH
  * jumps 0.25 h per tick — up to 0.15 rad at the cap — and visibly stutters.
@@ -175,7 +179,8 @@ export const CLOUD_CORE_GLSL = {
  * GLSL for component-graded cloud tops and deterministic overshooting-top
  * pulses. env.ts must splice this inside sampleCloud() immediately after the
  * surfaceC/ambientTopC declarations: it intentionally references that
- * function's Task 2 motion locals and cloud-component geometry in place.
+ * function's Task 2 motion locals and cloud-component geometry in place,
+ * including memDensity, memAge, and u_hasCloudMemory.
  */
 export const CLOUD_TOPS_GLSL = /* glsl */ `
   // Component-graded cloud tops: warmest first, coldest mixed last so a cold
@@ -210,6 +215,10 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
     smoothstep(0.55, 0.80, convectiveCells);
 
   float topC = ambientTopC;
+  float debrisTopC = mix(${DEBRIS_TOP_WARM_C.toFixed(1)}, ${DEBRIS_TOP_COLD_C.toFixed(1)},
+    1.0 - memAge);
+  float debrisPresence = clamp(memDensity * 1.3, 0.0, 1.0) * u_hasCloudMemory;
+  topC = mix(topC, debrisTopC, debrisPresence);
   topC = mix(topC, cirrusTopC, cirrusPresence);
   topC = mix(topC, bandTopC, bandPresence);
   topC = mix(topC, cdoTopC, corePresence);

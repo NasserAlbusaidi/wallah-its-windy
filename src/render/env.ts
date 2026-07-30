@@ -11,6 +11,7 @@
 import { TOKENS } from '../tokens';
 import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
+import { CLOUD_MEMORY_DT_H, CLOUD_MEMORY_MACRO_GAIN, DEBRIS_MAX_CLOUD } from './cloud-memory';
 import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
@@ -58,6 +59,7 @@ uniform sampler2D u_sstNext;
 uniform sampler2D u_rh;
 uniform sampler2D u_rhNext;
 uniform sampler2D u_ohcBlend;
+uniform sampler2D u_cloudMemory;
 uniform sampler2D u_shear;
 uniform sampler2D u_shearNext;
 uniform sampler2D u_steerU;
@@ -71,6 +73,7 @@ uniform sampler2D u_cloudNoise;
 uniform float u_hasSteer;
 uniform float u_hasUpper;
 uniform float u_hasAccum;
+uniform float u_hasCloudMemory;
 uniform float u_planeBlend;
 uniform vec2 u_sstRange;
 uniform vec4 u_warm;
@@ -129,6 +132,8 @@ mat2 rotate2(float angle) {
 
 ${CLOUD_MOTION_GLSL}
 
+// Keep constructor member order: composite, storm, ambient, brightness,
+// convection, relief, then the memory-only debris contribution.
 struct CloudField {
   float cloud;
   float stormCloud;
@@ -136,6 +141,7 @@ struct CloudField {
   float brightnessC;
   float convectiveCells;
   float relief;
+  float debris;
 };
 
 CloudField sampleCloud(float land, float sstC) {
@@ -197,6 +203,15 @@ ${CLOUD_CORE_GLSL.wobble}
     cloudNoise(pA * 0.62 + drift + seed * 11.0),
     weightA
   );
+  // ---- cloud memory: earth-fixed advected state, crossfaded RG/BA ----
+  vec4 memoryPacked = texture(u_cloudMemory, v_uv);
+  float memFrac = fract(u_cloudAgeH / ${CLOUD_MEMORY_DT_H}.0);
+  float memDensity = mix(memoryPacked.r, memoryPacked.b, memFrac) * u_hasCloudMemory;
+  float memAge = mix(memoryPacked.g, memoryPacked.a, memFrac);
+  // Enhancement-only gain: gain(0) = 1 exactly — an empty field reproduces
+  // the shipped look pixel-for-pixel (spec, gate-sealed).
+  macro = clamp(macro * (1.0 + ${CLOUD_MEMORY_MACRO_GAIN} *
+    smoothstep(0.15, 0.85, memDensity)), 0.0, 1.0);
   float fine;
   if (u_cloudDetail > 0.5) {
     fine = mix(
@@ -366,12 +381,17 @@ ${CLOUD_CORE_GLSL.eyewall}
   stormCloud *= 1.0 - eye * eyeStrength * 0.97;
   stormCloud *= u_stormPresence;
   float cloud = max(ambientCloud * (1.0 - centralOvercast * u_stormPresence), stormCloud);
+  // Debris: decaying stratiform deck the storm leaves behind. Deliberately
+  // outside stormCloud so shear erosion and storm presence cannot erase the
+  // wake the storm already shed.
+  float debris = memDensity * (1.0 - 0.55 * memAge) * ${DEBRIS_MAX_CLOUD};
+  cloud = max(cloud, debris);
 
   float surfaceC = mix(sstC, 34.0, smoothstep(0.35, 0.65, land));
   float ambientTopC = mix(-8.0, -42.0, synopticNoise * localRh);
 ${CLOUD_TOPS_GLSL}
 ${CLOUD_RELIEF_GLSL}
-  return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells, relief);
+  return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells, relief, debris);
 }
 
 vec4 addCloudContext(vec3 baseColor, float baseAlpha, CloudField field, float strength) {
@@ -653,7 +673,12 @@ export class EnvLayer implements RenderModule {
     /* fullscreen pass */
   }
 
-  draw(ctx: DrawCtx, gpu: GpuTextures, fade: number): void {
+  draw(
+    ctx: DrawCtx,
+    gpu: GpuTextures,
+    fade: number,
+    memoryTex: WebGLTexture | null = null,
+  ): void {
     const gl = this.gl;
     if (
       !this.prog ||
@@ -706,6 +731,7 @@ export class EnvLayer implements RenderModule {
     bind(2, gpu.humidity, 'u_rh');
     bind(3, gpu.humidityNext, 'u_rhNext');
     bind(4, this.ohcBlendTarget?.tex ?? gpu.land, 'u_ohcBlend');
+    bind(5, memoryTex ?? gpu.land, 'u_cloudMemory');
     bind(6, gpu.shear, 'u_shear');
     bind(7, gpu.shearNext, 'u_shearNext');
     bind(8, gpu.land, 'u_land');
@@ -721,12 +747,14 @@ export class EnvLayer implements RenderModule {
     bind(13, gpu.rainAccum ?? gpu.land, 'u_rainTotal');
     bind(14, this.cloudNoise, 'u_cloudNoise');
     // 16 fragment texture units is the WebGL2 guaranteed minimum and this
-    // program now uses 15, leaving unit 5 free for the cloud-memory field.
+    // program now uses exactly 16 (units 0-15). A new sampled field must pack
+    // into a free channel of an existing texture, never add a 17th sampler.
     const hasUpper = Boolean(gpu.upperUV);
     bind(15, gpu.upperUV ?? gpu.land, 'u_upperUV');
     gl.uniform1f(u('u_hasSteer'), hasSteer ? 1 : 0);
     gl.uniform1f(u('u_hasUpper'), hasUpper ? 1 : 0);
     gl.uniform1f(u('u_hasAccum'), gpu.rainAccum ? 1 : 0);
+    gl.uniform1f(u('u_hasCloudMemory'), memoryTex ? 1 : 0);
     gl.uniform1f(u('u_planeBlend'), gpu.envBlend);
     gl.uniform2f(u('u_sstRange'), SST_MIN_C, SST_MAX_C);
     gl.uniform4fv(u('u_warm'), TOKENS.sstWarm.rgba01);

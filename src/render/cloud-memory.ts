@@ -27,6 +27,7 @@ import {
   LEGACY_CLOUD_ROTATION_RAD_PER_H,
   cloudAngularRateRadPerH,
 } from './cloud-motion';
+export { DEBRIS_TOP_COLD_C, DEBRIS_TOP_WARM_C } from './cloud-motion';
 import {
   HALF_DOMAIN_HEIGHT_KM,
   RENDER_RADIUS_FLOOR,
@@ -70,9 +71,6 @@ export const CLOUD_MEMORY_SIZE_MOBILE = 256;
 export const CLOUD_MEMORY_MACRO_GAIN = 0.3;
 /** Backtrace substeps; >1 only if browser QA shows swirl artifacts. */
 export const CLOUD_MEMORY_SUBSTEPS = 1;
-/** Debris cloud-top grading, deg C — warmer than fresh bands (-45..-62). */
-export const DEBRIS_TOP_WARM_C = -28;
-export const DEBRIS_TOP_COLD_C = -45;
 /** Max cloud fraction debris alone can claim (decaying stratiform, not CDO). */
 export const DEBRIS_MAX_CLOUD = 0.55;
 

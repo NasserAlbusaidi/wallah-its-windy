@@ -65,8 +65,16 @@ state — nothing exists that *could* diverge from its reconstruction.
   `CLOUD_MEMORY_DT_H = 1` sim-hour. Window `CLOUD_MEMORY_WINDOW_H = 18`
   sim-hours → `N = 18` update steps per boundary state.
 - **Definition:** `state(k)` = start from a **zero field** at boundary
-  `k − N`, apply N update steps; step j reads storm history at boundary time
-  `(k − N + j) · dt` from the flight-recorder tape. Zero init (not seeded
+  `k − N`, apply N update steps. The step from boundary `t` to `t + 1` reads
+  storm history (center, intensity, structure) from the tape frame at time
+  `t`, and injects source for boundary `t` — so `state(k)` consumes tape
+  frames at `k − N … k − 1` **only**. This is a causality seal: the display
+  pair (state(k), state(k+1)) at display age `a ∈ [k, k+1)` needs frames no
+  later than `k`, which exist the moment `a ≥ k`. No lookup can ever run past
+  the tape, so there is no clamp; a missing frame is a thrown error, never a
+  fallback. The cache key (run identity, k, tier, reduced-motion flag) is
+  therefore complete — every other input is a frozen past frame. Zero init
+  (not seeded
   noise) removes any init-noise mismatch between adjacent boundary states:
   their *source inputs* over the shared window are identical, and they differ
   by the oldest/newest injection plus one extra advect/decay step applied to
@@ -118,22 +126,29 @@ One small fragment program ping-pongs two work textures; per step, per texel:
      constant beyond. Debris therefore spreads outward and is left behind by
      the moving source; no steering term — translation is implicit in the
      earth-fixed frame.
-   Worst-case backtrace: the cap bounds *angular* rate, so linear
-   displacement peaks at `0.3 rad/h × 95 km` (the structure model's RMW
-   clamp) ≈ 28.5 km ≈ **11 texels** per step at 512² (2.6 km/texel), plus
-   the bounded outflow term. Semi-Lagrangian backtracing is unconditionally
+   The rotation term is additionally bounded by a **linear speed cap**,
+   `CLOUD_MEMORY_MAX_ADVECT_KMH = 30` (named, with WHY): the angular cap
+   alone still permits ~57 km/h at 190 km radius and ~100 km/h far-field for
+   strong storms, where the Holland profile is gradient wind — but debris
+   physically rides the ambient flow, tens of km/h, not the gradient wind.
+   The cap is therefore the honest debris model *and* the numerical bound:
+   worst-case backtrace ≈ `√(30² + 12²) ≈ 32 km/h` ≈ **13 texels** per step
+   at 512² (2.6 km/texel). Semi-Lagrangian backtracing is unconditionally
    stable at any displacement; the cost of a long tap is smearing, not
    blow-up. If browser QA shows swirl artifacts near large-RMW cores, a
    named substep constant (`CLOUD_MEMORY_SUBSTEPS`) divides the step — it is
    part of the state definition, so changing it is a visual retune, never a
    replay break.
-2. **Decay** — density × `exp(−dt / CLOUD_MEMORY_DECAY_TAU_H)`,
-   `τ = 6` sim-hours; the debris-age channel increments by dt where density
-   is present.
-3. **Source** — convection injected from that boundary's tape frame: an
-   analytic envelope from vKt-derived development and the frame's
-   `structure` radii (rmw, outer size), textured by seeded `u_cloudNoise`
-   cells so injection is patchy, not a stamp.
+2. **Source** — convection injected for the step's boundary `t` from the
+   tape frame at `t`: an analytic envelope from vKt-derived development and
+   the frame's `structure` radii (rmw, outer size), textured by seeded
+   `u_cloudNoise` cells so injection is patchy, not a stamp.
+3. **Decay** — after injection: density × `exp(−dt / CLOUD_MEMORY_DECAY_TAU_H)`,
+   `τ = 6` sim-hours; the normalized debris-age channel increments by
+   `dt / W` where density persists. Source-before-decay is deliberate: every
+   contribution, the newest included, decays at least once, and the oldest
+   injection in the window decays exactly N times — the tail contract is
+   `exp(−N·dt/τ) = exp(−3) ≈ 4.98 %` with no off-by-one.
 
 The update program binds exactly **2 samplers** (previous state,
 `u_cloudNoise`) — its own budget, independent of env's. All constants are
@@ -149,7 +164,11 @@ named GLSL/TS constants with WHY comments; CPU mirrors are vitest-pinned.
   alpha to 0 and prev to the tape's previous frame, so `u_cloudAgeH` — and
   therefore the boundary pair and fraction — is a pure function of the
   selected frame index. Pause freezes it; the same replay frame reproduces
-  the same pixels.
+  the same pixels. One shipped characteristic is inherited, not changed:
+  paused-live and replay show slightly different cloud ages for the same tick
+  (the live path's prev carries the *current* `ageH`, the replay path's prev
+  is the tape's previous frame, and alpha is 0 in both) — so determinism and
+  equivalence claims are **within-mode**, never across paused-live vs replay.
 - **Sampler budget:** the env program currently uses all 16 guaranteed
   fragment texture units. The OHC month pair (`u_ohc`/`u_ohcNext`, blended
   once with `u_planeBlend`) is pre-blended into a single texture by a tiny
@@ -223,19 +242,23 @@ boundary. No new product claims, no label changes, no probability framing.
 ## Verification
 
 - **Vitest (no GL harness; GLSL is browser-verified):** boundary index/frac
-  math from cloudAgeH; window clamp at spawn; nearest-≤ tape lookup including
-  clamping beyond the last frame; normalized debris-age encode/decode
-  round-trip; velocity mirror reuse of `cloudAngularRateRadPerH` including
-  the reduced-motion legacy-rate branch; cache keying, run-identity
+  math from cloudAgeH; window clamp at spawn; the causality seal — the CPU
+  boundary enumerator for `state(k)` must request tape frames at
+  `k − N … k − 1` only, with a missing frame throwing, never falling back;
+  normalized debris-age encode/decode round-trip; the linear advection speed
+  cap; velocity mirror reuse of `cloudAngularRateRadPerH` including the
+  reduced-motion legacy-rate branch; cache keying, run-identity
   invalidation, and reduced-motion-toggle invalidation; OHC pre-blend
-  selection logic; W/τ ≥ 3 pinned as a relation test so retuning one
-  constant cannot silently break the tail contract.
+  selection logic; the tail contract pinned as a relation test on the
+  Advect→Source→Decay order: `exp(−(W/dt)·dt/τ) ≤ 5 %`, so retuning one
+  constant or reordering steps cannot silently break it.
 - **Browser QA (Playwright; console/WebGL errors are failures):**
-  1. *Scrub equivalence (the new critical check):* play forward and pause at
-     a frame, capture; cold-scrub away and back to the same frame, capture →
-     byte-identical. (Pausing and replay navigation both pin alpha to 0, so
-     the paused-live and replay views agree by construction.) Repeat across a
-     memory-boundary crossing.
+  1. *Scrub equivalence (the new critical check), within replay mode:*
+     scrub to a frame, capture; scrub far away (forcing cold recomputes);
+     scrub back to the same frame, capture → byte-identical. Repeat across a
+     memory-boundary crossing. Separately, a paused live frame captured twice
+     is byte-identical. No cross-mode (paused-live vs replay) equality is
+     claimed — the shipped `u_cloudAgeH` paths differ there by construction.
   2. Paused-frame and same-replay-frame captures byte-identical (shipped
      check, now exercising the memory path).
   3. Wake: a moving mature storm shows a decaying debris deck along its
@@ -249,11 +272,18 @@ boundary. No new product claims, no label changes, no probability framing.
      captures 2 s apart differ only at storm-translation scale).
   6. Rain alignment: radar vs IR at weak, mature, sheared states — the
      precipitating-cloud floor has not moved.
+  7. OHC pre-blend equivalence: baseline vs candidate captures with
+     `u_planeBlend` at 0, 0.5, and 1 — the pre-blended path must match the
+     direct two-sampler mix within quantization (the blend intermediate is
+     8-bit; a visible difference is a failure).
 - **Performance:** same sealed protocol as the IR round — same machine,
   viewport, tier, storm frame, 300-frame window; candidate p95 main-thread
   frame work ≤ baseline + max(20 %, 1 ms); missed-frame fraction rise ≤ 5 pp.
-  Additionally the cold-boundary scrub recompute is timed and must fit one
-  frame budget on the desktop detail tier. Raw numbers recorded in the PR.
+  Additionally the cold-boundary scrub recompute must fit one frame budget on
+  the desktop detail tier, measured to **GPU completion** (disjoint timer
+  query where available, else fence/readback or landed-frame latency) — draw
+  submission time alone measures enqueueing and is not accepted. Raw numbers
+  recorded in the PR.
 - **Morphology screen:** re-capture the fixed Shaheen 2.5-h grayscale frame
   and re-run the unchanged qualitative screen per the recorded A/B-relative
   acceptance protocol; thresholds and the observed case are not retuned. A
@@ -312,4 +342,29 @@ findings verified against code before acceptance.
     RG/BA one-call packing, presence-ladder ordering, sealed +2 relief taps,
     `rainCenterClip` support, per-tier resolution as a legitimate render
     trait, header-sized OHC blit.
-- **Round 3**: pending — re-review of the amended spec targeting zero P1.
+- **Round 3** (full scope, amended spec, `storm-session.ts` added to the
+  reading list): 4 P1, 2 P2, all accepted.
+  - P1 replay age off-by-one — accepted; it also falsified this seat's
+    round-2a claim that paused-live and replay agree at the same age: the
+    live path's prev spreads `...live` and keeps the *current* `ageH`, so
+    paused-live shows `cur` while replay shows `cur − 0.25`. Equivalence
+    claims are now within-mode only; the QA check compares replay with
+    replay.
+  - P1 causality seal — accepted (the sharpest find of the gate): sources
+    now run `k − N … k − 1`, every input is a frozen past frame, the
+    beyond-last-frame clamp is deleted (missing frame throws), and the cache
+    key is complete without tape length.
+  - P1 texel bound — accepted: the angular cap still permits ~57–100 km/h
+    linear far-field flow. Fixed with `CLOUD_MEMORY_MAX_ADVECT_KMH = 30`,
+    which is also the honest debris model (ambient flow, not gradient wind);
+    worst case ~13 texels/step.
+  - P1 tail off-by-one — accepted: source-after-decay gave the oldest parcel
+    N−1 decays (5.88 %). Step order is now Advect→Source→Decay (exactly N
+    decays, 4.98 %), pinned by the relation test.
+  - P2 GPU-completion timing and P2 OHC blend-equivalence captures —
+    accepted into verification.
+  - Verified as holding: dedup semantics, normalized RGBA8 age, force-RGBA8
+    targeting, reduced-motion cache input, outflow provenance, 16-sampler
+    accounting, RG/BA packing, relief/rain-support preservation, tier/header
+    sizing.
+- **Round 4**: pending — re-review targeting zero P1.

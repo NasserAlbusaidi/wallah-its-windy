@@ -12,7 +12,7 @@ import { TOKENS } from '../tokens';
 import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
 import { CLOUD_MEMORY_DT_H, CLOUD_MEMORY_MACRO_GAIN, DEBRIS_MAX_CLOUD } from './cloud-memory';
-import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, interpolatedCloudAgeH } from './cloud-motion';
+import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, cloudMetricX, cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import {
@@ -615,6 +615,10 @@ export class EnvLayer implements RenderModule {
     this.satellitePalette = palette;
   }
 
+  get cloudNoiseTexture(): WebGLTexture | null {
+    return this.cloudNoise;
+  }
+
   init(gl: WebGL2RenderingContext): void {
     this.gl = gl;
     this.caps = probeCaps(gl);
@@ -838,11 +842,7 @@ export class EnvLayer implements RenderModule {
       u('u_cloudDetail'),
       !ctx.reduced && ctx.width >= 720 ? 1 : 0,
     );
-    const genesis = ctx.track?.[0];
-    const seedWave = genesis
-      ? Math.sin(genesis.lon * 12.9898 + genesis.lat * 78.233) * 43758.5453
-      : 0.417;
-    gl.uniform1f(u('u_cloudSeed'), seedWave - Math.floor(seedWave));
+    gl.uniform1f(u('u_cloudSeed'), cloudSeedFromGenesis(ctx.track?.[0]));
     gl.uniform1i(
       u('u_satellitePalette'),
       SATELLITE_PALETTE_MODE[this.satellitePalette],
@@ -858,11 +858,7 @@ export class EnvLayer implements RenderModule {
       u('u_rainPlate'),
       TOKENS.rainPlate.rgba01.subarray(0, 3),
     );
-    const latitude = ctx.frame.storm?.lat ?? 21;
-    gl.uniform1f(
-      u('u_metricX'),
-      (20 * Math.cos((latitude * Math.PI) / 180)) / 12,
-    );
+    gl.uniform1f(u('u_metricX'), cloudMetricX(ctx.frame.storm?.lat ?? 21));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
   }

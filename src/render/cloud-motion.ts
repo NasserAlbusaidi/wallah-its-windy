@@ -62,6 +62,21 @@ export function interpolatedCloudAgeH(
   return prevAgeH + (ageH - prevAgeH) * clamped;
 }
 
+/** East-west metric correction shared by env and cloud-memory uploads. */
+export function cloudMetricX(latitude: number): number {
+  return (20 * Math.cos((latitude * Math.PI) / 180)) / 12;
+}
+
+/** Deterministic genesis-point seed shared by env and cloud-memory uploads. */
+export function cloudSeedFromGenesis(
+  genesis: { lat: number; lon: number } | null | undefined,
+): number {
+  const seedWave = genesis
+    ? Math.sin(genesis.lon * 12.9898 + genesis.lat * 78.233) * 43758.5453
+    : 0.417;
+  return seedWave - Math.floor(seedWave);
+}
+
 /**
  * Holland-profile angular rate at radius rKm, rad/sim-hour, display-capped.
  * 3.6 converts m/s to km/h; radii floor at 1 km to guard the singularity.

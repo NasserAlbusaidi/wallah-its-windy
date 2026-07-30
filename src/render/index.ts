@@ -91,6 +91,13 @@ import { ObservedSatelliteLayer } from './satellite';
 import { normalizeRainAccumulationMm } from '../rain-accumulation';
 import type { RadarSourceMode } from '../radar-observations';
 import { ObservedRadarLayer } from './observed-radar';
+import { CloudMemoryPass } from './cloud-memory';
+import type { CloudTape } from './cloud-memory';
+import {
+  cloudMetricX,
+  cloudSeedFromGenesis,
+  interpolatedCloudAgeH,
+} from './cloud-motion';
 
 /** Baked data handed to the renderer (mode A); any field may arrive progressively. */
 export interface RenderResources {
@@ -215,6 +222,7 @@ export class RenderPipeline implements RenderLayer {
 
   private terrain = new TerrainLayer();
   private env = new EnvLayer();
+  private cloudMemory = new CloudMemoryPass();
   private satellite = new ObservedSatelliteLayer();
   private observedRadar = new ObservedRadarLayer();
   private particles = new ParticleLayer();
@@ -265,6 +273,7 @@ export class RenderPipeline implements RenderLayer {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
     this.env.resize(this.width, this.height);
+    this.cloudMemory.resize(this.width, this.height);
     this.satellite.resize(this.width, this.height);
     this.observedRadar.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
@@ -282,6 +291,20 @@ export class RenderPipeline implements RenderLayer {
     this.syncEnvPlane(frame);
     this.syncRainAccum(frame);
     const ctx = this.buildCtx(frame);
+    const cloudAgeH = interpolatedCloudAgeH(
+      frame.prevStorm?.ageH ?? null,
+      frame.storm?.ageH ?? 0,
+      frame.alpha,
+    );
+    if (frame.storm) {
+      this.cloudMemory.ensure(
+        cloudAgeH,
+        ctx.reduced,
+        cloudMetricX(ctx.frame.storm?.lat ?? 21),
+        this.env.cloudNoiseTexture,
+        cloudSeedFromGenesis(ctx.track?.[0]),
+      );
+    }
     const terrainFade = this.fadeSince(this.terrainReadyMs, ctx.nowMs);
     const glowFade = this.fadeSince(this.glowReadyMs, ctx.nowMs);
 
@@ -314,7 +337,12 @@ export class RenderPipeline implements RenderLayer {
       }
     }
     this.satellite.draw(observedWeight);
-    this.env.draw(ctx, this.gpu, glowFade * simulatedWeight);
+    this.env.draw(
+      ctx,
+      this.gpu,
+      glowFade * simulatedWeight,
+      this.cloudMemory.texture,
+    );
     const observedRadar =
       ctx.weatherLayer === 'rain' &&
       this.radarSource === 'observed' &&
@@ -358,6 +386,7 @@ export class RenderPipeline implements RenderLayer {
     this.disposeTextures();
     this.terrain.dispose();
     this.env.dispose();
+    this.cloudMemory.dispose();
     this.satellite.dispose();
     this.observedRadar.dispose();
     this.particles.dispose();
@@ -421,6 +450,10 @@ export class RenderPipeline implements RenderLayer {
       return;
     }
     this.satellite.setFrame(image, channel);
+  }
+
+  setCloudTape(tape: CloudTape | null): void {
+    this.cloudMemory.setTape(tape);
   }
 
   setRadarSource(source: RadarSourceMode): void {
@@ -567,6 +600,7 @@ export class RenderPipeline implements RenderLayer {
     this.caps = probeCaps(gl);
     this.terrain.init(gl);
     this.env.init(gl);
+    this.cloudMemory.init(gl);
     this.satellite.init(gl);
     this.observedRadar.init(gl);
     this.env.setSatellitePalette(this.satellitePalette);
@@ -581,6 +615,7 @@ export class RenderPipeline implements RenderLayer {
       this.track.init(this.overlay);
     }
     this.env.resize(this.width, this.height);
+    this.cloudMemory.resize(this.width, this.height);
     this.satellite.resize(this.width, this.height);
     this.particles.resize(this.width, this.height);
     this.wind.resize(this.width, this.height);

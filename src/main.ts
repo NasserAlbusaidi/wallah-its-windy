@@ -148,6 +148,7 @@ import {
 // B, self-sourcing) only if createRenderer is absent. Either way storm particles +
 // track render from FrameState.storm.
 import * as renderModule from './render';
+import type { CloudTape } from './render/cloud-memory';
 
 // --- Time constants ---------------------------------------------------------
 const SIM_DT_MIN = 15; // fixed physics step, simulated minutes
@@ -525,6 +526,11 @@ try {
   }
   renderCtrl?.setSatellitePalette?.(activeSatellitePalette);
   renderCtrl?.setSatelliteSource?.(activeSatelliteSource, satelliteHandoffStartAgeH);
+  renderCtrl?.setCloudTape?.({
+    frameAtOrBeforeAge: (ageH) =>
+      session.recorder.frameAtOrBeforeAge(ageH),
+    runKey: () => session.recorder.runKey(),
+  });
 } catch (err) {
   console.warn('[boot] render layers unavailable — map will not composite:', err);
   layers = [];
@@ -2966,6 +2972,7 @@ type RenderController = RenderLayer & {
   setObservedRadarFrame?(image: TexImageSource | null): void;
   setObservedRadarCoverage?(image: TexImageSource | null): void;
   setParticleBudget?(count: number): void;
+  setCloudTape?(tape: CloudTape | null): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;
 };

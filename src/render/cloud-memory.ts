@@ -26,6 +26,7 @@ import {
   CLOUD_ROTATION_CAP_RAD_PER_H,
   LEGACY_CLOUD_ROTATION_RAD_PER_H,
   cloudAngularRateRadPerH,
+  cloudMetricX,
 } from './cloud-motion';
 export { DEBRIS_TOP_COLD_C, DEBRIS_TOP_WARM_C } from './cloud-motion';
 import {
@@ -382,7 +383,6 @@ export class CloudMemoryPass implements RenderModule {
   ensure(
     cloudAgeH: number,
     reducedMotion: boolean,
-    metricX: number,
     cloudNoiseTex: WebGLTexture | null,
     cloudSeed: number,
   ): void {
@@ -413,14 +413,7 @@ export class CloudMemoryPass implements RenderModule {
       ) !== null,
     );
     for (const k of need) {
-      this.computeState(
-        k,
-        runKey,
-        reducedMotion,
-        metricX,
-        cloudNoiseTex,
-        cloudSeed,
-      );
+      this.computeState(k, runKey, reducedMotion, cloudNoiseTex, cloudSeed);
     }
 
     const { k } = memoryBoundaryPair(cloudAgeH);
@@ -446,7 +439,6 @@ export class CloudMemoryPass implements RenderModule {
     k: number,
     runKey: string,
     reducedMotion: boolean,
-    metricX: number,
     cloudNoiseTex: WebGLTexture,
     cloudSeed: number,
   ): void {
@@ -507,7 +499,11 @@ export class CloudMemoryPass implements RenderModule {
             Math.max(0, 0.56 * frame.organization + 0.44 * intensity01),
           );
           gl.uniform2f(u('u_center'), center.x, center.y);
-          gl.uniform1f(u('u_metricX'), metricX);
+          // Causality seal: metricX derives from THIS boundary frame's
+          // latitude, never the display frame's — state(k) must be a pure
+          // function of the frozen tape or scrub returns stop being
+          // byte-identical (QA item 1 caught exactly this).
+          gl.uniform1f(u('u_metricX'), cloudMetricX(frame.lat));
           gl.uniform1f(u('u_rMax'), radii.rMax);
           gl.uniform1f(u('u_rCanopy'), radii.rCanopy);
           gl.uniform1f(

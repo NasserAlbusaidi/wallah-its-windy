@@ -93,11 +93,7 @@ import type { RadarSourceMode } from '../radar-observations';
 import { ObservedRadarLayer } from './observed-radar';
 import { CloudMemoryPass } from './cloud-memory';
 import type { CloudTape } from './cloud-memory';
-import {
-  cloudMetricX,
-  cloudSeedFromGenesis,
-  interpolatedCloudAgeH,
-} from './cloud-motion';
+import { cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
 
 /** Baked data handed to the renderer (mode A); any field may arrive progressively. */
 export interface RenderResources {
@@ -300,7 +296,6 @@ export class RenderPipeline implements RenderLayer {
       this.cloudMemory.ensure(
         cloudAgeH,
         ctx.reduced,
-        cloudMetricX(ctx.frame.storm?.lat ?? 21),
         this.env.cloudNoiseTexture,
         cloudSeedFromGenesis(ctx.track?.[0]),
       );

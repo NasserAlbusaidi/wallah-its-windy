@@ -10,7 +10,7 @@ Every entry follows the schema in docs/research/realism/README.md.
 | Severe, long-lived | Gonu 2007 | env=gonu | external reference (Meteosat in-app archive starts 2020-08-01) | pending |
 | Severe, recurving | Kyarr 2019 | env=kyarr | external reference | pending |
 | Oman landfall | Shaheen 2021 | env=shaheen | in-app paired | genesis, intensification, peak (IR+VIS), landfall, decay — done 2026-07-30 |
-| Indian-coast landfall + weak sheared phase | Biparjoy 2023 | env=biparjoy | in-app paired | pending |
+| Indian-coast landfall + weak sheared phase | Biparjoy 2023 | env=biparjoy | in-app paired | init (matched 70 kt), peak, sheared-mid, decay-end (IR) + sheared VIS — done 2026-08-01. Sim hindcast collapses 25.5 h after init, so no sim landfall or long weak phase exists; the Gujarat-landfall cell is NOT coverable in event replay (see RGR-014). |
 | Weak sheared system | Ashobaa 2015 | env=ashobaa | external reference | pending |
 
 Tauktae 2021 is excluded: no event bin exists, and baking one is outside R1's
@@ -23,9 +23,9 @@ research scope. Candidate future work, recorded in the HF-7 charter appendix.
 
 ## Entries
 
-Evidence shorthand: `shaheen/<stage>` = the capture pair
-`docs/research/realism/captures/shaheen/<stage>-{sim,obs}.webp`; session detail
-in `docs/research/realism/sessions/shaheen.md`.
+Evidence shorthand: `shaheen/<stage>` / `biparjoy/<stage>` = the capture pair
+`docs/research/realism/captures/<storm>/<stage>-{sim,obs}.webp`; session detail
+in `docs/research/realism/sessions/<storm>.md`.
 
 ### RGR-001 — Environmental sky is empty; observed basin is never cloud-free
 - subsystem: environment
@@ -33,10 +33,15 @@ in `docs/research/realism/sessions/shaheen.md`.
 - evidence: shaheen/genesis, shaheen/peak, shaheen/peak-vis — every observed
   IR/VIS frame carries monsoon/ITCZ cloud, cirrus streaks, and low-cloud fields
   across the whole domain; every sim frame renders the storm alone on black.
-- description: the sim draws no environmental cloud at all. This is the single
+  biparjoy/init, biparjoy/sheared-vis — first paired evidence of the
+  cloud-memory debris deck firing in a moist June environment: a handful of
+  dim amorphous blobs appear, but they read as smudges against an observed
+  basin filled with structured, textured cloud fields.
+- description: the sim draws almost no environmental cloud. This is the single
   loudest realism tell in every pair, in both IR and VIS. The app already
   carries per-event mid-level RH and SST fields that could drive a labeled
-  simulated environmental cloud proxy.
+  simulated environmental cloud proxy; the existing debris deck proves the
+  plumbing exists but its density, structure, and texture are far short.
 - class: presentation
 - severity: high
 - candidate metric: cloudy-area fraction (BT below a cirrus/low-cloud
@@ -50,7 +55,9 @@ in `docs/research/realism/sessions/shaheen.md`.
 - stage: intensification, peak
 - evidence: shaheen/intensification (sim: pinhole eye + solid annulus at
   58 kt; obs: eyeless asymmetric CDO), shaheen/peak (sim clean eye at 65 kt;
-  obs: no eye at ~70 kt real intensity).
+  obs: no eye at ~70 kt real intensity). biparjoy/init — the matched-intensity
+  pair (sim 70 kt vs real ~70 kt at the same instant): observed IR shows an
+  unbroken cold CDO with no eye; the sim draws a closed annulus + pinhole eye.
 - description: the sim renders a clean circular eye and closed ring from
   ~58 kt. Real Arabian Sea storms at 55–75 kt overwhelmingly show an eyeless
   CDO; satellite eye clarity is a >90 kt phenomenon (to be anchored precisely
@@ -67,10 +74,16 @@ in `docs/research/realism/sessions/shaheen.md`.
 - stage: all
 - evidence: shaheen/intensification, shaheen/peak (obs coldest tops displaced
   NE of center throughout; sim cold tops perfectly centered/annular).
+  biparjoy/sheared-mid — the self-inconsistency frame: the sim's own HUD
+  reports 20.7 m/s deep-layer shear and the intensity lane is actively
+  weakening the storm because of it, yet the rendered cloud stays perfectly
+  concentric. biparjoy/init..decay-end — the real fix sits on the NE EDGE of
+  its CDO in all four observed frames.
 - description: the sim's cold-top field is rotationally symmetric at all
   times. The real storm's convection was displaced downshear its entire life.
   The runtime already computes a vector shear diagnostic (layer 8) that the
-  cloud morphology never consumes.
+  cloud morphology never consumes — even while that same diagnostic is
+  driving the intensity response.
 - class: presentation
 - severity: high
 - candidate metric: cold-top centroid offset (distance and bearing) from the
@@ -83,7 +96,9 @@ in `docs/research/realism/sessions/shaheen.md`.
 - stage: intensification, peak, landfall
 - evidence: shaheen/intensification (obs tail band = discrete convective
   beads with ragged stratiform fringe; sim bands = airbrushed ribbons with
-  soft edges and evenly spaced embedded blobs).
+  soft edges and evenly spaced embedded blobs). biparjoy/peak,
+  biparjoy/sheared-mid (obs band complex arcing NW to the Oman coast is a
+  15°-long chain of discrete beaded cells; sim bands stay smooth ribbons).
 - description: band-scale texture is the strongest "computer graphics" tell
   after the empty sky: real bands granulate into cells with sharp edges; sim
   bands read as smooth gradient ribbons.
@@ -98,7 +113,10 @@ in `docs/research/realism/sessions/shaheen.md`.
 - subsystem: ir-clouds
 - stage: intensification, peak
 - evidence: shaheen/peak (sim solid deepest-red ring at 65 kt; obs at matched
-  time peaks in orange with only isolated colder cells).
+  time peaks in orange with only isolated colder cells). Counter-evidence
+  nuance from biparjoy/init: a real VSCS-transition CDO does hit extensive
+  deepest-red, so the saturation gap is intensity- and storm-dependent, not
+  universal — the metric must bin by intensity.
 - description: the sim's brightness-temperature proxy reaches the palette's
   coldest stops at intensities where the observed storm's tops are visibly
   warmer; the sim also concentrates its coldest values in an annulus that has
@@ -115,7 +133,8 @@ in `docs/research/realism/sessions/shaheen.md`.
 - stage: genesis
 - evidence: shaheen/genesis (obs: huge ragged multi-cluster burst displaced
   from the fix, more cold-top area than the sim's peak; sim: tidy concentric
-  mini-swirl centered on the fix).
+  mini-swirl centered on the fix). biparjoy/decay-end (sim at 19 kt
+  "dissipated" still renders an organized concentric pinwheel).
 - description: below ~45 kt the sim scales down its mature-storm archetype.
   Real pre-cyclone systems have no vortical cloud signature at all — they are
   dominated by episodic asymmetric convective bursts.
@@ -161,7 +180,9 @@ in `docs/research/realism/sessions/shaheen.md`.
 - stage: decay
 - evidence: shaheen/decay (sim: shrunken orange blob inside a dark concentric
   ring gap plus detached gauze blobs; no observed decaying system shows
-  concentric-ring geometry).
+  concentric-ring geometry). biparjoy/decay-end (second storm: the dissipated
+  state is a grayscale pinwheel with concentric ring gaps and detached
+  orange patches — same synthetic geometry).
 - class: presentation
 - severity: medium
 - candidate metric: A/B judgment; radial BT-proxy profile monotonicity in
@@ -174,7 +195,8 @@ in `docs/research/realism/sessions/shaheen.md`.
 - stage: intensification, peak
 - evidence: shaheen/intensification, shaheen/peak (sim gauze disc has a
   smooth circular outer boundary; observed shield is drawn out into streaks
-  by the upper-level flow).
+  by the upper-level flow). biparjoy/init, biparjoy/peak (observed cirrus
+  streams NE past Gwadar/Karachi; sim disc edge stays round).
 - class: presentation
 - severity: medium
 - candidate metric: canopy boundary raggedness (perimeter/area vs circle) and
@@ -201,6 +223,10 @@ in `docs/research/realism/sessions/shaheen.md`.
 - stage: peak
 - evidence: shaheen/peak-vis (obs VIS0.6 at 15:45 local is dim and
   low-contrast with gray sea; sim VIS is uniformly bright white on black).
+  biparjoy/sheared-vis (13:30 local: obs is a photographic scene — sunlit
+  land, dark-gray sea, shield with overshooting-top texture and shadows, a
+  distinct black eye pit; sim is a flat, uniformly lit white swirl with a
+  shallow dimple on black sea).
 - description: the simulated daytime-visible product renders constant
   illumination; observed VIS brightness and contrast follow solar elevation,
   and the sea is never black in daylight.
@@ -209,6 +235,51 @@ in `docs/research/realism/sessions/shaheen.md`.
 - candidate metric: scene luminance vs solar zenith angle at capture times.
 - rough cost: M
 - disposition: close-now
+
+### RGR-013 — Storm cloud shield is several times too small at matched intensity
+- subsystem: ir-clouds
+- stage: all
+- evidence: biparjoy/init — the one matched-intensity pair so far (sim 70 kt
+  vs real ~70 kt at the same valid time): the observed CDO plus attached
+  shield spans roughly 6–8° of the domain; the sim's entire cloud system
+  (gauze + ring + bands) spans about 3°. biparjoy/peak repeats it at 77 kt.
+- description: independent of morphology (RGR-002/003/006), the sim's total
+  cloud footprint per unit intensity is far too small. Shaheen pairs hinted
+  at this but always with an intensity mismatch caveat; the Biparjoy init
+  frame removes the caveat. `outerSizeKm` clamps at 420 km, and the canopy
+  scale is tied to it — a real Arabian Sea VSCS shield readily exceeds
+  1000 km across.
+- class: presentation
+- severity: high
+- candidate metric: cold-top area (BT-proxy below threshold) binned by
+  intensity, sim vs observed frames.
+- rough cost: M
+- disposition: close-now
+
+### RGR-014 — Event-mode hindcast lifecycle collapse removes whole stages from event replays
+- subsystem: environment (event scenarios)
+- stage: all (event scenarios)
+- evidence: sessions/biparjoy.md — hindcast init Jun 9 18:00 UTC at 70 kt
+  (the storm's real state); the sim dissipates the storm 25.5 h later under
+  a self-sampled 20.7–26.1 m/s deep-layer shear, while the real Biparjoy
+  intensified to ~85 kt in the same window and lived 6 more days to its
+  Gujarat landfall.
+- description: the shear-response constants (`SHEAR_THRESHOLD_MS`,
+  `SHEAR_K_KT_PER_H_PER_MS`) are calibrated against env.bin's monthly-mean
+  shear distribution (documented in src/sim.ts and CLAUDE.md); event bins
+  step their fields at 3 h, so event replays apply a monthly-mean-calibrated
+  response to much spikier inputs and over-weaken shear-resistant storms.
+  Consequence for this program: archetype cells that depend on late
+  lifecycle stages (Indian-coast landfall, long sheared-weak phase) cannot
+  be captured in event replay at all. This is the frozen intensity lane —
+  never fixable by a presentation wave.
+- class: physics
+- severity: high
+- candidate metric: hindcast lifetime ratio (sim run length / real
+  best-track length) per event scenario.
+- rough cost: L (to measure) — the fix itself is a gated recalibration,
+  out of R-program scope
+- disposition: hf7-charter
 
 ## R2 metric shortlist
 

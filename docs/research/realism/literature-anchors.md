@@ -88,14 +88,17 @@ Findings:
 
 > **Anchor:** satellite eye clarity is, by construction of the technique
 > operational forecasters have used since the 1970s, not expected below
-> roughly hurricane strength (T4.0-T4.5, ~65-77 kt), and an eyeless
-> CDO/curved-band scene remains valid up to T5.0 (~90 kt). RGR-002's
-> paired evidence — a rendered eye at 58 kt in one storm, no eye at
-> 103 kt (sim) / 125-130 kt (real) in another — places the sim on both
-> sides of a threshold analysts treat as roughly the 65-90 kt band. A
-> candidate metric: fraction of frames below ~77 kt with a sim-rendered
-> eye (should be ~0) and fraction above ~90 kt without one (should be
-> small). The same contrast-graded-by-category expectation applies to
+> roughly hurricane strength (T4.0 = 65 kt, confirmed; T4.5 = ~77 kt,
+> needs verification), and an eyeless CDO/curved-band scene remains valid
+> up to T5.0 (~90 kt, same unconfirmed table position — needs
+> verification). RGR-002's paired evidence — a rendered eye at 58 kt in
+> one storm, no eye at 103 kt (sim) / 125-130 kt (real) in another —
+> places the sim on both sides of a threshold analysts treat as roughly
+> the 65-90 kt band (the 77/90 kt endpoints need verification; the order
+> of the relationship does not). A candidate metric: fraction of frames
+> below ~77 kt (needs verification) with a sim-rendered eye (should be
+> ~0) and fraction above ~90 kt (needs verification) without one (should
+> be small). The same contrast-graded-by-category expectation applies to
 > RGR-005's coldest-ring saturation. Informs RGR-002, RGR-005.
 
 ## 3. Cirrus canopy / outflow extent
@@ -108,9 +111,6 @@ Findings:
 - Kawashima, M., 2021: A Numerical Study of Cirrus Bands and
   Low-Static-Stability Layers Associated with Tropical Cyclone Outflow.
   J. Atmos. Sci., 78 (11). doi:`10.1175/JAS-D-21-0047.1`
-- Leppert, K. D. II, and D. S. Cecil, 2016: Tropical Cyclone Diurnal
-  Cycle as Observed by TRMM. Mon. Wea. Rev., 144, 2793-2808.
-  doi:`10.1175/MWR-D-15-0358.1`
 
 Findings:
 
@@ -127,11 +127,15 @@ Findings:
   storms of comparable intensity (Merrill 1984). No Arabian Sea/North
   Indian Ocean-specific size climatology was recovered this session —
   needs verification.
-- Outer-shield radius: in a TRMM-based storm-centered composite study,
-  roughly 90% of tropical-cyclone cases had a cloud-shield outer edge
-  within 550-600 km of the center (attributed to Leppert and Cecil 2016
-  via this session's source access; the number could not be
-  cross-checked against the primary text — needs verification).
+- Outer-shield radius: search-engine-indexed summaries of TRMM-based
+  storm-centered composite studies put roughly 90% of tropical-cyclone
+  cases within a 550-600 km cloud-shield outer edge. The primary source
+  for that specific figure could not be pinned down this session — an
+  earlier draft of this document mis-attributed it to Leppert and Cecil
+  (2016), whose actual result (per independent review) is a diurnal
+  precipitation signal within <500 km, a different finding. Attribution
+  unresolved — needs verification before this number is used as a hard
+  target.
 - Outflow-driven banding: episodic cirrus banding within the outflow
   canopy is tied to violations of gradient-wind balance in the core and
   to ascent over the ambient static-stability field — a direct,
@@ -146,10 +150,11 @@ Findings:
 > wind-field asymmetry where available, rather than against intensity
 > alone; RGR-011's missing event-aligned 200-hPa data is the actual
 > blocker for computing that comparison in event replay. The bounded
-> shield radius (90% within ~550-600 km, needs verification) contextualizes
-> RGR-013's "several times too small" claim and Merrill's weak
-> size-intensity correlation supports binning by regime rather than a
-> single intensity axis. Informs RGR-010, RGR-011, RGR-013.
+> shield radius (90% within ~550-600 km; primary source unresolved,
+> needs verification) contextualizes RGR-013's "several times too
+> small" claim, and Merrill's weak size-intensity correlation supports
+> binning by regime rather than a single intensity axis. Informs
+> RGR-010, RGR-011, RGR-013.
 
 ## 4. Rainband geometry
 
@@ -234,8 +239,8 @@ Findings:
 | Topic | Verified this session | Needs verification |
 | --- | --- | --- |
 | Diurnal pulse | phase, propagation speed, global frequency | exact K amplitude; North Indian Ocean-specific frequency |
-| BT vs intensity | scene-type T-number bands, T4.0=65kt, eye/CDO overlap order | exact T4.5 kt value; ADT contrast-to-category table |
-| Canopy/outflow | edge-formation mechanism, weak size-intensity correlation | exact shield-radius percentile; Arabian Sea-specific size climatology |
+| BT vs intensity | scene-type T-number bands, T4.0=65kt, eye/CDO overlap order | T4.5 (~77kt) and T5.0 (~90kt) kt values; ADT contrast-to-category table |
+| Canopy/outflow | edge-formation mechanism, weak size-intensity correlation | shield-radius percentile (attribution unresolved — see §3); Arabian Sea-specific size climatology |
 | Rainband geometry | 200 km regime break, shear-quadrant organization | band spacing (km); crossing angle (degrees) |
 | Arabian Sea cloud | seasonal cycle shape, N/S regional asymmetry | single monsoon/post-monsoon cloud-fraction number |
 

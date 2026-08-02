@@ -68,11 +68,11 @@ research scope. Candidate future work, recorded in the HF-7 charter appendix.
   is redistributed — that is direct end-user access, not the app
   redistributing EUMETSAT's data).
   **Flag for the repo owner**: `docs/research/realism/captures/shaheen/
-  *-obs.webp` and `captures/biparjoy/*-obs.webp` (12 files, committed in
-  Task 3/4 before this decision existed) ARE raw EUMETSAT SEVIRI frames
-  already committed to this public repository under the general Terms of
-  Use's personal/non-commercial default. They predate D2 and are not
-  clearly licence-clean under the terms verified this session. Task 6 is
+  *-obs.webp` (6 files) and `captures/biparjoy/*-obs.webp` (5 files) — 11
+  files total — ARE raw EUMETSAT SEVIRI frames committed to this public
+  repository in Task 3/4, under the general Terms of Use's
+  personal/non-commercial default. They predate D2 and are not clearly
+  licence-clean under the terms verified this session. Task 6 is
   research/decisions only and does not remove them; resolving the
   exposure (seek EUMETSAT authorization, confirm the >=1h Data Policy
   tier actually clears it, or replace them with derived-only artifacts)
@@ -131,11 +131,13 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   gonu/nearpeak repeats it at 73 kt (no eye in that frame). Eye rendering is
   inconsistent in BOTH directions, not merely early.
   literature: the classic Dvorak scene-type table assigns the eye
-  pattern to T4.5-T8.0 (roughly 77+ kt) and keeps CDO/curved-band
-  (eyeless) scenes valid through T5.0 (~90 kt) (Dvorak 1984; Velden et
-  al. 2006, BAMS 87, 1195-1210; Olander & Velden 2007/2019) — the 58 kt
-  eye and the 103/125-130 kt no-eye frame sit on opposite sides of that
-  band (docs/research/realism/literature-anchors.md §2).
+  pattern to T4.5-T8.0 (T4.0 = 65 kt confirmed; T4.5 = ~77 kt needs
+  verification) and keeps CDO/curved-band (eyeless) scenes valid through
+  T5.0 (~90 kt, same unconfirmed table position — needs verification)
+  (Dvorak 1984; Velden et al. 2006, BAMS 87, 1195-1210; Olander & Velden
+  2007/2019) — the 58 kt eye and the 103/125-130 kt no-eye frame sit on
+  opposite sides of that band regardless of the exact endpoint values
+  (docs/research/realism/literature-anchors.md §2).
 - description: the sim renders a clean circular eye and closed ring from
   ~58 kt in some storms and no eye at all at 73–103 kt in others. Real
   Arabian Sea storms at 55–75 kt overwhelmingly show an eyeless CDO;
@@ -158,6 +160,13 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   weakening the storm because of it, yet the rendered cloud stays perfectly
   concentric. biparjoy/init..decay-end — the real fix sits on the NE EDGE of
   its CDO in all four observed frames.
+  literature: Hence & Houze (2012), J. Atmos. Sci. 69, 2644-2661, find
+  rainbands (and by extension convective organization generally) are
+  organized by the shear vector — right-of-shear quadrants hold newer
+  convection, left-of-shear quadrants are predominantly stratiform — so
+  a cold-top field with zero shear-relative asymmetry at any stage has
+  no observed counterpart (docs/research/realism/literature-anchors.md
+  §4).
 - description: the sim's cold-top field is rotationally symmetric at all
   times. The real storm's convection was displaced downshear its entire life.
   The runtime already computes a vector shear diagnostic (layer 8) that the
@@ -367,10 +376,11 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   size is only weakly correlated with intensity and varies strongly by
   basin/season (western North Pacific storms ~2x Atlantic storms at
   matched intensity) — supporting intensity-binning over a blanket
-  target. A TRMM composite study attributes a ~550-600 km, 90th-percentile
-  cloud-shield radius (needs verification — see literature-anchors.md §3),
-  which would make the sim's ~3° (roughly 300 km) footprint at 70-77 kt
-  undersized even against a generous outer bound
+  target. Composite shield-extent summaries put a ~550-600 km,
+  90th-percentile cloud-shield radius in the literature, but the primary
+  source for that figure is unresolved — needs verification; if it
+  holds, it would make the sim's ~3° (roughly 300 km) footprint at
+  70-77 kt undersized even against a generous outer bound
   (docs/research/realism/literature-anchors.md §3).
 - description: independent of morphology (RGR-002/003/006), the sim's total
   cloud footprint per unit intensity is far too small. Shaheen pairs hinted

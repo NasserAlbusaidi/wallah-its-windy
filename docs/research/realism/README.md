@@ -14,6 +14,10 @@ node bake/run-python.mjs -c "import sys; from PIL import Image; Image.open(sys.a
 - subsystem: ir-clouds | vis-clouds | radar-rain | environment
 - stage: genesis | intensification | peak | shear-decay | landfall | dissipation | all
 - evidence: <capture pair paths and/or citation and/or study numbers>
+  literature: <optional — published citation(s) that inform this entry,
+  with a pointer into docs/research/realism/literature-anchors.md; append
+  as a continuation of the evidence bullet, not a separate top-level
+  bullet>
 - description: <what the real product shows vs what the sim shows>
 - class: presentation | data | physics
 - severity: high | medium | low   (visibility to a satellite-literate viewer)

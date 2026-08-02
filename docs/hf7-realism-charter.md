@@ -161,11 +161,18 @@ genesis belt (lat <= 19 N).
 | 10 | 28.40 +/- 0.35 (p95 28.91) | 28.29 +/- 0.21 (p95 28.50) | 28.89 +/- 0.25 (p95 29.30) |
 | 11 | 27.42 +/- 0.24 (p95 27.80) | 27.70 +/- 0.25 (p95 28.06) | 28.69 +/- 0.22 (p95 28.96) |
 
-Shear's std/mean ratio (0.3-0.5 most months) and p95/mean ratio (up to
-2.35x in the domain-wide May 2021 cell, 1.3-2.4x in the genesis belt shown
-here) are both far larger than SST's (std/mean under 0.04 in every cell) —
-the field driving the collapse mechanism is also the field env.bin's
-monthly mean erases the most.
+Recomputed directly from `calibration/realism/env-variance.json` (all 21
+year/month cells per region): shear's genesis-belt std/mean ratio ranges
+0.09x (2023-07) to 0.47x (2021-05), landing in the 0.3-0.5 band for 9 of
+those 21 cells (2019-05/06/10/11, 2021-05/10, 2023-05/06/10) rather than
+"most" months. Its p95/mean ratio ranges 1.12x (2023-07) to 2.00x
+(2021-05) in the genesis belt, and 1.09x (2023-11) to 1.88x (2021-10) in
+the full domain — belt and domain are two different regions and neither
+matches the belt's own `maxOverMean` (max/mean, a different ratio) peak
+of 2.35x, also at 2021-05. Every one of these shear ratios is still far
+larger than SST's (std/mean under 0.04 in every cell, both regions) — the
+field driving the collapse mechanism is also the field env.bin's monthly
+mean erases the most.
 
 ## Consequences
 

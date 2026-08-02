@@ -7,11 +7,11 @@ Every entry follows the schema in docs/research/realism/README.md.
 
 | Archetype | Storm | Scenario | Observed side | Stages covered |
 | --- | --- | --- | --- | --- |
-| Severe, long-lived | Gonu 2007 | env=gonu | external reference (Meteosat in-app archive starts 2020-08-01) | pending |
-| Severe, recurving | Kyarr 2019 | env=kyarr | external reference | pending |
+| Severe, long-lived | Gonu 2007 | env=gonu | external reference (Meteosat in-app archive starts 2020-08-01): NASA Worldview MODIS Aqua | organizing (near-matched 61 kt), nearpeak, omanapproach, decay — done 2026-08-02. Sim lives the full 5 days but decays days early (29 kt at the real ~90 kt Muscat brush). |
+| Severe, recurving | Kyarr 2019 | env=kyarr | external reference: NASA Worldview MODIS Aqua | peakday (103 kt sim, highest in program), middecay, end — done 2026-08-02. Sim collapses in 67 h (real ~7 days): recurve and dissipation cells NOT coverable in event replay (RGR-014). |
 | Oman landfall | Shaheen 2021 | env=shaheen | in-app paired | genesis, intensification, peak (IR+VIS), landfall, decay — done 2026-07-30 |
 | Indian-coast landfall + weak sheared phase | Biparjoy 2023 | env=biparjoy | in-app paired | init (matched 70 kt), peak, sheared-mid, decay-end (IR) + sheared VIS — done 2026-08-01. Sim hindcast collapses 25.5 h after init, so no sim landfall or long weak phase exists; the Gujarat-landfall cell is NOT coverable in event replay (see RGR-014). |
-| Weak sheared system | Ashobaa 2015 | env=ashobaa | external reference | pending |
+| Weak sheared system | Ashobaa 2015 | env=ashobaa | external reference: NASA Worldview MODIS Aqua | genesis (matched 38 kt), end — done 2026-08-02. Sim collapses in 18.75 h (real ~6 days): best-organized and decaying cells NOT coverable in event replay (RGR-014). |
 
 Tauktae 2021 is excluded: no event bin exists, and baking one is outside R1's
 research scope. Candidate future work, recorded in the HF-7 charter appendix.
@@ -25,7 +25,9 @@ research scope. Candidate future work, recorded in the HF-7 charter appendix.
 
 Evidence shorthand: `shaheen/<stage>` / `biparjoy/<stage>` = the capture pair
 `docs/research/realism/captures/<storm>/<stage>-{sim,obs}.webp`; session detail
-in `docs/research/realism/sessions/<storm>.md`.
+in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
+(gonu, kyarr, ashobaa) use `<stage>-sim-{ir,vis}.webp` for the sim side and
+`<stage>-obs.webp` for the external NASA Worldview reference.
 
 ### RGR-001 — Environmental sky is empty; observed basin is never cloud-free
 - subsystem: environment
@@ -36,7 +38,10 @@ in `docs/research/realism/sessions/<storm>.md`.
   biparjoy/init, biparjoy/sheared-vis — first paired evidence of the
   cloud-memory debris deck firing in a moist June environment: a handful of
   dim amorphous blobs appear, but they read as smudges against an observed
-  basin filled with structured, textured cloud fields.
+  basin filled with structured, textured cloud fields. Seasonal nuance from
+  kyarr/peakday: the observed post-monsoon October basin WEST of the storm
+  is largely cloud-free — background cloudiness is strongly month-dependent,
+  so the metric must be conditioned on month, not a constant target.
 - description: the sim draws almost no environmental cloud. This is the single
   loudest realism tell in every pair, in both IR and VIS. The app already
   carries per-event mid-level RH and SST fields that could drive a labeled
@@ -58,9 +63,14 @@ in `docs/research/realism/sessions/<storm>.md`.
   obs: no eye at ~70 kt real intensity). biparjoy/init — the matched-intensity
   pair (sim 70 kt vs real ~70 kt at the same instant): observed IR shows an
   unbroken cold CDO with no eye; the sim draws a closed annulus + pinhole eye.
+  kyarr/peakday — the inverse failure: at 103 kt ESCS the sim renders a solid
+  eyeless disc while the real ~125–130 kt Kyarr shows a crisp pinhole eye;
+  gonu/nearpeak repeats it at 73 kt (no eye in that frame). Eye rendering is
+  inconsistent in BOTH directions, not merely early.
 - description: the sim renders a clean circular eye and closed ring from
-  ~58 kt. Real Arabian Sea storms at 55–75 kt overwhelmingly show an eyeless
-  CDO; satellite eye clarity is a >90 kt phenomenon (to be anchored precisely
+  ~58 kt in some storms and no eye at all at 73–103 kt in others. Real
+  Arabian Sea storms at 55–75 kt overwhelmingly show an eyeless CDO;
+  satellite eye clarity is a >90 kt phenomenon (to be anchored precisely
   by the literature task).
 - class: presentation
 - severity: high
@@ -116,7 +126,10 @@ in `docs/research/realism/sessions/<storm>.md`.
   time peaks in orange with only isolated colder cells). Counter-evidence
   nuance from biparjoy/init: a real VSCS-transition CDO does hit extensive
   deepest-red, so the saturation gap is intensity- and storm-dependent, not
-  universal — the metric must bin by intensity.
+  universal — the metric must bin by intensity. kyarr/peakday — strongest
+  example: at 103 kt the sim's entire core is a structureless disc at the
+  palette's coldest stop, zero internal texture or radial gradient, while
+  the real shield shows banded texture and an eye.
 - description: the sim's brightness-temperature proxy reaches the palette's
   coldest stops at intensities where the observed storm's tops are visibly
   warmer; the sim also concentrates its coldest values in an annulus that has
@@ -135,6 +148,9 @@ in `docs/research/realism/sessions/<storm>.md`.
   from the fix, more cold-top area than the sim's peak; sim: tidy concentric
   mini-swirl centered on the fix). biparjoy/decay-end (sim at 19 kt
   "dissipated" still renders an organized concentric pinwheel).
+  ashobaa/genesis — second matched-intensity pair (sim 38 kt vs real
+  ~35–40 kt): observed is a ragged multi-lobed burst mass with no visible
+  center; sim is a tidy grayscale pinwheel with perfect spiral arms.
 - description: below ~45 kt the sim scales down its mature-storm archetype.
   Real pre-cyclone systems have no vortical cloud signature at all — they are
   dominated by episodic asymmetric convective bursts.
@@ -182,7 +198,9 @@ in `docs/research/realism/sessions/<storm>.md`.
   ring gap plus detached gauze blobs; no observed decaying system shows
   concentric-ring geometry). biparjoy/decay-end (second storm: the dissipated
   state is a grayscale pinwheel with concentric ring gaps and detached
-  orange patches — same synthetic geometry).
+  orange patches — same synthetic geometry). gonu/decay, kyarr/end (third and
+  fourth storms). ashobaa/genesis — the ring-gap geometry also appears in a
+  LIVE 38 kt storm, so the artifact is not decay-specific.
 - class: presentation
 - severity: medium
 - candidate metric: A/B judgment; radial BT-proxy profile monotonicity in
@@ -243,6 +261,10 @@ in `docs/research/realism/sessions/<storm>.md`.
   vs real ~70 kt at the same valid time): the observed CDO plus attached
   shield spans roughly 6–8° of the domain; the sim's entire cloud system
   (gauze + ring + bands) spans about 3°. biparjoy/peak repeats it at 77 kt.
+  Counter-nuance from gonu/nearpeak: real near-peak Gonu is COMPACT/annular
+  and the sim footprint there is comparable or larger — the size relation is
+  regime-dependent, so the metric must be intensity-binned, not a blanket
+  "too small".
 - description: independent of morphology (RGR-002/003/006), the sim's total
   cloud footprint per unit intensity is far too small. Shaheen pairs hinted
   at this but always with an intensity mismatch caveat; the Biparjoy init
@@ -263,7 +285,13 @@ in `docs/research/realism/sessions/<storm>.md`.
   (the storm's real state); the sim dissipates the storm 25.5 h later under
   a self-sampled 20.7–26.1 m/s deep-layer shear, while the real Biparjoy
   intensified to ~85 kt in the same window and lived 6 more days to its
-  Gujarat landfall.
+  Gujarat landfall. sessions/kyarr.md — 110 kt ESCS init dies in 67 h vs ~7
+  real days (ratio ≈ 0.4), erasing the recurve and dissipation stages.
+  sessions/ashobaa.md — 35 kt init dies in 18.75 h vs ~6 real days
+  (ratio ≈ 0.16). sessions/gonu.md — duration roughly right but the arc is
+  hollow: peak 82 kt vs ~140 kt, a 29 kt remnant at the hour of the real
+  ~90 kt Muscat brush. Three of five event replays lose whole lifecycle
+  stages.
 - description: the shear-response constants (`SHEAR_THRESHOLD_MS`,
   `SHEAR_K_KT_PER_H_PER_MS`) are calibrated against env.bin's monthly-mean
   shear distribution (documented in src/sim.ts and CLAUDE.md); event bins

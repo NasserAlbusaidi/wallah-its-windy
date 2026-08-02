@@ -20,7 +20,7 @@ AREA = [27, 50, 15, 70]  # N, W, S, E — matches bake/fetch_era5.py
 GRID = [0.5, 0.5]
 YEARS = ("2019", "2021", "2023")
 MONTHS = ["05", "06", "07", "08", "09", "10", "11"]
-DAYS = [f"{d:02d}" for d in range(1, 32)]
+DAYS = [f"{d:02d}" for d in range(1, 32)]  # server drops invalid dates
 TIMES = ["00:00", "06:00", "12:00", "18:00"]
 
 

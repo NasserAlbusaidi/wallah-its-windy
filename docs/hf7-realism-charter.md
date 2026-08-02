@@ -85,7 +85,7 @@ constant's own comment:
 Event bins step their fields at 3-hourly resolution — much closer to
 instantaneous reality than a monthly mean. The env-variance study
 (quantified below) shows the genesis-belt shear distribution behind each
-monthly plane has a p95 running 1.3-2.4x its mean, and for June — Biparjoy's
+monthly plane has a p95 running 1.1-2.0x its mean, and for June — Biparjoy's
 month — 2019/2021/2023 p95 values of 29.07, 31.03, and 35.36 m/s against
 means of 19.04, 22.60, and 22.20 m/s. Applying `SHEAR_K_KT_PER_H_PER_MS` at
 a p95 excursion rather than the mean roughly doubles to triples the intended
@@ -199,7 +199,7 @@ mean erases the most.
 
 Tauktae 2021 (Indian-coast landfall archetype) has no baked event bin;
 baking one was ruled outside R1's research scope
-(`docs/superpowers/sdd/2026-07-30-realism-r1-gap-register/task-8-brief.md`
+(`docs/superpowers/plans/2026-07-30-realism-r1-gap-register.md`
 self-review notes: "Tauktae out, Biparjoy carries the Indian-coast cell").
 Biparjoy 2023 currently carries the Indian-coast-landfall archetype cell in
 the availability matrix instead, with the caveat that RGR-014's lifecycle

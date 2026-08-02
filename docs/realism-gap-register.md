@@ -313,7 +313,7 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
 
 ### RGR-009 — Decay renders a concentric "bullseye" ring artifact
 - subsystem: ir-clouds
-- stage: decay
+- stage: genesis, dissipation
 - evidence: shaheen/decay (sim: shrunken orange blob inside a dark concentric
   ring gap plus detached gauze blobs; no observed decaying system shows
   concentric-ring geometry). biparjoy/decay-end (second storm: the dissipated
@@ -321,6 +321,10 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   orange patches — same synthetic geometry). gonu/decay, kyarr/end (third and
   fourth storms). ashobaa/genesis — the ring-gap geometry also appears in a
   LIVE 38 kt storm, so the artifact is not decay-specific.
+- description: the sim renders a synthetic concentric-ring "bullseye" with
+  detached blob artifacts in both dissipating storms and at least one live
+  weak storm; no observed weak or decaying system shows this ring-gap
+  geometry at any stage.
 - class: presentation
 - severity: medium
 - candidate metric: A/B judgment; radial BT-proxy profile monotonicity in
@@ -340,6 +344,10 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   sharp only where radial outflow drops below ~1 m/s and tangential wind
   is near a local max, i.e. edge shape is not a free circular parameter
   (docs/research/realism/literature-anchors.md §3).
+- description: the sim's cirrus canopy edge is a smooth circle at every
+  stage; the real canopy's edge shape and streaming follow the ambient
+  upper-level outflow/tangential wind field, which event replays cannot
+  currently sample (RGR-011).
 - class: presentation
 - severity: medium
 - candidate metric: canopy boundary raggedness (perimeter/area vs circle) and

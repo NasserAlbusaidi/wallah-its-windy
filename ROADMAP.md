@@ -492,6 +492,24 @@ These features should grow around verified science rather than compete with it.
 - Time controls that keep every visible layer synchronized to the same valid
   time.
 
+### Realism program
+
+- **R1 (complete):** `docs/realism-gap-register.md` catalogues every
+  simulated IR/VIS/rain gap against paired observed sessions and
+  literature anchors, each entry classified presentation / data /
+  physics and dispositioned close-now or charter-only.
+- **R2 (contract, not started):** a field-space measurement harness under
+  `calibration/realism/` (`npm run realism` / `realism:check`) with
+  regression-only gate semantics — it proves a change did not get worse;
+  a human A/B verdict still decides whether it is better.
+- **R3 (not started):** closure waves, one gap-cluster per PR, each
+  citing its register entries and updating the register disposition in
+  the same PR.
+- **Two-track rule:** only presentation-class gaps close inside this
+  program. Data-side and physics-side gaps are recorded, never touched
+  here — they live in `docs/hf7-realism-charter.md`, a charter and
+  explicitly not a commitment to run a future HF-7 phase.
+
 ### Sharing and accessibility
 
 - GIF or satellite-loop export in addition to the existing PNG/WebM products.

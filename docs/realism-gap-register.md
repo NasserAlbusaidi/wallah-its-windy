@@ -18,8 +18,65 @@ research scope. Candidate future work, recorded in the HF-7 charter appendix.
 
 ## Decisions
 
-- D1 (pending, Task 6): observed rain reference over the open Arabian Sea.
-- D2 (pending, Task 6): licence position for committed observed reference material.
+- D1 (resolved 2026-08-02): GPM IMERG (NASA GES DISC/PPS) is R2's observed
+  rain-truth reference. IMERG is satellite-based (TRMM/GPM constellation
+  retrievals), so it covers the open Arabian Sea basin the same as the
+  coast — it has no ground-radar dependency. Access: a free NASA Earthdata
+  Login (self-service registration at
+  https://disc.gsfc.nasa.gov/earthdata-login) unlocks GES DISC HTTPS/
+  OPeNDAP downloads; formats are HDF5/NetCDF4/GeoTIFF; native grid is
+  0.1°x0.1° (~10 km) at 30-minute cadence. Latency tiers: Early Run ~4 h,
+  Late Run ~14 h, Final Run (research-grade, gauge-adjusted) ~3.5 months —
+  Final Run is the right tier for R2 since the paired sessions are already
+  archival/hindcast, not live. RainViewer was investigated and rejected:
+  its own coverage documentation lists only land-based radar ingestion
+  (1200+ stations, 150+ countries; Oman 5, India 27, Pakistan 7 radars
+  near this basin) and explicitly states open-ocean and high-latitude
+  regions "usually lack ground radar entirely and are not covered" — for
+  an Arabian Sea storm whose rainband footprint spans hundreds of km of
+  open water (RGR-013), RainViewer would only ever see the coastal edge
+  of a storm, never its core. RainViewer remains fine as the UI-parity
+  reference for the coastal fringe (already used at runtime per
+  NOTICE.md) but cannot anchor an open-basin rain-truth metric.
+- D2 (resolved 2026-08-02): raw-frame vs derived-statistics rule for
+  observed reference material committed to this repository. NASA
+  Worldview/GIBS (MODIS Aqua true color, used for the gonu/kyarr/ashobaa
+  reference sessions) is licence-clean to commit as raw frames: NASA
+  content is generally not copyrighted in the US, GIBS/Worldview
+  documentation explicitly encourages publication of imagery with
+  citation ("NASA Worldview" + permalink), and the existing session
+  captures already carry that attribution — no change needed there.
+  EUMETSAT (EUMETView SEVIRI IR10.8/VIS0.6, used for the shaheen/biparjoy
+  in-app paired sessions) is NOT clearly licence-clean for raw-frame
+  commits: EUMETSAT's general Terms of Use grant only "download and copy
+  ... for your own personal and non-commercial use" by default, require
+  "©EUMETSAT [year]" attribution, and require explicit EUMETSAT
+  authorization for redistribution or for republishing derived
+  statistics/analysis beyond that personal-use exemption; satellite data
+  and products are explicitly excluded from EUMETSAT's CC BY-SA Learning
+  Zone carve-out and remain governed by the separate EUMETSAT Data
+  Policy. That Data Policy states Meteosat Data with latency >= 1 hour is
+  available "without charge for any use," which may cover this case, but
+  the primary licence text could not be fully extracted this session (PDF
+  text extraction failed with the tools available) — needs verification
+  before relying on it. Given the conflict, the R2 rule is conservative:
+  commit derived statistics + a provenance manifest (source URL, product,
+  acquisition timestamp, access date — the same fields
+  `src/satellite-observations.ts` already tracks per frame) computed from
+  EUMETSAT frames; do not commit new raw EUMETSAT frames to the
+  repository. Live in-app WMS requests to EUMETView are unaffected (nothing
+  is redistributed — that is direct end-user access, not the app
+  redistributing EUMETSAT's data).
+  **Flag for the repo owner**: `docs/research/realism/captures/shaheen/
+  *-obs.webp` and `captures/biparjoy/*-obs.webp` (12 files, committed in
+  Task 3/4 before this decision existed) ARE raw EUMETSAT SEVIRI frames
+  already committed to this public repository under the general Terms of
+  Use's personal/non-commercial default. They predate D2 and are not
+  clearly licence-clean under the terms verified this session. Task 6 is
+  research/decisions only and does not remove them; resolving the
+  exposure (seek EUMETSAT authorization, confirm the >=1h Data Policy
+  tier actually clears it, or replace them with derived-only artifacts)
+  is follow-up work outside this task's scope.
 
 ## Entries
 
@@ -42,6 +99,12 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   kyarr/peakday: the observed post-monsoon October basin WEST of the storm
   is largely cloud-free — background cloudiness is strongly month-dependent,
   so the metric must be conditioned on month, not a constant target.
+  literature: Wonsick, Pinker & Govaerts (2009), J. Appl. Meteor.
+  Climatol. 48, 1803-1821, find the Indian-monsoon-region daytime cloud
+  cycle is flat premonsoon, U-shaped peak monsoon, and rises to an
+  afternoon peak postmonsoon — independent confirmation that the
+  June-vs-October contrast above is a real seasonal signal, not a
+  session artifact (docs/research/realism/literature-anchors.md §5).
 - description: the sim draws almost no environmental cloud. This is the single
   loudest realism tell in every pair, in both IR and VIS. The app already
   carries per-event mid-level RH and SST fields that could drive a labeled
@@ -67,6 +130,12 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   eyeless disc while the real ~125–130 kt Kyarr shows a crisp pinhole eye;
   gonu/nearpeak repeats it at 73 kt (no eye in that frame). Eye rendering is
   inconsistent in BOTH directions, not merely early.
+  literature: the classic Dvorak scene-type table assigns the eye
+  pattern to T4.5-T8.0 (roughly 77+ kt) and keeps CDO/curved-band
+  (eyeless) scenes valid through T5.0 (~90 kt) (Dvorak 1984; Velden et
+  al. 2006, BAMS 87, 1195-1210; Olander & Velden 2007/2019) — the 58 kt
+  eye and the 103/125-130 kt no-eye frame sit on opposite sides of that
+  band (docs/research/realism/literature-anchors.md §2).
 - description: the sim renders a clean circular eye and closed ring from
   ~58 kt in some storms and no eye at all at 73–103 kt in others. Real
   Arabian Sea storms at 55–75 kt overwhelmingly show an eyeless CDO;
@@ -109,6 +178,12 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   soft edges and evenly spaced embedded blobs). biparjoy/peak,
   biparjoy/sheared-mid (obs band complex arcing NW to the Oman coast is a
   15°-long chain of discrete beaded cells; sim bands stay smooth ribbons).
+  literature: Hence & Houze (2012), J. Atmos. Sci. 69, 2644-2661, find
+  rainbands organized by the shear vector (right-of-shear = newer
+  convective cells, left-of-shear = predominantly stratiform) and a
+  character change across a ~200 km-radius regime break; a uniform
+  smooth ribbon at all radii and shear quadrants has no observed
+  counterpart (docs/research/realism/literature-anchors.md §4).
 - description: band-scale texture is the strongest "computer graphics" tell
   after the empty sky: real bands granulate into cells with sharp edges; sim
   bands read as smooth gradient ribbons.
@@ -130,6 +205,12 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   example: at 103 kt the sim's entire core is a structureless disc at the
   palette's coldest stop, zero internal texture or radial gradient, while
   the real shield shows banded texture and an eye.
+  literature: the Dvorak/ADT eye-minus-cloud-top BT contrast is
+  category-graded by construction — larger contrast, higher estimated
+  intensity (Velden et al. 2006; Olander & Velden 2007/2019) — so a
+  structureless, palette-saturated disc with no internal gradient is not
+  a real satellite-consistent state at any single intensity
+  (docs/research/realism/literature-anchors.md §2).
 - description: the sim's brightness-temperature proxy reaches the palette's
   coldest stops at intensities where the observed storm's tops are visibly
   warmer; the sim also concentrates its coldest values in an annulus that has
@@ -166,6 +247,13 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
 - stage: all
 - evidence: shaheen/genesis (obs 04:00 local nocturnal burst maximum; sim
   cloud field carries no local-time dependence anywhere in the run).
+  literature: Dunion, Thorncroft & Velden (2014), Mon. Wea. Rev. 142,
+  3900-3919, document diurnal pulses initiating near sunset in the inner
+  core and propagating outward overnight at 5-13 m/s, reaching several
+  hundred km by the next afternoon; Zhang et al. (2023), JGR Atmos. 128,
+  e2022JD037660, find the signal occurs on 52% of TC days globally. Exact
+  amplitude in K not verified this session
+  (docs/research/realism/literature-anchors.md §1).
 - description: tropical oceanic convection and the TC cirrus canopy pulse on
   a well-documented diurnal cycle. In event replays the sim knows real UTC,
   so a display-side diurnal modulation is possible without touching physics;
@@ -215,6 +303,11 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   smooth circular outer boundary; observed shield is drawn out into streaks
   by the upper-level flow). biparjoy/init, biparjoy/peak (observed cirrus
   streams NE past Gwadar/Karachi; sim disc edge stays round).
+  literature: Merritt & Wexler (1967), Mon. Wea. Rev. 95, 111-120, tie the
+  canopy's edge shape directly to the outflow wind field — the edge is
+  sharp only where radial outflow drops below ~1 m/s and tangential wind
+  is near a local max, i.e. edge shape is not a free circular parameter
+  (docs/research/realism/literature-anchors.md §3).
 - class: presentation
 - severity: medium
 - candidate metric: canopy boundary raggedness (perimeter/area vs circle) and
@@ -227,6 +320,11 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
 - stage: all (event scenarios)
 - evidence: layer 9 in the shaheen replay reports "no aligned upper-level
   analysis for this event" (upper.bin is climatology-only by design).
+  literature: Kawashima (2021), J. Atmos. Sci. 78(11), ties observed
+  cirrus-canopy banding directly to the outflow layer's response to the
+  ambient upper-tropospheric flow, i.e. canopy shape is mechanistically
+  downstream of the 200-hPa field this entry says event replays lack
+  (docs/research/realism/literature-anchors.md §3).
 - description: canopy streaming and outflow asymmetry (RGR-010) can only be
   driven correctly in event mode if event-aligned 200-hPa winds exist. That is
   a data acquisition/bake question, not a rendering one.
@@ -265,6 +363,15 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   and the sim footprint there is comparable or larger — the size relation is
   regime-dependent, so the metric must be intensity-binned, not a blanket
   "too small".
+  literature: Merrill (1984), Mon. Wea. Rev. 112, 1408-1418, finds storm
+  size is only weakly correlated with intensity and varies strongly by
+  basin/season (western North Pacific storms ~2x Atlantic storms at
+  matched intensity) — supporting intensity-binning over a blanket
+  target. A TRMM composite study attributes a ~550-600 km, 90th-percentile
+  cloud-shield radius (needs verification — see literature-anchors.md §3),
+  which would make the sim's ~3° (roughly 300 km) footprint at 70-77 kt
+  undersized even against a generous outer bound
+  (docs/research/realism/literature-anchors.md §3).
 - description: independent of morphology (RGR-002/003/006), the sim's total
   cloud footprint per unit intensity is far too small. Shaheen pairs hinted
   at this but always with an intensity mismatch caveat; the Biparjoy init

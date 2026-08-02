@@ -55,6 +55,7 @@
     "data:hf6:catalog:check": "node bake/run-python.mjs bake/hf6_catalog.py --check",
     "data:hf6:fetch": "node bake/run-python.mjs -u bake/fetch_hf6_benchmark.py",
     "data:realism:fetch": "node bake/run-python.mjs -u bake/fetch_realism_era5.py",
+    "data:realism:variance": "node bake/run-python.mjs bake/realism_env_variance.py",
     "data:upper": "node bake/run-python.mjs bake/bake_upper_winds.py",
     "data:upper:check": "node bake/run-python.mjs bake/bake_upper_winds.py --check",
     "hf6:observation-audit": "node bake/run-python.mjs bake/hf6_observation_audit.py",

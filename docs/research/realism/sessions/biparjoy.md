@@ -40,6 +40,9 @@ In-app paired: Meteosat-9 IODC · SEVIRI IR10.8 μm (all stages) and VIS0.6 μm
 satellite desk per frame, e.g. "Meteosat-9 IODC · SEVIRI IR10.8 μm ·
 09 Jun 2023, 18:00 UTC". All five observed frames time-matched exactly to
 the model valid time.
+Observed-side imagery © EUMETSAT 2023, used with attribution; licence
+position and the standing derived-statistics rule are recorded in the
+register's D2 decision.
 
 ## Stage notes
 

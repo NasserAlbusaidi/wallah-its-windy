@@ -22,6 +22,9 @@ known skill problem, NOT a realism gap; entries below are morphology-only.
 In-app paired: Meteosat-8 IODC · SEVIRI IR10.8 μm (all stages) and VIS0.6 μm
 (peak) via EUMETSAT EUMETVIEW, provenance label confirmed per frame, e.g.
 "Meteosat-8 IODC · SEVIRI IR10.8 μm · 03 Oct 2021, 11:45 UTC".
+Observed-side imagery © EUMETSAT 2021, used with attribution; licence
+position and the standing derived-statistics rule are recorded in the
+register's D2 decision.
 
 ## Stage notes
 

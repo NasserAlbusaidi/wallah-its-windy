@@ -90,20 +90,20 @@ No sampled frame in this seal produced an eye-contrast value: the shader draws n
 
 **Event replays** (fraction of eligible ocean cells with BT-proxy ≤ 0 °C)
 
-| Month index | n | Median | Mean |
+| Month key | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| 05 | 27 | 0.0000 | 0.0258 |
-| 08 | 11 | 0.0213 | 0.0350 |
-| 09 | 11 | 0.0000 | 0.0021 |
+| m05 | 27 | 0.0000 | 0.0258 |
+| m08 | 11 | 0.0213 | 0.0350 |
+| m09 | 11 | 0.0000 | 0.0021 |
 
 **Climatology runs**
 
-| Month index | n | Median | Mean |
+| Month key | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| 10 | 7 | 0.0000 | 0.0000 |
-| 04 | 3 | 0.0000 | 0.0048 |
-| 08 | 8 | 0.0000 | 0.0000 |
-| 09 | 8 | 0.0000 | 0.0000 |
+| m04 | 3 | 0.0000 | 0.0048 |
+| m08 | 8 | 0.0000 | 0.0000 |
+| m09 | 8 | 0.0000 | 0.0000 |
+| m10 | 7 | 0.0000 | 0.0000 |
 
 ## Weak-bin × stage cold-top (RGR-006)
 
@@ -135,7 +135,7 @@ run's maximum wind, and `ageH <= peakAgeH` is pre-peak.
 | Metric | n | Median | Mean |
 | --- | ---: | ---: | ---: |
 | Cold-top centroid offset (km) | 38 | 35.04 | 52.51 |
-| |Centroid bearing rel. shear| (deg) | 38 | 85.82 | 80.75 |
+| \|Centroid bearing rel. shear\| (deg) | 38 | 85.82 | 80.75 |
 | Band edge energy, inner ≤200 km (°C/km) | 49 | 0.6374 | 0.6371 |
 | Band edge energy, outer 200–600 km (°C/km) | 45 | 0.3621 | 0.4414 |
 | Band edge energy, downshear-left (°C/km) | 49 | 0.5395 | 0.5677 |
@@ -148,7 +148,7 @@ run's maximum wind, and `ageH <= peakAgeH` is pre-peak.
 | Metric | n | Median | Mean |
 | --- | ---: | ---: | ---: |
 | Cold-top centroid offset (km) | 3 | 18.16 | 21.07 |
-| |Centroid bearing rel. shear| (deg) | 3 | 82.52 | 85.90 |
+| \|Centroid bearing rel. shear\| (deg) | 3 | 82.52 | 85.90 |
 | Band edge energy, inner ≤200 km (°C/km) | 26 | 0.2216 | 0.2519 |
 | Band edge energy, outer 200–600 km (°C/km) | 26 | 0.1926 | 0.2284 |
 | Band edge energy, downshear-left (°C/km) | 26 | 0.2124 | 0.2510 |
@@ -200,6 +200,11 @@ No observed derived-statistics references are committed yet. Landing them (and t
   same framebuffer.
 - Climatology storms are synthetic (fixed spawn/month/seed triplets). They are
   not events, not observed, and carry no verification value on their own.
+- **Months 05–07 sealed with 0 measured frames.** `clim-jun`, `clim-jul` and
+  `clim-aug` die of monsoon shear before the first 6-hour sample — calibrated
+  model output, on a cohort frozen before any replay ran — so RGR-001's month
+  conditioning currently covers 4 of the 7 season months. Coverage returns only
+  through the documented reseal + A/B flow, for which R2b is the natural moment.
 - Every run stops at simulated death, and the register's RGR-014 records that
   event-mode hindcasts collapse well before the observed storm ends. Scenarios
   that die early contribute few or no measured frames, so several bins rest on

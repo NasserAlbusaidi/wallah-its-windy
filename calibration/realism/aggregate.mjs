@@ -95,10 +95,14 @@ export function aggregateClass(samples) {
         ];
       }),
     ),
-    // RGR-001 is defined per MONTH, not per intensity bin.
+    // RGR-001 is defined per MONTH, not per intensity bin. The `m` prefix is
+    // load-bearing: a bare "04"/"10" is an array-index-like key, which JSON
+    // serialization emits in ascending NUMERIC order ahead of every other key,
+    // so the sealed block and the report would read out of season order no
+    // matter how carefully sortedMap sorted them.
     environmentalCloudFractionByMonth: sortedMap(
       months.map((monthIndex) => [
-        String(monthIndex).padStart(2, '0'),
+        `m${String(monthIndex).padStart(2, '0')}`,
         summarize(
           samples
             .filter((sample) => sample.monthIndex === monthIndex)

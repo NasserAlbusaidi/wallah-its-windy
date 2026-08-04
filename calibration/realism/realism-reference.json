@@ -97,23 +97,23 @@
         }
       },
       "environmentalCloudFractionByMonth": {
-        "10": {
-          "count": 7,
-          "median": 0,
-          "mean": 0
-        },
-        "04": {
+        "m04": {
           "count": 3,
           "median": 0,
           "mean": 0.004769921
         },
-        "08": {
+        "m08": {
           "count": 8,
           "median": 0,
           "mean": 0
         },
-        "09": {
+        "m09": {
           "count": 8,
+          "median": 0,
+          "mean": 0
+        },
+        "m10": {
+          "count": 7,
           "median": 0,
           "mean": 0
         }
@@ -288,17 +288,17 @@
         }
       },
       "environmentalCloudFractionByMonth": {
-        "05": {
+        "m05": {
           "count": 27,
           "median": 0,
           "mean": 0.025754826
         },
-        "08": {
+        "m08": {
           "count": 11,
           "median": 0.021252567,
           "mean": 0.034959469
         },
-        "09": {
+        "m09": {
           "count": 11,
           "median": 0,
           "mean": 0.002146472

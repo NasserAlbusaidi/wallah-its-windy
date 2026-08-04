@@ -74,6 +74,16 @@ The reference is written only when it is absent. To reseal:
 Changing any entry in `realism-scenarios.json` — an id, a spawn, the cadence,
 the horizon — re-opens the seal and requires the same three steps.
 
+### Known coverage gap: months 05–07 sealed with 0 frames
+
+`clim-jun`, `clim-jul` and `clim-aug` die of monsoon shear before the first
+6-hour sample, so they contribute no measured frames and RGR-001's month
+conditioning covers 4 of the 7 season months. This is calibrated model output on
+a cohort frozen before any replay ran, and it is sealed as-is deliberately —
+re-picking the triplets to make them survive would be tuning the cohort to the
+result. Coverage returns through the reseal + A/B flow above; R2b is the natural
+moment to revisit it.
+
 ## Validation-partition note
 
 Three of the five event replays sit in the hindcast **validation** partition.

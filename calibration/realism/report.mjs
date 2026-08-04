@@ -41,8 +41,9 @@ function monthTable(aggregate) {
   const entries = Object.entries(aggregate.environmentalCloudFractionByMonth);
   if (entries.length === 0) return '_No samples in this class._';
   return [
-    '| Month index | n | Median | Mean |',
+    '| Month key | n | Median | Mean |',
     '| --- | ---: | ---: | ---: |',
+    // Printed verbatim so a report row and its sealed key are the same string.
     ...entries.map(([month, stat]) => statRow(month, stat, 4)),
   ].join('\n');
 }
@@ -68,7 +69,8 @@ function weakStageTable(aggregate) {
 
 const UNBINNED_LABELS = [
   ['coldTopCentroidOffsetKm', 'Cold-top centroid offset (km)', 2],
-  ['coldTopAbsCentroidBearingRelToShearDeg', '|Centroid bearing rel. shear| (deg)', 2],
+  // The pipes must stay escaped: a raw `|` splits the row in a 4-column table.
+  ['coldTopAbsCentroidBearingRelToShearDeg', '\\|Centroid bearing rel. shear\\| (deg)', 2],
   ['bandEdgeInnerCPerKm', 'Band edge energy, inner ≤200 km (°C/km)', 4],
   ['bandEdgeOuterCPerKm', 'Band edge energy, outer 200–600 km (°C/km)', 4],
   ['bandEdgeQuadrantDownshearLeftCPerKm', 'Band edge energy, downshear-left (°C/km)', 4],
@@ -267,6 +269,11 @@ ${observedSection(result.observedReferences)}
   same framebuffer.
 - Climatology storms are synthetic (fixed spawn/month/seed triplets). They are
   not events, not observed, and carry no verification value on their own.
+- **Months 05–07 sealed with 0 measured frames.** \`clim-jun\`, \`clim-jul\` and
+  \`clim-aug\` die of monsoon shear before the first 6-hour sample — calibrated
+  model output, on a cohort frozen before any replay ran — so RGR-001's month
+  conditioning currently covers 4 of the 7 season months. Coverage returns only
+  through the documented reseal + A/B flow, for which R2b is the natural moment.
 - Every run stops at simulated death, and the register's RGR-014 records that
   event-mode hindcasts collapse well before the observed storm ends. Scenarios
   that die early contribute few or no measured frames, so several bins rest on

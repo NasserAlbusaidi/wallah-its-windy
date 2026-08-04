@@ -72,11 +72,21 @@ it.
   companion, never the only place a threshold appears. A threshold that lives
   only in `method` cannot be diffed, and re-deriving the statistic later would
   be guesswork.
+- `metricVersion` names the sim-side implementation the observed value was
+  matched against. Bump it whenever `src/realism-metrics.ts` or the aggregation
+  in `calibration/realism/aggregate.mjs` changes what a metric means, and record
+  the bump in `docs/realism-gap-register.md` alongside the reseal it forces. A
+  value carrying a stale `metricVersion` is not comparable to the current seal,
+  and the string is the only thing that says so.
 
 ### Dimension vocabulary
 
-Grounded in the sealed sim-side aggregate (`calibration/realism/aggregate.mjs`)
-so the two sides bin identically:
+Grounded in the sealed sim-side aggregate (`calibration/realism/aggregate.mjs`),
+so an observed record binned on one of these keys lines up with a sealed sim
+cell of the same name. The keys are shared vocabulary, **not** a claim that
+every metric is binned on every key — each metric's sealed binning is listed in
+the `metricId` table below, and an observed record binned on a key the sim side
+never binned that metric by has no sealed counterpart to compare against.
 
 - `monthIndex` — **0-indexed**, matching `realism-scenarios.json` and env.bin's
   layer convention. October is `9`, not `10`.
@@ -90,19 +100,42 @@ so the two sides bin identically:
 
 ### `metricId` vocabulary
 
-The sim-side ids an observed bundle can be compared against are the per-frame
-metric names in `src/realism-metrics.ts` (`RealismFrameMetrics`), which are
-also the sealed aggregate's leaf keys: `environmentalCloudFraction`,
-`eyeContrastC`, `coldTopAreaKm2`, `coldTopCentroidOffsetKm`,
-`coldTopAbsCentroidBearingRelToShearDeg`, `bandEdgeInnerCPerKm`,
-`bandEdgeOuterCPerKm`, `bandEdgeQuadrantDownshearLeftCPerKm`,
-`bandEdgeQuadrantDownshearRightCPerKm`, `bandEdgeQuadrantUpshearLeftCPerKm`,
-`bandEdgeQuadrantUpshearRightCPerKm`.
+The ids are the **aggregate's flattened leaf keys**, minted in
+`calibration/realism/aggregate.mjs` (lines 93–159). They are not the per-frame
+field names in `src/realism-metrics.ts` — the aggregation flattens and renames
+as it goes (`coldTop.areaKm2` → `coldTopAreaKm2`,
+`bandEdgeEnergy.byShearQuadrant.dl` → `bandEdgeQuadrantDownshearLeftCPerKm`).
+Read `aggregate.mjs`, not the per-frame interface, when deciding what an
+observed number has to match.
 
-One exception to that correspondence: `environmentalCloudFraction` appears in
-`realism-reference.json` only as the block `environmentalCloudFractionByMonth`,
-because RGR-001 is conditioned on month rather than intensity. Use the
-per-frame id as `metricId` and carry the month in `dimensions.monthIndex`.
+| `metricId` | Sealed binning |
+| --- | --- |
+| `environmentalCloudFraction` | month only — the block is `environmentalCloudFractionByMonth` |
+| `eyeContrastC` | intensity bin only |
+| `coldTopAreaKm2` | intensity bin, **and** weak bin × stage |
+| `coldTopCentroidOffsetKm` | weak bin × stage, **and** unbinned |
+| `coldTopAbsCentroidBearingRelToShearDeg` | unbinned |
+| `bandEdgeInnerCPerKm`, `bandEdgeOuterCPerKm` | unbinned |
+| `bandEdgeQuadrant{DownshearLeft,DownshearRight,UpshearLeft,UpshearRight}CPerKm` | unbinned |
+
+Two traps in that vocabulary, both of which produce a schema-legal file holding
+a silently incomparable number:
+
+- **`coldTopAbsCentroidBearingRelToShearDeg` is the ABSOLUTE bearing.** The
+  per-frame field `centroidBearingRelToShearDeg` is signed — compass-framed and
+  clockwise-positive, so downshear-left reads negative
+  (`src/realism-metrics.ts:98-105`) — and the aggregation takes `Math.abs()` of
+  it **per frame, before summarizing** (`aggregate.mjs:136-141`). Observed
+  extraction MUST take `|bearing|` per frame before aggregating. Averaging
+  signed bearings instead turns a real one-sided displacement into nothing: a
+  set of {-80°, +80°} means 0 against a sealed 80.
+- **The band-edge ids already encode region and quadrant.** For
+  `bandEdgeInnerCPerKm`, `bandEdgeOuterCPerKm`, and the four
+  `bandEdgeQuadrant*CPerKm` ids, the radial region and the shear quadrant live
+  in the **id**, not in `dimensions`. `dimensions.radialRegion` and
+  `dimensions.shearQuadrant` are invalid on band-edge records — a record with
+  `metricId: "bandEdgeInnerCPerKm"` and `radialRegion: "outer"` is
+  self-contradictory even though nothing in the schema shape rejects it.
 
 ### Unresolved before any comparison is meaningful
 
@@ -114,11 +147,18 @@ because that correspondence is **not established**. R2b must define and
 justify it. A committed observed number does not become comparable to a sealed
 sim number just because both files validate against this schema.
 
+This does not have a difference-metric escape hatch. `btProxyC` is the output
+of the render's cloud composition, not an affine remap of kelvin, so its
+transfer function is unknown and non-linear. Differences, gradients, and
+contrasts (`eyeContrastC`, the `bandEdge*` gradients) therefore do **not**
+cancel the offset the way they would between two affine-related scales.
+
 ## Licence rules
 
 ### D2 — derived statistics, never new raw EUMETSAT frames
 
-`docs/realism-gap-register.md` decision D2 (resolved 2026-08-02), verbatim:
+The D2 rule (`docs/realism-gap-register.md`, resolved 2026-08-02), verbatim —
+D2 is a longer decision and this is its operative clause:
 
 > commit derived statistics + a provenance manifest (source URL, product,
 > acquisition timestamp, access date — the same fields
@@ -126,12 +166,20 @@ sim number just because both files validate against this schema.
 > EUMETSAT frames; do not commit new raw EUMETSAT frames to the repository.
 
 EUMETSAT's general Terms of Use grant only personal, non-commercial download
-and copying by default and require explicit authorization for redistribution;
-satellite data and products are excluded from the CC BY-SA Learning Zone
-carve-out. The Data Policy's ">= 1 hour latency, without charge for any use"
-tier may cover this case but could not be verified from the primary text, so
-the rule stays conservative. Live in-app WMS requests to EUMETView are
-unaffected — that is direct end-user access, not redistribution.
+and copying by default, **require `© EUMETSAT [year]` attribution**, and require
+explicit authorization for redistribution; satellite data and products are
+excluded from the CC BY-SA Learning Zone carve-out. The Data Policy's ">= 1 hour
+latency, without charge for any use" tier may cover this case but could not be
+verified from the primary text, so the rule stays conservative. Live in-app WMS
+requests to EUMETView are unaffected — that is direct end-user access, not
+redistribution.
+
+**The attribution requirement survives derivation.** Every EUMETSAT-derived
+bundle MUST carry `© EUMETSAT <year>` in each relevant `provenance[].licenceNote`
+— the same attribution `NOTICE.md` and both paired session logs already carry.
+`EXAMPLE.derived-stats.json`'s `licenceNote` is deliberately minimal and is
+**incomplete on this axis**: copying it verbatim into a real EUMETSAT bundle
+would drop the attribution. Extend it there.
 
 NASA Worldview/GIBS is licence-clean to commit as raw frames (with the "NASA
 Worldview" + permalink citation the existing captures already carry), but that

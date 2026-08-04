@@ -66,6 +66,8 @@
     "hf6:gate": "node calibration/hf6-gate.mjs",
     "hf6:gate:check": "node calibration/hf6-gate.mjs --check --require-implementation-complete",
     "profile:ensemble": "vitest bench --run calibration/ensemble.bench.ts",
+    "realism": "node --experimental-strip-types calibration/realism/realism.mjs",
+    "realism:check": "node --experimental-strip-types calibration/realism/realism.mjs --check",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --maxWorkers=4",

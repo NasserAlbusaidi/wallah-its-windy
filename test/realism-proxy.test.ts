@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DOMAIN } from '../src/grid';
 import { cloudNoiseBytes } from '../src/render/cloud-noise';
 import {
   REALISM_GRID_N,
@@ -9,9 +10,12 @@ import {
   glslHash21,
   glslRotate2,
   midlevelRhUniform,
+  quantizedLayerSampler,
   smoothstep,
 } from '../src/realism-proxy';
-import type { RealismField } from '../src/realism-proxy';
+import type { RealismField, RealismFrameContext } from '../src/realism-proxy';
+import { DType } from '../src/types';
+import type { BinLayer, ParsedBin } from '../src/types';
 import { syntheticFrame, weakFrame } from './helpers/realism';
 
 describe('GLSL-semantics helpers', () => {
@@ -407,5 +411,172 @@ describe('buildRealismField', () => {
     });
     const bandField = buildRealismField(contextFor(bandOnly), openOcean);
     expect(Math.max(...bandField.precipBandCloud)).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Minimal in-memory BinLayer over the whole DOMAIN. `planes` carries one
+ * nx*ny array per timestep, row-major north->south, matching BinLayer's
+ * documented t-major layout. No .bin file is read: these fixtures pin the
+ * SAMPLER's arithmetic, not the baked assets.
+ *
+ * nx=2, ny=1 over DOMAIN puts the texel centres at lon 55 and lon 65 with the
+ * single row centred on lat 21 — so lon 60 / lat 21 is exactly midway between
+ * two texels (fx = 0.5, fy = 0), which is where the two filter orders differ.
+ */
+function synthLayer(
+  name: string,
+  nx: number,
+  ny: number,
+  planes: readonly number[][],
+): BinLayer {
+  const data = new Float32Array(nx * ny * planes.length);
+  planes.forEach((plane, t) => data.set(plane, t * nx * ny));
+  return {
+    name,
+    dtype: DType.float32,
+    quantized: false,
+    nx,
+    ny,
+    nt: planes.length,
+    bbox: DOMAIN,
+    scale: 1,
+    offset: 0,
+    data,
+  };
+}
+
+function synthBin(layers: readonly BinLayer[]): ParsedBin {
+  return { version: 1, layers: new Map(layers.map((l) => [l.name, l])) };
+}
+
+describe('quantizedLayerSampler', () => {
+  const rhLayer = synthLayer('rh_05', 2, 1, [[30, 30.5]]);
+  const sampleRh = quantizedLayerSampler(rhLayer, (v) => v / 100);
+
+  // App-truth note 5: buildR8Tex byte-quantizes each texel and GL bilinears
+  // the BYTES. The two orders do not commute, and without this test Task 7
+  // would seal a wrong order as the reference with every behavioural test
+  // still green (the brief's field tests only exercise the null-envBin path).
+  it('quantizes each texel BEFORE filtering (the order is observable here)', () => {
+    // RH 30% -> 0.300 * 255 = 76.5 -> byte 77; RH 30.5% -> 77.775 -> byte 78.
+    const quantizeThenFilter = (77 + 78) / 2 / 255; // 77.5/255
+    // Filtering first: (0.300 + 0.305) / 2 = 0.3025 -> 77.1375 -> byte 77.
+    const filterThenQuantize = 77 / 255;
+    // Guard the fixture itself: if these ever coincide the test proves nothing.
+    expect(quantizeThenFilter).not.toBe(filterThenQuantize);
+
+    expect(sampleRh(0, 21, 60)).toBeCloseTo(quantizeThenFilter, 12);
+    expect(sampleRh(0, 21, 60)).not.toBeCloseTo(filterThenQuantize, 6);
+  });
+
+  it('returns the exact stored byte at a texel centre', () => {
+    expect(sampleRh(0, 21, 55)).toBeCloseTo(77 / 255, 12);
+    expect(sampleRh(0, 21, 65)).toBeCloseTo(78 / 255, 12);
+  });
+
+  it('clamps past the edges (CLAMP_TO_EDGE), never wrapping', () => {
+    expect(sampleRh(0, 21, DOMAIN.lonMin - 5)).toBeCloseTo(77 / 255, 12);
+    expect(sampleRh(0, 21, DOMAIN.lonMax + 5)).toBeCloseTo(78 / 255, 12);
+  });
+
+  it('stores 0 for a non-finite texel, exactly as the Uint8Array upload does', () => {
+    const nanLayer = synthLayer('rh_05', 2, 1, [[Number.NaN, 50]]);
+    const sampleNan = quantizedLayerSampler(nanLayer, (v) => v / 100);
+    expect(sampleNan(0, 21, 55)).toBe(0);
+    // A NaN texel must not poison its filtered neighbour.
+    expect(sampleNan(0, 21, 60)).toBeCloseTo(128 / 2 / 255, 12);
+  });
+
+  it('selects per-plane data and clamps the plane index to nt - 1', () => {
+    const twoPlane = synthLayer('rh_05', 2, 1, [[30, 30.5], [80, 80]]);
+    const sample = quantizedLayerSampler(twoPlane, (v) => v / 100);
+    expect(sample(0, 21, 55)).toBeCloseTo(77 / 255, 12);
+    expect(sample(1, 21, 55)).toBeCloseTo(204 / 255, 12);
+    expect(sample(9, 21, 55)).toBeCloseTo(204 / 255, 12);
+  });
+});
+
+describe('buildRealismField env-plane path', () => {
+  // rh plane 0 = 30% everywhere, plane 1 = 80% everywhere; sst flat at 29 C.
+  const bin = synthBin([
+    synthLayer('rh_05', 2, 1, [[30, 30], [80, 80]]),
+    synthLayer('sst_05', 2, 1, [[29, 29], [29, 29]]),
+  ]);
+  const withBin = {
+    envBin: bin,
+    land01At: () => 0,
+    noise: new RealismNoise(),
+    debris: null,
+  };
+
+  function ambientField(
+    samplingMode: RealismFrameContext['samplingMode'],
+    displayTFrac: number,
+  ): Float32Array {
+    return buildRealismField(
+      { ...contextFor(syntheticFrame()), samplingMode, displayTFrac },
+      withBin,
+    ).ambientCloud;
+  }
+
+  function mean(values: Float32Array): number {
+    let total = 0;
+    for (let i = 0; i < values.length; i++) total += values[i];
+    return total / values.length;
+  }
+
+  it('event mode blends the floor/ceil planes AFTER filtering each', () => {
+    const dry = mean(ambientField({ kind: 'event-timeline' }, 0));
+    const mid = mean(ambientField({ kind: 'event-timeline' }, 0.5));
+    const wet = mean(ambientField({ kind: 'event-timeline' }, 1));
+    // ambientCloud is monotone in localRh, so a real fractional blend of the
+    // two planes must land strictly between the two endpoint fields.
+    expect(wet).toBeGreaterThan(dry);
+    expect(mid).toBeGreaterThan(dry);
+    expect(mid).toBeLessThan(wet);
+  });
+
+  it('synoptic mode reads the selected plane with no blend', () => {
+    // tFrac 1 pins current = next = last, blend 0 — byte-identical to
+    // selecting that plane synoptically, and tFrac is inert in synoptic mode.
+    expect(ambientField({ kind: 'synoptic-plane', plane: 1 }, 0.5)).toEqual(
+      ambientField({ kind: 'event-timeline' }, 1),
+    );
+    expect(ambientField({ kind: 'synoptic-plane', plane: 0 }, 0.5)).toEqual(
+      ambientField({ kind: 'event-timeline' }, 0),
+    );
+  });
+
+  it('throws rather than measuring a bin the app could not draw', () => {
+    const wrongMonth = synthBin([synthLayer('rh_09', 2, 1, [[30, 30]])]);
+    expect(() =>
+      buildRealismField(contextFor(syntheticFrame()), {
+        ...withBin,
+        envBin: wrongMonth,
+      }),
+    ).toThrow(/env bin lacks/);
+  });
+
+  it('throws when a debris grid is not at the measurement resolution', () => {
+    expect(() =>
+      buildRealismField(contextFor(syntheticFrame()), {
+        ...openOcean,
+        debris: { densityBytes: new Uint8Array(4), ageBytes: new Uint8Array(4) },
+      }),
+    ).toThrow(/debris/i);
+  });
+
+  it('accepts a debris grid at the measurement resolution', () => {
+    const cells = REALISM_GRID_N * REALISM_GRID_N;
+    expect(() =>
+      buildRealismField(contextFor(syntheticFrame()), {
+        ...openOcean,
+        debris: {
+          densityBytes: new Uint8Array(cells),
+          ageBytes: new Uint8Array(cells),
+        },
+      }),
+    ).not.toThrow();
   });
 });

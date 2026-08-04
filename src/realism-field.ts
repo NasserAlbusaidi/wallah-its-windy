@@ -63,8 +63,16 @@ export function quantizedLayerSampler(
     // Per-layer plane clamp, exactly as applyEnv does (`min(plane, nt - 1)`).
     const t = Math.max(0, Math.min(Math.floor(plane), nt - 1));
     const base = t * nx * ny;
-    const texel = (r: number, c: number): number =>
-      Math.round(clamp01(normalize(data[base + r * nx + c])) * 255) / 255;
+    const texel = (r: number, c: number): number => {
+      // buildR8Tex's exact byte expression, including its NaN behaviour: a
+      // non-finite value falls past both range tests into Math.round(NaN), and
+      // the Uint8Array store then coerces that to 0. Here the byte is a plain
+      // number, so the coercion has to be written out or a single NaN texel
+      // would propagate through the filter into the whole field.
+      const n = normalize(data[base + r * nx + c]);
+      const byte = n <= 0 ? 0 : n >= 1 ? 255 : Math.round(n * 255);
+      return (Number.isFinite(byte) ? byte : 0) / 255;
+    };
     const north = texel(r0, c0) * (1 - fx) + texel(r0, c1) * fx;
     const south = texel(r1, c0) * (1 - fx) + texel(r1, c1) * fx;
     return north * (1 - fy) + south * fy;
@@ -264,6 +272,19 @@ export function buildRealismField(
     : null;
 
   const size = n * n;
+  // The debris read below is a straight `j * n + i` index, not a resample, so a
+  // grid built at any other resolution would silently read the wrong cells (and
+  // out of range past the end). Same throw-don't-lie rule as envPlaneRead.
+  if (
+    sources.debris &&
+    (sources.debris.densityBytes.length !== size ||
+      sources.debris.ageBytes.length !== size)
+  ) {
+    throw new Error(
+      `realism field: debris grid must be ${n}x${n}; got density ` +
+        `${sources.debris.densityBytes.length}, age ${sources.debris.ageBytes.length}`,
+    );
+  }
   const field: RealismField = {
     n,
     metricX,

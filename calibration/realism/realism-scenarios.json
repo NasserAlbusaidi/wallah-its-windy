@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "comment": "Frozen R2a realism scenario set. Events replay the app's hindcast mode (public steering + monthly ocean + observed initial motion, default parameters). Climatology storms are fixed (spawn, month, seed) triplets - arbitrary but frozen before the first reference seal. Changing ANY entry re-opens the seal (delete realism-reference.json, rerun npm run realism in the same PR, record the A/B verdict in the register).",
+  "sampleEveryH": 6,
+  "climatologyMaxHours": 240,
+  "events": ["gonu", "kyarr", "shaheen", "biparjoy", "ashobaa"],
+  "climatology": [
+    { "id": "clim-may", "monthIndex": 4, "lat": 15.8, "lon": 65.0, "seed": 11052026 },
+    { "id": "clim-jun", "monthIndex": 5, "lat": 16.5, "lon": 64.0, "seed": 12062026 },
+    { "id": "clim-jul", "monthIndex": 6, "lat": 17.0, "lon": 62.5, "seed": 13072026 },
+    { "id": "clim-aug", "monthIndex": 7, "lat": 16.2, "lon": 66.5, "seed": 14082026 },
+    { "id": "clim-sep", "monthIndex": 8, "lat": 17.5, "lon": 63.0, "seed": 15092026 },
+    { "id": "clim-oct", "monthIndex": 9, "lat": 16.8, "lon": 61.5, "seed": 16102026 },
+    { "id": "clim-nov", "monthIndex": 10, "lat": 16.0, "lon": 63.5, "seed": 17112026 }
+  ]
+}

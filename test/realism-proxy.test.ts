@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { cloudNoiseBytes } from '../src/render/cloud-noise';
 import {
+  REALISM_GRID_N,
   RealismNoise,
+  buildRealismField,
   computeDebrisState,
   glslFract,
   glslHash21,
   glslRotate2,
+  midlevelRhUniform,
   smoothstep,
 } from '../src/realism-proxy';
+import type { RealismField } from '../src/realism-proxy';
 import { syntheticFrame, weakFrame } from './helpers/realism';
 
 describe('GLSL-semantics helpers', () => {
@@ -273,5 +277,135 @@ describe('computeDebrisState golden byte vector', () => {
     const ages = new Set(Array.from(state.ageBytes).filter((x) => x !== 0));
     expect(ages.size).toBeGreaterThan(1);
     expect(ages.has(43)).toBe(false);
+  });
+});
+
+function contextFor(frame: ReturnType<typeof syntheticFrame>) {
+  return {
+    frame,
+    genesis: { lat: 16, lon: 64 },
+    envShear: {
+      u: frame.structure.shearUms,
+      v: frame.structure.shearVms,
+      magnitude: Math.hypot(frame.structure.shearUms, frame.structure.shearVms),
+    },
+    envSteer: { u: -2, v: 3 },
+    midlevelRh01: midlevelRhUniform(frame, null),
+    monthIndex: 5,
+    displayTFrac: 0,
+    samplingMode: { kind: 'synoptic-plane', plane: 0 } as const,
+  };
+}
+
+const openOcean = {
+  envBin: null,
+  land01At: () => 0,
+  noise: new RealismNoise(),
+  debris: null,
+};
+
+function centreCellIndex(field: RealismField): number {
+  let best = 0;
+  let bestD = Infinity;
+  for (let j = 0; j < field.n; j++) {
+    for (let i = 0; i < field.n; i++) {
+      const u = (i + 0.5) / field.n;
+      const v = (j + 0.5) / field.n;
+      const x = u * 2 - 1;
+      const y = 1 - v * 2;
+      const d = Math.hypot((x - field.center.x) * field.metricX, y - field.center.y);
+      if (d < bestD) { bestD = d; best = j * field.n + i; }
+    }
+  }
+  return best;
+}
+
+/** Coldest btProxyC in the eyewall annulus 0.8 <= r/rmw <= 1.3. */
+function eyewallMinC(field: RealismField, rmwKm: number): number {
+  let coldest = Infinity;
+  for (let j = 0; j < field.n; j++) {
+    for (let i = 0; i < field.n; i++) {
+      const u = (i + 0.5) / field.n;
+      const v = (j + 0.5) / field.n;
+      const east = ((u * 2 - 1) - field.center.x) * field.metricX * 666;
+      const north = ((1 - v * 2) - field.center.y) * 666;
+      const q = Math.hypot(east, north) / rmwKm;
+      if (q >= 0.8 && q <= 1.3) coldest = Math.min(coldest, field.btProxyC[j * field.n + i]);
+    }
+  }
+  return coldest;
+}
+
+describe('midlevelRhUniform', () => {
+  it('prefers ventilationMeanRhPct, then env sample, then 55', () => {
+    const f = syntheticFrame();
+    expect(midlevelRhUniform(f, { midlevelRhPct: 80 })).toBeCloseTo(0.58, 9);
+    const noVent = syntheticFrame({
+      diagnostics: { ...f.diagnostics, ventilationMeanRhPct: undefined },
+    });
+    expect(midlevelRhUniform(noVent, { midlevelRhPct: 80 })).toBeCloseTo(0.8, 9);
+    expect(midlevelRhUniform(noVent, null)).toBeCloseTo(0.55, 9);
+  });
+});
+
+describe('buildRealismField', () => {
+  it('grid geometry: 192^2, metricX from frame latitude', () => {
+    const field = buildRealismField(contextFor(syntheticFrame()), openOcean);
+    expect(field.n).toBe(REALISM_GRID_N);
+    expect(field.btProxyC.length).toBe(REALISM_GRID_N * REALISM_GRID_N);
+    expect(field.metricX).toBeCloseTo((20 * Math.cos((18 * Math.PI) / 180)) / 12, 9);
+  });
+
+  it('mature storm: eyewall annulus is far colder than the ambient far field', () => {
+    const frame = syntheticFrame();
+    const field = buildRealismField(contextFor(frame), openOcean);
+    const corner = field.btProxyC[0];
+    expect(eyewallMinC(field, frame.structure.rmwKm)).toBeLessThan(corner - 40);
+  });
+
+  it('mature storm: the eye centre is WARMER than the eyewall (shader eye term)', () => {
+    const frame = syntheticFrame();
+    const field = buildRealismField(contextFor(frame), openOcean);
+    const centre = field.btProxyC[centreCellIndex(field)];
+    expect(centre).toBeGreaterThan(eyewallMinC(field, frame.structure.rmwKm) + 20);
+  });
+
+  it('weak eyeless storm: centre is cold (no eye clearing)', () => {
+    const frame = weakFrame();
+    const field = buildRealismField(contextFor(frame), openOcean);
+    const centre = field.btProxyC[centreCellIndex(field)];
+    expect(centre).toBeLessThan(-20);
+  });
+
+  it('stormCloud is zero everywhere when the frame is not alive', () => {
+    const dead = syntheticFrame({ alive: false });
+    const field = buildRealismField(contextFor(dead), openOcean);
+    expect(Math.max(...field.stormCloud)).toBe(0);
+  });
+
+  it('is deterministic (two builds are byte-equal)', () => {
+    const a = buildRealismField(contextFor(syntheticFrame()), openOcean);
+    const b = buildRealismField(contextFor(syntheticFrame()), openOcean);
+    expect(a.btProxyC).toEqual(b.btProxyC);
+    expect(a.cloud).toEqual(b.cloud);
+  });
+
+  it('precipBandCloud excludes the precipitation-eyewall arm', () => {
+    // Eye-only rain: band support is zero, so a correct precipBandCloud is
+    // zero EVERYWHERE even though the eyewall arm is strongly active. An
+    // implementation that mistakenly stores the full precipitatingCloud
+    // (max of both arms) fails here — this is the RGR-004 regression proof.
+    const base = syntheticFrame();
+    const eyeOnly = syntheticFrame({
+      diagnostics: { ...base.diagnostics, eyewallRainMmH: 20, rainbandRainMmH: 0 },
+    });
+    const eyeField = buildRealismField(contextFor(eyeOnly), openOcean);
+    expect(Math.max(...eyeField.precipBandCloud)).toBe(0);
+
+    const bandOnly = syntheticFrame({
+      diagnostics: { ...base.diagnostics, eyewallRainMmH: 0, rainbandRainMmH: 6 },
+    });
+    const bandField = buildRealismField(contextFor(bandOnly), openOcean);
+    expect(Math.max(...bandField.precipBandCloud)).toBeGreaterThan(0);
   });
 });

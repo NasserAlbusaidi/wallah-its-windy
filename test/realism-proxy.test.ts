@@ -7,6 +7,7 @@ import {
   glslRotate2,
   smoothstep,
 } from '../src/realism-proxy';
+import { syntheticFrame, weakFrame } from './helpers/realism';
 
 describe('GLSL-semantics helpers', () => {
   it('glslFract handles negatives like GLSL (x - floor(x))', () => {
@@ -63,5 +64,80 @@ describe('RealismNoise', () => {
     expect(v1).toBe(v2);
     expect(v1).toBeGreaterThan(0);
     expect(v1).toBeLessThan(1);
+  });
+});
+
+// A proxy metric may read a quantity from the frame, the diagnostics, or the
+// structure. If those disagree, a test asserting "weak storm => X" can pass or
+// fail for a reason unrelated to what it claims. These invariants are asserted
+// rather than promised in a doc comment.
+describe('frame fixtures are internally self-consistent', () => {
+  for (const [name, frame] of [
+    ['syntheticFrame', syntheticFrame()],
+    ['weakFrame', weakFrame()],
+  ] as const) {
+    it(`${name}: the same quantity carries one value everywhere`, () => {
+      expect(frame.organization).toBe(frame.diagnostics.organization);
+      expect(frame.organization).toBe(frame.diagnostics.organizationTarget);
+      expect(frame.coldWakeC).toBe(frame.diagnostics.coldWakeC);
+      expect(frame.vKt).toBe(frame.structure.maximumWindKt);
+      expect(frame.diagnostics.shearUms).toBe(frame.structure.shearUms);
+      expect(frame.diagnostics.shearVms).toBe(frame.structure.shearVms);
+    });
+
+    it(`${name}: scalars equal the quantities they summarize`, () => {
+      const { diagnostics } = frame;
+      expect(Math.hypot(diagnostics.shearUms, diagnostics.shearVms))
+        .toBeCloseTo(diagnostics.shearMs, 12);
+      expect(diagnostics.totalRainMmH).toBeCloseTo(
+        diagnostics.eyewallRainMmH + diagnostics.rainbandRainMmH +
+          diagnostics.orographicRainMmH,
+        12,
+      );
+      expect(diagnostics.netKtPerH).toBeCloseTo(
+        diagnostics.oceanKtPerH - diagnostics.shearKtPerH -
+          diagnostics.landKtPerH - diagnostics.dryAirKtPerH,
+        12,
+      );
+    });
+
+    it(`${name}: wind radii nest and never exceed the intensity`, () => {
+      const { r34Km, r50Km, r64Km, maximumWindKt } = frame.structure;
+      for (const q of ['ne', 'se', 'sw', 'nw'] as const) {
+        expect(r34Km[q]).toBeGreaterThanOrEqual(r50Km[q]);
+        expect(r50Km[q]).toBeGreaterThanOrEqual(r64Km[q]);
+        if (maximumWindKt < 50) expect(r50Km[q]).toBe(0);
+        if (maximumWindKt < 64) expect(r64Km[q]).toBe(0);
+      }
+    });
+
+    it(`${name}: the core is deeper than its environment`, () => {
+      const { centralPressureHpa, environmentalPressureHpa } = frame.structure;
+      expect(centralPressureHpa).toBeLessThan(environmentalPressureHpa);
+    });
+  }
+
+  it('weakFrame is weaker than syntheticFrame on every intensity axis', () => {
+    const strong = syntheticFrame();
+    const weak = weakFrame();
+    expect(weak.vKt).toBeLessThan(strong.vKt);
+    expect(weak.organization).toBeLessThan(strong.organization);
+    expect(weak.structure.centralPressureHpa)
+      .toBeGreaterThan(strong.structure.centralPressureHpa);
+    expect(weak.diagnostics.totalRainMmH)
+      .toBeLessThan(strong.diagnostics.totalRainMmH);
+  });
+
+  it('overrides still apply on top of a coherent base', () => {
+    expect(syntheticFrame({ ageH: 96 }).ageH).toBe(96);
+    expect(weakFrame({ lat: -5 }).lat).toBe(-5);
+    // The plan pins these; a coherence edit must not have moved them.
+    const weak = weakFrame();
+    expect(weak.vKt).toBe(35);
+    expect(weak.organization).toBe(0.3);
+    expect(weak.structure.maximumWindKt).toBe(35);
+    expect(weak.structure.rmwKm).toBe(60);
+    expect(weak.structure.outerSizeKm).toBe(180);
+    expect(weak.structure.hollandB).toBe(1.2);
   });
 });

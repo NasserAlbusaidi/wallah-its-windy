@@ -95,7 +95,13 @@ export interface RealismBandEdgeEnergy {
 export interface RealismColdTop {
   areaKm2: number;
   centroidOffsetKm: number | null;
-  /** (-180, 180], 0 = downshear. */
+  /**
+   * (-180, 180], 0 = downshear. COMPASS-framed and clockwise-positive
+   * (`atan2(east, north)`), so a centroid downshear-LEFT reads NEGATIVE — the
+   * OPPOSITE sign sense from RGR-004's `dl` bucket, which is `cross > 0`. Both
+   * are intentional: the bearing follows the meteorological convention, the
+   * quadrant follows the vector cross product. Do not "align" one to the other.
+   */
   centroidBearingRelToShearDeg: number | null;
 }
 

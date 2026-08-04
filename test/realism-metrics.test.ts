@@ -5,6 +5,9 @@ import {
   metricsForField,
 } from '../src/realism-metrics';
 import { syntheticFrame, weakFrame } from './helpers/realism';
+// The MODULE may not import a render path, so it restates HALF_DOMAIN_HEIGHT_KM.
+// This TEST is under no such rule, and imports the original to bind the two.
+import { HALF_DOMAIN_HEIGHT_KM } from '../src/render/storm-radii';
 
 function blankField(): RealismField {
   const n = 8;
@@ -29,6 +32,17 @@ function ctxFor(frame = syntheticFrame()) {
     displayTFrac: 0,
     samplingMode: { kind: 'synoptic-plane', plane: 0 } as const,
   };
+}
+
+/**
+ * Eight cold cells due EAST of the centre (rows j=3,4 straddle the axis, so the
+ * centroid's north component is exactly 0) with mean clip x = 0.5. Exactly
+ * REALISM_MIN_COLD_CELLS, so the centroid is reported.
+ */
+function eastLobeField(): RealismField {
+  const field = blankField();
+  for (const j of [3, 4]) for (let i = 4; i <= 7; i++) field.btProxyC[j * 8 + i] = -70;
+  return field;
 }
 
 describe('metricsForField', () => {
@@ -143,6 +157,47 @@ describe('metricsForField', () => {
       envShear: { u: 0.06, v: 0, magnitude: 0.06 },
     });
     expect(above.coldTop.centroidBearingRelToShearDeg).not.toBeNull();
+  });
+
+  it('assigns quadrants with the documented shear handedness', () => {
+    const field = blankField();
+    // Shear is due EAST (ctxFor's default). Masked cell (i=4, j=3) sits
+    // north-east of the centre: dot = +83.25 (downshear) and
+    // cross = shear x cell = +83.25 (left) -> dl. Masked cell (i=3, j=5) sits
+    // south-west: dot = -83.25 (upshear), cross = -249.75 (right) -> ur.
+    // Exactly two buckets may be populated, so ANY pairwise label swap —
+    // dl/dr, ul/ur, or downshear/upshear — nulls a bucket asserted non-null.
+    field.btProxyC[3 * 8 + 3] = -40; // west neighbour of (4,3): a gradient to read
+    field.btProxyC[5 * 8 + 2] = -40; // west neighbour of (3,5)
+    field.bands[3 * 8 + 4] = 0.5;
+    field.bands[5 * 8 + 3] = 0.5;
+    const q = metricsForField(field, ctxFor()).bandEdgeEnergy.byShearQuadrant;
+    expect(q.dl).toBeGreaterThan(0);
+    expect(q.ur).toBeGreaterThan(0);
+    expect(q.dr).toBeNull();
+    expect(q.ul).toBeNull();
+  });
+
+  it('centroid bearing is compass-framed, clockwise-positive from the shear', () => {
+    // Shear due NORTH, cold centroid due EAST: east is a quarter turn
+    // CLOCKWISE from north, so the compass-framed bearing
+    // (atan2(east, north) - atan2(u, v)) is +90. The math convention
+    // (atan2(north, east) - atan2(v, u)) would report -90 on this same
+    // fixture, which is what makes the sign here discriminating.
+    const m = metricsForField(eastLobeField(), {
+      ...ctxFor(),
+      envShear: { u: 0, v: 1, magnitude: 1 },
+    });
+    expect(m.coldTop.centroidBearingRelToShearDeg).toBeCloseTo(90, 6);
+  });
+
+  it('the km mapping tracks the field builder\'s half-domain height', () => {
+    // Drift guard for the duplicated 666. The cold centroid sits at clip
+    // (0.5, 0), so its offset must be exactly half the domain height. Changing
+    // EITHER copy — the render path's constant or the metrics module's local
+    // restatement — breaks this equality, so a divergence cannot go quiet.
+    const m = metricsForField(eastLobeField(), ctxFor());
+    expect(m.coldTop.centroidOffsetKm).toBeCloseTo(0.5 * HALF_DOMAIN_HEIGHT_KM, 6);
   });
 
   it('precipBandCloud alone activates the RGR-004 band mask', () => {

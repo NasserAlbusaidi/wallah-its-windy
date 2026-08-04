@@ -1,7 +1,15 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import {
   CLOUD_CROSSFADE_PERIOD_H,
   CLOUD_ROTATION_CAP_RAD_PER_H,
+  CLOUD_TOP_BAND_DEVELOPING_C,
+  CLOUD_TOP_BAND_MATURE_C,
+  CLOUD_TOP_CDO_DEVELOPING_C,
+  CLOUD_TOP_CDO_MATURE_C,
+  CLOUD_TOP_CIRRUS_COLD_C,
+  CLOUD_TOP_CIRRUS_WARM_C,
+  CLOUD_TOPS_GLSL,
   cloudAngularRateAtClipRadius,
   cloudAngularRateRadPerH,
   flowPhaseState,
@@ -80,5 +88,26 @@ describe('flowPhaseState', () => {
     const before = flowPhaseState(CLOUD_CROSSFADE_PERIOD_H * 3 - eps);
     const after = flowPhaseState(CLOUD_CROSSFADE_PERIOD_H * 3 + eps);
     expect(Math.abs(before.weightA - after.weightA)).toBeLessThan(1e-4);
+  });
+});
+
+describe('cloud-top component temperature constants', () => {
+  test('pins the component grading endpoints', () => {
+    expect(CLOUD_TOP_CDO_DEVELOPING_C).toBe(-65);
+    expect(CLOUD_TOP_CDO_MATURE_C).toBe(-82);
+    expect(CLOUD_TOP_BAND_DEVELOPING_C).toBe(-45);
+    expect(CLOUD_TOP_BAND_MATURE_C).toBe(-62);
+    expect(CLOUD_TOP_CIRRUS_WARM_C).toBe(-35);
+    expect(CLOUD_TOP_CIRRUS_COLD_C).toBe(-48);
+  });
+
+  test('keeps the emitted CLOUD_TOPS_GLSL byte-identical (pre-refactor digest)', () => {
+    // sha256 of CLOUD_TOPS_GLSL captured on 2026-08-02 BEFORE this refactor
+    // (2259 chars). Any change to the emitted shader text fails here.
+    const digest = createHash('sha256').update(CLOUD_TOPS_GLSL).digest('hex');
+    expect(digest).toBe(
+      '4ed94b08cad4d72e429210af66827336905407075bda5a3107d640062eb11ff5',
+    );
+    expect(CLOUD_TOPS_GLSL.length).toBe(2259);
   });
 });

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "source": {
+    "bundleId": "eumetview-seviri-ir108-shaheen-2021",
+    "product": "EUMETSAT Meteosat-9 IODC SEVIRI IR10.8 (EUMETView WMS)",
+    "kind": "geostationary-ir"
+  },
+  "provenance": [
+    {
+      "id": "p1",
+      "frameId": "shaheen/peak-obs",
+      "validTime": "2021-10-02T09:00:00Z",
+      "sourceUrl": "…",
+      "acquisitionTimestamp": "2026-07-30T09:00:00Z",
+      "accessDate": "2026-08-02",
+      "licenceNote": "Derived statistic committed per register decision D2; no raw frame is committed.",
+      "sha256OfSourceFrame": "computed at extraction time; the frame itself is NOT committed"
+    }
+  ],
+  "metrics": [
+    {
+      "metricId": "environmentalCloudFraction",
+      "registerEntry": "RGR-001",
+      "metricVersion": "realism-metrics.ts@r2a-1",
+      "parameters": {
+        "observedBtThresholdK": null,
+        "mapsToSimConstant": "REALISM_ENV_CLOUDY_TOP_C",
+        "exclusionRadius": "3 * outerSizeKm"
+      },
+      "method": "verbatim description of the computation",
+      "values": [
+        {
+          "dimensions": { "monthIndex": 9, "stage": "pre-peak" },
+          "value": null,
+          "sampleCount": 0,
+          "uncertainty": null,
+          "provenanceIds": ["p1"]
+        }
+      ]
+    }
+  ]
+}

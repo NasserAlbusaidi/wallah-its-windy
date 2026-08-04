@@ -117,6 +117,12 @@ export class RealismNoise {
   }
 }
 
+/**
+ * Row order: index `j * n + i` with `u = (i+0.5)/n`, `v = (j+0.5)/n`, so j=0 is
+ * the NORTH edge (`cellY = 1 - 2v`). That is vertically flipped relative to a
+ * GPU readPixels dump, whose row 0 sits at `v_uv.y = 1`. Consumers must index
+ * with this convention or the field reads north-for-south.
+ */
 export interface DebrisState {
   densityBytes: Uint8Array;
   ageBytes: Uint8Array;

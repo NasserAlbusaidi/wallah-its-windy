@@ -159,9 +159,14 @@ describe('computeDebrisState', () => {
   });
 
   it('is deterministic', () => {
-    const noise = new RealismNoise();
-    const a = computeDebrisState(4, (b) => syntheticFrame({ ageH: b }), noise, 0.4, 32);
-    const b = computeDebrisState(4, (b2) => syntheticFrame({ ageH: b2 }), noise, 0.4, 32);
+    // Separate RealismNoise instances: a shared one would also pass if the
+    // result depended on sampler state rather than on the arguments alone.
+    const a = computeDebrisState(
+      4, (b) => syntheticFrame({ ageH: b }), new RealismNoise(), 0.4, 32,
+    );
+    const b = computeDebrisState(
+      4, (b2) => syntheticFrame({ ageH: b2 }), new RealismNoise(), 0.4, 32,
+    );
     expect(a.densityBytes).toEqual(b.densityBytes);
     expect(a.ageBytes).toEqual(b.ageBytes);
   });
@@ -170,8 +175,103 @@ describe('computeDebrisState', () => {
     const state = computeDebrisState(
       3, (b) => syntheticFrame({ ageH: b }), new RealismNoise(), 0.4, 32,
     );
+    let zeroCount = 0;
     for (let i = 0; i < state.densityBytes.length; i++) {
-      if (state.densityBytes[i] === 0) expect(state.ageBytes[i]).toBe(0);
+      if (state.densityBytes[i] === 0) {
+        zeroCount++;
+        expect(state.ageBytes[i]).toBe(0);
+      }
     }
+    // Without this the loop body could never run and the test pass vacuously.
+    expect(zeroCount).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The ONE mechanical pin on every mirrored shader term.
+ *
+ * Human reading is what verified this module against CLOUD_MEMORY_UPDATE_FS;
+ * this vector is what keeps it verified. The behavioural tests above all stay
+ * green under real mirror breakages — flipping cellY's sign, flipping backV's
+ * sign, dropping the max(metricX, 1e-5) divisor, or dropping the cloudSeed*13
+ * noise offset each leave k=0 zero, the peak above 13, the run deterministic
+ * and the age-reset predicate intact. Only these bytes catch them.
+ *
+ * Captured from the implementation (like BINARY-FORMATS.md's golden hex
+ * vector, these are recorded values, not re-derivable by hand): n=16, k=3, so
+ * three advect->source->decay passes; syntheticFrame at every boundary;
+ * cloudSeed 0.4. syntheticFrame's centre (18N, 62E) projects to clip
+ * (0.2, -0.5) = row 11.5, col 9.1, which is exactly where the debris sits.
+ *
+ * A diff here means a mirrored term moved. Re-check it against the GLSL in
+ * src/render/cloud-memory.ts before re-recording.
+ */
+const GOLDEN_N = 16;
+
+const GOLDEN_DENSITY = [
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  2, 14,  2,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0, 10, 74,  8,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  7, 57, 10,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  2, 11,  2,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+];
+
+const GOLDEN_AGE = [
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0, 16,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0, 27, 28, 29,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0, 30, 26, 28,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0, 29, 26, 31,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0, 30, 30, 28,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0, 17,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+];
+
+describe('computeDebrisState golden byte vector', () => {
+  const state = computeDebrisState(
+    3, (b) => syntheticFrame({ ageH: b }), new RealismNoise(), 0.4, GOLDEN_N,
+  );
+
+  it('reproduces the recorded density bytes exactly', () => {
+    expect(Array.from(state.densityBytes)).toEqual(GOLDEN_DENSITY);
+  });
+
+  it('reproduces the recorded age bytes exactly', () => {
+    expect(Array.from(state.ageBytes)).toEqual(GOLDEN_AGE);
+  });
+
+  // A vector of all zeros, or one whose ages are all the same, would pin
+  // nothing. These assert the recorded field actually exercises the terms:
+  // varied ages mean the density-weighted rejuvenation rule ran (three passes
+  // of pure accumulation would give a uniform 3/18 -> byte 43), and the
+  // left/right and up/down asymmetry around the peak is the advection.
+  it('is a non-degenerate field that exercises advection and rejuvenation', () => {
+    const peak = 11 * GOLDEN_N + 9;
+    expect(state.densityBytes[peak]).toBe(74);
+    expect(state.densityBytes[peak - 1]).not.toBe(state.densityBytes[peak + 1]);
+    expect(state.densityBytes[peak - GOLDEN_N])
+      .not.toBe(state.densityBytes[peak + GOLDEN_N]);
+    const ages = new Set(Array.from(state.ageBytes).filter((x) => x !== 0));
+    expect(ages.size).toBeGreaterThan(1);
+    expect(ages.has(43)).toBe(false);
   });
 });

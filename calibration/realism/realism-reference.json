@@ -1,0 +1,401 @@
+{
+  "schemaVersion": 1,
+  "scenariosSha256": "0442eafb9d238cd1c2f6b4ef2806347cea6bd698b1ca8c7fd73b0e7dd6f66721",
+  "protocol": {
+    "maxDriftFraction": 0.05,
+    "numericPrecisionDecimalPlaces": 9
+  },
+  "frameCounts": {
+    "ashobaa": 3,
+    "biparjoy": 4,
+    "clim-aug": 0,
+    "clim-jul": 0,
+    "clim-jun": 0,
+    "clim-may": 3,
+    "clim-nov": 7,
+    "clim-oct": 8,
+    "clim-sep": 8,
+    "gonu": 20,
+    "kyarr": 11,
+    "shaheen": 11
+  },
+  "aggregate": {
+    "climatology": {
+      "samples": 26,
+      "intensityBins": {
+        "020-035": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 20,
+            "median": 0,
+            "mean": 0
+          }
+        },
+        "035-050": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 3,
+            "median": 0,
+            "mean": 0
+          }
+        },
+        "050-064": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          }
+        },
+        "064-083": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 1,
+            "median": 6262.826493706,
+            "mean": 6262.826493706
+          }
+        },
+        "083-100": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 1,
+            "median": 9367.907258419,
+            "mean": 9367.907258419
+          }
+        },
+        "100-200": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 1,
+            "median": 14949.047814998,
+            "mean": 14949.047814998
+          }
+        }
+      },
+      "environmentalCloudFractionByMonth": {
+        "m04": {
+          "count": 3,
+          "median": 0,
+          "mean": 0.004769921
+        },
+        "m08": {
+          "count": 8,
+          "median": 0,
+          "mean": 0
+        },
+        "m09": {
+          "count": 8,
+          "median": 0,
+          "mean": 0
+        },
+        "m10": {
+          "count": 7,
+          "median": 0,
+          "mean": 0
+        }
+      },
+      "weakBinByStage": {
+        "020-035|post-peak": {
+          "coldTopAreaKm2": {
+            "count": 7,
+            "median": 0,
+            "mean": 0
+          },
+          "coldTopCentroidOffsetKm": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          }
+        },
+        "020-035|pre-peak": {
+          "coldTopAreaKm2": {
+            "count": 13,
+            "median": 0,
+            "mean": 0
+          },
+          "coldTopCentroidOffsetKm": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          }
+        },
+        "035-050|post-peak": {
+          "coldTopAreaKm2": {
+            "count": 1,
+            "median": 0,
+            "mean": 0
+          },
+          "coldTopCentroidOffsetKm": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          }
+        },
+        "035-050|pre-peak": {
+          "coldTopAreaKm2": {
+            "count": 2,
+            "median": 0,
+            "mean": 0
+          },
+          "coldTopCentroidOffsetKm": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          }
+        }
+      },
+      "unbinned": {
+        "coldTopCentroidOffsetKm": {
+          "count": 3,
+          "median": 18.15673823,
+          "mean": 21.068241104
+        },
+        "coldTopAbsCentroidBearingRelToShearDeg": {
+          "count": 3,
+          "median": 82.521986889,
+          "mean": 85.903678947
+        },
+        "bandEdgeInnerCPerKm": {
+          "count": 26,
+          "median": 0.221599461,
+          "mean": 0.251871015
+        },
+        "bandEdgeOuterCPerKm": {
+          "count": 26,
+          "median": 0.192582777,
+          "mean": 0.228394448
+        },
+        "bandEdgeQuadrantDownshearLeftCPerKm": {
+          "count": 26,
+          "median": 0.212416457,
+          "mean": 0.250957519
+        },
+        "bandEdgeQuadrantDownshearRightCPerKm": {
+          "count": 26,
+          "median": 0.230563814,
+          "mean": 0.247097395
+        },
+        "bandEdgeQuadrantUpshearLeftCPerKm": {
+          "count": 26,
+          "median": 0.190998525,
+          "mean": 0.224305851
+        },
+        "bandEdgeQuadrantUpshearRightCPerKm": {
+          "count": 24,
+          "median": 0.163954718,
+          "mean": 0.204487311
+        }
+      }
+    },
+    "event": {
+      "samples": 49,
+      "intensityBins": {
+        "020-035": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 15,
+            "median": 73.189830338,
+            "mean": 712.774614702
+          }
+        },
+        "035-050": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 12,
+            "median": 6948.721352474,
+            "mean": 8776.626412798
+          }
+        },
+        "050-064": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 6,
+            "median": 21458.666878611,
+            "mean": 21101.082882999
+          }
+        },
+        "064-083": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 12,
+            "median": 34803.708333956,
+            "mean": 37283.357207911
+          }
+        },
+        "083-100": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 2,
+            "median": 57595.130321743,
+            "mean": 57595.130321743
+          }
+        },
+        "100-200": {
+          "eyeContrastC": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopAreaKm2": {
+            "count": 2,
+            "median": 69119.010449525,
+            "mean": 69119.010449525
+          }
+        }
+      },
+      "environmentalCloudFractionByMonth": {
+        "m05": {
+          "count": 27,
+          "median": 0,
+          "mean": 0.025754826
+        },
+        "m08": {
+          "count": 11,
+          "median": 0.021252567,
+          "mean": 0.034959469
+        },
+        "m09": {
+          "count": 11,
+          "median": 0,
+          "mean": 0.002146472
+        }
+      },
+      "weakBinByStage": {
+        "020-035|post-peak": {
+          "coldTopAreaKm2": {
+            "count": 15,
+            "median": 73.189830338,
+            "mean": 712.774614702
+          },
+          "coldTopCentroidOffsetKm": {
+            "count": 5,
+            "median": 172.561599834,
+            "mean": 155.156712654
+          }
+        },
+        "020-035|pre-peak": {
+          "coldTopAreaKm2": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          },
+          "coldTopCentroidOffsetKm": {
+            "count": 0,
+            "median": null,
+            "mean": null
+          }
+        },
+        "035-050|post-peak": {
+          "coldTopAreaKm2": {
+            "count": 4,
+            "median": 15052.33785897,
+            "mean": 14332.586348784
+          },
+          "coldTopCentroidOffsetKm": {
+            "count": 4,
+            "median": 35.147663705,
+            "mean": 35.431098398
+          }
+        },
+        "035-050|pre-peak": {
+          "coldTopAreaKm2": {
+            "count": 8,
+            "median": 3914.748769244,
+            "mean": 5998.646444805
+          },
+          "coldTopCentroidOffsetKm": {
+            "count": 7,
+            "median": 36.534061537,
+            "mean": 59.871913257
+          }
+        }
+      },
+      "unbinned": {
+        "coldTopCentroidOffsetKm": {
+          "count": 38,
+          "median": 35.037732118,
+          "mean": 52.51046847
+        },
+        "coldTopAbsCentroidBearingRelToShearDeg": {
+          "count": 38,
+          "median": 85.820844935,
+          "mean": 80.747685085
+        },
+        "bandEdgeInnerCPerKm": {
+          "count": 49,
+          "median": 0.637434551,
+          "mean": 0.637132576
+        },
+        "bandEdgeOuterCPerKm": {
+          "count": 45,
+          "median": 0.362139695,
+          "mean": 0.441425543
+        },
+        "bandEdgeQuadrantDownshearLeftCPerKm": {
+          "count": 49,
+          "median": 0.539508065,
+          "mean": 0.567718008
+        },
+        "bandEdgeQuadrantDownshearRightCPerKm": {
+          "count": 49,
+          "median": 0.456716209,
+          "mean": 0.471904369
+        },
+        "bandEdgeQuadrantUpshearLeftCPerKm": {
+          "count": 49,
+          "median": 0.508791707,
+          "mean": 0.515513412
+        },
+        "bandEdgeQuadrantUpshearRightCPerKm": {
+          "count": 49,
+          "median": 0.460836694,
+          "mean": 0.508287051
+        }
+      }
+    }
+  }
+}

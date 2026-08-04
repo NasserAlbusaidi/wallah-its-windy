@@ -191,6 +191,19 @@ export const CLOUD_CORE_GLSL = {
 } as const;
 
 /**
+ * Component cloud-top grading endpoints, deg C. Exported so the R2a realism
+ * BT-proxy (src/realism-proxy.ts) measures with the exact temperatures the
+ * shader renders. The GLSL splice below must keep the emitted text
+ * byte-identical (digest-pinned by test/cloud-motion.test.ts).
+ */
+export const CLOUD_TOP_CDO_DEVELOPING_C = -65;
+export const CLOUD_TOP_CDO_MATURE_C = -82;
+export const CLOUD_TOP_BAND_DEVELOPING_C = -45;
+export const CLOUD_TOP_BAND_MATURE_C = -62;
+export const CLOUD_TOP_CIRRUS_WARM_C = -35;
+export const CLOUD_TOP_CIRRUS_COLD_C = -48;
+
+/**
  * GLSL for component-graded cloud tops and deterministic overshooting-top
  * pulses. env.ts must splice this inside sampleCloud() immediately after the
  * surfaceC/ambientTopC declarations: it intentionally references that
@@ -200,9 +213,9 @@ export const CLOUD_CORE_GLSL = {
 export const CLOUD_TOPS_GLSL = /* glsl */ `
   // Component-graded cloud tops: warmest first, coldest mixed last so a cold
   // tower is never averaged back toward a warmer underlying band.
-  float cdoTopC = mix(-65.0, -82.0, development);
-  float bandTopC = mix(-45.0, -62.0, development);
-  float cirrusTopC = mix(-35.0, -48.0, u_organization);
+  float cdoTopC = mix(${CLOUD_TOP_CDO_DEVELOPING_C.toFixed(1)}, ${CLOUD_TOP_CDO_MATURE_C.toFixed(1)}, development);
+  float bandTopC = mix(${CLOUD_TOP_BAND_DEVELOPING_C.toFixed(1)}, ${CLOUD_TOP_BAND_MATURE_C.toFixed(1)}, development);
+  float cirrusTopC = mix(${CLOUD_TOP_CIRRUS_WARM_C.toFixed(1)}, ${CLOUD_TOP_CIRRUS_COLD_C.toFixed(1)}, u_organization);
 
   // Overshooting tops: deterministic per-cell pulses. Cell identity comes from
   // the advected storm-relative coordinate + seed; the lifecycle reads the

@@ -1,0 +1,170 @@
+/**
+ * realism-proxy.ts — CPU "field-space twin" of the simulated-IR composition,
+ * built for the R2a realism measurement harness (calibration/realism/).
+ *
+ * This module rasterizes a deterministic cloud-cover + cloud-top-temperature
+ * PROXY field from flight-recorder frames, env bins, and the same exported
+ * constants the env shader embeds. It is a measurement instrument, not a
+ * renderer: it never runs on the GPU, is never imported by main.ts or any
+ * render path, and is NOT pixel-identical to the shader (documented
+ * approximations: no relief shading, no palette/compositing, single
+ * per-frame metricX, debris at the fixed measurement grid). Metrics computed
+ * from it are labeled "simulated cloud-top brightness-temperature proxy"
+ * everywhere.
+ *
+ * THE SINGLE IMPORT SURFACE. The harness is split across three files to stay
+ * under the repo's file-size cap — `realism-glsl.ts` (GLSL-semantics leaf),
+ * `realism-cloud-sample.ts` (the `sampleCloud()` transcription) and
+ * `realism-field.ts` (the rasterizer) — but every consumer imports from HERE,
+ * which owns the debris recurrence and re-exports the rest. The re-exports
+ * below are the reason `test/realism-proxy.test.ts` and the runner never name
+ * a sibling module; keep it that way.
+ *
+ * Determinism: everything here is a pure function of its arguments; noise
+ * comes from the seeded cloudNoiseBytes(128) lattice the renderer uploads.
+ */
+
+export * from './realism-glsl';
+export * from './realism-field';
+
+import { DOMAIN, latLonToClip } from './grid';
+import type { FlightFrame } from './flight-recorder';
+import { cellUv, clamp01, mix, smoothstep } from './realism-glsl';
+import type { RealismNoise } from './realism-glsl';
+import {
+  CLOUD_MEMORY_DECAY_TAU_H,
+  CLOUD_MEMORY_DT_H,
+  CLOUD_MEMORY_MAX_ADVECT_KMH,
+  CLOUD_MEMORY_OUTFLOW_KMH,
+  CLOUD_MEMORY_WINDOW_H,
+  sourceBoundaries,
+} from './render/cloud-memory';
+import { cloudAngularRateRadPerH, cloudMetricX } from './render/cloud-motion';
+import {
+  HALF_DOMAIN_HEIGHT_KM,
+  RENDER_RADIUS_FLOOR,
+  stormRenderRadii,
+} from './render/storm-radii';
+
+/**
+ * Row order: index `j * n + i` with `u = (i+0.5)/n`, `v = (j+0.5)/n`, so j=0 is
+ * the NORTH edge (`cellY = 1 - 2v`). That is vertically flipped relative to a
+ * GPU readPixels dump, whose row 0 sits at `v_uv.y = 1`. Consumers must index
+ * with this convention or the field reads north-for-south.
+ */
+export interface DebrisState {
+  densityBytes: Uint8Array;
+  ageBytes: Uint8Array;
+}
+
+/** Bilinear CLAMP_TO_EDGE read of a byte grid at uv, normalized to [0,1]. */
+function sampleByteGrid(grid: Uint8Array, n: number, u: number, v: number): number {
+  const x = Math.min(n - 1, Math.max(0, u * n - 0.5));
+  const y = Math.min(n - 1, Math.max(0, v * n - 0.5));
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const x1 = Math.min(n - 1, x0 + 1);
+  const y1 = Math.min(n - 1, y0 + 1);
+  const fx = x - x0;
+  const fy = y - y0;
+  const top = grid[y0 * n + x0] * (1 - fx) + grid[y0 * n + x1] * fx;
+  const bottom = grid[y1 * n + x0] * (1 - fx) + grid[y1 * n + x1] * fx;
+  return (top * (1 - fy) + bottom * fy) / 255;
+}
+
+/** RGBA8 store: round to the nearest byte. */
+function toByte(x01: number): number {
+  return Math.round(clamp01(x01) * 255);
+}
+
+/**
+ * CPU mirror of CLOUD_MEMORY_UPDATE_FS at a fixed n-grid: state(k) from a
+ * zero field via one advect→source→decay pass per boundary k-18..k-1, byte
+ * stored at every pass exactly like the RGBA8 render target. Measurement
+ * pose: reducedMotion=false.
+ */
+export function computeDebrisState(
+  k: number,
+  frameAtBoundary: (boundaryH: number) => FlightFrame | null,
+  noise: RealismNoise,
+  cloudSeed: number,
+  n: number,
+): DebrisState {
+  let densityBytes = new Uint8Array(n * n);
+  let ageBytes = new Uint8Array(n * n);
+  const decay = Math.exp(-CLOUD_MEMORY_DT_H / CLOUD_MEMORY_DECAY_TAU_H);
+
+  for (const boundary of sourceBoundaries(k)) {
+    const frame = frameAtBoundary(boundary * CLOUD_MEMORY_DT_H);
+    if (!frame) throw new Error(`realism debris: no tape frame at boundary ${boundary}`);
+    const center = latLonToClip(frame.lat, frame.lon, DOMAIN);
+    const radii = stormRenderRadii(frame.structure);
+    const metricX = cloudMetricX(frame.lat);
+    const vmaxMs = frame.structure.maximumWindKt * 0.514444;
+    const intensity01 = clamp01((frame.vKt - 20) / 100);
+    const development = clamp01(0.56 * frame.organization + 0.44 * intensity01);
+    const rmwKm = Math.max(radii.rMax, 0.001) * HALF_DOMAIN_HEIGHT_KM;
+    const omegaRmwKm =
+      Math.max(radii.rMax, RENDER_RADIUS_FLOOR) * HALF_DOMAIN_HEIGHT_KM;
+
+    const nextDensity = new Uint8Array(n * n);
+    const nextAge = new Uint8Array(n * n);
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const { u, v } = cellUv(i, j, n);
+        const cellX = u * 2 - 1;
+        const cellY = 1 - v * 2;
+        const radialX = (cellX - center.x) * metricX;
+        const radialY = cellY - center.y;
+        const rLen = Math.hypot(radialX, radialY);
+        const rKm = Math.max(rLen * HALF_DOMAIN_HEIGHT_KM, 1);
+
+        // advect: capped Holland rotation + ramped radial outflow (FS mirror)
+        const omega = cloudAngularRateRadPerH(
+          rKm, omegaRmwKm, vmaxMs, frame.structure.hollandB,
+        );
+        const tangential = Math.min(omega * rKm, CLOUD_MEMORY_MAX_ADVECT_KMH);
+        const outflow =
+          CLOUD_MEMORY_OUTFLOW_KMH * smoothstep(1.2 * rmwKm, 2.5 * rmwKm, rKm);
+        let velX = 0;
+        let velY = 0;
+        if (rLen > 1e-5) {
+          const invLen = 1 / rLen;
+          velX = -radialY * invLen * tangential + radialX * invLen * outflow;
+          velY = radialX * invLen * tangential + radialY * invLen * outflow;
+        }
+        const dispClipX =
+          (velX * CLOUD_MEMORY_DT_H) / HALF_DOMAIN_HEIGHT_KM / Math.max(metricX, 1e-5);
+        const dispClipY = (velY * CLOUD_MEMORY_DT_H) / HALF_DOMAIN_HEIGHT_KM;
+        const backU = u - dispClipX * 0.5;
+        const backV = v + dispClipY * 0.5;
+        const prevDensity = sampleByteGrid(densityBytes, n, backU, backV);
+        const prevAge = sampleByteGrid(ageBytes, n, backU, backV);
+
+        // source: analytic convection envelope, patchy via the shared noise.
+        // GLSL: texture(u_cloudNoise, radial * 2.1 + u_seed * 13.0).r — the
+        // scalar seed offset is added to BOTH components.
+        const q = rLen / Math.max(radii.rMax, 0.001);
+        const envelope = development * Math.exp(-((q / 2.6) ** 2));
+        const cells = smoothstep(
+          0.35, 0.8,
+          noise.tap(radialX * 2.1 + cloudSeed * 13.0, radialY * 2.1 + cloudSeed * 13.0, 0),
+        );
+        const source = envelope * mix(0.35, 1.0, cells) * 0.55;
+
+        // sealed combine rules, then decay + quantized-zero age reset
+        let cellDensity = Math.min(1, prevDensity + source);
+        let cellAge = (prevAge * prevDensity) / Math.max(prevDensity + source, 1e-5);
+        cellDensity *= decay;
+        cellAge = cellDensity < 0.5 / 255
+          ? 0
+          : Math.min(1, cellAge + CLOUD_MEMORY_DT_H / CLOUD_MEMORY_WINDOW_H);
+        nextDensity[j * n + i] = toByte(cellDensity);
+        nextAge[j * n + i] = toByte(cellAge);
+      }
+    }
+    densityBytes = nextDensity;
+    ageBytes = nextAge;
+  }
+  return { densityBytes, ageBytes };
+}

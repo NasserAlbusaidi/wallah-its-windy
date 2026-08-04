@@ -30,6 +30,7 @@ One line per document. Classes:
 | [`hindcast-benchmark.md`](hindcast-benchmark.md) | **GENERATED** — `npm run calibrate:intensity` | Ten-storm historical hindcast benchmark report. |
 | [`model-card-hf6.md`](model-card-hf6.md) | — | Model card for the HF-6 reduced-order model: intended use, data, evaluation, limitations. Hand-written; `npm run hf6:gate` checks that it exists. |
 | [`adr/2026-07-28-hf4-node-runtime-migration.md`](adr/2026-07-28-hf4-node-runtime-migration.md) | — | Accepted decision pinning sealed reproduction to Node 24.18.0 and authorizing one adjacent-rounding HF-4 metric refresh after the original interpreter was retired. |
+| [`realism-benchmark.md`](realism-benchmark.md) | **GENERATED** — `npm run realism` | R2a realism harness report: field-space metrics over the simulated brightness-temperature proxy. Sim-side regression evidence only; no observed comparison until R2b. |
 | [`satellite-cloud-validation.md`](satellite-cloud-validation.md) | — | Qualitative cloud-morphology screen with an explicit claim boundary; not a forecast-skill score. |
 | [`structure-calibration.md`](structure-calibration.md) | **GENERATED** — `npm run calibrate:structure` | North Indian Ocean physical-structure calibration report. |
 
@@ -51,3 +52,4 @@ history once merged.
 | --- | --- | --- |
 | [`../bake/README.md`](../bake/README.md) | — | Offline Python bake pipeline: turns free public geodata into the `.bin` files the browser loads; nothing in it ships. |
 | [`../calibration/README.md`](../calibration/README.md) | — | Calibration directory: pinned IBTrACS subset and the scripts that run the reproducible validation, separate from the browser runtime. |
+| [`../calibration/realism/README.md`](../calibration/realism/README.md) | — | R2a realism harness: frozen scenario set, sealed reference, regression-only gate semantics, reseal flow, and the advisory-rollout boundary. |

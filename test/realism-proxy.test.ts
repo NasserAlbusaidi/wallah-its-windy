@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cloudNoiseBytes } from '../src/render/cloud-noise';
 import {
   RealismNoise,
+  computeDebrisState,
   glslFract,
   glslHash21,
   glslRotate2,
@@ -139,5 +140,38 @@ describe('frame fixtures are internally self-consistent', () => {
     expect(weak.structure.rmwKm).toBe(60);
     expect(weak.structure.outerSizeKm).toBe(180);
     expect(weak.structure.hollandB).toBe(1.2);
+  });
+});
+
+describe('computeDebrisState', () => {
+  it('k=0 is an all-zero field (no source boundaries before spawn)', () => {
+    const state = computeDebrisState(0, () => syntheticFrame(), new RealismNoise(), 0.4, 32);
+    expect(Math.max(...state.densityBytes)).toBe(0);
+    expect(Math.max(...state.ageBytes)).toBe(0);
+  });
+
+  it('an active storm deposits debris near its centre by k=6', () => {
+    const state = computeDebrisState(
+      6, (b) => syntheticFrame({ ageH: b }), new RealismNoise(), 0.4, 64,
+    );
+    // > 0.05 density in byte space
+    expect(Math.max(...state.densityBytes)).toBeGreaterThan(13);
+  });
+
+  it('is deterministic', () => {
+    const noise = new RealismNoise();
+    const a = computeDebrisState(4, (b) => syntheticFrame({ ageH: b }), noise, 0.4, 32);
+    const b = computeDebrisState(4, (b2) => syntheticFrame({ ageH: b2 }), noise, 0.4, 32);
+    expect(a.densityBytes).toEqual(b.densityBytes);
+    expect(a.ageBytes).toEqual(b.ageBytes);
+  });
+
+  it('age resets to zero wherever stored density is below the byte floor', () => {
+    const state = computeDebrisState(
+      3, (b) => syntheticFrame({ ageH: b }), new RealismNoise(), 0.4, 32,
+    );
+    for (let i = 0; i < state.densityBytes.length; i++) {
+      if (state.densityBytes[i] === 0) expect(state.ageBytes[i]).toBe(0);
+    }
   });
 });

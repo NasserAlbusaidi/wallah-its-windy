@@ -14,6 +14,10 @@ self-describing `.bin` assets the browser loads.
   deliberate, gated recalibration.
 - `npm run fidelity` regenerates the 30-storm benchmark report;
   `npm run fidelity:check` verifies without writing.
+- `npm run realism` regenerates the R2a realism benchmark report;
+  `npm run realism:check` verifies without writing (advisory — not yet a CI
+  gate). It is a sim-side regression check only: drift fails in both
+  directions, and R2 completes only with R2b's observed references.
 - `npm run profile:ensemble` — vitest bench of `calibration/ensemble.bench.ts`;
   run it when touching ensemble/worker hot paths so regressions are measured,
   not guessed.
@@ -118,7 +122,8 @@ self-describing `.bin` assets the browser loads.
 - `docs/fidelity-benchmark.md` (`npm run fidelity`),
   `docs/hindcast-benchmark.md` (`npm run calibrate:intensity`),
   `docs/structure-calibration.md` (`npm run calibrate:structure`),
-  `docs/hf6-scorecard.md` (`npm run hf6:gate`). Regenerate via the script; a
+  `docs/hf6-scorecard.md` (`npm run hf6:gate`),
+  `docs/realism-benchmark.md` (`npm run realism`). Regenerate via the script; a
   hand edit is reverted on the next run and makes the report lie about the code.
 
 ## Frozen scientific gates

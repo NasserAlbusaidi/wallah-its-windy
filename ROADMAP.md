@@ -498,10 +498,15 @@ These features should grow around verified science rather than compete with it.
   simulated IR/VIS/rain gap against paired observed sessions and
   literature anchors, each entry classified presentation / data /
   physics and dispositioned close-now or charter-only.
-- **R2 (contract, not started):** a field-space measurement harness under
-  `calibration/realism/` (`npm run realism` / `realism:check`) with
-  regression-only gate semantics — it proves a change did not get worse;
-  a human A/B verdict still decides whether it is better.
+- **R2a (sim-side harness landed):** the field-space measurement harness
+  under `calibration/realism/` (`npm run realism` / `realism:check`) with
+  regression-only gate semantics — it proves a change did not move the
+  simulated product; a human A/B verdict still decides whether a move is
+  better, and a reseal records it. Rollout is advisory — not yet a CI gate.
+- **R2b (not started):** R2 completes only with R2b — observed
+  derived-statistics references (EUMETSAT per D2) and the GPM IMERG
+  rain-truth comparison (D1). Until those land, every harness number is
+  sim-side only and nothing may claim R2 complete.
 - **R3 (not started):** closure waves, one gap-cluster per PR, each
   citing its register entries and updating the register disposition in
   the same PR.

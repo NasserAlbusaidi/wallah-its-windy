@@ -294,14 +294,38 @@ export function sampleCloudProxy(
       3.55 / CANOPY_COEFFICIENT_DIVISOR,
       development,
     ) * mix(1.0, 0.86, shearN);
-  const coreIrregularity = mix(
-    0.34,
-    0.12,
-    smoothstep(0.38, 0.82, u.organization),
+  const shearCrossDirX = -shearDirY;
+  const shearCrossDirY = shearDirX;
+  const canopyNormX = canopyRadialX / rCanopy;
+  const canopyNormY = canopyRadialY / rCanopy;
+  const canopyAlong = canopyNormX * shearDirX + canopyNormY * shearDirY;
+  const canopyCross =
+    canopyNormX * shearCrossDirX + canopyNormY * shearCrossDirY;
+  // Mirrors the shader's strict real-vector gate; the fallback axis must not
+  // create a physical-looking anisotropy at or below the direction threshold.
+  const anisotropyShearN = shearN * (shearLen <= 0.05 ? 0 : 1);
+  const downshearSide = smoothstep(-0.35, 0.55, canopyAlong);
+  const coreAlongScale = mix(
+    1.0 - 0.26 * anisotropyShearN,
+    1.0 + 1.25 * anisotropyShearN,
+    downshearSide,
   );
-  const irregularCoreRadius =
-    coreRadius * mix(1.0 - coreIrregularity, 1.0 + coreIrregularity, macro);
-  const centralOvercast = Math.exp(-((canopyQ / irregularCoreRadius) ** 2));
+  const coreCrossScale = 1.0 - 0.48 * anisotropyShearN;
+  const anisotropicCoreQ = Math.hypot(
+    canopyAlong / Math.max(0.45, coreAlongScale),
+    canopyCross / Math.max(0.55, coreCrossScale),
+  );
+  const coreEdgeTexture = macro * 0.68 + fine * 0.32;
+  const coreEdgeWarp =
+    (0.5 - coreEdgeTexture) *
+    mix(0.52, 0.24, smoothstep(0.38, 0.86, u.organization)) *
+    smoothstep(0.08, 0.55, anisotropicCoreQ);
+  const warpedCoreQ = Math.max(0, anisotropicCoreQ + coreEdgeWarp);
+  const coreEdge0 = coreRadius * 0.22;
+  const coreEdge1 = coreRadius * mix(1.65, 2.15, development);
+  const centralOvercast =
+    1.0 -
+    smoothstep(coreEdge0, coreEdge1, warpedCoreQ);
   const eyewall = Math.exp(
     -(((qCore - 1.0) / mix(0.46, 0.27, u.organization)) ** 2),
   );
@@ -370,8 +394,10 @@ export function sampleCloudProxy(
     precipBandSupport *
     PRECIPITATING_CLOUD_BAND_MAX;
   const precipTexture = mix(PRECIPITATING_CLOUD_TEXTURE_FLOOR, 1.0, macro);
-  const precipitatingCloud =
-    Math.max(precipEyewall * precipEyeSupport, precipBandArm) * precipTexture;
+  const precipEyeCloud = precipEyewall * precipEyeSupport * precipTexture;
+  const precipBandCloud = precipBandArm * precipTexture;
+  const precipitatingCloud = Math.max(precipEyeCloud, precipBandCloud);
+  const precipColdCloud = precipitatingCloud * convectiveCells;
   const bandCoherence =
     smoothstep(0.42, 0.78, u.organization) *
     smoothstep(0.12, 0.52, u.intensity);
@@ -392,8 +418,16 @@ export function sampleCloudProxy(
   const shearErosion = 1.0 - shearN * upshear * mix(0.28, 0.62, 1.0 - moisture);
   const eyewallMaturity =
     smoothstep(0.3, 0.68, u.intensity) * smoothstep(0.4, 0.72, u.organization);
+  const cellularColdTops = smoothstep(
+    0.36,
+    0.78,
+    fine * 0.7 + macro * 0.36,
+  );
   const coreCloud =
-    centralOvercast * mix(0.7, 1.0, development) * mix(0.88, 1.0, macro);
+    centralOvercast *
+    mix(0.66, 0.94, development) *
+    mix(0.72, 1.0, cellularColdTops) *
+    mix(0.88, 1.0, macro);
 
   // ---- CLOUD_CORE_GLSL.eyewall ----
   const mesoTheta = animGate * CLOUD_ROTATION_CAP_RAD_PER_H * u.cloudAgeH;
@@ -412,7 +446,7 @@ export function sampleCloudProxy(
     dslBoost *
     eyewallMaturity *
     mix(0.48, 1.0, rainEnergy) *
-    mix(0.68, 1.0, convectiveCells);
+    mix(0.28, 1.0, convectiveCells);
   // ---- end eyewall ----
 
   const rainbands =
@@ -435,15 +469,31 @@ export function sampleCloudProxy(
       2,
     ),
   );
+  const cirrusAlongScale = mix(
+    1.0 - 0.1 * anisotropyShearN,
+    1.0 + 1.1 * anisotropyShearN,
+    smoothstep(-0.55, 0.35, canopyAlong),
+  );
+  const cirrusCrossScale = 1.0 - 0.34 * anisotropyShearN;
+  const anisotropicCirrusQ = Math.hypot(
+    canopyAlong / Math.max(0.42, cirrusAlongScale),
+    canopyCross / Math.max(0.5, cirrusCrossScale),
+  );
+  const cirrusEdgeWarp =
+    ((cirrusTexture - 0.5) * 0.74 + (macro - 0.5) * 0.28) *
+    smoothstep(0.22, 1.4, anisotropicCirrusQ);
+  const warpedCirrusQ = Math.max(0, anisotropicCirrusQ - cirrusEdgeWarp);
+  const cirrusEnvelope = 1.0 - smoothstep(0.34, 2.65, warpedCirrusQ);
   const cirrus =
-    Math.exp(-((canopyQ / (5.8 / CANOPY_COEFFICIENT_DIVISOR)) ** 1.55)) *
-    cirrusTexture *
-    mix(0.16, 0.38, u.organization) *
+    cirrusEnvelope *
+    mix(0.18, 1.0, cirrusTexture) *
+    mix(0.2, 0.44, u.organization) *
     mix(0.82, 1.16, shearN);
 
   const eyeStrength =
-    smoothstep(0.18, 0.56, u.intensity * u.organization) *
-    smoothstep(0.62, 0.82, u.organization);
+    smoothstep(0.7, 0.9, u.intensity) *
+    smoothstep(0.74, 0.88, u.organization) *
+    (1.0 - smoothstep(12, 22, u.shearAtStorm));
   const eye = 1.0 - smoothstep(0.18, mix(0.46, 0.68, eyeStrength), qCore);
   let stormCloud = clamp01(
     (coreCloud + eyewallCloud + rainbands + cirrus + precipitatingCloud) *
@@ -467,6 +517,9 @@ export function sampleCloudProxy(
     CLOUD_TOP_CDO_MATURE_C,
     development,
   );
+  const localCdoTopC =
+    cdoTopC +
+    mix(6.0, 12.0, development) * (1.0 - cellularColdTops);
   const bandTopC = mix(
     CLOUD_TOP_BAND_DEVELOPING_C,
     CLOUD_TOP_BAND_MATURE_C,
@@ -499,11 +552,13 @@ export function sampleCloudProxy(
     smoothstep(0.3, 0.8, rainEnergy);
 
   const cirrusPresence = clamp01(cirrus * 2.6);
-  const bandPresence = clamp01(Math.max(rainbands, precipitatingCloud) * 1.6);
-  const corePresence = clamp01(coreCloud * 1.4);
+  const bandPresence = clamp01(Math.max(rainbands, precipColdCloud) * 1.45);
+  const corePresence = clamp01(coreCloud * 1.28);
+  const towerCell = smoothstep(0.58, 0.86, fine);
   const towerPresence =
-    clamp01(Math.max(eyewallCloud, precipitatingCloud) * 1.2) *
-    smoothstep(0.55, 0.8, convectiveCells);
+    clamp01(Math.max(eyewallCloud, precipColdCloud) * 1.1) *
+    towerCell *
+    towerCell;
 
   let topC = ambientTopC;
   const debrisTopC = mix(DEBRIS_TOP_WARM_C, DEBRIS_TOP_COLD_C, 1.0 - memAge);
@@ -511,8 +566,12 @@ export function sampleCloudProxy(
   topC = mix(topC, debrisTopC, debrisPresence);
   topC = mix(topC, cirrusTopC, cirrusPresence);
   topC = mix(topC, bandTopC, bandPresence);
-  topC = mix(topC, cdoTopC, corePresence);
-  topC = mix(topC, Math.min(topC, cdoTopC) - overshootC, towerPresence);
+  topC = mix(topC, localCdoTopC, corePresence);
+  topC = mix(
+    topC,
+    Math.min(topC, localCdoTopC) - overshootC,
+    towerPresence,
+  );
 
   let brightnessC = mix(surfaceC, ambientTopC, ambientCloud);
   brightnessC = mix(brightnessC, topC, stormCloud);
@@ -532,7 +591,7 @@ export function sampleCloudProxy(
     ambientCloud,
     brightnessC,
     rainbands,
-    precipBandCloud: precipBandArm * precipTexture,
+    precipBandCloud,
     debris,
   };
 }

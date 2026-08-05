@@ -68,12 +68,12 @@ No sampled frame in this seal produced an eye-contrast value: the shader draws n
 
 | Intensity bin (kt) | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| 20–35 | 15 | 73.2 | 712.8 |
-| 35–50 | 12 | 6948.7 | 8776.6 |
-| 50–64 | 6 | 21458.7 | 21101.1 |
-| 64–83 | 12 | 34803.7 | 37283.4 |
-| 83–100 | 2 | 57595.1 | 57595.1 |
-| 100–200 | 2 | 69119.0 | 69119.0 |
+| 20–35 | 15 | 0.0 | 45.3 |
+| 35–50 | 12 | 1792.0 | 2339.0 |
+| 50–64 | 6 | 9924.8 | 9052.4 |
+| 64–83 | 12 | 16584.7 | 17070.3 |
+| 83–100 | 2 | 38960.8 | 38960.8 |
+| 100–200 | 2 | 61801.6 | 61801.6 |
 
 **Climatology runs** (km²)
 
@@ -82,9 +82,9 @@ No sampled frame in this seal produced an eye-contrast value: the shader draws n
 | 20–35 | 20 | 0.0 | 0.0 |
 | 35–50 | 3 | 0.0 | 0.0 |
 | 50–64 | 0 | — | — |
-| 64–83 | 1 | 6262.8 | 6262.8 |
-| 83–100 | 1 | 9367.9 | 9367.9 |
-| 100–200 | 1 | 14949.0 | 14949.0 |
+| 64–83 | 1 | 0.0 | 0.0 |
+| 83–100 | 1 | 7355.0 | 7355.0 |
+| 100–200 | 1 | 10843.9 | 10843.9 |
 
 ## Environmental cloud fraction by month (RGR-001)
 
@@ -92,15 +92,15 @@ No sampled frame in this seal produced an eye-contrast value: the shader draws n
 
 | Month key | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| m05 | 27 | 0.0000 | 0.0258 |
-| m08 | 11 | 0.0213 | 0.0350 |
+| m05 | 27 | 0.0000 | 0.0166 |
+| m08 | 11 | 0.0028 | 0.0144 |
 | m09 | 11 | 0.0000 | 0.0021 |
 
 **Climatology runs**
 
 | Month key | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| m04 | 3 | 0.0000 | 0.0048 |
+| m04 | 3 | 0.0000 | 0.0022 |
 | m08 | 8 | 0.0000 | 0.0000 |
 | m09 | 8 | 0.0000 | 0.0000 |
 | m10 | 7 | 0.0000 | 0.0000 |
@@ -111,10 +111,10 @@ No sampled frame in this seal produced an eye-contrast value: the shader draws n
 
 | Bin (kt) | Stage | n | Median area km² | Mean area km² | n | Median offset km | Mean offset km |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 20–35 | post-peak | 15 | 73.2 | 712.8 | 5 | 172.56 | 155.16 |
+| 20–35 | post-peak | 15 | 0.0 | 45.3 | 1 | 40.77 | 40.77 |
 | 20–35 | pre-peak | 0 | — | — | 0 | — | — |
-| 35–50 | post-peak | 4 | 15052.3 | 14332.6 | 4 | 35.15 | 35.43 |
-| 35–50 | pre-peak | 8 | 3914.7 | 5998.6 | 7 | 36.53 | 59.87 |
+| 35–50 | post-peak | 4 | 3228.5 | 4785.4 | 4 | 30.35 | 27.10 |
+| 35–50 | pre-peak | 8 | 586.0 | 1115.9 | 4 | 36.80 | 37.83 |
 
 **Climatology runs**
 
@@ -134,27 +134,27 @@ run's maximum wind, and `ageH <= peakAgeH` is pre-peak.
 
 | Metric | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| Cold-top centroid offset (km) | 38 | 35.04 | 52.51 |
-| \|Centroid bearing rel. shear\| (deg) | 38 | 85.82 | 80.75 |
-| Band edge energy, inner ≤200 km (°C/km) | 49 | 0.6374 | 0.6371 |
-| Band edge energy, outer 200–600 km (°C/km) | 45 | 0.3621 | 0.4414 |
-| Band edge energy, downshear-left (°C/km) | 49 | 0.5395 | 0.5677 |
-| Band edge energy, downshear-right (°C/km) | 49 | 0.4567 | 0.4719 |
-| Band edge energy, upshear-left (°C/km) | 49 | 0.5088 | 0.5155 |
-| Band edge energy, upshear-right (°C/km) | 49 | 0.4608 | 0.5083 |
+| Cold-top centroid offset (km) | 31 | 27.86 | 27.86 |
+| \|Centroid bearing rel. shear\| (deg) | 31 | 37.96 | 41.30 |
+| Band edge energy, inner ≤200 km (°C/km) | 49 | 0.5366 | 0.5353 |
+| Band edge energy, outer 200–600 km (°C/km) | 45 | 0.3034 | 0.3645 |
+| Band edge energy, downshear-left (°C/km) | 49 | 0.4444 | 0.4697 |
+| Band edge energy, downshear-right (°C/km) | 49 | 0.3856 | 0.3955 |
+| Band edge energy, upshear-left (°C/km) | 49 | 0.3799 | 0.4199 |
+| Band edge energy, upshear-right (°C/km) | 49 | 0.3792 | 0.4262 |
 
 **Climatology runs**
 
 | Metric | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| Cold-top centroid offset (km) | 3 | 18.16 | 21.07 |
-| \|Centroid bearing rel. shear\| (deg) | 3 | 82.52 | 85.90 |
-| Band edge energy, inner ≤200 km (°C/km) | 26 | 0.2216 | 0.2519 |
-| Band edge energy, outer 200–600 km (°C/km) | 26 | 0.1926 | 0.2284 |
-| Band edge energy, downshear-left (°C/km) | 26 | 0.2124 | 0.2510 |
-| Band edge energy, downshear-right (°C/km) | 26 | 0.2306 | 0.2471 |
-| Band edge energy, upshear-left (°C/km) | 26 | 0.1910 | 0.2243 |
-| Band edge energy, upshear-right (°C/km) | 24 | 0.1640 | 0.2045 |
+| Cold-top centroid offset (km) | 2 | 31.44 | 31.44 |
+| \|Centroid bearing rel. shear\| (deg) | 2 | 105.58 | 105.58 |
+| Band edge energy, inner ≤200 km (°C/km) | 26 | 0.2410 | 0.2589 |
+| Band edge energy, outer 200–600 km (°C/km) | 26 | 0.1888 | 0.2165 |
+| Band edge energy, downshear-left (°C/km) | 26 | 0.2401 | 0.2559 |
+| Band edge energy, downshear-right (°C/km) | 26 | 0.2290 | 0.2477 |
+| Band edge energy, upshear-left (°C/km) | 26 | 0.1848 | 0.2123 |
+| Band edge energy, upshear-right (°C/km) | 24 | 0.1652 | 0.2036 |
 
 ## Per-scenario
 

@@ -186,7 +186,7 @@ export const CLOUD_CORE_GLSL = {
   float dsl = max(0.0, dot(canopyDir, vec2(-shearDir.y, shearDir.x)));
   float dslBoost = 1.0 + 0.22 * shearN * hasShearDir * dsl;
   float eyewallCloud = eyewall * meso * dslBoost * eyewallMaturity *
-    mix(0.48, 1.0, rainEnergy) * mix(0.68, 1.0, convectiveCells);
+    mix(0.48, 1.0, rainEnergy) * mix(0.28, 1.0, convectiveCells);
 `,
 } as const;
 
@@ -214,6 +214,10 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
   // Component-graded cloud tops: warmest first, coldest mixed last so a cold
   // tower is never averaged back toward a warmer underlying band.
   float cdoTopC = mix(${CLOUD_TOP_CDO_DEVELOPING_C.toFixed(1)}, ${CLOUD_TOP_CDO_MATURE_C.toFixed(1)}, development);
+  // The broad shield is not one isothermal slab. Embedded advected cells keep
+  // the physical CDO top while the intercell/stratiform canopy is warmer.
+  float localCdoTopC = cdoTopC + mix(6.0, 12.0, development) *
+    (1.0 - cellularColdTops);
   float bandTopC = mix(${CLOUD_TOP_BAND_DEVELOPING_C.toFixed(1)}, ${CLOUD_TOP_BAND_MATURE_C.toFixed(1)}, development);
   float cirrusTopC = mix(${CLOUD_TOP_CIRRUS_WARM_C.toFixed(1)}, ${CLOUD_TOP_CIRRUS_COLD_C.toFixed(1)}, u_organization);
 
@@ -237,10 +241,11 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
   // Presence ladder (tuning constants: how strongly each component claims the
   // column before opacity compositing).
   float cirrusPresence = clamp(cirrus * 2.6, 0.0, 1.0);
-  float bandPresence = clamp(max(rainbands, precipitatingCloud) * 1.6, 0.0, 1.0);
-  float corePresence = clamp(coreCloud * 1.4, 0.0, 1.0);
-  float towerPresence = clamp(max(eyewallCloud, precipitatingCloud) * 1.2, 0.0, 1.0) *
-    smoothstep(0.55, 0.80, convectiveCells);
+  float bandPresence = clamp(max(rainbands, precipColdCloud) * 1.45, 0.0, 1.0);
+  float corePresence = clamp(coreCloud * 1.28, 0.0, 1.0);
+  float towerCell = smoothstep(0.58, 0.86, fine);
+  float towerPresence = clamp(max(eyewallCloud, precipColdCloud) * 1.1, 0.0, 1.0) *
+    towerCell * towerCell;
 
   float topC = ambientTopC;
   float debrisTopC = mix(${DEBRIS_TOP_WARM_C.toFixed(1)}, ${DEBRIS_TOP_COLD_C.toFixed(1)},
@@ -249,8 +254,8 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
   topC = mix(topC, debrisTopC, debrisPresence);
   topC = mix(topC, cirrusTopC, cirrusPresence);
   topC = mix(topC, bandTopC, bandPresence);
-  topC = mix(topC, cdoTopC, corePresence);
-  topC = mix(topC, min(topC, cdoTopC) - overshootC, towerPresence);
+  topC = mix(topC, localCdoTopC, corePresence);
+  topC = mix(topC, min(topC, localCdoTopC) - overshootC, towerPresence);
 
   float brightnessC = mix(surfaceC, ambientTopC, ambientCloud);
   brightnessC = mix(brightnessC, topC, stormCloud);
@@ -277,13 +282,23 @@ export const CLOUD_RELIEF_GLSL = /* glsl */ `
     float hx = texture(u_cloudNoise, noiseP + vec2(e, 0.0)).r;
     float hy = texture(u_cloudNoise, noiseP + vec2(0.0, e)).r;
     vec2 noiseGrad = (vec2(hx, hy) - macro) * 6.0;
-    // Analytic CDO envelope slope, outward-negative (the dome falls off).
-    float envSlope = -2.0 * (canopyQ / (irregularCoreRadius * irregularCoreRadius)) *
-      centralOvercast;
-    vec2 radialDir = canopyQ > 0.001
-      ? canopyRadial / (canopyQ * rCanopy)
-      : vec2(0.0, 1.0);
-    vec2 grad = noiseGrad + radialDir * envSlope * 0.8;
+    // Analytic slope of 1-smoothstep(coreEdge0, coreEdge1, warpedCoreQ).
+    // The direction follows the anisotropic CDO metric; texture-warp and the
+    // downshear scale derivative are intentionally left to noiseGrad.
+    float coreEnvelopeT = clamp(
+      (warpedCoreQ - coreEdge0) / max(coreEdge1 - coreEdge0, 0.001),
+      0.0,
+      1.0
+    );
+    float envSlope = -6.0 * coreEnvelopeT * (1.0 - coreEnvelopeT) /
+      max(coreEdge1 - coreEdge0, 0.001);
+    vec2 anisotropicCoreGrad = anisotropicCoreQ > 0.001
+      ? shearDir * (canopyAlong /
+          (coreAlongScale * coreAlongScale * anisotropicCoreQ)) +
+        shearCrossDir * (canopyCross /
+          (coreCrossScale * coreCrossScale * anisotropicCoreQ))
+      : vec2(0.0);
+    vec2 grad = noiseGrad + anisotropicCoreGrad * envSlope * 0.45;
     // Standard height-field normal, lit by a fixed NW sun in east/north space.
     vec3 normal = normalize(vec3(-grad, 1.4));
     vec3 sunDir = normalize(vec3(-0.707, 0.707, 1.2));

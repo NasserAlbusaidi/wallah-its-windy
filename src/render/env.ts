@@ -250,16 +250,43 @@ ${CLOUD_CORE_GLSL.wobble}
     ${3.55 / CANOPY_COEFFICIENT_DIVISOR},
     development
   ) * mix(1.0, 0.86, shearN);
-  // Incipient and sheared systems form a lopsided, ragged CDO rather than a
-  // mathematically circular disc. Mature organization gradually suppresses
-  // that radial perturbation without removing the underlying cloud texture.
-  float coreIrregularity = mix(0.34, 0.12, smoothstep(0.38, 0.82, u_organization));
-  float irregularCoreRadius = coreRadius * mix(
-    1.0 - coreIrregularity,
-    1.0 + coreIrregularity,
-    macro
+  // Build the canopy in shear-relative coordinates. Downshear cloud spreads
+  // into a long anvil while the upshear and cross-shear sides stay compact.
+  // macro/fine are the existing advected texture samples, so the edge is
+  // deterministic and ragged without another sampler or lookup.
+  vec2 shearCrossDir = vec2(-shearDir.y, shearDir.x);
+  vec2 canopyNorm = canopyRadial / rCanopy;
+  float canopyAlong = dot(canopyNorm, shearDir);
+  float canopyCross = dot(canopyNorm, shearCrossDir);
+  // A fallback axis keeps legacy texture/displacement math finite, but only a
+  // real vector may create a physical-looking elongated outflow signature.
+  float anisotropyShearN = shearN * (length(u_shearVector) > 0.05 ? 1.0 : 0.0);
+  float downshearSide = smoothstep(-0.35, 0.55, canopyAlong);
+  float coreAlongScale = mix(
+    1.0 - 0.26 * anisotropyShearN,
+    1.0 + 1.25 * anisotropyShearN,
+    downshearSide
   );
-  float centralOvercast = exp(-pow(canopyQ / irregularCoreRadius, 2.0));
+  float coreCrossScale = 1.0 - 0.48 * anisotropyShearN;
+  float anisotropicCoreQ = length(vec2(
+    canopyAlong / max(0.45, coreAlongScale),
+    canopyCross / max(0.55, coreCrossScale)
+  ));
+  float coreEdgeTexture = macro * 0.68 + fine * 0.32;
+  float coreEdgeWarp = (0.5 - coreEdgeTexture) *
+    mix(0.52, 0.24, smoothstep(0.38, 0.86, u_organization)) *
+    smoothstep(0.08, 0.55, anisotropicCoreQ);
+  float warpedCoreQ = max(0.0, anisotropicCoreQ + coreEdgeWarp);
+  float coreEdge0 = coreRadius * 0.22;
+  // Cloud shields outgrow the wind-defined outer core as convection matures.
+  // Scaling the soft edge with development broadens the CDO without changing
+  // the shared physical radii or the rain-centred inner-core geometry.
+  float coreEdge1 = coreRadius * mix(1.65, 2.15, development);
+  float centralOvercast = 1.0 - smoothstep(
+    coreEdge0,
+    coreEdge1,
+    warpedCoreQ
+  );
   float eyewall = exp(-pow((qCore - 1.0) / mix(0.46, 0.27, u_organization), 2.0));
   float outerBandRadius = mix(6.35, 8.8, smoothstep(0.30, 0.84, development));
   float bandEnvelope = smoothstep(1.25, 1.85, bandQ) *
@@ -328,13 +355,17 @@ ${CLOUD_CORE_GLSL.wobble}
     ${PRECIPITATING_CLOUD_BAND_FULL_MM_H.toFixed(1)},
     u_rainbandRain
   );
-  float precipitatingCloud = max(
-    precipEyewall * precipEyeSupport,
-    precipBandEnvelope *
-      mix(${PRECIPITATING_CLOUD_SPIRAL_FLOOR}, 1.0, precipSpiralN) *
-      precipBandSupport *
-      ${PRECIPITATING_CLOUD_BAND_MAX}
-  ) * mix(${PRECIPITATING_CLOUD_TEXTURE_FLOOR}, 1.0, macro);
+  float precipTexture = mix(${PRECIPITATING_CLOUD_TEXTURE_FLOOR}, 1.0, macro);
+  float precipEyeCloud = precipEyewall * precipEyeSupport * precipTexture;
+  float precipBandCloud = precipBandEnvelope *
+    mix(${PRECIPITATING_CLOUD_SPIRAL_FLOOR}, 1.0, precipSpiralN) *
+    precipBandSupport *
+    ${PRECIPITATING_CLOUD_BAND_MAX} *
+    precipTexture;
+  // Raw support remains in stormCloud so radar-visible rain never sits under
+  // clear sky. Only embedded cells below may claim a cold cloud-top grade.
+  float precipitatingCloud = max(precipEyeCloud, precipBandCloud);
+  float precipColdCloud = precipitatingCloud * convectiveCells;
   float bandCoherence = smoothstep(0.42, 0.78, u_organization) *
     smoothstep(0.12, 0.52, u_intensity);
   float brokenBand = smoothstep(0.28, 0.72, macro * 0.62 + fine * 0.42) *
@@ -346,8 +377,18 @@ ${CLOUD_CORE_GLSL.wobble}
   float shearErosion = 1.0 - shearN * upshear * mix(0.28, 0.62, 1.0 - moisture);
   float eyewallMaturity = smoothstep(0.30, 0.68, u_intensity) *
     smoothstep(0.40, 0.72, u_organization);
+  // Broad canopy cover no longer means a uniformly saturated cold top. Only
+  // deterministic advected cells claim the deepest CDO temperatures; the
+  // lower floor preserves an overcast shield between convective bursts.
+  float cellularColdTops = smoothstep(
+    0.36,
+    0.78,
+    fine * 0.70 + macro * 0.36
+  );
   float coreCloud = centralOvercast *
-    mix(0.70, 1.0, development) * mix(0.88, 1.0, macro);
+    mix(0.66, 0.94, development) *
+    mix(0.72, 1.0, cellularColdTops) *
+    mix(0.88, 1.0, macro);
 ${CLOUD_CORE_GLSL.eyewall}
   float rainbands = bandEnvelope *
     bandShape *
@@ -368,14 +409,26 @@ ${CLOUD_CORE_GLSL.eyewall}
            dot(spiralBase, shearDir) * 0.011 - cirrusStream) + drift * 0.018
     ).b
   );
-  float cirrus = exp(-pow(
-    canopyQ / (${5.8 / CANOPY_COEFFICIENT_DIVISOR}),
-    1.55
-  )) * cirrusTexture *
-    mix(0.16, 0.38, u_organization) * mix(0.82, 1.16, shearN);
+  float cirrusAlongScale = mix(
+    1.0 - 0.10 * anisotropyShearN,
+    1.0 + 1.10 * anisotropyShearN,
+    smoothstep(-0.55, 0.35, canopyAlong)
+  );
+  float cirrusCrossScale = 1.0 - 0.34 * anisotropyShearN;
+  float anisotropicCirrusQ = length(vec2(
+    canopyAlong / max(0.42, cirrusAlongScale),
+    canopyCross / max(0.50, cirrusCrossScale)
+  ));
+  float cirrusEdgeWarp = ((cirrusTexture - 0.5) * 0.74 +
+    (macro - 0.5) * 0.28) * smoothstep(0.22, 1.40, anisotropicCirrusQ);
+  float warpedCirrusQ = max(0.0, anisotropicCirrusQ - cirrusEdgeWarp);
+  float cirrusEnvelope = 1.0 - smoothstep(0.34, 2.65, warpedCirrusQ);
+  float cirrus = cirrusEnvelope * mix(0.18, 1.0, cirrusTexture) *
+    mix(0.20, 0.44, u_organization) * mix(0.82, 1.16, shearN);
 
-  float eyeStrength = smoothstep(0.18, 0.56, u_intensity * u_organization) *
-    smoothstep(0.62, 0.82, u_organization);
+  float eyeStrength = smoothstep(0.70, 0.90, u_intensity) *
+    smoothstep(0.74, 0.88, u_organization) *
+    (1.0 - smoothstep(12.0, 22.0, u_shearAtStorm));
   float eye = 1.0 - smoothstep(0.18, mix(0.46, 0.68, eyeStrength), qCore);
   float stormCloud = clamp(
     (coreCloud + eyewallCloud + rainbands + cirrus + precipitatingCloud) *
@@ -426,10 +479,9 @@ void main() {
 
   if (u_mode == 1) {
     CloudField field = sampleCloud(land, sstC);
-    // Stretch roughly +20…-70 C into display luminance. This preserves dark
-    // land/sea while letting deep convective tops reach the white end of both
-    // operational grayscale and enhanced-IR palettes.
-    float enhanced = clamp((20.0 - field.brightnessC) / 90.0, 0.0, 1.0);
+    // Stretch roughly +20…-85 C into display luminance. The prior -70 C end
+    // stop flattened most CDO and overshooting-top structure into one colour.
+    float enhanced = clamp((20.0 - field.brightnessC) / 105.0, 0.0, 1.0);
     vec3 color;
     if (u_satellitePalette == 1) {
       color = vec3(pow(enhanced, 0.82));

@@ -101,13 +101,14 @@ describe('cloud-top component temperature constants', () => {
     expect(CLOUD_TOP_CIRRUS_COLD_C).toBe(-48);
   });
 
-  test('keeps the emitted CLOUD_TOPS_GLSL byte-identical (pre-refactor digest)', () => {
-    // sha256 of CLOUD_TOPS_GLSL captured on 2026-08-02 BEFORE this refactor
-    // (2259 chars). Any change to the emitted shader text fails here.
+  test('keeps the emitted CLOUD_TOPS_GLSL byte-identical (morphology R3 digest)', () => {
+    // sha256 of CLOUD_TOPS_GLSL captured on 2026-08-05 after the morphology R3
+    // thermal-topology pass (2544 chars). Any change to the emitted shader
+    // text fails here.
     const digest = createHash('sha256').update(CLOUD_TOPS_GLSL).digest('hex');
     expect(digest).toBe(
-      '4ed94b08cad4d72e429210af66827336905407075bda5a3107d640062eb11ff5',
+      '663c4fa96508a849afdc493a4cf2091623c799423c39cc371fb3717e500a0512',
     );
-    expect(CLOUD_TOPS_GLSL.length).toBe(2259);
+    expect(CLOUD_TOPS_GLSL.length).toBe(2544);
   });
 });

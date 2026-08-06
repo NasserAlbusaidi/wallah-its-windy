@@ -247,6 +247,16 @@ void main() {
   o = vec4(col, alpha);
 }`;
 
+/**
+ * Domain-fixed accumulator size. 1000×600 matches the domain's 5:3 metric
+ * shape (~2.1 km per cell — close to the 2 km terrain/travel-time bake). The
+ * accumulator is quasi-physical flood state: registering it to the DOMAIN
+ * instead of the screen means camera moves cannot smear it, window resizes
+ * cannot wipe it, and D8 routing speed stops depending on canvas size.
+ */
+const ACCUM_W = 1000;
+const ACCUM_H = 600;
+
 export class RainLayer {
   private gl!: WebGL2RenderingContext;
   private caps!: GlCaps;
@@ -256,8 +266,6 @@ export class RainLayer {
   private compVao: WebGLVertexArrayObject | null = null;
   private targets: [RenderTarget | null, RenderTarget | null] = [null, null];
   private cur = 0;
-  private rtW = 1;
-  private rtH = 1;
 
   init(gl: WebGL2RenderingContext, caps: GlCaps): void {
     this.gl = gl;
@@ -266,27 +274,25 @@ export class RainLayer {
     this.updVao = makeQuadVao(gl, this.updProg);
     this.compProg = makeProgram(gl, QUAD_VS, COMPOSITE_FS);
     this.compVao = makeQuadVao(gl, this.compProg);
-  }
-
-  resize(w: number, h: number): void {
-    const gl = this.gl;
-    this.rtW = Math.max(1, Math.floor(w / 2));
-    this.rtH = Math.max(1, Math.floor(h / 2));
     disposeRenderTarget(gl, this.targets[0]);
     disposeRenderTarget(gl, this.targets[1]);
-    this.targets[0] = makeRenderTarget(gl, this.rtW, this.rtH, this.caps);
-    this.targets[1] = makeRenderTarget(gl, this.rtW, this.rtH, this.caps);
+    this.targets[0] = makeRenderTarget(gl, ACCUM_W, ACCUM_H, this.caps);
+    this.targets[1] = makeRenderTarget(gl, ACCUM_W, ACCUM_H, this.caps);
     this.cur = 0;
-    // Clear both accumulators.
     for (const t of this.targets) {
       if (!t) continue;
       gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
-      gl.viewport(0, 0, this.rtW, this.rtH);
+      gl.viewport(0, 0, ACCUM_W, ACCUM_H);
       gl.clearColor(0, 0, 0, 1);
       gl.disable(gl.BLEND);
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  resize(_w: number, _h: number): void {
+    // Accumulator state is domain-fixed — a window resize must not wipe the
+    // flood ledger. The composite pass is a fullscreen quad; nothing cached.
   }
 
   /** Advance the accumulator one frame (offscreen). Restores the screen FBO. */
@@ -302,7 +308,7 @@ export class RainLayer {
     if (!this.updProg || !src || !dst || !gpu.elev || !gpu.land || !gpu.terrainGrid) return;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
-    gl.viewport(0, 0, this.rtW, this.rtH);
+    gl.viewport(0, 0, ACCUM_W, ACCUM_H);
     gl.disable(gl.BLEND);
     gl.useProgram(this.updProg);
     gl.bindVertexArray(this.updVao);
@@ -318,7 +324,7 @@ export class RainLayer {
     gl.uniform1f(u('u_hasBasin'), gpu.hasBasin ? 1 : 0);
     gl.uniform1f(u('u_hasRouting'), gpu.hasFlowRouting ? 1 : 0);
     gl.uniform2f(u('u_elevTexel'), 1 / gpu.terrainGrid.nx, 1 / gpu.terrainGrid.ny);
-    gl.uniform2f(u('u_rtexel'), 1 / this.rtW, 1 / this.rtH);
+    gl.uniform2f(u('u_rtexel'), 1 / ACCUM_W, 1 / ACCUM_H);
     gl.uniform1f(u('u_decayPerH'), RAIN_DECAY_PER_H);
     gl.uniform1f(u('u_gain'), RAIN_GAIN);
     gl.uniform1f(u('u_fallbackTransportPerH'), FALLBACK_TRANSPORT_PER_H);

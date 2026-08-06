@@ -20,7 +20,7 @@ import {
   maxWindRadiusKm,
   windRadiusFromQuadrantsKm,
 } from '../structure';
-import type { WindRadiiKm } from '../types';
+import type { ViewTransform, WindRadiiKm } from '../types';
 import type { DrawCtx } from './context';
 
 const t = TOKENS.track.rgba01;
@@ -50,6 +50,7 @@ export class TrackLayer {
   private ov: CanvasRenderingContext2D | null = null;
   private w = 1;
   private h = 1;
+  private view: ViewTransform | null = null;
 
   init(overlay: CanvasRenderingContext2D): void {
     this.ov = overlay;
@@ -60,8 +61,12 @@ export class TrackLayer {
     this.h = height;
   }
 
+  /** World clip -> device px through the frame's view (set at draw start). */
   private px(clipX: number, clipY: number): [number, number] {
-    return [(clipX * 0.5 + 0.5) * this.w, (0.5 - clipY * 0.5) * this.h];
+    const v = this.view;
+    const nx = v ? clipX * v.scaleX + v.offsetX : clipX;
+    const ny = v ? clipY * v.scaleY + v.offsetY : clipY;
+    return [(nx * 0.5 + 0.5) * this.w, (0.5 - ny * 0.5) * this.h];
   }
 
   private drawWindRing(
@@ -105,6 +110,7 @@ export class TrackLayer {
   draw(ctx: DrawCtx): void {
     const g = this.ov;
     if (!g) return;
+    this.view = ctx.view;
     const fade = ctx.aftermath;
     if (fade <= 0.001) return;
     // Unit for resolution-independent weights (relative to canvas height).

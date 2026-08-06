@@ -2,17 +2,15 @@
 
 import type { SatelliteChannel } from '../satellite-observations';
 import type { SatellitePaletteId } from '../weather-layers';
+import type { ViewTransform } from '../types';
 import { TOKENS } from '../tokens';
-import { makeProgram, makeQuadVao } from './gl-utils';
+import { VIEW_QUAD_VS, makeProgram, makeQuadVao, setViewUniform } from './gl-utils';
 import type { RenderModule } from './context';
 
-const VS = /* glsl */ `#version 300 es
-in vec2 a_pos;
-out vec2 v_uv;
-void main() {
-  v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
-  gl_Position = vec4(a_pos, 0.0, 1.0);
-}`;
+// The observed frame is a DOMAIN-cropped texture (frame bbox == DOMAIN by
+// the provider request contract); the view-aware quad VS keeps it pinned to
+// the geography, not the screen.
+const VS = VIEW_QUAD_VS;
 
 const FS = /* glsl */ `#version 300 es
 precision highp float;
@@ -111,7 +109,7 @@ export class ObservedSatelliteLayer implements RenderModule {
     this.ready = true;
   }
 
-  draw(opacity: number): void {
+  draw(opacity: number, view: ViewTransform): void {
     const gl = this.gl;
     if (!this.ready || !this.texture || !this.prog || !this.vao || opacity <= 0.001) return;
     gl.enable(gl.BLEND);
@@ -121,6 +119,7 @@ export class ObservedSatelliteLayer implements RenderModule {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     const u = (name: string) => gl.getUniformLocation(this.prog!, name);
+    setViewUniform(gl, u('u_view'), view);
     gl.uniform1i(u('u_frame'), 0);
     gl.uniform1i(u('u_palette'), PALETTE_MODE[this.palette]);
     gl.uniform1i(u('u_channel'), this.channel === 'infrared' ? 0 : 1);

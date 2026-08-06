@@ -16,6 +16,7 @@ import type {
   GridSpec,
   StormStructure,
   TrackPoint,
+  ViewTransform,
 } from '../types';
 import type { WeatherLayerId } from '../weather-layers';
 
@@ -82,6 +83,12 @@ export interface DrawCtx {
   height: number;
   /** width / height, for the aspect-correct (round-on-screen) particle vortex. */
   aspect: number;
+  /**
+   * Shared world->ndc view (src/camera.ts). On-screen passes apply it (VS
+   * forward for VBO passes, VS inverse for fullscreen quads); offscreen
+   * domain-space passes bind IDENTITY_VIEW instead — never this.
+   */
+  view: ViewTransform;
   nowMs: number;
   /** Real seconds since the previous draw, clamped — drives particle advection. */
   dtSec: number;

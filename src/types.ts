@@ -37,7 +37,13 @@ export interface CellCoord {
   row: number;
 }
 
-/** WebGL clip-space coordinate, each axis in [-1, 1], y-up. */
+/**
+ * WORLD-space coordinate: domain-normalized clip, each axis in [-1, 1], y-up
+ * (domain edges at ±1 — the exact output of grid.ts latLonToClip). The view
+ * transform in src/camera.ts maps world -> on-screen NDC; everything below
+ * the screen boundary (shader fragment math, recorded output, calibration)
+ * stays in world space.
+ */
 export interface ClipCoord {
   x: number;
   y: number;
@@ -47,6 +53,28 @@ export interface ClipCoord {
 export interface LatLon {
   lat: number;
   lon: number;
+}
+
+// ---------------------------------------------------------------------------
+// View / camera (src/camera.ts owns the math; presentation-only state)
+// ---------------------------------------------------------------------------
+
+/** Presentation-only camera state (main.ts owns the live instance). */
+export interface ViewState {
+  /** View centre in world coordinates (domain clip), each in [-1,1]. */
+  center: { x: number; y: number };
+  /** 1 = cover-fit minimum; clamped to [cover-fit, MAX_ZOOM]. */
+  zoom: number;
+}
+
+/** Derived per-frame affine view: ndc = world * scale + offset. */
+export interface ViewTransform {
+  scaleX: number;
+  scaleY: number;
+  offsetX: number;
+  offsetY: number;
+  /** Visible geographic bbox. Always inside DOMAIN (clamped). */
+  bbox: BBox;
 }
 
 // ---------------------------------------------------------------------------
@@ -472,6 +500,11 @@ export interface FrameState {
   envTFrac: number;
   /** Storm-total rain grid for the accumulated-rainfall layer, or null. */
   rainAccum: RainAccumView | null;
+  /**
+   * The shared world->ndc view transform for this frame (src/camera.ts).
+   * Presentation-only: recorded output and sim state never read it.
+   */
+  view: ViewTransform;
 }
 
 /**

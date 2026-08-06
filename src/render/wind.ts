@@ -29,6 +29,7 @@ import {
   makeQuadVao,
   makeRenderTarget,
   disposeRenderTarget,
+  setViewUniform,
 } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
 import type { DrawCtx, RenderModule } from './context';
@@ -55,16 +56,19 @@ const METRIC_X =
     Math.cos((((DOMAIN.latMin + DOMAIN.latMax) / 2) * Math.PI) / 180)) /
   (DOMAIN.latMax - DOMAIN.latMin);
 
+// a_pos is WORLD clip; u_view projects it to the screen-registered trail
+// target (camera moves clear the trail history rather than re-projecting it).
 const LINE_VS = /* glsl */ `#version 300 es
 in vec2 a_pos;
 in float a_speed;
 in float a_alpha;
+uniform vec4 u_view;
 out float v_speed;
 out float v_alpha;
 void main() {
   v_speed = a_speed;
   v_alpha = a_alpha;
-  gl_Position = vec4(a_pos, 0.0, 1.0);
+  gl_Position = vec4(a_pos * u_view.xy + u_view.zw, 0.0, 1.0);
 }`;
 
 const LINE_FS = /* glsl */ `#version 300 es
@@ -355,6 +359,7 @@ export class WindLayer implements RenderModule {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuf);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, verts);
     const u = (n: string) => gl.getUniformLocation(this.lineProg!, n);
+    setViewUniform(gl, u('u_view'), ctx.view);
     gl.uniform3fv(u('u_w0'), TOKENS.wind0.rgba01.subarray(0, 3));
     gl.uniform3fv(u('u_w1'), TOKENS.wind1.rgba01.subarray(0, 3));
     gl.uniform3fv(u('u_w2'), TOKENS.wind2.rgba01.subarray(0, 3));

@@ -23,7 +23,7 @@ import { TOKENS } from '../tokens';
 import { makeRng } from '../rng';
 import { maxWindRadiusKm } from '../structure';
 import { INFLOW_RAD, vortexWind } from './vortex';
-import { makeProgram } from './gl-utils';
+import { makeProgram, setViewUniform } from './gl-utils';
 import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 import type { Rng } from '../rng';
 import type { DrawCtx, RenderModule } from './context';
@@ -100,14 +100,17 @@ function geometry(ctx: DrawCtx): ParticleGeometry {
   };
 }
 
+// a_pos is WORLD clip; u_view projects to the screen. u_size stays device-px
+// (screen-constant glyphs — deliberate, readable at every zoom).
 const VS = /* glsl */ `#version 300 es
 in vec2 a_pos;
 in float a_a;
 uniform float u_size;
+uniform vec4 u_view;
 out float v_a;
 void main() {
   v_a = a_a;
-  gl_Position = vec4(a_pos, 0.0, 1.0);
+  gl_Position = vec4(a_pos * u_view.xy + u_view.zw, 0.0, 1.0);
   gl_PointSize = u_size;
 }`;
 
@@ -136,6 +139,7 @@ export class ParticleLayer implements RenderModule {
   private uSize: WebGLUniformLocation | null = null;
   private uCore: WebGLUniformLocation | null = null;
   private uAlpha: WebGLUniformLocation | null = null;
+  private uView: WebGLUniformLocation | null = null;
   private height = 1;
 
   setBudget(count: number): void {
@@ -173,6 +177,7 @@ export class ParticleLayer implements RenderModule {
     this.uSize = gl.getUniformLocation(this.prog, 'u_size');
     this.uCore = gl.getUniformLocation(this.prog, 'u_core');
     this.uAlpha = gl.getUniformLocation(this.prog, 'u_alpha');
+    this.uView = gl.getUniformLocation(this.prog, 'u_view');
   }
 
   resize(_w: number, h: number): void {
@@ -220,7 +225,11 @@ export class ParticleLayer implements RenderModule {
       this.seeded = false; // storm gone; re-seed on next spawn
       return;
     }
-    const aspect = ctx.aspect;
+    // On-screen anisotropy of world units (px-per-world-x over px-per-world-y);
+    // equals the old canvas aspect at the home view and metricX(centre lat) in
+    // general, so the spiral stays round on the ground at every zoom.
+    const aspect =
+      (ctx.width * ctx.view.scaleX) / (ctx.height * ctx.view.scaleY);
     const intensity = ctx.intensity01;
     const geometryValue = geometry(ctx);
     if (!this.seeded) this.seedAll(c.x, c.y, aspect, geometryValue);
@@ -294,6 +303,7 @@ export class ParticleLayer implements RenderModule {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // additive
     gl.useProgram(this.prog);
+    setViewUniform(gl, this.uView, ctx.view);
     gl.uniform1f(this.uSize, this.height * 0.011 * (0.8 + 0.5 * intensity));
     gl.uniform4fv(this.uCore, TOKENS.stormCore.rgba01);
     // Soft per-point alpha; demo storm and aftermath both render dimmer.

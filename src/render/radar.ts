@@ -15,17 +15,11 @@ import {
 import { TOKENS } from '../tokens';
 import type { DrawCtx, RenderModule } from './context';
 import { cloudMetricX } from './cloud-motion';
-import { makeProgram, makeQuadVao } from './gl-utils';
+import { VIEW_QUAD_VS, makeProgram, makeQuadVao, setViewUniform } from './gl-utils';
 import { rainCenterClip } from './precipitating-cloud';
 import { HALF_DOMAIN_HEIGHT_KM, RENDER_RADIUS_FLOOR } from './storm-radii';
 
-const VS = /* glsl */ `#version 300 es
-in vec2 a_pos;
-out vec2 v_uv;
-void main() {
-  v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
-  gl_Position = vec4(a_pos, 0.0, 1.0);
-}`;
+const VS = VIEW_QUAD_VS;
 
 const FS = /* glsl */ `#version 300 es
 precision highp float;
@@ -117,6 +111,7 @@ export class RadarLayer implements RenderModule {
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
     const u = (name: string) => gl.getUniformLocation(this.program!, name);
+    setViewUniform(gl, u('u_view'), ctx.view);
     const rainCenter = rainCenterClip(ctx.centerClip, ctx.structure);
     gl.uniform2f(
       u('u_center'),

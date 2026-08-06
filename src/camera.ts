@@ -15,26 +15,10 @@
  * occur by construction.
  */
 
-import type { BBox } from './types';
+import type { ViewState, ViewTransform } from './types';
 import { DOMAIN, clipToLatLon, latLonToClip } from './grid';
 
-/** Presentation-only camera state (main.ts owns the live instance). */
-export interface ViewState {
-  /** View centre in world coordinates (domain clip), each in [-1,1]. */
-  center: { x: number; y: number };
-  /** 1 = cover-fit minimum; clamped to [cover-fit, MAX_ZOOM]. */
-  zoom: number;
-}
-
-/** Derived per-frame transform: ndc = world * scale + offset. */
-export interface ViewTransform {
-  scaleX: number;
-  scaleY: number;
-  offsetX: number;
-  offsetY: number;
-  /** Visible geographic bbox. Always inside DOMAIN (clamped). */
-  bbox: BBox;
-}
+export type { ViewState, ViewTransform } from './types';
 
 /** Full-domain default view (cover-fit for whatever canvas aspect rules). */
 export const HOME_VIEW: ViewState = { center: { x: 0, y: 0 }, zoom: 1 };

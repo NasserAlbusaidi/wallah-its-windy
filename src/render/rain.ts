@@ -47,11 +47,14 @@ import {
 } from '../rainband-profile';
 import type { DrawCtx, GpuTextures } from './context';
 import {
+  IDENTITY_VIEW,
+  VIEW_QUAD_VS,
   bindTex,
   disposeRenderTarget,
   makeProgram,
   makeQuadVao,
   makeRenderTarget,
+  setViewUniform,
 } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
 import { rainCenterClip } from './precipitating-cloud';
@@ -71,13 +74,7 @@ const WADI_LO = 0.41;
 const WADI_HI = 0.84;
 const RAIN_TO_GLOW = 2.5; // maps small accumulated rain to flood brightness
 
-const QUAD_VS = /* glsl */ `#version 300 es
-in vec2 a_pos;
-out vec2 v_uv;
-void main() {
-  v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
-  gl_Position = vec4(a_pos, 0.0, 1.0);
-}`;
+const QUAD_VS = VIEW_QUAD_VS;
 
 const UPDATE_FS = /* glsl */ `#version 300 es
 precision highp float;
@@ -310,6 +307,8 @@ export class RainLayer {
     gl.useProgram(this.updProg);
     gl.bindVertexArray(this.updVao);
     const u = (n: string) => gl.getUniformLocation(this.updProg!, n);
+    // Offscreen domain-space accumulator: its target IS the domain.
+    setViewUniform(gl, u('u_view'), IDENTITY_VIEW);
     bindTex(gl, 0, src.tex, u('u_src'));
     bindTex(gl, 1, gpu.elev, u('u_elev'));
     bindTex(gl, 2, gpu.land, u('u_land'));
@@ -398,6 +397,7 @@ export class RainLayer {
     gl.useProgram(this.compProg);
     gl.bindVertexArray(this.compVao);
     const u = (n: string) => gl.getUniformLocation(this.compProg!, n);
+    setViewUniform(gl, u('u_view'), ctx.view);
     bindTex(gl, 0, accum.tex, u('u_accum'));
     bindTex(gl, 1, gpu.acc, u('u_acc'));
     bindTex(gl, 2, gpu.land, u('u_land'));
@@ -408,7 +408,6 @@ export class RainLayer {
     gl.uniform1f(u('u_fade'), fade);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
-    void ctx;
   }
 
   dispose(): void {

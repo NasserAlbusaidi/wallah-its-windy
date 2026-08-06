@@ -79,6 +79,8 @@ dd,
 /* The chart frame: an aspect-correct, centered map (JS computes the rect in
    resize()). It now uses nearly the full limiting viewport dimension while
    preserving the Arabian Sea's metric aspect. */
+/* Edge-to-edge map (UX v2 phase 2): the camera owns aspect, the frame fills
+   the window — no border/radius/shadow chrome around a full-bleed canvas. */
 #map-frame {
   position: absolute;
   top: 0;
@@ -86,12 +88,6 @@ dd,
   width: 100%;
   height: 100%;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--ridge-hi, #2c343c) 85%, transparent);
-  border-radius: calc(var(--radius, 4px) + 2px);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.6),
-    0 18px 60px rgba(0, 0, 0, 0.55),
-    0 0 90px color-mix(in srgb, var(--track, #78dcff) 6%, transparent);
 }
 
 /* Survey marks make the map read as an instrument surface, not a wallpaper. */

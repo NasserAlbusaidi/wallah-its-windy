@@ -16,11 +16,14 @@ import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOU
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import {
+  IDENTITY_VIEW,
+  VIEW_QUAD_VS,
   disposeRenderTarget,
   makeProgram,
   makeQuadVao,
   makeRenderTarget,
   probeCaps,
+  setViewUniform,
 } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
 import { PRECIPITATING_CLOUD_BAND_MAX, PRECIPITATING_CLOUD_BAND_FULL_MM_H, PRECIPITATING_CLOUD_EYE_FULL_MM_H, PRECIPITATING_CLOUD_RAIN_START_MM_H, PRECIPITATING_CLOUD_SPIRAL_FLOOR, PRECIPITATING_CLOUD_TEXTURE_FLOOR, rainCenterClip } from './precipitating-cloud';
@@ -31,13 +34,7 @@ import {
 } from './storm-radii';
 import { SST_MAX_C, SST_MIN_C } from './textures';
 
-const VS = /* glsl */ `#version 300 es
-in vec2 a_pos;
-out vec2 v_uv;
-void main() {
-  v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
-  gl_Position = vec4(a_pos, 0.0, 1.0);
-}`;
+const VS = VIEW_QUAD_VS;
 
 const OHC_BLEND_FS = /* glsl */ `#version 300 es
 precision highp float;
@@ -765,6 +762,8 @@ export class EnvLayer implements RenderModule {
       gl.bindVertexArray(this.vao);
       const blendU = (name: string) =>
         gl.getUniformLocation(this.ohcBlendProg!, name);
+      // Offscreen domain-space blit: the target IS the domain, never a screen.
+      setViewUniform(gl, blendU('u_view'), IDENTITY_VIEW);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, gpu.ohc);
       gl.uniform1i(blendU('u_a'), 0);
@@ -782,6 +781,7 @@ export class EnvLayer implements RenderModule {
     gl.useProgram(this.prog);
     gl.bindVertexArray(this.vao);
     const u = (name: string) => gl.getUniformLocation(this.prog!, name);
+    setViewUniform(gl, u('u_view'), ctx.view);
     const bind = (unit: number, texture: WebGLTexture, name: string): void => {
       gl.activeTexture(gl.TEXTURE0 + unit);
       gl.bindTexture(gl.TEXTURE_2D, texture);

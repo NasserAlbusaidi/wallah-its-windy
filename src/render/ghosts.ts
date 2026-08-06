@@ -21,6 +21,7 @@
 import { TOKENS } from '../tokens';
 import { latLonToClip } from '../grid';
 import type { GhostPolyline } from '../tracks';
+import type { ViewTransform } from '../types';
 
 const g = TOKENS.ghostTrack.rgba01;
 const GR = Math.round(g[0] * 255);
@@ -59,8 +60,14 @@ export class GhostLayer {
     this.activeId = id;
   }
 
+  private view: ViewTransform | null = null;
+
+  /** World clip -> device px through the frame's view (set at draw start). */
   private px(clipX: number, clipY: number): [number, number] {
-    return [(clipX * 0.5 + 0.5) * this.w, (0.5 - clipY * 0.5) * this.h];
+    const v = this.view;
+    const nx = v ? clipX * v.scaleX + v.offsetX : clipX;
+    const ny = v ? clipY * v.scaleY + v.offsetY : clipY;
+    return [(nx * 0.5 + 0.5) * this.w, (0.5 - ny * 0.5) * this.h];
   }
 
   /**
@@ -69,8 +76,9 @@ export class GhostLayer {
    * anyway; the canvas clips them (C1). Re-strokes each frame (the overlay is
    * cleared every frame by both main and the facade — no retained 2D state).
    */
-  draw(): void {
+  draw(view: ViewTransform): void {
     const ctx = this.ov;
+    this.view = view;
     if (!ctx || this.tracks.length === 0) return;
     const unit = this.h; // resolution-independent weight base (mirrors TrackLayer)
 

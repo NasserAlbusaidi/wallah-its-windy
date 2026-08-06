@@ -913,7 +913,12 @@ let hindcastScoreCache: HindcastScore | null = null;
 let hindcastScoreFrameCount = -1;
 /** vKt at the recorded landfall frame, resolved once per landfall. */
 let landfallKtCache: { frameIndex: number; vKt: number } | null = null;
-const pendingMapCaptures: Array<(canvas: HTMLCanvasElement) => void> = [];
+/** A frame snapshot plus the camera view it was composited with. */
+interface MapCapture {
+  canvas: HTMLCanvasElement;
+  view: ViewTransform;
+}
+const pendingMapCaptures: Array<(capture: MapCapture) => void> = [];
 let analogCache: {
   frameBucket: number;
   complete: boolean;
@@ -935,7 +940,7 @@ function headOf(s: StormState): Head {
  * produce a black export. This captures once, in-frame, without imposing the
  * permanent cost of `preserveDrawingBuffer: true`.
  */
-function captureMapFrame(): Promise<HTMLCanvasElement> {
+function captureMapFrame(): Promise<MapCapture> {
   return new Promise((resolve) => pendingMapCaptures.push(resolve));
 }
 
@@ -944,13 +949,15 @@ function flushMapCaptures(): void {
   const snapshot = document.createElement('canvas');
   snapshot.width = glCanvas.width;
   snapshot.height = glCanvas.height;
+  // Exports annotate what the camera showed: the view rides with the pixels.
+  const capture: MapCapture = { canvas: snapshot, view: currentViewTransform() };
   const ctx = snapshot.getContext('2d');
   if (!ctx) {
-    pendingMapCaptures.splice(0).forEach((resolve) => resolve(snapshot));
+    pendingMapCaptures.splice(0).forEach((resolve) => resolve(capture));
     return;
   }
   ctx.drawImage(glCanvas, 0, 0);
-  pendingMapCaptures.splice(0).forEach((resolve) => resolve(snapshot));
+  pendingMapCaptures.splice(0).forEach((resolve) => resolve(capture));
 }
 
 function labelForRun(params: SpawnParams): string {
@@ -2751,11 +2758,12 @@ exportCard.addEventListener('click', () => {
   if (!run) return;
   ui.setExportStatus('drawing debrief card…', true);
   void captureMapFrame()
-    .then((mapCanvas) =>
+    .then((capture) =>
       makeDebriefCard({
         run,
         comparison: session.comparison(),
-        mapCanvas,
+        mapCanvas: capture.canvas,
+        view: capture.view,
       }),
     )
     .then((blob) => {
@@ -2773,11 +2781,12 @@ exportReplay.addEventListener('click', () => {
   if (!run) return;
   ui.setExportStatus('recording 10 s replay…', true);
   void captureMapFrame()
-    .then((mapCanvas) =>
+    .then((capture) =>
       makeReplayVideo({
         run,
         comparison: session.comparison(),
-        mapCanvas,
+        mapCanvas: capture.canvas,
+        view: capture.view,
       }),
     )
     .then((blob) => {

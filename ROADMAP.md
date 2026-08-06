@@ -49,7 +49,7 @@ persistence on validation.
 | HF-5 | Infrastructure complete | Provider-neutral boundary and immutable archive pass; scheduled live feed disabled |
 | HF-6 | Implementation complete; sealed result rejected | 72 storms/144 starts audited; 8 storms/16 starts scored once; prospective evidence still open |
 | Product depth | Complete | Probe, cities, names, analog, and sparkline |
-| UX big bet | Selected, not started | Shared-camera pan and zoom |
+| UX big bet | Complete (2026-08-07) | Shared-camera pan and zoom shipped: `src/camera.ts` + `src/camera-gestures.ts`, cover-fit edge-to-edge map |
 
 ## Current product and engineering state — 2026-07-27
 
@@ -582,15 +582,20 @@ incident record.
    as recorded fact, never an ETA) replaced the debrief-buried impact report and
    the conditional live line. Umbrella design:
    `docs/superpowers/specs/2026-08-06-impact-board-ux-v2-design.md`.
+7. **Complete (2026-08-07): shared camera — UX v2 phase 2.** Pan/zoom per the
+   contract above: cover-fit edge-to-edge canvas, every geo↔screen conversion
+   through one affine world→NDC view, wheel/drag/pinch/keyboard controls
+   clamped inside the baked domain, physics and recorded output untouched
+   (grid.ts clip space stays domain-fixed WORLD space; offscreen state passes
+   bind the identity view). One deviation from the contract text: the view
+   math lives in the sibling `src/camera.ts` rather than inside `grid.ts` —
+   one concern per file; grid.ts remains the data-space owner. The rain
+   accumulator moved to a domain-fixed 1000×600 grid in the same PR (it was
+   screen-registered state that any camera move would have corrupted).
 
 ### Next
 
-7. **Product lane — pan/zoom:** build the shared camera per the contract above
-   without changing simulation state. Still the selected UX big bet; not
-   started as of 2026-07-27 (`src/grid.ts` has no view/camera state). This is
-   phase 2 of the UX-v2 sequence
-   (`docs/superpowers/specs/2026-08-06-impact-board-ux-v2-design.md`); phases
-   3–4 (regional rain ledger, ensemble on-map) follow it.
+
 8. **Evidence lane — prospective archiving:** archive future HF-5 runs before
    observations exist; evaluate only after at least 12 forecasts across four
    storms mature. This lane runs on the calendar, not on effort — it only

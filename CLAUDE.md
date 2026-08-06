@@ -59,6 +59,13 @@ self-describing `.bin` assets the browser loads.
   (`satellite-observations.ts`, `radar-observations.ts`, and the satellite
   target-time and radar-timeline code in main.ts) — never in sim code or
   recorded output.
+- The pan/zoom camera (`src/camera.ts` + `src/camera-gestures.ts`) is
+  presentation-only: `grid.ts` clip space stays domain-fixed WORLD space
+  (edges at ±1) and the camera is an affine world→NDC view applied at the
+  screen boundary. Sim, recorded output, calibration, and offscreen state
+  passes (cloud-memory, OHC blend, rain accumulator update — they bind
+  `IDENTITY_VIEW`) never read it. Never make `latLonToClip`/`clipToLatLon`
+  camera-aware — realism/fidelity/impact all consume them.
 - The URL-hash format is a frozen compatibility contract: a climatology storm
   must encode to the exact legacy `lat=…&lon=…&month=…&seed=…` string; optional
   keys (the scenario `env` key) append validated and last, and unknown values

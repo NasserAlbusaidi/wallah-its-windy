@@ -344,9 +344,6 @@
           counterfactual tape · the observed storm is the faint ghost track
         </p>
 
-        <!-- Live coastal exposure while a city is inside the storm's reach. -->
-        <p id="impact-live" hidden></p>
-
         <dl class="flight-readouts" aria-label="Current storm physics">
           <div class="flight-readout primary">
             <dt>trend</dt>
@@ -422,15 +419,6 @@
             <div id="debrief-compare-row"><dt>history</dt><dd id="debrief-compare">—</dd></div>
           </dl>
 
-          <!-- Landfall / coastal impact: parametric wind + storm-total rain
-               proxies from the model, never observations. -->
-          <section id="impact-report" aria-label="Coastal impact" hidden>
-            <h2>coastal impact · parametric proxy</h2>
-            <p id="impact-headline">—</p>
-            <dl class="comparison-grid impact-grid" id="impact-cities"></dl>
-            <p id="impact-flood">—</p>
-          </section>
-
           <section id="hindcast-score" aria-label="Historical hindcast score" hidden>
             <h2>observed-fix verification</h2>
             <dl class="comparison-grid">
@@ -483,6 +471,25 @@
         </div>
 
       </section>
+
+      <!-- Impact board: the ONE always-visible storm-effects surface. Appears
+           on spawn, persists through completion and replay; parametric proxies
+           only, never observations (spec 2026-08-06-impact-board-ux-v2). -->
+      <aside id="impact-board" class="chrome" aria-label="Storm impact board" hidden>
+        <header class="impact-board-head">
+          <span>impact board</span>
+          <span class="impact-board-tag">parametric proxy</span>
+        </header>
+        <p id="impact-board-headline" aria-live="polite">—</p>
+        <dl class="impact-board-vitals">
+          <div><dt>peak</dt><dd id="impact-board-peak">—</dd></div>
+          <div><dt>landfall</dt><dd id="impact-board-landfall">—</dd></div>
+          <div><dt>rain</dt><dd id="impact-board-rain">—</dd></div>
+        </dl>
+        <p id="impact-board-flood" data-risk="minimal">—</p>
+        <div id="impact-board-cities" role="list" aria-label="Ranked city exposure"></div>
+        <p id="impact-board-allclear" hidden></p>
+      </aside>
 
       <details id="analysis-dock" class="chrome">
         <summary><span>Forecast laboratory</span><small>Ensemble + sensitivity</small></summary>

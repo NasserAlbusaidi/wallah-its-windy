@@ -139,6 +139,76 @@ function landfallFact(
   return 'over water';
 }
 
+export interface ImpactBoardElements {
+  root: HTMLElement;
+  headline: HTMLElement;
+  peak: HTMLElement;
+  landfall: HTMLElement;
+  rain: HTMLElement;
+  flood: HTMLElement;
+  cities: HTMLElement;
+  allClear: HTMLElement;
+}
+
+/**
+ * Thin DOM writer: repaints only when the model's change-detection key moves
+ * (the recorder repaints every rAF; this keeps the board O(1) per frame).
+ */
+export class ImpactBoardView {
+  private key = '';
+
+  constructor(
+    private readonly el: ImpactBoardElements,
+    private readonly onCitySelect: (cityId: string) => void,
+  ) {
+    // Compact-strip expander: CSS only reacts to data-expanded under the
+    // mobile breakpoints, so this toggle is inert on desktop.
+    el.root.querySelector('header')?.addEventListener('click', () => {
+      el.root.dataset.expanded =
+        el.root.dataset.expanded === 'true' ? 'false' : 'true';
+    });
+  }
+
+  update(model: ImpactBoardModel): void {
+    this.el.root.hidden = !model.visible;
+    if (!model.visible) {
+      this.key = '';
+      return;
+    }
+    if (model.key === this.key) return;
+    this.key = model.key;
+    this.el.headline.textContent = model.headline;
+    this.el.peak.textContent = model.peakText;
+    this.el.landfall.textContent = model.landfallText;
+    this.el.rain.textContent = model.rainText;
+    this.el.flood.dataset.risk = model.floodRisk ?? 'minimal';
+    this.el.flood.textContent = model.floodText;
+    this.el.allClear.hidden = model.allClearText === null;
+    this.el.allClear.textContent = model.allClearText ?? '';
+    this.el.cities.replaceChildren(
+      ...model.rows.map((row) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'impact-board-row';
+        button.setAttribute('role', 'listitem');
+        if (row.tint) button.style.setProperty('--row-tint', row.tint);
+        const label = document.createElement('span');
+        label.className = 'impact-board-city';
+        label.textContent = row.label;
+        const now = document.createElement('output');
+        now.textContent = row.nowText;
+        const peak = document.createElement('span');
+        peak.textContent = row.peakText;
+        const rain = document.createElement('span');
+        rain.textContent = row.rainText;
+        button.append(label, now, peak, rain);
+        button.addEventListener('click', () => this.onCitySelect(row.id));
+        return button;
+      }),
+    );
+  }
+}
+
 export function buildImpactBoardModel(
   input: ImpactBoardInput,
 ): ImpactBoardModel {

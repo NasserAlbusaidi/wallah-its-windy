@@ -123,6 +123,14 @@ describe('impact board model', () => {
     expect(withAge.peakText).toBe('97 kt 1-min');
   });
 
+  it('live post-landfall storms report the ashore fact, not over water', () => {
+    // The landfall milestone is recorded at the coast crossing while the
+    // storm is still alive; the vital must flip immediately, without waiting
+    // for the debrief.
+    const model = buildImpactBoardModel(inputWith({ landfallAgeH: 41.8 }));
+    expect(model.landfallText).toBe('ashore +42 h');
+  });
+
   it('no-landfall completion reads none · stayed offshore', () => {
     const debrief = {
       death: { peakKt: 61, durationH: 80, closestApproachKm: 310, reason: 0 },
@@ -144,7 +152,7 @@ describe('impact board model', () => {
       const model = buildImpactBoardModel(inputWith({ impact }));
       expect(model.floodRisk).toBe(tier);
       expect(model.floodText).toBe(`flash-flood proxy ${tier}`);
-      expect(model.rainText).toBe(`max ${mm} mm over land`);
+      expect(model.rainText).toBe(`max storm-total ${mm} mm over land`);
     }
   });
 

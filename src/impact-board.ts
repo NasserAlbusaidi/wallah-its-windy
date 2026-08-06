@@ -136,6 +136,11 @@ function landfallFact(
     return `ashore${age} near ${at}`;
   }
   if (debrief) return 'none · stayed offshore';
+  // The landfall milestone is recorded live at the coast crossing, long
+  // before the debrief exists — a landfalling storm must not read "over
+  // water" for its whole inland phase. Coordinates only ship with the
+  // debrief, so live the fact is the hour offset alone.
+  if (landfallAgeH !== null) return `ashore +${Math.round(landfallAgeH)} h`;
   return 'over water';
 }
 
@@ -247,7 +252,7 @@ export function buildImpactBoardModel(
     : liveHeadline(storm, impact);
   const peakText = `${Math.round(debrief ? debrief.death.peakKt : input.peakSoFarKt)} kt 1-min`;
   const landfallText = landfallFact(debrief, input.landfallAgeH);
-  const rainText = `max ${Math.round(impact.maxLandRainMm)} mm over land`;
+  const rainText = `max storm-total ${Math.round(impact.maxLandRainMm)} mm over land`;
   const floodText = `flash-flood proxy ${impact.floodRisk}`;
   const allClearText = rows.every((row) => row.peakKt < DAMAGING_WIND_KT)
     ? 'no damaging winds reached any city'
@@ -260,8 +265,11 @@ export function buildImpactBoardModel(
     rainText,
     floodText,
     allClearText ?? '',
+    // tint participates so an unrounded threshold crossing (peak 19.9 -> 20.1
+    // or a category boundary) repaints even when every rounded text is stable.
     ...cityRows.map(
-      (row) => `${row.id}:${row.nowText}:${row.peakText}:${row.rainText}`,
+      (row) =>
+        `${row.id}:${row.nowText}:${row.peakText}:${row.rainText}:${row.tint ?? ''}`,
     ),
   ].join('|');
 

@@ -3024,8 +3024,14 @@ html[data-compact='true'] .ghost-label:not(.active) {
   display: none;
 }
 
-#app:has(#impact-board:not([hidden])) #analysis-dock {
-  left: 768px;
+/* Third slot in the bottom row only where it provably fits: dock right edge
+   768+390 = 1158 must clear the widest open workbench rail (100vw - 312) with
+   margin, i.e. viewports >= 1478px. Narrower desktops park the dock top-right
+   instead (see the media blocks at the end of this file). */
+@media (min-width: 1478px) {
+  #app:has(#impact-board:not([hidden])) #analysis-dock {
+    left: 768px;
+  }
 }
 
 #app #impact-board .impact-board-head {
@@ -3077,7 +3083,9 @@ html[data-compact='true'] .ghost-label:not(.active) {
 
 #app #impact-board .impact-board-cols {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 3.6em 3.6em 4.2em;
+  /* px tracks: the header row renders at 9px and the data rows at 10px, so
+     em-based tracks would misalign the two grids. */
+  grid-template-columns: minmax(0, 1fr) 36px 36px 42px;
   gap: 6px;
   margin-top: 8px;
   padding-top: 6px;
@@ -3100,9 +3108,12 @@ html[data-compact='true'] .ghost-label:not(.active) {
   margin-top: 4px;
 }
 
-#app .impact-board-row {
+/* Two-id scope: the generic `#app .chrome button` control styling (1,1,1)
+   must lose to these rules, or every row renders as a grey chrome button and
+   the category tint never shows. */
+#app #impact-board .impact-board-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 3.6em 3.6em 4.2em;
+  grid-template-columns: minmax(0, 1fr) 36px 36px 42px;
   gap: 6px;
   align-items: baseline;
   padding: 2px 4px;
@@ -3113,11 +3124,12 @@ html[data-compact='true'] .ghost-label:not(.active) {
   font: inherit;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
+  line-height: 1.35;
   text-align: right;
   cursor: pointer;
 }
 
-#app .impact-board-row .impact-board-city {
+#app #impact-board .impact-board-row .impact-board-city {
   overflow: hidden;
   color: var(--text-mut);
   letter-spacing: 0.05em;
@@ -3127,11 +3139,11 @@ html[data-compact='true'] .ghost-label:not(.active) {
   white-space: nowrap;
 }
 
-#app .impact-board-row output {
+#app #impact-board .impact-board-row output {
   color: var(--storm-core, #e8f4ff);
 }
 
-#app .impact-board-row:hover {
+#app #impact-board .impact-board-row:hover {
   background: color-mix(in srgb, var(--track, #78dcff) 12%, var(--row-tint, transparent));
 }
 
@@ -3679,17 +3691,25 @@ html[data-compact='true'] .ghost-label:not(.active) {
   }
 }
 
-/* Impact board responsive: narrower on mid desktop, then a collapsed strip
-   above the timeline on mobile. ImpactBoardView's header tap toggles
-   data-expanded; only these breakpoints react to it, so it is inert on
-   desktop. */
-@media (min-width: 821px) and (max-width: 1282px) {
-  #app #impact-board {
-    width: 300px;
+/* Impact board responsive: the board keeps the bottom-row slot beside the
+   recorder on every desktop width (right edge 404+340 = 744 clears even the
+   1000px full rail), while the dock leaves the row below 1478px and parks
+   top-right under the month picker — its open state may transiently overlay
+   the rail, but at rest nothing collides or leaves the viewport. On mobile
+   the board is a collapsed strip above the timeline; ImpactBoardView's
+   header tap toggles data-expanded and only these breakpoints react to it,
+   so the toggle is inert on desktop. */
+@media (min-width: 821px) and (max-width: 1477px) {
+  #app:has(#impact-board:not([hidden])) #analysis-dock {
+    top: 118px;
+    right: 16px;
+    bottom: auto;
+    left: auto;
   }
 
-  #app:has(#impact-board:not([hidden])) #analysis-dock {
-    left: 728px;
+  /* Event mode grows the month picker (scenario rows + contract line). */
+  #app:has(#scenario-contract:not([hidden])):has(#impact-board:not([hidden])) #analysis-dock {
+    top: 196px;
   }
 }
 
@@ -3722,6 +3742,15 @@ html[data-compact='true'] .ghost-label:not(.active) {
   #app #impact-board-cities,
   #app #impact-board-allclear {
     display: none;
+  }
+
+  /* Collapsed strip budgets ~86px of height (recorder sits at bottom:164);
+     a wrapping headline would overrun it, so clamp to one line — expanding
+     shows the full text. */
+  #app #impact-board:not([data-expanded='true']) #impact-board-headline {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   #app #impact-board[data-expanded='true'] {

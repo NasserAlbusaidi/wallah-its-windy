@@ -62,6 +62,7 @@ import {
   weatherLayerDefinition,
 } from './weather-layers';
 import { formatStormTag, type StormTagInput } from './storm-tag';
+import { formatLatLon } from './impact-board';
 import {
   SIMULATED_WIND_CONVENTION,
   northIndianOceanClassification,
@@ -1724,12 +1725,6 @@ function flightClock(ageH: number): string {
   const minutes = totalMinutes % 60;
   if (days > 0) return `${days} d ${String(hours).padStart(2, '0')} h`;
   return `${hours} h ${String(minutes).padStart(2, '0')} m`;
-}
-
-function formatLatLon(lat: number, lon: number): string {
-  const ns = lat < 0 ? 's' : 'n';
-  const ew = lon < 0 ? 'w' : 'e';
-  return `${Math.abs(lat).toFixed(1)}°${ns} ${Math.abs(lon).toFixed(1)}°${ew}`;
 }
 
 function compactDirection(steerU: number, steerV: number): string {

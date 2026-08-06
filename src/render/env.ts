@@ -12,7 +12,7 @@ import { TOKENS } from '../tokens';
 import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
 import { CLOUD_MEMORY_DT_H, CLOUD_MEMORY_MACRO_GAIN, DEBRIS_MAX_CLOUD } from './cloud-memory';
-import { CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, cloudMetricX, cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
+import { AMBIENT_RH_DRIVE_HI, AMBIENT_RH_DRIVE_LO, AMBIENT_TOP_CONGESTUS_COLD_C, AMBIENT_TOP_CONGESTUS_WARM_C, AMBIENT_TOP_CUMULUS_COLD_C, AMBIENT_TOP_CUMULUS_WARM_C, AMBIENT_TOP_VEIL_C, CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, cloudMetricX, cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import {
@@ -228,16 +228,51 @@ ${CLOUD_CORE_GLSL.wobble}
       weightA
     );
   }
-  // A faint synoptic deck prevents the ocean outside the cyclone from
-  // becoming an implausibly empty plate. It follows the exact baked humidity
-  // plane and advects with the sampled steering vector.
+  // ---- environmental cloud deck (RGR-001) ----
+  // The observed basin is never cloud-free: monsoon/ITCZ decks, granulated
+  // cumulus fields and streamed veils fill every real IR/VIS frame, and their
+  // density is strongly month-dependent. The baked humidity plane carries that
+  // exact seasonal/spatial signal, so coverage follows localRh; structure
+  // comes from the shared noise lattice in earth-fixed coordinates. No
+  // diurnal or solar term here — RGR-007/RGR-012 are separate waves.
   vec2 synopticDrift = vec2(u_steerAtStorm.x, -u_steerAtStorm.y) * u_ageH * 0.0012;
   vec2 synopticP = v_uv * vec2(8.0, 5.2) - synopticDrift + seed * 3.0;
   float synopticNoise = cloudNoise(synopticP * 1.35 + 9.7);
   float localRh = mix(texture(u_rh, v_uv).r, texture(u_rhNext, v_uv).r, u_planeBlend);
-  float ambientGate = synopticNoise + localRh * 0.38;
-  float ambientCloud = smoothstep(0.59, 0.88, ambientGate) *
-    mix(0.12, 0.52, smoothstep(0.35, 0.86, localRh));
+  float rhDrive = smoothstep(${AMBIENT_RH_DRIVE_LO}, ${AMBIENT_RH_DRIVE_HI}, localRh);
+  // Marine-cumulus potential: granulated fields live over warm open water;
+  // land and cool water keep only the stratiform and veil components.
+  float warmSea = smoothstep(26.0, 29.0, sstC) * (1.0 - smoothstep(0.35, 0.65, land));
+  // WHERE cloud lives: two synoptic octaves with a moisture-shifted threshold.
+  // The second octave breaks single-noise blobbiness into fronts and patches.
+  float patchNoise = 0.62 * synopticNoise + 0.38 * cloudNoise(synopticP * 0.41 + 3.7);
+  float deckPatch = smoothstep(0.60 - 0.26 * rhDrive, 0.95 - 0.10 * rhDrive,
+    patchNoise + 0.22 * rhDrive);
+  // HOW it granulates: ~80 km cells inside the patches — real trade-cumulus
+  // and monsoon decks are beaded chains, never an airbrushed wash (RGR-001).
+  // The windows hug the composite noise's actual spread (its 8-tap weighted
+  // sum concentrates near 0.5) so granulation uses the full [0,1] range.
+  float granuleNoise = cloudNoise(synopticP * 3.1 + seed * 7.0);
+  float granule = smoothstep(0.32, 0.64, granuleNoise);
+  float deckCover = deckPatch * mix(0.45, 1.0, granule) *
+    mix(0.16, 0.92, rhDrive) * mix(0.55, 1.0, warmSea);
+  // Streamed veils: thin high cloud drawn along the steering axis. The axis is
+  // the sampled storm-centre steering — deterministic and advection-consistent
+  // with synopticDrift; event-aligned upper flow is RGR-011 (HF-7 charter).
+  vec2 steerAxis = length(u_steerAtStorm) > 0.05
+    ? normalize(vec2(u_steerAtStorm.x, -u_steerAtStorm.y))
+    : vec2(0.86, -0.51);
+  vec2 veilP = v_uv * vec2(8.0, 5.2) + seed * 5.0;
+  float veilTexture = texture(u_cloudNoise, vec2(
+    dot(veilP, vec2(-steerAxis.y, steerAxis.x)) * 0.058,
+    dot(veilP, steerAxis) * 0.013 - u_ageH * 0.0035
+  )).b;
+  float veil = smoothstep(0.52, 0.88, veilTexture) * mix(0.08, 0.38, rhDrive);
+  // Structural bound: deckCover tops out at 0.92 and the veil fills at most
+  // the remaining gap's 0.38, so ambient cover stays below 0.96 — the deck
+  // can read overcast but never solid, and the composite below still lets
+  // stormCloud win everywhere it is present.
+  float ambientCloud = deckCover + veil * (1.0 - deckCover);
 
   float moisture = clamp((u_midlevelRh - 0.25) / 0.62, 0.0, 1.0);
   float rainEnergy = clamp((u_eyewallRain + 0.7 * u_rainbandRain) / 28.0, 0.0, 1.0);
@@ -443,7 +478,22 @@ ${CLOUD_CORE_GLSL.eyewall}
   cloud = max(cloud, debris);
 
   float surfaceC = mix(sstC, 34.0, smoothstep(0.35, 0.65, land));
-  float ambientTopC = mix(-8.0, -42.0, synopticNoise * localRh);
+  // Component-graded environmental tops (RGR-001). Shallow cumulus stays warm
+  // — near-SST in IR, so it reads as VIS texture, not cold shield — while
+  // congestus claims mid-cold tops only in moist columns and veils sit high
+  // but thin. The congestus floor stays far above the -60 C realism cold-top
+  // mask, so the environment can never masquerade as storm canopy.
+  float congestus = rhDrive * deckPatch * smoothstep(0.38, 0.70, granuleNoise);
+  float cumulusTopC = mix(${AMBIENT_TOP_CUMULUS_WARM_C.toFixed(1)},
+    ${AMBIENT_TOP_CUMULUS_COLD_C.toFixed(1)}, granule);
+  float congestusTopC = mix(${AMBIENT_TOP_CONGESTUS_WARM_C.toFixed(1)},
+    ${AMBIENT_TOP_CONGESTUS_COLD_C.toFixed(1)}, rhDrive);
+  float veilShare = veil * (1.0 - deckCover) / max(ambientCloud, 0.001);
+  float ambientTopC = mix(
+    mix(cumulusTopC, congestusTopC, congestus),
+    ${AMBIENT_TOP_VEIL_C.toFixed(1)},
+    veilShare
+  );
 ${CLOUD_TOPS_GLSL}
 ${CLOUD_RELIEF_GLSL}
   return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells, relief, debris);

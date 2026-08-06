@@ -45,6 +45,37 @@ export const DEBRIS_TOP_WARM_C = -28;
 export const DEBRIS_TOP_COLD_C = -45;
 
 /**
+ * Environmental-deck moisture window (RGR-001). rhDrive is the deck's month
+ * and space signal — a smoothstep over the baked mid-level RH plane, which
+ * already carries the monsoon-vs-post-monsoon contrast the register demands.
+ * Below LO a column reads post-monsoon dry (sparse shallow cumulus only);
+ * above HI it reads monsoon moist (patch decks and congestus clusters).
+ *
+ * ANCHORED TO THE BAKED PLANES, NOT LITERATURE RH: env.bin's monthly-mean
+ * mid-level RH over ocean spans ~0.08-0.65 (May p50 0.24, Jul p50 0.45,
+ * Kyarr's October event plane p50 0.13) — monthly means sit far below
+ * instantaneous sounding values, exactly the SHEAR_THRESHOLD_MS lesson in
+ * src/sim.ts. Moving the env source to daily/hourly fields re-opens these
+ * two constants.
+ */
+export const AMBIENT_RH_DRIVE_LO = 0.16;
+export const AMBIENT_RH_DRIVE_HI = 0.52;
+
+/**
+ * Environmental cloud-top grading, deg C. Shallow marine cumulus stays warm
+ * (it reads as VIS texture, not cold IR shield); congestus claims mid-cold
+ * tops only in moist columns; veils sit high but thin. The congestus floor
+ * must stay far above the -60 C realism cold-top mask
+ * (REALISM_COLD_TOP_C in src/realism-metrics.ts) so the environment can never
+ * masquerade as storm canopy in the RGR-003/006/013 metrics.
+ */
+export const AMBIENT_TOP_CUMULUS_WARM_C = -2;
+export const AMBIENT_TOP_CUMULUS_COLD_C = -16;
+export const AMBIENT_TOP_CONGESTUS_WARM_C = -26;
+export const AMBIENT_TOP_CONGESTUS_COLD_C = -52;
+export const AMBIENT_TOP_VEIL_C = -40;
+
+/**
  * Interpolated decorative cloud age for u_cloudAgeH. Raw fixed-frame ageH
  * jumps 0.25 h per tick — up to 0.15 rad at the cap — and visibly stutters.
  * Runs monotonically forward: a respawn (prev age ahead of the new storm's)

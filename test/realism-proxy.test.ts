@@ -498,9 +498,13 @@ describe('quantizedLayerSampler', () => {
 });
 
 describe('buildRealismField env-plane path', () => {
-  // rh plane 0 = 30% everywhere, plane 1 = 80% everywhere; sst flat at 29 C.
+  // rh plane 0 = 20% everywhere, plane 1 = 48% everywhere; sst flat at 29 C.
+  // Both endpoints (and their byte-blend midpoint ~34%) sit strictly inside
+  // the deck's (AMBIENT_RH_DRIVE_LO, AMBIENT_RH_DRIVE_HI) moisture window —
+  // past HI the drive saturates and the strict mid-between-endpoints
+  // ordering this suite pins would compare equal for the wrong reason.
   const bin = synthBin([
-    synthLayer('rh_05', 2, 1, [[30, 30], [80, 80]]),
+    synthLayer('rh_05', 2, 1, [[20, 20], [48, 48]]),
     synthLayer('sst_05', 2, 1, [[29, 29], [29, 29]]),
   ]);
   const withBin = {

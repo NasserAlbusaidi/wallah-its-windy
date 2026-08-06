@@ -37,6 +37,13 @@ import {
   DEBRIS_MAX_CLOUD,
 } from './render/cloud-memory';
 import {
+  AMBIENT_RH_DRIVE_HI,
+  AMBIENT_RH_DRIVE_LO,
+  AMBIENT_TOP_CONGESTUS_COLD_C,
+  AMBIENT_TOP_CONGESTUS_WARM_C,
+  AMBIENT_TOP_CUMULUS_COLD_C,
+  AMBIENT_TOP_CUMULUS_WARM_C,
+  AMBIENT_TOP_VEIL_C,
   CLOUD_BAND_REFERENCE_Q,
   CLOUD_CROSSFADE_PERIOD_H,
   CLOUD_PULSE_PERIOD_H,
@@ -271,6 +278,7 @@ export function sampleCloudProxy(
           weightA,
         );
 
+  // ---- environmental cloud deck (RGR-001) ----
   const synopticDriftX = u.steerAtStorm.x * u.ageH * 0.0012;
   const synopticDriftY = -u.steerAtStorm.y * u.ageH * 0.0012;
   const synopticPx = cell.u * 8.0 - synopticDriftX + seed * 3.0;
@@ -280,10 +288,42 @@ export function sampleCloudProxy(
     synopticPy * 1.35 + 9.7,
   );
   const localRh = cell.localRh;
-  const ambientGate = synopticNoise + localRh * 0.38;
-  const ambientCloud =
-    smoothstep(0.59, 0.88, ambientGate) *
-    mix(0.12, 0.52, smoothstep(0.35, 0.86, localRh));
+  const rhDrive = smoothstep(AMBIENT_RH_DRIVE_LO, AMBIENT_RH_DRIVE_HI, localRh);
+  const warmSea =
+    smoothstep(26.0, 29.0, cell.sstC) *
+    (1.0 - smoothstep(0.35, 0.65, cell.land));
+  const patchNoise =
+    0.62 * synopticNoise +
+    0.38 * noise.cloudNoise(synopticPx * 0.41 + 3.7, synopticPy * 0.41 + 3.7);
+  const deckPatch = smoothstep(
+    0.6 - 0.26 * rhDrive,
+    0.95 - 0.1 * rhDrive,
+    patchNoise + 0.22 * rhDrive,
+  );
+  const granuleNoise = noise.cloudNoise(
+    synopticPx * 3.1 + seed * 7.0,
+    synopticPy * 3.1 + seed * 7.0,
+  );
+  const granule = smoothstep(0.32, 0.64, granuleNoise);
+  const deckCover =
+    deckPatch *
+    mix(0.45, 1.0, granule) *
+    mix(0.16, 0.92, rhDrive) *
+    mix(0.55, 1.0, warmSea);
+  // GLSL: normalize(vec2(u_steerAtStorm.x, -u_steerAtStorm.y)) — the y flip
+  // does not change the length, so one hypot serves both components.
+  const steerLen = Math.hypot(u.steerAtStorm.x, u.steerAtStorm.y);
+  const steerAxisX = steerLen > 0.05 ? u.steerAtStorm.x / steerLen : 0.86;
+  const steerAxisY = steerLen > 0.05 ? -u.steerAtStorm.y / steerLen : -0.51;
+  const veilPx = cell.u * 8.0 + seed * 5.0;
+  const veilPy = cell.v * 5.2 + seed * 5.0;
+  const veilTexture = noise.tap(
+    (veilPx * -steerAxisY + veilPy * steerAxisX) * 0.058,
+    (veilPx * steerAxisX + veilPy * steerAxisY) * 0.013 - u.ageH * 0.0035,
+    2,
+  );
+  const veil = smoothstep(0.52, 0.88, veilTexture) * mix(0.08, 0.38, rhDrive);
+  const ambientCloud = deckCover + veil * (1.0 - deckCover);
 
   const moisture = clamp01((u.midlevelRh - 0.25) / 0.62);
   const rainEnergy = clamp01((u.eyewallRain + 0.7 * u.rainbandRain) / 28.0);
@@ -509,7 +549,26 @@ export function sampleCloudProxy(
   cloud = Math.max(cloud, debris);
 
   const surfaceC = mix(cell.sstC, 34.0, smoothstep(0.35, 0.65, cell.land));
-  const ambientTopC = mix(-8.0, -42.0, synopticNoise * localRh);
+  // Component-graded environmental tops (RGR-001). The GLSL emits the AMBIENT
+  // constants through toFixed(1); every one is an integer, so that format is
+  // lossless and the shared constants can be used here directly.
+  const congestus = rhDrive * deckPatch * smoothstep(0.38, 0.7, granuleNoise);
+  const cumulusTopC = mix(
+    AMBIENT_TOP_CUMULUS_WARM_C,
+    AMBIENT_TOP_CUMULUS_COLD_C,
+    granule,
+  );
+  const congestusTopC = mix(
+    AMBIENT_TOP_CONGESTUS_WARM_C,
+    AMBIENT_TOP_CONGESTUS_COLD_C,
+    rhDrive,
+  );
+  const veilShare = (veil * (1.0 - deckCover)) / Math.max(ambientCloud, 0.001);
+  const ambientTopC = mix(
+    mix(cumulusTopC, congestusTopC, congestus),
+    AMBIENT_TOP_VEIL_C,
+    veilShare,
+  );
 
   // ---- CLOUD_TOPS_GLSL ----
   const cdoTopC = mix(

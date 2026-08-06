@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { FlightFrame } from '../src/flight-recorder';
+import { DOMAIN } from '../src/grid';
+import { DType } from '../src/types';
+import type { BinLayer, ParsedBin } from '../src/types';
 import {
   REALISM_COLD_TOP_C,
   REALISM_EYE_CORE_Q,
@@ -30,6 +33,38 @@ const MIN_MATURE_EYE_CLEARING = 0.42;
 function openOcean() {
   return {
     envBin: null,
+    land01At: () => 0,
+    noise: new RealismNoise(),
+    debris: null,
+  };
+}
+
+/**
+ * A moisture-starved flat environment (RH 20%, below AMBIENT_RH_DRIVE_LO;
+ * SST 28 C, the null-envBin value). The wave-2 environmental deck reads only
+ * localRh from the plane, so this keeps every OTHER input byte-identical to
+ * openOcean while silencing ambient cloud — for pins that must measure the
+ * storm's own morphology, not storm-plus-environment.
+ */
+function dryEnvironment() {
+  const layer = (name: string, value: number): BinLayer => ({
+    name,
+    dtype: DType.float32,
+    quantized: false,
+    nx: 2,
+    ny: 1,
+    nt: 1,
+    bbox: DOMAIN,
+    scale: 1,
+    offset: 0,
+    data: new Float32Array([value, value]),
+  });
+  const layers = [layer('rh_05', 20), layer('sst_05', 28)];
+  return {
+    envBin: {
+      version: 1,
+      layers: new Map(layers.map((l) => [l.name, l])),
+    } as ParsedBin,
     land01At: () => 0,
     noise: new RealismNoise(),
     debris: null,
@@ -283,7 +318,11 @@ describe('simulated IR morphology', () => {
   });
 
   it('leaves sector-scale cold-top variation and gaps around a moderate core', () => {
-    const field = buildRealismField(contextFor(moderate), openOcean());
+    // Dry environment: the RGR-001 deck legitimately fills cloud gaps with
+    // ambient cloud (that is its job), which narrows sector BT contrast. This
+    // pin is about the STORM leaving gaps, so it measures against a sky the
+    // deck cannot populate.
+    const field = buildRealismField(contextFor(moderate), dryEnvironment());
     const sectors = eyewallColdSectors(field, moderate.structure.rmwKm);
     const coldestMean = Math.min(...sectors.meanBtC);
     const warmestMean = Math.max(...sectors.meanBtC);

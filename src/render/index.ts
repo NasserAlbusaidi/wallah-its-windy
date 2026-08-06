@@ -474,6 +474,12 @@ export class RenderPipeline implements RenderLayer {
     this.upperWind.setBudget(count);
   }
 
+  /** Camera moved: screen-registered trail history no longer matches the map. */
+  clearWindTrails(): void {
+    this.wind.clearTrails();
+    this.upperWind.clearTrails();
+  }
+
   /** Highlight one ghost polyline (~2x alpha) as the active scenario; null clears
    *  it. The matching DOM label is highlighted separately via ui.highlightGhost. */
   setActiveGhost(id: string | null): void {

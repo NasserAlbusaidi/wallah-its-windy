@@ -30,8 +30,11 @@ import {
   computeViewTransform,
   latLonToScreen,
   screenToLatLon,
+  viewKey,
+  viewStateOf,
 } from './camera';
-import type { ViewState, ViewTransform } from './camera';
+import type { ViewTransform } from './camera';
+import { CameraGestureController } from './camera-gestures';
 import { parseBin } from './loader';
 import type {
   BinLayer,
@@ -563,7 +566,21 @@ function layoutMapFrame(): void {
 }
 
 // --- Camera (presentation-only; never enters sim state or recorded output) --
-let cameraView: ViewState = HOME_VIEW;
+const cameraGestures = new CameraGestureController(HOME_VIEW);
+let lastRenderedViewKey = '';
+
+// Dev-only deterministic camera for headless visual QA (?camera=cx,cy,zoom).
+// A SEARCH param, never a hash key — the frozen URL-hash contract is not
+// touched — and the whole branch is dead-stripped from production builds.
+if (import.meta.env.DEV) {
+  const qa = new URLSearchParams(window.location.search).get('camera');
+  if (qa) {
+    const [cx, cy, zoom] = qa.split(',').map(Number);
+    if ([cx, cy, zoom].every(Number.isFinite)) {
+      cameraGestures.reset({ center: { x: cx, y: cy }, zoom });
+    }
+  }
+}
 
 /** Aspect from CSS px (identical ratio in device px). */
 function canvasAspect(): number {
@@ -574,7 +591,7 @@ function canvasAspect(): number {
 
 /** Derive (and clamp) the current frame's view transform. */
 function currentViewTransform(): ViewTransform {
-  return computeViewTransform(cameraView, canvasAspect());
+  return computeViewTransform(cameraGestures.view(), canvasAspect());
 }
 
 function resize(): void {
@@ -2423,12 +2440,60 @@ sensitivityRun.addEventListener('click', () => {
     });
 });
 
+/** Canvas-relative CSS-px coordinates for the camera gesture controller. */
+function canvasPoint(event: PointerEvent | WheelEvent): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const rect = glCanvas.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+    w: Math.max(1, rect.width),
+    h: Math.max(1, rect.height),
+  };
+}
+
+glCanvas.addEventListener(
+  'wheel',
+  (event) => {
+    event.preventDefault();
+    const p = canvasPoint(event);
+    cameraGestures.wheel(
+      currentViewTransform(),
+      event.deltaY,
+      p.x,
+      p.y,
+      p.w,
+      p.h,
+    );
+  },
+  { passive: false },
+);
+
 glCanvas.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'mouse' && event.button !== 0) return;
   if (event.pointerType === 'touch' && probePinned) {
     probePinned = false;
     probePosition = null;
     ui.hidePointProbe();
+    return;
+  }
+  const p = canvasPoint(event);
+  cameraGestures.pointerDown(event.pointerId, p.x, p.y);
+  // Keep pan/pinch streams flowing when the pointer leaves the window.
+  try {
+    glCanvas.setPointerCapture(event.pointerId);
+  } catch {
+    /* capture is best-effort (synthetic events in tests lack it) */
+  }
+  if (cameraGestures.activePointers() >= 2) {
+    // Second finger = pinch: this finger never becomes a tap or a probe
+    // press, and the first finger's tap is suppressed on release.
+    mapTap.cancel(event.pointerId);
+    clearProbeTouch();
     return;
   }
   mapTap.start(event.pointerId, event.clientX, event.clientY, event.timeStamp);
@@ -2457,6 +2522,20 @@ glCanvas.addEventListener('pointerdown', (event) => {
 });
 glCanvas.addEventListener('pointermove', (event) => {
   mapTap.move(event.pointerId, event.clientX, event.clientY);
+  const p = canvasPoint(event);
+  const update = cameraGestures.pointerMove(
+    currentViewTransform(),
+    event.pointerId,
+    p.x,
+    p.y,
+    p.w,
+    p.h,
+  );
+  if (update.becamePan) {
+    // The drag is now the camera's: cancel the pending tap + probe timers.
+    mapTap.cancel(event.pointerId);
+    clearProbeTouch(event.pointerId);
+  }
   if (event.pointerType === 'mouse' && event.buttons === 0 && !probePinned) {
     showPointProbeAt(event.clientX, event.clientY);
   }
@@ -2474,6 +2553,7 @@ glCanvas.addEventListener('pointermove', (event) => {
   }
 });
 glCanvas.addEventListener('pointercancel', (event) => {
+  cameraGestures.pointerCancel(event.pointerId);
   clearProbeTouch(event.pointerId);
   mapTap.cancel(event.pointerId);
 });
@@ -2486,7 +2566,13 @@ glCanvas.addEventListener('pointerleave', (event) => {
   }
 });
 glCanvas.addEventListener('pointerup', (e) => {
+  const wasCameraGesture = cameraGestures.pointerUp(e.pointerId);
   clearProbeTouch(e.pointerId);
+  if (wasCameraGesture) {
+    // The press panned or pinched the camera — it is not a spawn tap.
+    mapTap.cancel(e.pointerId);
+    return;
+  }
   if (!mapTap.end(e.pointerId, e.clientX, e.clientY, e.timeStamp)) return;
   const point = mapPointFromClient(e.clientX, e.clientY);
   if (!point) return;
@@ -2537,6 +2623,18 @@ window.addEventListener('keydown', (e) => {
     probePinned = false;
     probePosition = null;
     ui.hidePointProbe();
+    return;
+  }
+  // Camera keys: arrows pan, +/- zoom about the centre, h/Home = full domain.
+  const rect = glCanvas.getBoundingClientRect();
+  const camera = cameraGestures.key(
+    currentViewTransform(),
+    e.code,
+    Math.max(1, rect.width),
+    Math.max(1, rect.height),
+  );
+  if (camera) {
+    e.preventDefault();
     return;
   }
   if (e.code !== 'Space') return;
@@ -2839,6 +2937,15 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
     void refreshSatelliteObservation();
   }
   const view = currentViewTransform();
+  // Clamp feedback: keep the gesture state exactly what the screen shows, so
+  // panning against a domain edge never accumulates invisible offset.
+  cameraGestures.reset(viewStateOf(view));
+  const vk = viewKey(view);
+  if (vk !== lastRenderedViewKey) {
+    lastRenderedViewKey = vk;
+    // Trail history is screen-registered; a camera move invalidates it.
+    renderCtrl?.clearWindTrails?.();
+  }
   ui.setView(view);
   const frame: FrameState = {
     storm,
@@ -3004,6 +3111,8 @@ type RenderController = RenderLayer & {
   setCloudTape?(tape: CloudTape | null): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;
+  /** Screen-registered wind-trail history is stale after any camera move. */
+  clearWindTrails?(): void;
 };
 
 function hasInjectionApi(v: RenderLayer): v is RenderController {

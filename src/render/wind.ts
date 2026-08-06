@@ -155,6 +155,14 @@ export class WindLayer implements RenderModule {
   private verts = new Float32Array(this.count * 8);
   private rng: Rng;
   private seeded = false;
+  /**
+   * World-space seed/kill rectangles tracking the visible viewport (set each
+   * draw from ctx.view; defaults to the full domain). Seeding into the view
+   * keeps on-screen particle density constant across the zoom range; the
+   * kill margin is wider than the seed margin so edge spawns aren't culled.
+   */
+  private seedRect = { minX: -1.02, maxX: 1.02, minY: -1.02, maxY: 1.02 };
+  private killRect = { minX: -1.04, maxX: 1.04, minY: -1.04, maxY: 1.04 };
 
   constructor(private readonly fieldKind: 'surface' | 'upper' = 'surface') {
     this.rng = makeRng(fieldKind === 'upper' ? 0x2007717 : 0x7717d);
@@ -218,8 +226,9 @@ export class WindLayer implements RenderModule {
   }
 
   private respawn(i: number): void {
-    this.pos[i * 2] = this.rng.next() * 2 - 1;
-    this.pos[i * 2 + 1] = this.rng.next() * 2 - 1;
+    const r = this.seedRect;
+    this.pos[i * 2] = r.minX + this.rng.next() * (r.maxX - r.minX);
+    this.pos[i * 2 + 1] = r.minY + this.rng.next() * (r.maxY - r.minY);
     this.life[i] = LIFE_MIN_S + this.rng.next() * (LIFE_MAX_S - LIFE_MIN_S);
   }
 
@@ -288,6 +297,27 @@ export class WindLayer implements RenderModule {
       ctx.reduced ||
       (this.fieldKind === 'upper' && !ctx.upperAt)
     ) return;
+    // Track the visible viewport in world coordinates (2% seed margin so
+    // particles drift IN from just offscreen; 4% kill margin outside that).
+    const v = ctx.view;
+    const vminX = (-1 - v.offsetX) / v.scaleX;
+    const vmaxX = (1 - v.offsetX) / v.scaleX;
+    const vminY = (-1 - v.offsetY) / v.scaleY;
+    const vmaxY = (1 - v.offsetY) / v.scaleY;
+    const mx = (vmaxX - vminX) * 0.02;
+    const my = (vmaxY - vminY) * 0.02;
+    this.seedRect = {
+      minX: vminX - mx,
+      maxX: vmaxX + mx,
+      minY: vminY - my,
+      maxY: vmaxY + my,
+    };
+    this.killRect = {
+      minX: vminX - 2 * mx,
+      maxX: vmaxX + 2 * mx,
+      minY: vminY - 2 * my,
+      maxY: vmaxY + 2 * my,
+    };
     if (!this.seeded) this.seedAll();
     const dt = Math.max(0.001, ctx.dtSec);
 
@@ -303,9 +333,10 @@ export class WindLayer implements RenderModule {
       const nx = px + (wind.u / METRIC_X) * SPEED_TO_CLIP * dt;
       const ny = py + wind.v * SPEED_TO_CLIP * dt;
       this.life[i] -= dt;
+      const k = this.killRect;
       const dead =
         this.life[i] <= 0 ||
-        nx < -1.02 || nx > 1.02 || ny < -1.02 || ny > 1.02;
+        nx < k.minX || nx > k.maxX || ny < k.minY || ny > k.maxY;
       const speed01 = Math.min(1, speedMs / SPEED_SPAN_MS);
       // Fade in/out over the ends of a particle's life. NOT scaled by
       // ctx.aftermath — the ambient flow must not vanish after a storm dies

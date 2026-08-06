@@ -196,6 +196,19 @@ export function zoomAboutAnchor(
   };
 }
 
+/**
+ * Recover the CLAMPED camera state a transform was derived from (scaleY is
+ * exactly the clamped zoom; the offsets encode the clamped centre). main.ts
+ * feeds this back to the gesture controller each frame so its state cannot
+ * drift unboundedly while panning against the domain edge.
+ */
+export function viewStateOf(t: ViewTransform): ViewState {
+  return {
+    center: { x: -t.offsetX / t.scaleX, y: -t.offsetY / t.scaleY },
+    zoom: t.scaleY,
+  };
+}
+
 /** Change-detection key for relayout / trail-clear triggers. */
 export function viewKey(t: ViewTransform): string {
   return `${t.scaleX.toFixed(9)}|${t.scaleY.toFixed(9)}|${t.offsetX.toFixed(9)}|${t.offsetY.toFixed(9)}`;

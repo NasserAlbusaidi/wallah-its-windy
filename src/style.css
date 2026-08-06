@@ -226,6 +226,11 @@ dd,
   border-radius: 50%;
   box-shadow: 0 0 0 1px rgba(120, 220, 255, 0.2);
 }
+/* Camera culling: display:inline-flex above would defeat the [hidden] UA
+   style, leaving off-view markers painted at stale positions. */
+.city-marker[hidden] {
+  display: none;
+}
 .city-marker[data-side='left'] {
   flex-direction: row-reverse;
   transform: translate(calc(-100% + 5px), -50%);

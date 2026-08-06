@@ -8,6 +8,7 @@ import {
   panByPixels,
   screenToLatLon,
   viewKey,
+  viewStateOf,
   worldToNdc,
   zoomAboutAnchor,
   type ViewState,
@@ -157,6 +158,18 @@ describe('camera view transform', () => {
     const vFar = panByPixels(v0, t0, 1e7, 0, w, h);
     const tFar = computeViewTransform(vFar, aspect);
     expect(tFar.bbox.lonMax).toBeLessThanOrEqual(DOMAIN.lonMax + 1e-9);
+  });
+
+  it('viewStateOf recovers the clamped state a transform encodes', () => {
+    const requested = view(0.95, 0.9, 2.5); // centre gets clamped
+    const t = computeViewTransform(requested, 1.7);
+    const clamped = viewStateOf(t);
+    expect(clamped.zoom).toBeCloseTo(2.5, 12);
+    // Re-deriving from the clamped state reproduces the same transform.
+    const t2 = computeViewTransform(clamped, 1.7);
+    expect(t2.scaleX).toBeCloseTo(t.scaleX, 9);
+    expect(t2.offsetX).toBeCloseTo(t.offsetX, 9);
+    expect(t2.offsetY).toBeCloseTo(t.offsetY, 9);
   });
 
   it('viewKey is stable for identical transforms and moves on any change', () => {

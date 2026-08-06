@@ -577,12 +577,20 @@ incident record.
 6. **Complete:** post-HF-6 product lane — HydroSHEDS flood-pulse routing,
    storm room + satellite desk, observed radar + rain accumulation, and the
    windy-grade reskin (see the current-state section above).
+6b. **Complete (2026-08-06): impact board — UX v2 phase 1.** The always-visible
+   effects panel (ranked 8-city table, vitals, live/complete headline; landfall
+   as recorded fact, never an ETA) replaced the debrief-buried impact report and
+   the conditional live line. Umbrella design:
+   `docs/superpowers/specs/2026-08-06-impact-board-ux-v2-design.md`.
 
 ### Next
 
 7. **Product lane — pan/zoom:** build the shared camera per the contract above
    without changing simulation state. Still the selected UX big bet; not
-   started as of 2026-07-27 (`src/grid.ts` has no view/camera state).
+   started as of 2026-07-27 (`src/grid.ts` has no view/camera state). This is
+   phase 2 of the UX-v2 sequence
+   (`docs/superpowers/specs/2026-08-06-impact-board-ux-v2-design.md`); phases
+   3–4 (regional rain ledger, ensemble on-map) follow it.
 8. **Evidence lane — prospective archiving:** archive future HF-5 runs before
    observations exist; evaluate only after at least 12 forecasts across four
    storms mature. This lane runs on the calendar, not on effort — it only

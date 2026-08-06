@@ -27,14 +27,10 @@ import type {
 } from './types';
 import { DeathReason, AFTERMATH_FADE_MS } from './types';
 import { randomSeed, type HashState } from './rng';
-import { DOMAIN, greatCircleKm, latLonToCell, latLonToClip } from './grid';
+import { DOMAIN, latLonToCell, latLonToClip } from './grid';
 import { TOKENS } from './tokens';
 import { categoryRgba, intensityFraction, stormCategory } from './category';
-import {
-  experiencedWindPhrase,
-  IMPACT_CITIES,
-  windAtPointKt,
-} from './impact';
+import { IMPACT_CITIES, windAtPointKt } from './impact';
 import type { ImpactSummary } from './impact';
 import type { GhostLabelAnchor } from './tracks';
 import type { RunComparison } from './comparison';
@@ -62,6 +58,11 @@ import {
   weatherLayerDefinition,
 } from './weather-layers';
 import { formatStormTag, type StormTagInput } from './storm-tag';
+import {
+  buildImpactBoardModel,
+  formatLatLon,
+  ImpactBoardView,
+} from './impact-board';
 import {
   SIMULATED_WIND_CONVENTION,
   northIndianOceanClassification,
@@ -253,11 +254,6 @@ export class UiController {
     needleNow: HTMLElement;
     needlePotential: HTMLElement;
     intensityNote: HTMLElement;
-    impactLive: HTMLElement;
-    impactReport: HTMLElement;
-    impactHeadline: HTMLElement;
-    impactCities: HTMLElement;
-    impactFlood: HTMLElement;
     sparkline: HTMLElement;
     sparklinePath: SVGPathElement;
     sparklineCursor: SVGLineElement;
@@ -291,8 +287,6 @@ export class UiController {
   private readonly stormTagChip = dom('storm-tag-chip');
   private readonly stormTagLine1 = dom('storm-tag-line1');
   private readonly stormTagLine2 = dom('storm-tag-line2');
-  /** Content signature of the rendered impact-city rows (skip rebuilds). */
-  private impactCitiesKey = '';
   private readonly cityMarkerRoot = dom('city-markers');
   private readonly cityDetail = dom('city-detail');
   private readonly cityDetailName = dom('city-detail-name');
@@ -301,6 +295,22 @@ export class UiController {
   private readonly cityMarkers = new Map<string, HTMLButtonElement>();
   private cityImpact: ImpactSummary | null = null;
   private cityStorm: StormState | null = null;
+  /** Displayed-frame parametric wind per city; markers, detail card and the
+   * impact board all read this one computation (updateCityMarkers fills it). */
+  private readonly cityNowWindsKt = new Map<string, number>();
+  private readonly impactBoard = new ImpactBoardView(
+    {
+      root: dom('impact-board'),
+      headline: dom('impact-board-headline'),
+      peak: dom('impact-board-peak'),
+      landfall: dom('impact-board-landfall'),
+      rain: dom('impact-board-rain'),
+      flood: dom('impact-board-flood'),
+      cities: dom('impact-board-cities'),
+      allClear: dom('impact-board-allclear'),
+    },
+    (cityId) => this.openCityDetail(cityId),
+  );
   private readonly pointProbe = dom('point-probe');
   private readonly pointProbePin = dom<HTMLButtonElement>('point-probe-pin');
   private sparklineSeries: readonly FlightIntensityPoint[] = [];
@@ -375,11 +385,6 @@ export class UiController {
       needleNow: dom('scale-needle-now'),
       needlePotential: dom('scale-needle-potential'),
       intensityNote: dom('intensity-note'),
-      impactLive: dom('impact-live'),
-      impactReport: dom('impact-report'),
-      impactHeadline: dom('impact-headline'),
-      impactCities: dom('impact-cities'),
-      impactFlood: dom('impact-flood'),
       sparkline: dom('intensity-sparkline'),
       sparklinePath: dom<SVGPathElement>('intensity-sparkline-path'),
       sparklineCursor: dom<SVGLineElement>('intensity-sparkline-cursor'),
@@ -515,6 +520,7 @@ export class UiController {
       if (!marker) continue;
       const currentWindKt =
         storm && storm.alive ? windAtPointKt(storm, city) : 0;
+      this.cityNowWindsKt.set(city.id, currentWindKt);
       const run = accumulated.get(city.id);
       const exposed = currentWindKt >= 34;
       marker.dataset.exposed = String(exposed);
@@ -966,6 +972,18 @@ export class UiController {
     if (!storm || storm.isDemo) {
       f.root.hidden = true;
       this.timelineGradientFrameCount = -1;
+      this.impactBoard.update(
+        buildImpactBoardModel({
+          storm: null,
+          isDemo: true,
+          impact: null,
+          debrief: null,
+          landfallKt: null,
+          landfallAgeH: null,
+          peakSoFarKt: 0,
+          nowWindsKt: this.cityNowWindsKt,
+        }),
+      );
       return;
     }
 
@@ -1143,24 +1161,28 @@ export class UiController {
         `(indicative RSMC band · mpi ${Math.round(potentialKt)} kt 1-min)`;
     }
 
-    // Live coastal exposure: visible while a city is inside the storm's reach.
-    const liveImpact = view.impact?.live ?? null;
-    const showLive = liveImpact !== null && storm.alive && !complete;
-    f.impactLive.hidden = !showLive;
-    if (showLive && liveImpact) {
-      const distanceKm = Math.round(
-        greatCircleKm(
-          { lat: storm.lat, lon: storm.lon },
-          liveImpact.city,
-        ),
-      );
-      const rain = Math.round(liveImpact.rainMm);
-      f.impactLive.textContent =
-        liveImpact.peakWindKt >= 20
-          ? `${liveImpact.city.label} · ${distanceKm} km · ` +
-            `${experiencedWindPhrase(liveImpact.peakWindKt)} so far · ${rain} mm rain`
-          : `watching ${liveImpact.city.label} · ${distanceKm} km out`;
+    // The always-visible impact board owns live exposure, vitals, and the
+    // ranked city table (impact-board.ts).
+    const landfallAgeH =
+      view.milestones?.landfall != null
+        ? (view.intensitySeries[view.milestones.landfall]?.ageH ?? null)
+        : null;
+    let peakSoFarKt = storm.vKt;
+    for (const point of view.intensitySeries) {
+      if (point.vKt > peakSoFarKt) peakSoFarKt = point.vKt;
     }
+    this.impactBoard.update(
+      buildImpactBoardModel({
+        storm,
+        isDemo: false,
+        impact: view.impact,
+        debrief: view.debrief,
+        landfallKt: view.landfallKt,
+        landfallAgeH,
+        peakSoFarKt,
+        nowWindsKt: this.cityNowWindsKt,
+      }),
+    );
 
     f.scrubber.max = String(Math.max(0, view.frameCount - 1));
     f.scrubber.value = String(Math.max(0, view.frameIndex));
@@ -1210,63 +1232,6 @@ export class UiController {
         summary.historicalDeltaKt ?? 0,
         summary.historicalPeakKt,
       );
-    }
-
-    // Coastal-impact report: parametric wind + rain proxies for this run.
-    const impact = view.impact;
-    f.impactReport.hidden = impact === null;
-    if (impact) {
-      if (summary.landfall && view.landfallKt !== null) {
-        const landfallCategory = northIndianOceanClassification(
-          view.landfallKt,
-          SIMULATED_WIND_CONVENTION.averagingMinutes,
-        );
-        f.impactHeadline.textContent =
-          `ashore in the indicative ${landfallCategory.category.name} band · ` +
-          `${Math.round(view.landfallKt)} kt 1-min near ` +
-          formatLatLon(summary.landfall.lat, summary.landfall.lon);
-      } else {
-        const closestKm = summary.death.closestApproachKm;
-        f.impactHeadline.textContent = !Number.isFinite(closestKm)
-          ? 'stayed offshore · never neared muscat'
-          : closestKm <= 25
-            ? 'stayed offshore · skirted muscat inside 25 km'
-            : `stayed offshore · closest pass ${Math.round(closestKm)} km from muscat`;
-      }
-      const exposed = impact.cities
-        .filter((entry) => entry.peakWindKt >= 20)
-        .slice(0, 3);
-      // Rows: [city, phrase · kt · mm], or one all-clear line with no city
-      // attached (a global statement must not read as a per-city record).
-      const rows: Array<[string, string]> =
-        exposed.length > 0
-          ? exposed.map((entry) => [
-              entry.city.label,
-              `${experiencedWindPhrase(entry.peakWindKt)} · ` +
-                `${Math.round(entry.peakWindKt)} kt 1-min · ` +
-                `${Math.round(entry.rainMm)} mm`,
-            ])
-          : [['coast', 'no damaging winds reached any city']];
-      // The recorder repaints every frame; rebuild this list only on change.
-      const rowsKey = rows.flat().join('|');
-      if (rowsKey !== this.impactCitiesKey) {
-        this.impactCitiesKey = rowsKey;
-        f.impactCities.replaceChildren(
-          ...rows.map(([city, detailText]) => {
-            const wrap = document.createElement('div');
-            const term = document.createElement('dt');
-            term.textContent = city;
-            const detail = document.createElement('dd');
-            detail.textContent = detailText;
-            wrap.append(term, detail);
-            return wrap;
-          }),
-        );
-      }
-      f.impactFlood.dataset.risk = impact.floodRisk;
-      f.impactFlood.textContent =
-        `flash-flood proxy ${impact.floodRisk} · ` +
-        `max storm-total ${Math.round(impact.maxLandRainMm)} mm over land`;
     }
 
     const score = view.hindcastScore;
@@ -1724,12 +1689,6 @@ function flightClock(ageH: number): string {
   const minutes = totalMinutes % 60;
   if (days > 0) return `${days} d ${String(hours).padStart(2, '0')} h`;
   return `${hours} h ${String(minutes).padStart(2, '0')} m`;
-}
-
-function formatLatLon(lat: number, lon: number): string {
-  const ns = lat < 0 ? 's' : 'n';
-  const ew = lon < 0 ? 'w' : 'e';
-  return `${Math.abs(lat).toFixed(1)}°${ns} ${Math.abs(lon).toFixed(1)}°${ew}`;
 }
 
 function compactDirection(steerU: number, steerV: number): string {

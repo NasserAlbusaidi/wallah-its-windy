@@ -147,6 +147,7 @@ Notes verified in code:
 | `rain-accumulation.ts` | Fixed accumulation-window definitions, physical millimetre breaks, and piecewise GPU normalization. No DOM or wall clock. | `RAIN_ACCUMULATION_WINDOWS`, `rainAccumulationDefinition`, `normalizeRainAccumulationMm` |
 | `narrative.ts` | Translates the exact intensity budget into one causal sentence. | `explainIntensity`, `CausalNarrative` |
 | `intensity-sparkline.ts` | Pure geometry for the flight-tape wind-vs-time sparkline. | `buildIntensitySparkline`, `nearestIntensityIndex` |
+| `impact-board.ts` | The one always-visible impact surface: pure view-model builder over the impact ledger + debrief (ranked 8-city table, vitals, live/complete headline; landfall is recorded fact, never an ETA) and a thin key-cached DOM view. Fed from `ui.ts:updateFlightRecorder`; supersedes the old debrief impact report and `#impact-live` line. | `buildImpactBoardModel`, `ImpactBoardView`, `formatLatLon` |
 | `point-probe.ts` | Pure point-probe reading from the same environment + vortex data the sim uses, with selected-window rain supplied by the deterministic impact ledger; DOM positioning lives in main/ui. | `createPointProbeReading`, `PointProbeReading` |
 | `export.ts` | Dependency-free storm artifacts: PNG debrief card and WebM replay loop rendered from the immutable tape, never by rewinding the engine. | `makeDebriefCard`, `makeReplayVideo`, `exportFileStem`, `downloadBlob` |
 | `historical-analog.ts` | Deterministic geometric/intensity similarity against shipped historic ghosts; educational analogue, not a forecast claim. | `findHistoricalAnalog`, `HistoricalAnalog` |
@@ -298,6 +299,7 @@ terminates the worker.
 | Add a baked data source | `bake/bake.py` + `bake/binfmt.py` (writer), document in `BINARY-FORMATS.md`, register in `MANIFEST` in `src/main.ts`, add layer-name candidates in `src/render/textures.ts` `pickLayer` if rendered |
 | Add a historical event/scenario | `bake/event_catalog.py` (frozen catalogue), rebake `env_<id>.bin`/`steering_<id>.bin` + `public/data/scenarios.json`, shape validated by `src/scenarios.ts` |
 | Change impact scoring, flood tiers, city list | `src/impact.ts` (`ImpactTracker`, `floodRiskTier`, `IMPACT_CITIES`) |
+| Change how impact is presented (board layout, headline copy, ranking) | `src/impact-board.ts` (model + view), fed from `src/ui.ts` `updateFlightRecorder`; skeleton in `index.html` `#impact-board`, styles in the `style.css` P1 section |
 | Change rain accumulation windows or scales | `src/rain-accumulation.ts`; ring integration in `src/impact.ts`; upload normalization in `src/render/index.ts` |
 | Change the observed-radar provider boundary | `src/radar-observations.ts` (manifest/tile validation + reprojection), `src/main.ts` (wall-clock transport/provenance), `src/render/observed-radar.ts` (display-only pass) |
 | Touch the export card or replay video | `src/export.ts` (`makeDebriefCard`, `makeReplayVideo`) |

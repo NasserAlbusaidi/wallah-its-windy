@@ -1616,16 +1616,6 @@ dd,
 }
 
 /* Live coastal exposure strip (amber family — it is a warning readout). */
-#impact-live {
-  margin: 6px 0 0;
-  color: var(--cat-3, #ffc140);
-  font-size: 11px;
-  letter-spacing: 0.05em;
-}
-#impact-live[hidden] {
-  display: none;
-}
-
 .flight-readouts {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1686,43 +1676,10 @@ dd,
 #debrief-compare-row[hidden],
 #run-comparison[hidden],
 #hindcast-score[hidden],
-#impact-report[hidden],
 #compare-clear[hidden] {
   display: none;
 }
 
-/* Coastal-impact debrief block: cyan family (a report, not a comparison). */
-#impact-report {
-  margin-top: 9px;
-  padding: 9px;
-  background: linear-gradient(90deg, rgba(77, 216, 255, 0.07), transparent);
-  border-left: 2px solid color-mix(in srgb, var(--track, #78dcff) 62%, transparent);
-}
-#impact-report h2 {
-  margin: 0;
-  color: var(--track, #78dcff);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-#impact-headline {
-  margin: 3px 0 7px;
-  color: var(--storm-core, #e8f4ff);
-  font-size: 10px;
-}
-.impact-grid {
-  grid-template-columns: repeat(3, 1fr);
-}
-#impact-flood {
-  margin: 7px 0 0;
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  color: var(--text-mut);
-}
-#impact-flood[data-risk='moderate'] { color: var(--cat-3, #ffc140); }
-#impact-flood[data-risk='high'] { color: var(--cat-4, #ff8f20); }
-#impact-flood[data-risk='extreme'] { color: var(--cat-5, #ff6060); }
 #flight-verdict {
   margin: 0 0 7px;
   color: var(--storm-core, #e8f4ff);
@@ -2155,7 +2112,6 @@ html[data-compact='true'] .ghost-label:not(.active) {
 #app #flight-explanation[data-tone='weakening'] strong,
 #app #flight-trend[data-sign='up'],
 #app #flight-trend[data-sign='down'],
-#app #impact-report h2,
 #app #run-comparison h2,
 #app #hindcast-score h2,
 #model-dialog header p,
@@ -2193,7 +2149,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
 #app #analysis-dock > summary,
 #app .analysis-body h2,
 #app .flight-head,
-#app #impact-report h2,
+#app .impact-board-head,
 #app #run-comparison h2,
 #app #hindcast-score h2,
 #model-dialog h3 {
@@ -2226,7 +2182,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
 #app #intensity-note,
 #app #intensity-sparkline-value,
 #app #historical-analog,
-#app #impact-live,
+#app #impact-board-allclear,
 #app #hindcast-samples,
 #app #export-status {
   color: var(--text-mut);
@@ -2389,9 +2345,9 @@ html[data-compact='true'] .ghost-label:not(.active) {
   color: #f3b3a5;
 }
 
-#app #impact-flood[data-risk='moderate'] { color: var(--cat-3, #ffc140); }
-#app #impact-flood[data-risk='high'] { color: var(--cat-4, #ff8f20); }
-#app #impact-flood[data-risk='extreme'] { color: var(--cat-5, #ff6060); }
+#app #impact-board-flood[data-risk='moderate'] { color: var(--cat-3, #ffc140); }
+#app #impact-board-flood[data-risk='high'] { color: var(--cat-4, #ff8f20); }
+#app #impact-board-flood[data-risk='extreme'] { color: var(--cat-5, #ff6060); }
 
 @media (max-width: 820px) {
   /* Rail becomes a horizontal icon strip below the pickers so the bottom
@@ -3048,6 +3004,157 @@ html[data-compact='true'] .ghost-label:not(.active) {
   left: 404px;
 }
 
+/* Impact board: bottom instrument row reads physics (recorder) then effects
+   (board); the analysis dock slides right to make room when both are up. */
+#app #impact-board {
+  top: auto;
+  right: auto;
+  bottom: 96px;
+  left: 404px;
+  z-index: 6;
+  width: 340px;
+  max-height: min(60dvh, 520px);
+  padding: 13px 15px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#app #impact-board[hidden] {
+  display: none;
+}
+
+/* Third slot in the bottom row only where it provably fits: dock right edge
+   768+390 = 1158 must clear the widest open workbench rail (100vw - 312) with
+   margin, i.e. viewports >= 1478px. Narrower desktops park the dock top-right
+   instead (see the media blocks at the end of this file). */
+@media (min-width: 1478px) {
+  #app:has(#impact-board:not([hidden])) #analysis-dock {
+    left: 768px;
+  }
+}
+
+#app #impact-board .impact-board-head {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+#app #impact-board .impact-board-tag {
+  color: var(--text-dim);
+}
+
+#app #impact-board-headline {
+  margin: 8px 0 0;
+  color: var(--storm-core, #e8f4ff);
+  font-size: 11px;
+}
+
+#app #impact-board .impact-board-vitals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin: 8px 0 0;
+}
+
+#app #impact-board .impact-board-vitals dt {
+  margin: 0 0 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#app #impact-board .impact-board-vitals dd {
+  margin: 0;
+  color: var(--text-hi);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+}
+
+#app #impact-board-flood {
+  margin: 7px 0 0;
+  color: var(--text-mut);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+#app #impact-board .impact-board-cols {
+  display: grid;
+  /* px tracks: the header row renders at 9px and the data rows at 10px, so
+     em-based tracks would misalign the two grids. */
+  grid-template-columns: minmax(0, 1fr) 36px 36px 42px;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--ridge-hi, #2c343c) 42%, transparent);
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+#app #impact-board .impact-board-cols span:first-child {
+  text-align: left;
+}
+
+#app #impact-board-cities {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+/* Two-id scope: the generic `#app .chrome button` control styling (1,1,1)
+   must lose to these rules, or every row renders as a grey chrome button and
+   the category tint never shows. */
+#app #impact-board .impact-board-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px 36px 42px;
+  gap: 6px;
+  align-items: baseline;
+  padding: 2px 4px;
+  background: var(--row-tint, transparent);
+  border: 0;
+  border-radius: 3px;
+  color: var(--text-hi);
+  font: inherit;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  text-align: right;
+  cursor: pointer;
+}
+
+#app #impact-board .impact-board-row .impact-board-city {
+  overflow: hidden;
+  color: var(--text-mut);
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#app #impact-board .impact-board-row output {
+  color: var(--storm-core, #e8f4ff);
+}
+
+#app #impact-board .impact-board-row:hover {
+  background: color-mix(in srgb, var(--track, #78dcff) 12%, var(--row-tint, transparent));
+}
+
+#app #impact-board-allclear {
+  margin: 6px 0 0;
+}
+
+#app #impact-board-allclear[hidden] {
+  display: none;
+}
+
 #app #timeline {
   right: 16px;
   bottom: 16px;
@@ -3581,5 +3688,83 @@ html[data-compact='true'] .ghost-label:not(.active) {
 
   #app:has(#scenario-contract:not([hidden])) #layer-rail {
     top: calc(max(8px, env(safe-area-inset-top)) + 206px);
+  }
+}
+
+/* Impact board responsive: the board keeps the bottom-row slot beside the
+   recorder on every desktop width (right edge 404+340 = 744 clears even the
+   1000px full rail), while the dock leaves the row below 1478px and parks
+   top-right under the month picker — its open state may transiently overlay
+   the rail, but at rest nothing collides or leaves the viewport. On mobile
+   the board is a collapsed strip above the timeline; ImpactBoardView's
+   header tap toggles data-expanded and only these breakpoints react to it,
+   so the toggle is inert on desktop. */
+@media (min-width: 821px) and (max-width: 1477px) {
+  #app:has(#impact-board:not([hidden])) #analysis-dock {
+    top: 118px;
+    right: 16px;
+    bottom: auto;
+    left: auto;
+  }
+
+  /* Event mode grows the month picker (scenario rows + contract line). */
+  #app:has(#scenario-contract:not([hidden])):has(#impact-board:not([hidden])) #analysis-dock {
+    top: 196px;
+  }
+}
+
+@media (max-width: 820px) {
+  #app #impact-board {
+    right: 8px;
+    bottom: 78px;
+    left: 8px;
+    width: auto;
+    max-height: none;
+    padding: 8px 12px;
+  }
+
+  /* Recorder and dock stack above the strip so the bottom row stays legible. */
+  #app:has(#impact-board:not([hidden])) #flight-recorder {
+    bottom: 164px;
+    max-height: min(48dvh, calc(100dvh - 250px));
+  }
+
+  #app:has(#impact-board:not([hidden])) #analysis-dock,
+  #app:has(#flight-recorder:not([hidden])):has(#impact-board:not([hidden])) #analysis-dock {
+    top: auto;
+    right: 8px;
+    bottom: 164px;
+    left: auto;
+  }
+
+  #app #impact-board .impact-board-vitals,
+  #app #impact-board .impact-board-cols,
+  #app #impact-board-cities,
+  #app #impact-board-allclear {
+    display: none;
+  }
+
+  /* Collapsed strip budgets ~86px of height (recorder sits at bottom:164);
+     a wrapping headline would overrun it, so clamp to one line — expanding
+     shows the full text. */
+  #app #impact-board:not([data-expanded='true']) #impact-board-headline {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #app #impact-board[data-expanded='true'] {
+    max-height: 55dvh;
+    overflow-y: auto;
+  }
+
+  #app #impact-board[data-expanded='true'] .impact-board-vitals,
+  #app #impact-board[data-expanded='true'] .impact-board-cols,
+  #app #impact-board[data-expanded='true'] #impact-board-cities {
+    display: grid;
+  }
+
+  #app #impact-board[data-expanded='true'] #impact-board-allclear:not([hidden]) {
+    display: block;
   }
 }

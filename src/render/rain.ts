@@ -55,6 +55,8 @@ import {
 } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
 import { rainCenterClip } from './precipitating-cloud';
+import { cloudMetricX } from './cloud-motion';
+import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
 
 /** Per-frame decay multiply — THE knob (eng task T5, valid 0.90–1.00). */
@@ -62,8 +64,6 @@ const RAIN_DECAY_PER_H = 0.72;
 const RAIN_GAIN = 0.0025; // metres of local relief -> bounded upslope multiplier
 const FALLBACK_TRANSPORT_PER_H = 0.44;
 const RMAX_BASE = 0.11; // mirror of particles' base radius (clip units here)
-const HALF_DOMAIN_HEIGHT_KM =
-  ((DOMAIN.latMax - DOMAIN.latMin) * 111) / 2;
 // Channel window on the normalized baked log10(1+acc) values. These preserve the
 // old visual cutoffs after removing the renderer's accidental second logarithm:
 // old 0.62/0.92 in log1p-space map to ~0.41/0.84 in the honest linear space.
@@ -370,11 +370,7 @@ export class RainLayer {
     );
     gl.uniform1f(u('u_inflow'), INFLOW_RAD);
     const centreLat = c ? clipToLatLon(c.x, c.y, DOMAIN).lat : 21;
-    gl.uniform1f(
-      u('u_metricX'),
-      ((DOMAIN.lonMax - DOMAIN.lonMin) * Math.cos((centreLat * Math.PI) / 180)) /
-        (DOMAIN.latMax - DOMAIN.latMin),
-    );
+    gl.uniform1f(u('u_metricX'), cloudMetricX(centreLat));
     // Only a live storm produces new rain; aftermath retains routing + decay.
     const raining = Boolean(c && ctx.frame.storm?.alive && ctx.vKt > 0);
     const d = ctx.frame.storm?.diagnostics;

@@ -32,6 +32,7 @@ import {
 } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
 import type { DrawCtx, RenderModule } from './context';
+import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 
 const DEFAULT_COUNT = 3000;
 const MS_PER_KT = 0.514444;
@@ -43,9 +44,12 @@ const LIFE_MIN_S = 2.0;
 const LIFE_MAX_S = 5.0;
 /** Palette span, m/s (matches the wind layer legend + fill shader). */
 const SPEED_SPAN_MS = 50;
-/** Half the domain height in km — converts rmwKm to clip-y units. */
-const HALF_DOMAIN_HEIGHT_KM = ((DOMAIN.latMax - DOMAIN.latMin) * 111) / 2;
-/** Clip-x metres per clip-y metre at the domain's mid latitude (~1.56). */
+/**
+ * Clip-x metres per clip-y metre, deliberately frozen at the domain's mid
+ * latitude (~1.56): the whole particle field shares one advection frame, so a
+ * per-particle cos(lat) would shear trails mid-flight. Not a duplicate of
+ * cloudMetricX (which is latitude-dependent by design).
+ */
 const METRIC_X =
   ((DOMAIN.lonMax - DOMAIN.lonMin) *
     Math.cos((((DOMAIN.latMin + DOMAIN.latMax) / 2) * Math.PI) / 180)) /

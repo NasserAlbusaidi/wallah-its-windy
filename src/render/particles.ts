@@ -21,10 +21,10 @@
 
 import { TOKENS } from '../tokens';
 import { makeRng } from '../rng';
-import { DOMAIN } from '../grid';
 import { maxWindRadiusKm } from '../structure';
 import { INFLOW_RAD, vortexWind } from './vortex';
 import { makeProgram } from './gl-utils';
+import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 import type { Rng } from '../rng';
 import type { DrawCtx, RenderModule } from './context';
 
@@ -37,8 +37,6 @@ const SHEAR_THRESHOLD = 9; // m/s; above this the swarm smears downshear
 const SHEAR_K = 0.010; // clip units / sec per (m/s) above threshold
 const LIFE_MIN = 2.2;
 const LIFE_MAX = 5.5;
-const HALF_DOMAIN_HEIGHT_KM =
-  ((DOMAIN.latMax - DOMAIN.latMin) * 111) / 2;
 
 interface ParticleGeometry {
   rMax: number;

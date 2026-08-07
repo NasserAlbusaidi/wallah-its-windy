@@ -428,6 +428,74 @@ describe('flowacc.bin', () => {
   });
 });
 
+describe('regions.bin + regions.json', () => {
+  const bin = loadBin('regions.bin');
+  const sidecar = JSON.parse(
+    readFileSync(`${DATA_DIR}/regions.json`, 'utf8'),
+  ) as {
+    version: number;
+    grid: { nx: number; ny: number; bbox: number[] };
+    admin1: Record<string, string>;
+    wadi: Record<string, string>;
+    wadiBasinCount: number;
+  };
+
+  it('pins the impact-grid geometry and unquantized categorical contract', () => {
+    const admin = bin.layers.get('admin1');
+    const wadi = bin.layers.get('wadi');
+    expect(admin).toBeDefined();
+    expect(wadi).toBeDefined();
+    for (const layer of [admin!, wadi!]) {
+      // The bake mirrors src/impact.ts GRID_NX/GRID_NY — drift must be loud.
+      expect(layer.nx).toBe(200);
+      expect(layer.ny).toBe(120);
+      expect(layer.nt).toBe(1);
+      expect(layer.bbox).toEqual(DOMAIN);
+      expect(layer.quantized).toBe(false);
+      expect(layer.scale).toBe(1);
+      expect(layer.offset).toBe(0);
+      expect(allFinite(layer.data)).toBe(true);
+      // Ids must survive the Float32 dequantize path integer-exact.
+      for (const v of layer.data) expect(v).toBe(Math.round(v));
+    }
+    expect(admin!.dtype).toBe(DType.uint8);
+    expect(wadi!.dtype).toBe(DType.uint16);
+  });
+
+  it('every named id exists in its raster and ranges are sane', () => {
+    const admin = bin.layers.get('admin1')!;
+    const wadi = bin.layers.get('wadi')!;
+    expect(range(admin.data).max).toBeLessThanOrEqual(11);
+    expect(range(wadi.data).max).toBe(sidecar.wadiBasinCount);
+    expect(sidecar.grid.nx).toBe(admin.nx);
+    expect(sidecar.grid.ny).toBe(admin.ny);
+    expect(sidecar.grid.bbox).toEqual([
+      DOMAIN.lonMin,
+      DOMAIN.lonMax,
+      DOMAIN.latMin,
+      DOMAIN.latMax,
+    ]);
+    expect(Object.keys(sidecar.admin1)).toHaveLength(11);
+    expect(Object.values(sidecar.admin1)).toContain('muscat');
+    expect(Object.values(sidecar.admin1)).toContain('dhofar');
+    const adminIds = new Set(Array.from(admin.data));
+    for (const id of Object.keys(sidecar.admin1)) {
+      expect(adminIds.has(Number(id))).toBe(true);
+    }
+    const wadiIds = new Set(Array.from(wadi.data));
+    for (const id of Object.keys(sidecar.wadi)) {
+      expect(wadiIds.has(Number(id))).toBe(true);
+    }
+    // Spot checks: Muscat city sits in the muscat governorate; open sea is 0.
+    const muscatId = Number(
+      Object.entries(sidecar.admin1).find(([, n]) => n === 'muscat')![0],
+    );
+    expect(nearest(admin, MUSCAT.lat, MUSCAT.lon)).toBe(muscatId);
+    expect(nearest(admin, 18, 65)).toBe(0);
+    expect(nearest(wadi, 18, 65)).toBe(0);
+  });
+});
+
 describe('genesis.json', () => {
   it('is an array of {lat,lon} all inside the domain', () => {
     const raw = readFileSync(`${DATA_DIR}/genesis.json`, 'utf8');

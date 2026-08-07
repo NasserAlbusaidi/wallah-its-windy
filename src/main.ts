@@ -512,8 +512,20 @@ let ensembleBoardSummary: EnsembleBoardSummary | null = null;
 let ensembleMembersShown = false;
 /** Pending post-spawn settle timer for the automatic ensemble. */
 let autoEnsembleTimer: number | null = null;
-/** Device eligibility for the auto run (AUTO_ENSEMBLE_BUDGET); set in resize(). */
-let autoEnsembleEligible = false;
+
+/**
+ * Device eligibility for the auto run (AUTO_ENSEMBLE_BUDGET), evaluated at
+ * scheduling time — a boot-time cache would freeze whatever tier the first
+ * pre-layout resize() saw and never recover on windows that never resize.
+ */
+function autoEnsembleAllowed(): boolean {
+  return chooseRenderProfile({
+    width: glCanvas.clientWidth,
+    dpr: window.devicePixelRatio || 1,
+    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+    hardwareConcurrency: navigator.hardwareConcurrency || 8,
+  }).autoEnsemble;
+}
 
 // --- Sim + render construction (defensive against half-done siblings) --------
 let engine: SimEngine | null = null;
@@ -628,7 +640,6 @@ function resize(): void {
   const h = Math.floor(glCanvas.clientHeight * dpr);
   document.documentElement.dataset.compact = String(profile.compact);
   renderCtrl?.setParticleBudget?.(profile.particleBudget);
-  autoEnsembleEligible = profile.autoEnsemble;
   for (const c of [glCanvas, overlayCanvas]) {
     if (c.width !== w || c.height !== h) {
       c.width = w;
@@ -1167,7 +1178,7 @@ function doSpawn(
   ensembleStatus.value = spawn.isDemo
     ? 'spawn or select a storm'
     : 'ready · worker cache will reuse this environment';
-  if (!spawn.isDemo && autoEnsembleEligible) {
+  if (!spawn.isDemo && autoEnsembleAllowed()) {
     const spawnRef = currentSpawn;
     autoEnsembleTimer = window.setTimeout(() => {
       autoEnsembleTimer = null;

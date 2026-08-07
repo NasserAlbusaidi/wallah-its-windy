@@ -626,6 +626,14 @@ function resize(): void {
   ui.layoutMapOverlays();
 }
 window.addEventListener('resize', resize);
+// The compact breakpoint moves #map-frame's CSS top when the scenario
+// contract appears (`:has(#scenario-contract:not([hidden]))`) — no resize
+// event fires, but the inline frame height derived from offsetTop must
+// follow or the canvas bottom over/under-fills by the 60px delta.
+new MutationObserver(() => resize()).observe(
+  must(document.getElementById('scenario-contract'), '#scenario-contract'),
+  { attributes: true, attributeFilter: ['hidden'] },
+);
 resize();
 
 // --- Progressive data loading (design task T2 — map assembles as data arrives) --
@@ -2480,6 +2488,30 @@ glCanvas.addEventListener(
   { passive: false },
 );
 
+// A second pinch finger can land on a city-marker button (they sit above the
+// canvas and are prominent when zoomed). Adopt that pointer into the active
+// camera gesture instead of letting it click the marker mid-pinch; pointer
+// capture retargets its stream to glCanvas and cancelling the pointerdown
+// suppresses the compatibility click.
+window.addEventListener(
+  'pointerdown',
+  (event) => {
+    if (cameraGestures.activePointers() === 0) return;
+    if (!(event.target instanceof Element)) return;
+    if (!event.target.closest('.city-marker')) return;
+    const p = canvasPoint(event);
+    cameraGestures.pointerDown(event.pointerId, p.x, p.y);
+    try {
+      glCanvas.setPointerCapture(event.pointerId);
+    } catch {
+      /* capture is best-effort */
+    }
+    clearProbeTouch();
+    event.preventDefault();
+  },
+  { capture: true },
+);
+
 glCanvas.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'mouse' && event.button !== 0) return;
   if (event.pointerType === 'touch' && probePinned) {
@@ -2608,6 +2640,9 @@ function toggleTransport(): void {
 }
 
 window.addEventListener('keydown', (e) => {
+  // A focused widget already consumed this key (e.g. the sparkline scrubber
+  // preventDefaults its arrows) — don't ALSO drive the camera or transport.
+  if (e.defaultPrevented) return;
   const t = e.target as HTMLElement | null;
   if (
     t instanceof HTMLSelectElement ||
@@ -2633,16 +2668,20 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   // Camera keys: arrows pan, +/- zoom about the centre, h/Home = full domain.
-  const rect = glCanvas.getBoundingClientRect();
-  const camera = cameraGestures.key(
-    currentViewTransform(),
-    e.code,
-    Math.max(1, rect.width),
-    Math.max(1, rect.height),
-  );
-  if (camera) {
-    e.preventDefault();
-    return;
+  // Modified keys stay the browser's (Ctrl+/- page zoom is an a11y feature;
+  // Alt+arrows is history navigation).
+  if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+    const rect = glCanvas.getBoundingClientRect();
+    const camera = cameraGestures.key(
+      currentViewTransform(),
+      e.code,
+      Math.max(1, rect.width),
+      Math.max(1, rect.height),
+    );
+    if (camera) {
+      e.preventDefault();
+      return;
+    }
   }
   if (e.code !== 'Space') return;
   e.preventDefault();

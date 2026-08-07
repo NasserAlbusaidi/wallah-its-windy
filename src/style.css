@@ -123,7 +123,11 @@ dd,
   pointer-events: none; /* clicks fall through to the app for spawning */
 }
 #gl-canvas {
-  touch-action: manipulation;
+  /* The app owns ALL touch gestures on the map (pan/pinch camera, tap-to-
+     spawn, long-press probe). `manipulation` would leave pinch-zoom and
+     panning to the browser, which claims them and pointercancels the app's
+     gesture — the camera pinch would never fire on a real touch device. */
+  touch-action: none;
 }
 
 /* Storm identity pinned to the simulated eye. The zero-size root is the exact

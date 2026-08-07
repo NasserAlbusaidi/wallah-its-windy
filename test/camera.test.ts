@@ -118,6 +118,15 @@ describe('camera view transform', () => {
     expect(t.bbox.latMin).toBeGreaterThanOrEqual(DOMAIN.latMin - 1e-9);
   });
 
+  it('containment outranks MAX_ZOOM on hyper-wide canvases', () => {
+    // aspect 13 > metricX * MAX_ZOOM (~12.45): the cover-fit floor exceeds
+    // MAX_ZOOM, and the view must still stay inside the domain.
+    const t = computeViewTransform(view(0, 0, 4), 13);
+    expect(t.bbox.lonMin).toBeGreaterThanOrEqual(DOMAIN.lonMin - 1e-9);
+    expect(t.bbox.lonMax).toBeLessThanOrEqual(DOMAIN.lonMax + 1e-9);
+    expect(t.bbox.lonMax - t.bbox.lonMin).toBeCloseTo(20, 6);
+  });
+
   it('clamps zoom to the cover-fit minimum and MAX_ZOOM', () => {
     const wide = computeViewTransform(view(0, 0, 0.2), 2.0);
     // Under-zoom clamps to cover-fit: canvas fully covered by domain data.

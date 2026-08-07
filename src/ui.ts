@@ -419,6 +419,7 @@ export class UiController {
     this.buildCityMarkers();
     dom<HTMLButtonElement>('city-detail-close').addEventListener('click', () => {
       this.cityDetail.hidden = true;
+      this.cityDetailOpenId = null;
     });
     this.installLayerRailIcons();
     this.bindSparklineInspection();
@@ -511,6 +512,7 @@ export class UiController {
       marker.style.top = `${y}px`;
       placed.push({ x, y, side });
     }
+    this.reanchorCityDetail();
   }
 
   /** Update glow and exact accessible readings from the current displayed frame. */
@@ -562,6 +564,28 @@ export class UiController {
     this.cityDetail.style.left = marker.style.left;
     this.cityDetail.style.top = marker.style.top;
     this.cityDetail.hidden = false;
+    this.cityDetailOpenId = cityId;
+  }
+
+  /** Which city's detail card is open, so camera moves can re-anchor it. */
+  private cityDetailOpenId: string | null = null;
+
+  /**
+   * The card copies its anchor from the marker once at open time; after a
+   * pan/zoom relayout it must follow the marker — or close when the marker
+   * was culled off-view (a floating card over the wrong geography is worse
+   * than a closed one).
+   */
+  private reanchorCityDetail(): void {
+    if (this.cityDetailOpenId === null || this.cityDetail.hidden) return;
+    const marker = this.cityMarkers.get(this.cityDetailOpenId);
+    if (!marker || marker.hidden) {
+      this.cityDetail.hidden = true;
+      this.cityDetailOpenId = null;
+      return;
+    }
+    this.cityDetail.style.left = marker.style.left;
+    this.cityDetail.style.top = marker.style.top;
   }
 
   showPointProbe(
@@ -1438,6 +1462,13 @@ export class UiController {
 
     const x = this.pxX(view.lon, width);
     const y = this.pxY(view.lat, height);
+    // Panned/zoomed views can put the eye far off-screen; without this cull
+    // the chip clamp would pin an identity chip to the screen edge, visibly
+    // attached to nothing (city markers cull the same way).
+    if (x < -40 || x > width + 40 || y < -20 || y > height + 20) {
+      this.stormTag.hidden = true;
+      return;
+    }
     this.stormTag.style.left = `${x}px`;
     this.stormTag.style.top = `${y}px`;
     this.stormTag.hidden = false;

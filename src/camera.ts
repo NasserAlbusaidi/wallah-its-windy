@@ -56,7 +56,11 @@ function clampPass(
 ): ClampedView {
   const centreLat = clipToLatLon(0, cy).lat;
   const m = metricX(centreLat);
-  const z = clamp(zoom, Math.max(1, aspect / m), MAX_ZOOM);
+  // Domain containment outranks MAX_ZOOM: on a hyper-wide canvas the
+  // cover-fit floor (aspect/m) can exceed MAX_ZOOM, and capping at MAX_ZOOM
+  // there would push the visible bbox outside the domain.
+  const floor = Math.max(1, aspect / m);
+  const z = clamp(zoom, floor, Math.max(MAX_ZOOM, floor));
   const halfH = 1 / z;
   const halfW = (aspect * halfH) / m;
   return {

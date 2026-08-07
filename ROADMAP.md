@@ -462,6 +462,9 @@ These features should grow around verified science rather than compete with it.
 
 ### Automatic ensemble envelope
 
+Delivered 2026-08-07 as UX v2 phase 4 (item 7c below); the calibrated-cone
+upgrade path stays gated on HF-4.
+
 - Auto-run a 20-member ensemble after a spawn once the input settles; cancel a
   stale job when the user respawns or changes the environment.
 - Derive a time-indexed percentile envelope from the ensemble worker output and
@@ -600,6 +603,24 @@ incident record.
    ranked worst-hit block on the impact board following the accum-window
    selection. Areal values keep the parametric-proxy label and are never
    flood-tiered. Phase 4 (ensemble on-map) remains.
+7c. **Complete (2026-08-07): ensemble on-map — UX v2 phase 4.** The
+   "Automatic ensemble envelope" contract above, delivered: a 20-member
+   ensemble auto-runs after a real (non-demo) spawn once input settles
+   (1.5 s debounce); respawns, environment switches, and sensitivity runs
+   cancel the stale job cooperatively (worker abandons remaining members via
+   a cancel message, not just a discarded result). A time-indexed percentile
+   envelope (`src/ensemble-envelope.ts`: per-lead median centre + p90
+   great-circle radius, membership floor max(4, 30%)) draws by default
+   through the render facade (`src/render/ensemble.ts`, between ghosts and
+   the live track in luminance order); member tracks are on demand via the
+   impact-board toggle. Headline counts ("N of 20 members" — never a
+   percentage) sit on the impact board. The versioned budget the contract
+   requires is `AUTO_ENSEMBLE_BUDGET` v1 in `src/performance.ts`: 20
+   members, worker-thread only, envelope computed once per result, auto-run
+   eligibility = desktop tier only (`RenderProfile.autoEnsemble`); phone and
+   mid tiers keep the explicit Run fallback. Wording stays
+   perturbation-frequency everywhere (HF-4 rejection binding); the
+   calibrated-cone replacement remains gated on a future HF-4 pass.
 
 ### Next
 
@@ -608,8 +629,9 @@ incident record.
    observations exist; evaluate only after at least 12 forecasts across four
    storms mature. This lane runs on the calendar, not on effort — it only
    accumulates when real storms happen.
-9. Add population exposure and automatic ensemble envelopes with the explicit
-   non-casualty and perturbation-frequency labels defined above.
+9. Add population exposure with the explicit non-casualty labels defined
+   above (the automatic ensemble envelope shipped as item 7c with its
+   perturbation-frequency labels).
 
 ### Later
 

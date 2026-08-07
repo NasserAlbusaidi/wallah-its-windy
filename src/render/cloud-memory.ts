@@ -205,6 +205,10 @@ export interface CloudTape {
   runKey(): string | null;
 }
 
+// Deliberately NOT the view-aware VIEW_QUAD_VS: cloud-memory state textures
+// are domain-registered and causality-sealed (state(k) is a pure function of
+// the frozen tape) — the camera must never enter this pipeline. env.ts reads
+// the result at view-derived domain UV, which is where presentation happens.
 const CLOUD_MEMORY_VS = /* glsl */ `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;

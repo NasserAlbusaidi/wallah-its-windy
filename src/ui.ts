@@ -24,10 +24,12 @@ import type {
   StormDeath,
   StormState,
   UiState,
+  ViewTransform,
 } from './types';
 import { DeathReason, AFTERMATH_FADE_MS } from './types';
 import { randomSeed, type HashState } from './rng';
 import { DOMAIN, latLonToCell, latLonToClip } from './grid';
+import { latLonToScreen, viewKey } from './camera';
 import { TOKENS } from './tokens';
 import { categoryRgba, intensityFraction, stormCategory } from './category';
 import { IMPACT_CITIES, windAtPointKt } from './impact';
@@ -417,6 +419,7 @@ export class UiController {
     this.buildCityMarkers();
     dom<HTMLButtonElement>('city-detail-close').addEventListener('click', () => {
       this.cityDetail.hidden = true;
+      this.cityDetailOpenId = null;
     });
     this.installLayerRailIcons();
     this.bindSparklineInspection();
@@ -486,6 +489,12 @@ export class UiController {
       if (!marker) continue;
       const x = this.pxX(city.lon, width);
       let y = this.pxY(city.lat, height);
+      // Zoomed/panned views place some cities outside the canvas — hide them
+      // (with a margin so half-visible labels at the edge still render).
+      const offscreen =
+        x < -40 || x > width + 40 || y < -20 || y > height + 20;
+      marker.hidden = offscreen;
+      if (offscreen) continue;
       const side = city.lon >= 64.5 ? 'left' : 'right';
       // Static labels are sparse, but Muscat/Sur and the Makran cities can
       // collide on compact screens. Nudge only close neighbours on one side.
@@ -503,6 +512,7 @@ export class UiController {
       marker.style.top = `${y}px`;
       placed.push({ x, y, side });
     }
+    this.reanchorCityDetail();
   }
 
   /** Update glow and exact accessible readings from the current displayed frame. */
@@ -554,6 +564,28 @@ export class UiController {
     this.cityDetail.style.left = marker.style.left;
     this.cityDetail.style.top = marker.style.top;
     this.cityDetail.hidden = false;
+    this.cityDetailOpenId = cityId;
+  }
+
+  /** Which city's detail card is open, so camera moves can re-anchor it. */
+  private cityDetailOpenId: string | null = null;
+
+  /**
+   * The card copies its anchor from the marker once at open time; after a
+   * pan/zoom relayout it must follow the marker — or close when the marker
+   * was culled off-view (a floating card over the wrong geography is worse
+   * than a closed one).
+   */
+  private reanchorCityDetail(): void {
+    if (this.cityDetailOpenId === null || this.cityDetail.hidden) return;
+    const marker = this.cityMarkers.get(this.cityDetailOpenId);
+    if (!marker || marker.hidden) {
+      this.cityDetail.hidden = true;
+      this.cityDetailOpenId = null;
+      return;
+    }
+    this.cityDetail.style.left = marker.style.left;
+    this.cityDetail.style.top = marker.style.top;
   }
 
   showPointProbe(
@@ -1430,6 +1462,13 @@ export class UiController {
 
     const x = this.pxX(view.lon, width);
     const y = this.pxY(view.lat, height);
+    // Panned/zoomed views can put the eye far off-screen; without this cull
+    // the chip clamp would pin an identity chip to the screen edge, visibly
+    // attached to nothing (city markers cull the same way).
+    if (x < -40 || x > width + 40 || y < -20 || y > height + 20) {
+      this.stormTag.hidden = true;
+      return;
+    }
     this.stormTag.style.left = `${x}px`;
     this.stormTag.style.top = `${y}px`;
     this.stormTag.hidden = false;
@@ -1516,17 +1555,18 @@ export class UiController {
   }
 
   /**
-   * Faint 5° graticule + coordinate labels — the chart-frame furniture that
-   * makes the letterboxed map read as a charted area rather than a screenshot.
-   * Drawn beneath the genesis glow; deliberately near-invisible (chart lines,
-   * not data). Canvas text is a deliberate exception to the DOM-type rule:
-   * these labels reproject every frame with the map exactly like the grid.
+   * Faint graticule + coordinate labels — chart furniture. Line generation
+   * derives from the VISIBLE bbox (the camera's clamped view), stepping 5°
+   * when the visible lon span is wide and 1° when zoomed in, so lines exist
+   * at every zoom instead of stopping at the fixed-domain positions.
    */
   private drawGraticule(
     ctx: CanvasRenderingContext2D,
     w: number,
     h: number,
   ): void {
+    const bbox = this.view?.bbox ?? DOMAIN;
+    const step = bbox.lonMax - bbox.lonMin > 8 ? 5 : 1;
     const line = trackRgba(0.05);
     const label = trackRgba(0.3);
     const font = Math.max(8, Math.round(h * 0.013));
@@ -1536,7 +1576,9 @@ export class UiController {
     ctx.fillStyle = label;
     ctx.font = `${font}px "IBM Plex Mono", monospace`;
     ctx.textBaseline = 'bottom';
-    for (let lon = DOMAIN.lonMin + 5; lon < DOMAIN.lonMax; lon += 5) {
+    const lon0 = Math.ceil(bbox.lonMin / step) * step;
+    for (let lon = lon0; lon < bbox.lonMax; lon += step) {
+      if (lon <= bbox.lonMin) continue;
       const x = this.pxX(lon, w);
       ctx.beginPath();
       ctx.moveTo(x, 0);
@@ -1545,7 +1587,9 @@ export class UiController {
       ctx.textAlign = 'center';
       ctx.fillText(`${lon}°e`, x, h - font * 0.4);
     }
-    for (let lat = DOMAIN.latMin + 5; lat < DOMAIN.latMax; lat += 5) {
+    const lat0 = Math.ceil(bbox.latMin / step) * step;
+    for (let lat = lat0; lat < bbox.latMax; lat += step) {
+      if (lat <= bbox.latMin) continue;
       const y = this.pxY(lat, h);
       ctx.beginPath();
       ctx.moveTo(0, y);
@@ -1557,13 +1601,30 @@ export class UiController {
     ctx.restore();
   }
 
-  /** lon -> device-pixel x, via grid.ts clip space (the only coordinate owner). */
+  /** The frame's world->ndc view; main.ts pushes it before each render pass. */
+  private view: ViewTransform | null = null;
+  private lastViewKey = '';
+
+  setView(view: ViewTransform): void {
+    this.view = view;
+    // DOM overlays (city markers, ghost labels) reproject only on demand;
+    // re-lay them whenever the camera actually moved.
+    const key = viewKey(view);
+    if (key !== this.lastViewKey) {
+      this.lastViewKey = key;
+      this.layoutMapOverlays();
+    }
+  }
+
+  /** lon -> pixel x through the camera view (grid.ts + camera.ts own the math). */
   private pxX(lon: number, w: number): number {
+    if (this.view) return latLonToScreen(this.view, 0, lon, w, 1).x;
     return ((latLonToClip(0, lon).x + 1) / 2) * w;
   }
 
-  /** lat -> device-pixel y (clip y is up; canvas y is down). */
+  /** lat -> pixel y (clip y is up; canvas y is down). */
   private pxY(lat: number, h: number): number {
+    if (this.view) return latLonToScreen(this.view, lat, 0, 1, h).y;
     return ((1 - latLonToClip(lat, 0).y) / 2) * h;
   }
 

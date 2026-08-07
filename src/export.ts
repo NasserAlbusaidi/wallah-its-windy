@@ -12,12 +12,13 @@ import type {
   FlightFrame,
   FlightRunSnapshot,
 } from './flight-recorder';
-import { DOMAIN, offsetKm } from './grid';
+import { offsetKm } from './grid';
+import { latLonToScreen } from './camera';
 import {
   maxWindRadiusKm,
   windRadiusFromQuadrantsKm,
 } from './structure';
-import type { WindRadiiKm } from './types';
+import type { ViewTransform, WindRadiiKm } from './types';
 import {
   SIMULATED_WIND_CONVENTION,
   northIndianOceanClassification,
@@ -35,6 +36,12 @@ export interface StormExport {
   run: FlightRunSnapshot;
   comparison: RunComparison | null;
   mapCanvas: HTMLCanvasElement;
+  /**
+   * The camera view the map snapshot was composited with. Annotations (track,
+   * rings, marker) project through it so they land on the captured pixels;
+   * exported DATA stays view-independent — only presentation rides the camera.
+   */
+  view: ViewTransform;
 }
 
 function exportCanvas(): HTMLCanvasElement {
@@ -56,16 +63,23 @@ function freezeMap(source: HTMLCanvasElement): HTMLCanvasElement {
   return frozen;
 }
 
-function point(frame: Pick<FlightFrame, 'lat' | 'lon'>): [number, number] {
-  return [
-    ((frame.lon - DOMAIN.lonMin) / (DOMAIN.lonMax - DOMAIN.lonMin)) * WIDTH,
-    ((DOMAIN.latMax - frame.lat) / (DOMAIN.latMax - DOMAIN.latMin)) * HEIGHT,
-  ];
+/**
+ * Geo -> export-canvas px through the CAPTURED view. The snapshot is drawn
+ * stretched onto the export canvas, so the same linear ndc->px map places
+ * annotations exactly on the captured pixels at any camera state.
+ */
+function point(
+  frame: Pick<FlightFrame, 'lat' | 'lon'>,
+  view: ViewTransform,
+): [number, number] {
+  const p = latLonToScreen(view, frame.lat, frame.lon, WIDTH, HEIGHT);
+  return [p.x, p.y];
 }
 
 function drawTrack(
   ctx: CanvasRenderingContext2D,
   frames: readonly Pick<FlightFrame, 'lat' | 'lon'>[],
+  view: ViewTransform,
   color: string,
   width: number,
 ): void {
@@ -78,7 +92,7 @@ function drawTrack(
   ctx.setLineDash([5, 11]);
   ctx.beginPath();
   frames.forEach((frame, index) => {
-    const [x, y] = point(frame);
+    const [x, y] = point(frame, view);
     if (index === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
@@ -89,6 +103,7 @@ function drawTrack(
 function drawWindRing(
   ctx: CanvasRenderingContext2D,
   frame: FlightFrame,
+  view: ViewTransform,
   radii: WindRadiiKm,
   color: string,
   width: number,
@@ -112,7 +127,7 @@ function drawWindRing(
       Math.cos(angle),
       radiusKm,
     );
-    const [x, y] = point(location);
+    const [x, y] = point(location, view);
     if (step === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
@@ -201,6 +216,7 @@ function drawStorm(
   canvas: HTMLCanvasElement,
   frozenMap: HTMLCanvasElement,
   run: FlightRunSnapshot,
+  view: ViewTransform,
   frameIndex: number,
   comparison: RunComparison | null,
 ): void {
@@ -212,12 +228,13 @@ function drawStorm(
   ctx.drawImage(frozenMap, 0, 0);
 
   if (comparison) {
-    drawTrack(ctx, comparison.baseline.frames, 'rgba(255, 183, 77, 0.56)', 3);
+    drawTrack(ctx, comparison.baseline.frames, view, 'rgba(255, 183, 77, 0.56)', 3);
   }
-  drawTrack(ctx, run.frames.slice(0, index + 1), 'rgba(120, 220, 255, 0.78)', 4);
+  drawTrack(ctx, run.frames.slice(0, index + 1), view, 'rgba(120, 220, 255, 0.78)', 4);
   drawWindRing(
     ctx,
     frame,
+    view,
     frame.structure.r34Km,
     'rgba(120, 220, 255, 0.22)',
     2,
@@ -226,6 +243,7 @@ function drawStorm(
   drawWindRing(
     ctx,
     frame,
+    view,
     frame.structure.r64Km,
     'rgba(232, 244, 255, 0.34)',
     2,
@@ -237,9 +255,9 @@ function drawStorm(
     sw: frame.structure.rmwKm,
     nw: frame.structure.rmwKm,
   };
-  drawWindRing(ctx, frame, rmw, 'rgba(255, 183, 77, 0.5)', 2, []);
+  drawWindRing(ctx, frame, view, rmw, 'rgba(255, 183, 77, 0.5)', 2, []);
 
-  const [x, y] = point(frame);
+  const [x, y] = point(frame, view);
   const radius = 24 + Math.max(0, frame.vKt - 20) * 0.32;
   const halo = ctx.createRadialGradient(x, y, 0, x, y, radius);
   halo.addColorStop(0, 'rgba(232, 244, 255, 0.95)');
@@ -286,6 +304,7 @@ export async function makeDebriefCard(input: StormExport): Promise<Blob> {
     canvas,
     frozenMap,
     input.run,
+    input.view,
     input.run.frames.length - 1,
     input.comparison,
   );
@@ -341,7 +360,7 @@ export async function makeReplayVideo(
     const paint = (now: number): void => {
       const fraction = Math.min(1, (now - start) / durationMs);
       const index = Math.round(fraction * (input.run.frames.length - 1));
-      drawStorm(canvas, frozenMap, input.run, index, input.comparison);
+      drawStorm(canvas, frozenMap, input.run, input.view, index, input.comparison);
       if (fraction >= 1) {
         resolve();
         return;

@@ -29,9 +29,11 @@ import {
   makeQuadVao,
   makeRenderTarget,
   disposeRenderTarget,
+  setViewUniform,
 } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
 import type { DrawCtx, RenderModule } from './context';
+import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 
 const DEFAULT_COUNT = 3000;
 const MS_PER_KT = 0.514444;
@@ -43,24 +45,30 @@ const LIFE_MIN_S = 2.0;
 const LIFE_MAX_S = 5.0;
 /** Palette span, m/s (matches the wind layer legend + fill shader). */
 const SPEED_SPAN_MS = 50;
-/** Half the domain height in km — converts rmwKm to clip-y units. */
-const HALF_DOMAIN_HEIGHT_KM = ((DOMAIN.latMax - DOMAIN.latMin) * 111) / 2;
-/** Clip-x metres per clip-y metre at the domain's mid latitude (~1.56). */
+/**
+ * Clip-x metres per clip-y metre, deliberately frozen at the domain's mid
+ * latitude (~1.56): the whole particle field shares one advection frame, so a
+ * per-particle cos(lat) would shear trails mid-flight. Not a duplicate of
+ * cloudMetricX (which is latitude-dependent by design).
+ */
 const METRIC_X =
   ((DOMAIN.lonMax - DOMAIN.lonMin) *
     Math.cos((((DOMAIN.latMin + DOMAIN.latMax) / 2) * Math.PI) / 180)) /
   (DOMAIN.latMax - DOMAIN.latMin);
 
+// a_pos is WORLD clip; u_view projects it to the screen-registered trail
+// target (camera moves clear the trail history rather than re-projecting it).
 const LINE_VS = /* glsl */ `#version 300 es
 in vec2 a_pos;
 in float a_speed;
 in float a_alpha;
+uniform vec4 u_view;
 out float v_speed;
 out float v_alpha;
 void main() {
   v_speed = a_speed;
   v_alpha = a_alpha;
-  gl_Position = vec4(a_pos, 0.0, 1.0);
+  gl_Position = vec4(a_pos * u_view.xy + u_view.zw, 0.0, 1.0);
 }`;
 
 const LINE_FS = /* glsl */ `#version 300 es
@@ -147,6 +155,14 @@ export class WindLayer implements RenderModule {
   private verts = new Float32Array(this.count * 8);
   private rng: Rng;
   private seeded = false;
+  /**
+   * World-space seed/kill rectangles tracking the visible viewport (set each
+   * draw from ctx.view; defaults to the full domain). Seeding into the view
+   * keeps on-screen particle density constant across the zoom range; the
+   * kill margin is wider than the seed margin so edge spawns aren't culled.
+   */
+  private seedRect = { minX: -1.02, maxX: 1.02, minY: -1.02, maxY: 1.02 };
+  private killRect = { minX: -1.04, maxX: 1.04, minY: -1.04, maxY: 1.04 };
 
   constructor(private readonly fieldKind: 'surface' | 'upper' = 'surface') {
     this.rng = makeRng(fieldKind === 'upper' ? 0x2007717 : 0x7717d);
@@ -210,8 +226,9 @@ export class WindLayer implements RenderModule {
   }
 
   private respawn(i: number): void {
-    this.pos[i * 2] = this.rng.next() * 2 - 1;
-    this.pos[i * 2 + 1] = this.rng.next() * 2 - 1;
+    const r = this.seedRect;
+    this.pos[i * 2] = r.minX + this.rng.next() * (r.maxX - r.minX);
+    this.pos[i * 2 + 1] = r.minY + this.rng.next() * (r.maxY - r.minY);
     this.life[i] = LIFE_MIN_S + this.rng.next() * (LIFE_MAX_S - LIFE_MIN_S);
   }
 
@@ -280,6 +297,27 @@ export class WindLayer implements RenderModule {
       ctx.reduced ||
       (this.fieldKind === 'upper' && !ctx.upperAt)
     ) return;
+    // Track the visible viewport in world coordinates (2% seed margin so
+    // particles drift IN from just offscreen; 4% kill margin outside that).
+    const v = ctx.view;
+    const vminX = (-1 - v.offsetX) / v.scaleX;
+    const vmaxX = (1 - v.offsetX) / v.scaleX;
+    const vminY = (-1 - v.offsetY) / v.scaleY;
+    const vmaxY = (1 - v.offsetY) / v.scaleY;
+    const mx = (vmaxX - vminX) * 0.02;
+    const my = (vmaxY - vminY) * 0.02;
+    this.seedRect = {
+      minX: vminX - mx,
+      maxX: vmaxX + mx,
+      minY: vminY - my,
+      maxY: vmaxY + my,
+    };
+    this.killRect = {
+      minX: vminX - 2 * mx,
+      maxX: vmaxX + 2 * mx,
+      minY: vminY - 2 * my,
+      maxY: vmaxY + 2 * my,
+    };
     if (!this.seeded) this.seedAll();
     const dt = Math.max(0.001, ctx.dtSec);
 
@@ -295,9 +333,10 @@ export class WindLayer implements RenderModule {
       const nx = px + (wind.u / METRIC_X) * SPEED_TO_CLIP * dt;
       const ny = py + wind.v * SPEED_TO_CLIP * dt;
       this.life[i] -= dt;
+      const k = this.killRect;
       const dead =
         this.life[i] <= 0 ||
-        nx < -1.02 || nx > 1.02 || ny < -1.02 || ny > 1.02;
+        nx < k.minX || nx > k.maxX || ny < k.minY || ny > k.maxY;
       const speed01 = Math.min(1, speedMs / SPEED_SPAN_MS);
       // Fade in/out over the ends of a particle's life. NOT scaled by
       // ctx.aftermath — the ambient flow must not vanish after a storm dies
@@ -351,6 +390,7 @@ export class WindLayer implements RenderModule {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuf);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, verts);
     const u = (n: string) => gl.getUniformLocation(this.lineProg!, n);
+    setViewUniform(gl, u('u_view'), ctx.view);
     gl.uniform3fv(u('u_w0'), TOKENS.wind0.rgba01.subarray(0, 3));
     gl.uniform3fv(u('u_w1'), TOKENS.wind1.rgba01.subarray(0, 3));
     gl.uniform3fv(u('u_w2'), TOKENS.wind2.rgba01.subarray(0, 3));

@@ -331,7 +331,7 @@ export class RenderPipeline implements RenderLayer {
         observedWeight = 1 - simulatedWeight;
       }
     }
-    this.satellite.draw(observedWeight);
+    this.satellite.draw(observedWeight, ctx.view);
     this.env.draw(
       ctx,
       this.gpu,
@@ -342,7 +342,7 @@ export class RenderPipeline implements RenderLayer {
       ctx.weatherLayer === 'rain' &&
       this.radarSource === 'observed' &&
       this.observedRadar.hasFrame();
-    if (observedRadar) this.observedRadar.draw(0.94);
+    if (observedRadar) this.observedRadar.draw(0.94, ctx.view);
     else this.radar.draw(ctx);
     this.rain.update(ctx, this.gpu);
     if (!observedRadar) this.rain.composite(ctx, this.gpu, terrainFade);
@@ -365,7 +365,7 @@ export class RenderPipeline implements RenderLayer {
     if (this.overlay) {
       this.overlay.clearRect(0, 0, this.width, this.height);
       // Ghosts sit BELOW the live track in luminance: dimmer, drawn first (C7).
-      this.ghosts.draw();
+      this.ghosts.draw(ctx.view);
       this.track.draw(ctx); // ripples land on top when ui.drawOverlay runs after
     }
   }
@@ -472,6 +472,12 @@ export class RenderPipeline implements RenderLayer {
     this.particles.setBudget(count);
     this.wind.setBudget(count);
     this.upperWind.setBudget(count);
+  }
+
+  /** Camera moved: screen-registered trail history no longer matches the map. */
+  clearWindTrails(): void {
+    this.wind.clearTrails();
+    this.upperWind.clearTrails();
   }
 
   /** Highlight one ghost polyline (~2x alpha) as the active scenario; null clears
@@ -1099,6 +1105,7 @@ export class RenderPipeline implements RenderLayer {
       width: this.width,
       height: this.height,
       aspect: this.width / this.height,
+      view: frame.view,
       nowMs,
       dtSec,
       centerClip: center,

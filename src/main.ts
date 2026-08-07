@@ -24,7 +24,17 @@
 import './style.css';
 import { injectCssVars, TOKENS } from './tokens';
 import { readHash, writeHash, clearHash, isEnvHashKey } from './rng';
-import { DOMAIN, clipToLatLon, inBBox, latLonToClip } from './grid';
+import { DOMAIN, cellToLatLon, inBBox } from './grid';
+import {
+  HOME_VIEW,
+  computeViewTransform,
+  latLonToScreen,
+  screenToLatLon,
+  viewKey,
+  viewStateOf,
+} from './camera';
+import type { ViewTransform } from './camera';
+import { CameraGestureController } from './camera-gestures';
 import { parseBin } from './loader';
 import type {
   BinLayer,
@@ -539,32 +549,49 @@ try {
 
 // --- Canvas sizing ----------------------------------------------------------
 /**
- * Metric aspect of the domain (ground metres east-west : north-south at the
- * mid latitude), so the chart is not stretched to the window shape.
+ * Edge-to-edge canvas (UX v2 phase 2): the frame fills the window and the
+ * cover-fit camera (src/camera.ts) owns aspect correctness — the visible bbox
+ * is chosen so ground metres per pixel are equal in x and y at every zoom.
+ * The old letterboxed MAP_ASPECT frame died here; the camera replaces it.
  */
-const MAP_ASPECT =
-  ((DOMAIN.lonMax - DOMAIN.lonMin) *
-    Math.cos((((DOMAIN.latMin + DOMAIN.latMax) / 2) * Math.PI) / 180)) /
-  (DOMAIN.latMax - DOMAIN.latMin);
-/** Let the map use nearly all of the limiting viewport dimension. */
-const MAP_FILL_DESKTOP = 0.985;
-const MAP_FILL_MOBILE = 1;
-
-/** Fit the chart frame into the window: aspect-correct, centered, framed. */
 function layoutMapFrame(): void {
-  const availW = window.innerWidth;
-  const availH = window.innerHeight;
-  const fill = window.innerWidth <= 820 ? MAP_FILL_MOBILE : MAP_FILL_DESKTOP;
-  let w = availW * fill;
-  let h = w / MAP_ASPECT;
-  if (h > availH * fill) {
-    h = availH * fill;
-    w = h * MAP_ASPECT;
+  mapFrame.style.left = '0px';
+  mapFrame.style.top = '0px';
+  mapFrame.style.width = `${Math.round(window.innerWidth)}px`;
+  // The compact breakpoint pushes the frame below the header stack with an
+  // !important top override — read the resolved top so the frame never
+  // overflows the viewport bottom.
+  const top = mapFrame.offsetTop;
+  mapFrame.style.height = `${Math.max(1, Math.round(window.innerHeight - top))}px`;
+}
+
+// --- Camera (presentation-only; never enters sim state or recorded output) --
+const cameraGestures = new CameraGestureController(HOME_VIEW);
+let lastRenderedViewKey = '';
+
+// Dev-only deterministic camera for headless visual QA (?camera=cx,cy,zoom).
+// A SEARCH param, never a hash key — the frozen URL-hash contract is not
+// touched — and the whole branch is dead-stripped from production builds.
+if (import.meta.env.DEV) {
+  const qa = new URLSearchParams(window.location.search).get('camera');
+  if (qa) {
+    const [cx, cy, zoom] = qa.split(',').map(Number);
+    if ([cx, cy, zoom].every(Number.isFinite)) {
+      cameraGestures.reset({ center: { x: cx, y: cy }, zoom });
+    }
   }
-  mapFrame.style.left = `${Math.round((availW - w) / 2)}px`;
-  mapFrame.style.top = `${Math.round((availH - h) / 2)}px`;
-  mapFrame.style.width = `${Math.round(w)}px`;
-  mapFrame.style.height = `${Math.round(h)}px`;
+}
+
+/** Aspect from CSS px (identical ratio in device px). */
+function canvasAspect(): number {
+  const w = glCanvas.clientWidth || 1;
+  const h = glCanvas.clientHeight || 1;
+  return w / h;
+}
+
+/** Derive (and clamp) the current frame's view transform. */
+function currentViewTransform(): ViewTransform {
+  return computeViewTransform(cameraGestures.view(), canvasAspect());
 }
 
 function resize(): void {
@@ -599,6 +626,14 @@ function resize(): void {
   ui.layoutMapOverlays();
 }
 window.addEventListener('resize', resize);
+// The compact breakpoint moves #map-frame's CSS top when the scenario
+// contract appears (`:has(#scenario-contract:not([hidden]))`) — no resize
+// event fires, but the inline frame height derived from offsetTop must
+// follow or the canvas bottom over/under-fills by the 60px delta.
+new MutationObserver(() => resize()).observe(
+  must(document.getElementById('scenario-contract'), '#scenario-contract'),
+  { attributes: true, attributeFilter: ['hidden'] },
+);
 resize();
 
 // --- Progressive data loading (design task T2 — map assembles as data arrives) --
@@ -886,7 +921,12 @@ let hindcastScoreCache: HindcastScore | null = null;
 let hindcastScoreFrameCount = -1;
 /** vKt at the recorded landfall frame, resolved once per landfall. */
 let landfallKtCache: { frameIndex: number; vKt: number } | null = null;
-const pendingMapCaptures: Array<(canvas: HTMLCanvasElement) => void> = [];
+/** A frame snapshot plus the camera view it was composited with. */
+interface MapCapture {
+  canvas: HTMLCanvasElement;
+  view: ViewTransform;
+}
+const pendingMapCaptures: Array<(capture: MapCapture) => void> = [];
 let analogCache: {
   frameBucket: number;
   complete: boolean;
@@ -908,7 +948,7 @@ function headOf(s: StormState): Head {
  * produce a black export. This captures once, in-frame, without imposing the
  * permanent cost of `preserveDrawingBuffer: true`.
  */
-function captureMapFrame(): Promise<HTMLCanvasElement> {
+function captureMapFrame(): Promise<MapCapture> {
   return new Promise((resolve) => pendingMapCaptures.push(resolve));
 }
 
@@ -917,13 +957,15 @@ function flushMapCaptures(): void {
   const snapshot = document.createElement('canvas');
   snapshot.width = glCanvas.width;
   snapshot.height = glCanvas.height;
+  // Exports annotate what the camera showed: the view rides with the pixels.
+  const capture: MapCapture = { canvas: snapshot, view: currentViewTransform() };
   const ctx = snapshot.getContext('2d');
   if (!ctx) {
-    pendingMapCaptures.splice(0).forEach((resolve) => resolve(snapshot));
+    pendingMapCaptures.splice(0).forEach((resolve) => resolve(capture));
     return;
   }
   ctx.drawImage(glCanvas, 0, 0);
-  pendingMapCaptures.splice(0).forEach((resolve) => resolve(snapshot));
+  pendingMapCaptures.splice(0).forEach((resolve) => resolve(capture));
 }
 
 function labelForRun(params: SpawnParams): string {
@@ -1366,9 +1408,15 @@ let probeTouch: {
 function mapPointFromClient(clientX: number, clientY: number): LatLon | null {
   const rect = glCanvas.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return null;
-  const clipX = ((clientX - rect.left) / rect.width) * 2 - 1;
-  const clipY = -(((clientY - rect.top) / rect.height) * 2 - 1);
-  const point = clipToLatLon(clipX, clipY);
+  const point = screenToLatLon(
+    currentViewTransform(),
+    clientX - rect.left,
+    clientY - rect.top,
+    rect.width,
+    rect.height,
+  );
+  // Data-validity gate, applied AFTER the camera inverse: the view is clamped
+  // inside the domain, so this only trims float noise at the exact edge.
   return inBBox(point.lat, point.lon, DOMAIN) ? point : null;
 }
 
@@ -1380,10 +1428,16 @@ function probePlacement(point: LatLon): {
   pinned: boolean;
 } {
   const rect = glCanvas.getBoundingClientRect();
-  const clip = latLonToClip(point.lat, point.lon, DOMAIN);
+  const px = latLonToScreen(
+    currentViewTransform(),
+    point.lat,
+    point.lon,
+    rect.width,
+    rect.height,
+  );
   return {
-    xPx: ((clip.x + 1) / 2) * rect.width,
-    yPx: ((1 - clip.y) / 2) * rect.height,
+    xPx: px.x,
+    yPx: px.y,
     widthPx: rect.width,
     heightPx: rect.height,
     pinned: probePinned,
@@ -2401,12 +2455,84 @@ sensitivityRun.addEventListener('click', () => {
     });
 });
 
+/** Canvas-relative CSS-px coordinates for the camera gesture controller. */
+function canvasPoint(event: PointerEvent | WheelEvent): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const rect = glCanvas.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+    w: Math.max(1, rect.width),
+    h: Math.max(1, rect.height),
+  };
+}
+
+glCanvas.addEventListener(
+  'wheel',
+  (event) => {
+    event.preventDefault();
+    const p = canvasPoint(event);
+    cameraGestures.wheel(
+      currentViewTransform(),
+      event.deltaY,
+      p.x,
+      p.y,
+      p.w,
+      p.h,
+    );
+  },
+  { passive: false },
+);
+
+// A second pinch finger can land on a city-marker button (they sit above the
+// canvas and are prominent when zoomed). Adopt that pointer into the active
+// camera gesture instead of letting it click the marker mid-pinch; pointer
+// capture retargets its stream to glCanvas and cancelling the pointerdown
+// suppresses the compatibility click.
+window.addEventListener(
+  'pointerdown',
+  (event) => {
+    if (cameraGestures.activePointers() === 0) return;
+    if (!(event.target instanceof Element)) return;
+    if (!event.target.closest('.city-marker')) return;
+    const p = canvasPoint(event);
+    cameraGestures.pointerDown(event.pointerId, p.x, p.y);
+    try {
+      glCanvas.setPointerCapture(event.pointerId);
+    } catch {
+      /* capture is best-effort */
+    }
+    clearProbeTouch();
+    event.preventDefault();
+  },
+  { capture: true },
+);
+
 glCanvas.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'mouse' && event.button !== 0) return;
   if (event.pointerType === 'touch' && probePinned) {
     probePinned = false;
     probePosition = null;
     ui.hidePointProbe();
+    return;
+  }
+  const p = canvasPoint(event);
+  cameraGestures.pointerDown(event.pointerId, p.x, p.y);
+  // Keep pan/pinch streams flowing when the pointer leaves the window.
+  try {
+    glCanvas.setPointerCapture(event.pointerId);
+  } catch {
+    /* capture is best-effort (synthetic events in tests lack it) */
+  }
+  if (cameraGestures.activePointers() >= 2) {
+    // Second finger = pinch: this finger never becomes a tap or a probe
+    // press, and the first finger's tap is suppressed on release.
+    mapTap.cancel(event.pointerId);
+    clearProbeTouch();
     return;
   }
   mapTap.start(event.pointerId, event.clientX, event.clientY, event.timeStamp);
@@ -2435,6 +2561,20 @@ glCanvas.addEventListener('pointerdown', (event) => {
 });
 glCanvas.addEventListener('pointermove', (event) => {
   mapTap.move(event.pointerId, event.clientX, event.clientY);
+  const p = canvasPoint(event);
+  const update = cameraGestures.pointerMove(
+    currentViewTransform(),
+    event.pointerId,
+    p.x,
+    p.y,
+    p.w,
+    p.h,
+  );
+  if (update.becamePan) {
+    // The drag is now the camera's: cancel the pending tap + probe timers.
+    mapTap.cancel(event.pointerId);
+    clearProbeTouch(event.pointerId);
+  }
   if (event.pointerType === 'mouse' && event.buttons === 0 && !probePinned) {
     showPointProbeAt(event.clientX, event.clientY);
   }
@@ -2452,6 +2592,7 @@ glCanvas.addEventListener('pointermove', (event) => {
   }
 });
 glCanvas.addEventListener('pointercancel', (event) => {
+  cameraGestures.pointerCancel(event.pointerId);
   clearProbeTouch(event.pointerId);
   mapTap.cancel(event.pointerId);
 });
@@ -2464,7 +2605,13 @@ glCanvas.addEventListener('pointerleave', (event) => {
   }
 });
 glCanvas.addEventListener('pointerup', (e) => {
+  const wasCameraGesture = cameraGestures.pointerUp(e.pointerId);
   clearProbeTouch(e.pointerId);
+  if (wasCameraGesture) {
+    // The press panned or pinched the camera — it is not a spawn tap.
+    mapTap.cancel(e.pointerId);
+    return;
+  }
   if (!mapTap.end(e.pointerId, e.clientX, e.clientY, e.timeStamp)) return;
   const point = mapPointFromClient(e.clientX, e.clientY);
   if (!point) return;
@@ -2493,6 +2640,9 @@ function toggleTransport(): void {
 }
 
 window.addEventListener('keydown', (e) => {
+  // A focused widget already consumed this key (e.g. the sparkline scrubber
+  // preventDefaults its arrows) — don't ALSO drive the camera or transport.
+  if (e.defaultPrevented) return;
   const t = e.target as HTMLElement | null;
   if (
     t instanceof HTMLSelectElement ||
@@ -2516,6 +2666,22 @@ window.addEventListener('keydown', (e) => {
     probePosition = null;
     ui.hidePointProbe();
     return;
+  }
+  // Camera keys: arrows pan, +/- zoom about the centre, h/Home = full domain.
+  // Modified keys stay the browser's (Ctrl+/- page zoom is an a11y feature;
+  // Alt+arrows is history navigation).
+  if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+    const rect = glCanvas.getBoundingClientRect();
+    const camera = cameraGestures.key(
+      currentViewTransform(),
+      e.code,
+      Math.max(1, rect.width),
+      Math.max(1, rect.height),
+    );
+    if (camera) {
+      e.preventDefault();
+      return;
+    }
   }
   if (e.code !== 'Space') return;
   e.preventDefault();
@@ -2631,11 +2797,12 @@ exportCard.addEventListener('click', () => {
   if (!run) return;
   ui.setExportStatus('drawing debrief card…', true);
   void captureMapFrame()
-    .then((mapCanvas) =>
+    .then((capture) =>
       makeDebriefCard({
         run,
         comparison: session.comparison(),
-        mapCanvas,
+        mapCanvas: capture.canvas,
+        view: capture.view,
       }),
     )
     .then((blob) => {
@@ -2653,11 +2820,12 @@ exportReplay.addEventListener('click', () => {
   if (!run) return;
   ui.setExportStatus('recording 10 s replay…', true);
   void captureMapFrame()
-    .then((mapCanvas) =>
+    .then((capture) =>
       makeReplayVideo({
         run,
         comparison: session.comparison(),
-        mapCanvas,
+        mapCanvas: capture.canvas,
+        view: capture.view,
       }),
     )
     .then((blob) => {
@@ -2751,11 +2919,17 @@ function buildStorm(): { storm: StormState | null; prev: StormState | null } {
   return { storm: live, prev };
 }
 
-function drawEnsembleOverlay(result: EnsembleResult | null): void {
+function drawEnsembleOverlay(
+  result: EnsembleResult | null,
+  view: ViewTransform,
+): void {
   if (!result) return;
   const { nx, ny, probability } = result.grid;
-  const cellWidth = overlayCanvas.width / nx;
-  const cellHeight = overlayCanvas.height / ny;
+  const w = overlayCanvas.width;
+  const h = overlayCanvas.height;
+  // The ensemble grid spans the DOMAIN; each cell projects through the view
+  // (geo-anchored) rather than mapping grid indices straight to the canvas.
+  const spec = { nx, ny, bbox: DOMAIN };
   overlay.save();
   overlay.globalCompositeOperation = 'screen';
   const accent = TOKENS.accent.rgba01;
@@ -2764,15 +2938,15 @@ function drawEnsembleOverlay(result: EnsembleResult | null): void {
     if (chance < 0.025) continue;
     const col = index % nx;
     const row = Math.floor(index / nx);
+    // Cell corners: cell centres sit at integer (col,row); corners at ±0.5.
+    const nw = cellToLatLon(spec, col - 0.5, row - 0.5);
+    const se = cellToLatLon(spec, col + 0.5, row + 0.5);
+    const a = latLonToScreen(view, nw.lat, nw.lon, w, h);
+    const b = latLonToScreen(view, se.lat, se.lon, w, h);
     overlay.fillStyle =
       `rgba(${Math.round(accent[0] * 255)},${Math.round(accent[1] * 255)},` +
       `${Math.round(accent[2] * 255)},${Math.min(0.28, 0.025 + chance * 0.32)})`;
-    overlay.fillRect(
-      col * cellWidth,
-      row * cellHeight,
-      cellWidth + 1,
-      cellHeight + 1,
-    );
+    overlay.fillRect(a.x, a.y, b.x - a.x + 1, b.y - a.y + 1);
   }
   const trackColor = TOKENS.track.rgba01;
   overlay.strokeStyle =
@@ -2784,11 +2958,9 @@ function drawEnsembleOverlay(result: EnsembleResult | null): void {
     overlay.beginPath();
     for (let index = 0; index < member.track.length; index++) {
       const point = member.track[index];
-      const clip = latLonToClip(point.lat, point.lon, DOMAIN);
-      const x = ((clip.x + 1) * overlayCanvas.width) / 2;
-      const y = ((1 - clip.y) * overlayCanvas.height) / 2;
-      if (index === 0) overlay.moveTo(x, y);
-      else overlay.lineTo(x, y);
+      const p = latLonToScreen(view, point.lat, point.lon, w, h);
+      if (index === 0) overlay.moveTo(p.x, p.y);
+      else overlay.lineTo(p.x, p.y);
     }
     overlay.stroke();
   }
@@ -2812,6 +2984,17 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
   } else if (activeWeatherLayer === 'infrared' && activeSatelliteSource !== 'simulated') {
     void refreshSatelliteObservation();
   }
+  const view = currentViewTransform();
+  // Clamp feedback: keep the gesture state exactly what the screen shows, so
+  // panning against a domain edge never accumulates invisible offset.
+  cameraGestures.reset(viewStateOf(view));
+  const vk = viewKey(view);
+  if (vk !== lastRenderedViewKey) {
+    lastRenderedViewKey = vk;
+    // Trail history is screen-registered; a camera move invalidates it.
+    renderCtrl?.clearWindTrails?.();
+  }
+  ui.setView(view);
   const frame: FrameState = {
     storm,
     prevStorm: prev ?? prevFrameStorm,
@@ -2830,6 +3013,7 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
         ? eventTimeFraction(storm.ageH, activeScenario.windowH)
         : 0,
     rainAccum: impact.rainView(),
+    view,
   };
 
   // main owns the base clear of both canvases (guards against any render layer
@@ -2844,7 +3028,7 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
       console.warn('[render] layer draw threw (skipping this frame):', err);
     }
   }
-  drawEnsembleOverlay(activeEnsemble);
+  drawEnsembleOverlay(activeEnsemble, view);
   flushMapCaptures();
   prevFrameStorm = storm;
 
@@ -2975,6 +3159,8 @@ type RenderController = RenderLayer & {
   setCloudTape?(tape: CloudTape | null): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;
+  /** Screen-registered wind-trail history is stale after any camera move. */
+  clearWindTrails?(): void;
 };
 
 function hasInjectionApi(v: RenderLayer): v is RenderController {

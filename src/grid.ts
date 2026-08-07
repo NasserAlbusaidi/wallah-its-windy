@@ -15,7 +15,12 @@
  *   - Raster row order: row 0 is the NORTH edge (latMax), row ny-1 the SOUTH
  *     edge (latMin). Columns run west (lonMin) -> east (lonMax).
  *   - Integer (col,row) addresses a cell CENTER; fractional values interpolate.
- *   - Clip space is [-1,1] on each axis, y-up (lat increases with y).
+ *   - Clip space is [-1,1] on each axis, y-up (lat increases with y). Since the
+ *     camera (UX v2 phase 2) this is WORLD space — domain edges at exactly ±1,
+ *     regardless of what the screen shows. src/camera.ts owns the affine
+ *     world->NDC view layered on top; it is presentation-only and never
+ *     changes what these functions return. Recorded output, calibration, and
+ *     offscreen state textures all live in this domain-fixed space.
  */
 
 import type { BBox, CellCoord, ClipCoord, GridSpec, LatLon } from './types';

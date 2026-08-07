@@ -47,14 +47,19 @@ import {
 } from '../rainband-profile';
 import type { DrawCtx, GpuTextures } from './context';
 import {
+  IDENTITY_VIEW,
+  VIEW_QUAD_VS,
   bindTex,
   disposeRenderTarget,
   makeProgram,
   makeQuadVao,
   makeRenderTarget,
+  setViewUniform,
 } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
 import { rainCenterClip } from './precipitating-cloud';
+import { cloudMetricX } from './cloud-motion';
+import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
 
 /** Per-frame decay multiply — THE knob (eng task T5, valid 0.90–1.00). */
@@ -62,8 +67,6 @@ const RAIN_DECAY_PER_H = 0.72;
 const RAIN_GAIN = 0.0025; // metres of local relief -> bounded upslope multiplier
 const FALLBACK_TRANSPORT_PER_H = 0.44;
 const RMAX_BASE = 0.11; // mirror of particles' base radius (clip units here)
-const HALF_DOMAIN_HEIGHT_KM =
-  ((DOMAIN.latMax - DOMAIN.latMin) * 111) / 2;
 // Channel window on the normalized baked log10(1+acc) values. These preserve the
 // old visual cutoffs after removing the renderer's accidental second logarithm:
 // old 0.62/0.92 in log1p-space map to ~0.41/0.84 in the honest linear space.
@@ -71,13 +74,7 @@ const WADI_LO = 0.41;
 const WADI_HI = 0.84;
 const RAIN_TO_GLOW = 2.5; // maps small accumulated rain to flood brightness
 
-const QUAD_VS = /* glsl */ `#version 300 es
-in vec2 a_pos;
-out vec2 v_uv;
-void main() {
-  v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
-  gl_Position = vec4(a_pos, 0.0, 1.0);
-}`;
+const QUAD_VS = VIEW_QUAD_VS;
 
 const UPDATE_FS = /* glsl */ `#version 300 es
 precision highp float;
@@ -250,6 +247,16 @@ void main() {
   o = vec4(col, alpha);
 }`;
 
+/**
+ * Domain-fixed accumulator size. 1000×600 matches the domain's 5:3 metric
+ * shape (~2.1 km per cell — close to the 2 km terrain/travel-time bake). The
+ * accumulator is quasi-physical flood state: registering it to the DOMAIN
+ * instead of the screen means camera moves cannot smear it, window resizes
+ * cannot wipe it, and D8 routing speed stops depending on canvas size.
+ */
+const ACCUM_W = 1000;
+const ACCUM_H = 600;
+
 export class RainLayer {
   private gl!: WebGL2RenderingContext;
   private caps!: GlCaps;
@@ -259,8 +266,6 @@ export class RainLayer {
   private compVao: WebGLVertexArrayObject | null = null;
   private targets: [RenderTarget | null, RenderTarget | null] = [null, null];
   private cur = 0;
-  private rtW = 1;
-  private rtH = 1;
 
   init(gl: WebGL2RenderingContext, caps: GlCaps): void {
     this.gl = gl;
@@ -269,27 +274,25 @@ export class RainLayer {
     this.updVao = makeQuadVao(gl, this.updProg);
     this.compProg = makeProgram(gl, QUAD_VS, COMPOSITE_FS);
     this.compVao = makeQuadVao(gl, this.compProg);
-  }
-
-  resize(w: number, h: number): void {
-    const gl = this.gl;
-    this.rtW = Math.max(1, Math.floor(w / 2));
-    this.rtH = Math.max(1, Math.floor(h / 2));
     disposeRenderTarget(gl, this.targets[0]);
     disposeRenderTarget(gl, this.targets[1]);
-    this.targets[0] = makeRenderTarget(gl, this.rtW, this.rtH, this.caps);
-    this.targets[1] = makeRenderTarget(gl, this.rtW, this.rtH, this.caps);
+    this.targets[0] = makeRenderTarget(gl, ACCUM_W, ACCUM_H, this.caps);
+    this.targets[1] = makeRenderTarget(gl, ACCUM_W, ACCUM_H, this.caps);
     this.cur = 0;
-    // Clear both accumulators.
     for (const t of this.targets) {
       if (!t) continue;
       gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
-      gl.viewport(0, 0, this.rtW, this.rtH);
+      gl.viewport(0, 0, ACCUM_W, ACCUM_H);
       gl.clearColor(0, 0, 0, 1);
       gl.disable(gl.BLEND);
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  resize(_w: number, _h: number): void {
+    // Accumulator state is domain-fixed — a window resize must not wipe the
+    // flood ledger. The composite pass is a fullscreen quad; nothing cached.
   }
 
   /** Advance the accumulator one frame (offscreen). Restores the screen FBO. */
@@ -305,11 +308,13 @@ export class RainLayer {
     if (!this.updProg || !src || !dst || !gpu.elev || !gpu.land || !gpu.terrainGrid) return;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
-    gl.viewport(0, 0, this.rtW, this.rtH);
+    gl.viewport(0, 0, ACCUM_W, ACCUM_H);
     gl.disable(gl.BLEND);
     gl.useProgram(this.updProg);
     gl.bindVertexArray(this.updVao);
     const u = (n: string) => gl.getUniformLocation(this.updProg!, n);
+    // Offscreen domain-space accumulator: its target IS the domain.
+    setViewUniform(gl, u('u_view'), IDENTITY_VIEW);
     bindTex(gl, 0, src.tex, u('u_src'));
     bindTex(gl, 1, gpu.elev, u('u_elev'));
     bindTex(gl, 2, gpu.land, u('u_land'));
@@ -319,7 +324,7 @@ export class RainLayer {
     gl.uniform1f(u('u_hasBasin'), gpu.hasBasin ? 1 : 0);
     gl.uniform1f(u('u_hasRouting'), gpu.hasFlowRouting ? 1 : 0);
     gl.uniform2f(u('u_elevTexel'), 1 / gpu.terrainGrid.nx, 1 / gpu.terrainGrid.ny);
-    gl.uniform2f(u('u_rtexel'), 1 / this.rtW, 1 / this.rtH);
+    gl.uniform2f(u('u_rtexel'), 1 / ACCUM_W, 1 / ACCUM_H);
     gl.uniform1f(u('u_decayPerH'), RAIN_DECAY_PER_H);
     gl.uniform1f(u('u_gain'), RAIN_GAIN);
     gl.uniform1f(u('u_fallbackTransportPerH'), FALLBACK_TRANSPORT_PER_H);
@@ -370,11 +375,7 @@ export class RainLayer {
     );
     gl.uniform1f(u('u_inflow'), INFLOW_RAD);
     const centreLat = c ? clipToLatLon(c.x, c.y, DOMAIN).lat : 21;
-    gl.uniform1f(
-      u('u_metricX'),
-      ((DOMAIN.lonMax - DOMAIN.lonMin) * Math.cos((centreLat * Math.PI) / 180)) /
-        (DOMAIN.latMax - DOMAIN.latMin),
-    );
+    gl.uniform1f(u('u_metricX'), cloudMetricX(centreLat));
     // Only a live storm produces new rain; aftermath retains routing + decay.
     const raining = Boolean(c && ctx.frame.storm?.alive && ctx.vKt > 0);
     const d = ctx.frame.storm?.diagnostics;
@@ -402,6 +403,7 @@ export class RainLayer {
     gl.useProgram(this.compProg);
     gl.bindVertexArray(this.compVao);
     const u = (n: string) => gl.getUniformLocation(this.compProg!, n);
+    setViewUniform(gl, u('u_view'), ctx.view);
     bindTex(gl, 0, accum.tex, u('u_accum'));
     bindTex(gl, 1, gpu.acc, u('u_acc'));
     bindTex(gl, 2, gpu.land, u('u_land'));
@@ -412,7 +414,6 @@ export class RainLayer {
     gl.uniform1f(u('u_fade'), fade);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
-    void ctx;
   }
 
   dispose(): void {

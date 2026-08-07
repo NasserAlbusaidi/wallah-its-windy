@@ -1,14 +1,11 @@
 /** Display-only pass for a timestamped observed radar mosaic. */
 
-import { makeProgram, makeQuadVao } from './gl-utils';
+import type { ViewTransform } from '../types';
+import { VIEW_QUAD_VS, makeProgram, makeQuadVao, setViewUniform } from './gl-utils';
 
-const VS = /* glsl */ `#version 300 es
-in vec2 a_pos;
-out vec2 v_uv;
-void main() {
-  v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
-  gl_Position = vec4(a_pos, 0.0, 1.0);
-}`;
+// The mosaic is a DOMAIN-registered equirect texture (radar-observations.ts
+// reprojects into the domain bbox); the view-aware VS pins it to geography.
+const VS = VIEW_QUAD_VS;
 
 const FS = /* glsl */ `#version 300 es
 precision highp float;
@@ -98,7 +95,7 @@ export class ObservedRadarLayer {
     this.coverageReady = true;
   }
 
-  draw(opacity: number): void {
+  draw(opacity: number, view: ViewTransform): void {
     const gl = this.gl;
     if (
       !this.ready ||
@@ -118,6 +115,7 @@ export class ObservedRadarLayer {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.coverageTexture);
     const u = (name: string) => gl.getUniformLocation(this.program!, name);
+    setViewUniform(gl, u('u_view'), view);
     gl.uniform1i(u('u_frame'), 0);
     gl.uniform1i(u('u_coverage'), 1);
     gl.uniform1f(u('u_opacity'), Math.max(0, Math.min(1, opacity)));

@@ -10,20 +10,13 @@
  */
 
 import { TOKENS } from '../tokens';
-import { makeProgram, makeQuadVao } from './gl-utils';
+import { VIEW_QUAD_VS, makeProgram, makeQuadVao, setViewUniform } from './gl-utils';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 
 /** Vertical exaggeration for the hillshade normal (elevation is raw metres). */
 const RELIEF = 0.006;
 
-const VS = /* glsl */ `#version 300 es
-in vec2 a_pos;
-out vec2 v_uv;
-void main() {
-  // Clip -> domain UV with north (clip y = +1) at row 0 (uv.y = 0).
-  v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
-  gl_Position = vec4(a_pos, 0.0, 1.0);
-}`;
+const VS = VIEW_QUAD_VS;
 
 const FS = /* glsl */ `#version 300 es
 precision highp float;
@@ -70,6 +63,7 @@ void main() {
 }`;
 
 interface Uniforms {
+  view: WebGLUniformLocation | null;
   elev: WebGLUniformLocation | null;
   land: WebGLUniformLocation | null;
   texel: WebGLUniformLocation | null;
@@ -93,6 +87,7 @@ export class TerrainLayer implements RenderModule {
     this.vao = makeQuadVao(gl, this.prog);
     const u = (n: string) => gl.getUniformLocation(this.prog!, n);
     this.u = {
+      view: u('u_view'),
       elev: u('u_elev'),
       land: u('u_land'),
       texel: u('u_texel'),
@@ -123,6 +118,7 @@ export class TerrainLayer implements RenderModule {
     gl.bindTexture(gl.TEXTURE_2D, gpu.land);
     gl.uniform1i(this.u.land, 1);
 
+    setViewUniform(gl, this.u.view, ctx.view);
     gl.uniform2f(this.u.texel, 1 / gpu.terrainGrid.nx, 1 / gpu.terrainGrid.ny);
     gl.uniform1f(this.u.relief, RELIEF);
     gl.uniform1f(this.u.fade, fade);
@@ -133,7 +129,6 @@ export class TerrainLayer implements RenderModule {
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
-    void ctx;
   }
 
   dispose(): void {

@@ -43,12 +43,50 @@ export function makeProgram(gl: WebGL2RenderingContext, vs: string, fs: string):
   return p;
 }
 
+/**
+ * The shared view contract (src/camera.ts): `u_view = vec4(scaleX, scaleY,
+ * offsetX, offsetY)` maps WORLD clip (domain edges at ±1) to on-screen NDC,
+ * `ndc = world * u_view.xy + u_view.zw`. Fullscreen-quad passes invert it in
+ * the vertex stage — `world = (a_pos - u_view.zw) / u_view.xy` — so their
+ * fragment shaders keep receiving domain-registered UV; VBO passes apply it
+ * forward on their world-space positions. Offscreen domain-space passes
+ * (cloud-memory update, env OHC blend, rain accumulator update) bind
+ * {@link IDENTITY_VIEW}: their render targets ARE the domain, never a screen.
+ */
+export const IDENTITY_VIEW = { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
+
+/** Upload a view (or IDENTITY_VIEW) to a `uniform vec4 u_view` location. */
+export function setViewUniform(
+  gl: WebGL2RenderingContext,
+  loc: WebGLUniformLocation | null,
+  view: { scaleX: number; scaleY: number; offsetX: number; offsetY: number },
+): void {
+  if (loc) gl.uniform4f(loc, view.scaleX, view.scaleY, view.offsetX, view.offsetY);
+}
+
+/**
+ * The ONE fullscreen-quad vertex shader for domain-registered passes: the
+ * screen-covering quad is un-projected through u_view so v_uv stays DOMAIN
+ * UV (north at uv.y = 0) whatever the camera shows. Programs whose target is
+ * itself the domain (offscreen state) bind IDENTITY_VIEW and are unchanged.
+ */
+export const VIEW_QUAD_VS = /* glsl */ `#version 300 es
+in vec2 a_pos;
+uniform vec4 u_view; // world->ndc: ndc = world * xy + zw
+out vec2 v_uv;
+void main() {
+  vec2 world = (a_pos - u_view.zw) / u_view.xy;
+  v_uv = vec2(world.x * 0.5 + 0.5, 0.5 - world.y * 0.5);
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
 /** Clip-space corners for a fullscreen triangle strip (two triangles). */
 const QUAD = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
 
 /**
  * Build a VAO drawing a fullscreen clip quad through `a_pos` (vec2). The frag
- * shader reconstructs the domain UV from the interpolated clip position.
+ * shader reconstructs the domain UV from the interpolated clip position (the
+ * vertex stage un-projects the screen through u_view first — see IDENTITY_VIEW).
  */
 export function makeQuadVao(gl: WebGL2RenderingContext, program: WebGLProgram): WebGLVertexArrayObject {
   const vao = gl.createVertexArray();

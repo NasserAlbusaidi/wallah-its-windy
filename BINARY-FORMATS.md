@@ -309,6 +309,42 @@ layer.
 
 ---
 
+## `regions.bin` region-id rasters + `regions.json`
+
+`bake/bake_regions.py` writes the regional-rain-ledger geography (UX v2
+phase 3): two single-plane categorical layers on the IMPACT grid — 200×120,
+0.1° over the domain, mirroring `src/impact.ts` `GRID_NX`/`GRID_NY`
+(`test/integration-bins.test.ts` pins the geometry so bake and runtime
+cannot drift apart).
+
+- `admin1` — uint8, **unquantized** (scale 1, offset 0): Oman governorate
+  ids `1..11` in sorted-display-name order, `0` = none (sea and non-Oman
+  land). Source: Natural Earth 10m admin-1, pinned release v5.1.2 (public
+  domain), filtered to Oman and rasterized with rasterio.
+- `wadi` — uint16, **unquantized**: drainage-basin ids derived natively on
+  this grid from HydroSHEDS v1.1 DIR+ACC (the same grid-parametric
+  derivation `flowacc.bin` uses at 2 km), basins under 4 cells dropped,
+  ids compacted to `1..N`; `0` = none/ocean. These are bake-derived outlet
+  ids, NOT official HydroSHEDS ids.
+
+Categorical layers ship unquantized because uint8/uint16 raw values are
+bit-exact through the loader's `raw*scale+offset` Float32 path — consumers
+may `Math.round` and compare ids safely. The name `basin` is deliberately
+NOT reused (flowacc.bin owns it, different grid + id space).
+
+`regions.json` is the id→display-name sidecar: `admin1` and `wadi` tables
+(string ids → lowercase labels), grid echo, and source provenance. Wadi
+names are resolved at bake time from curated in-channel anchor coordinates
+— keyed to geography, not ids, so a rebake re-resolves; anchors that miss
+or collide are logged and skipped, and unnamed basins render as
+`unnamed basin <id>`. `npm run data:regions` bakes;
+`npm run data:regions:check` verifies the committed bytes reproduce.
+Runtime: `src/main.ts` loads both (404-tolerant → the regional block simply
+hides) and hands them to `ImpactTracker.setRegions`, which nearest-resamples
+through each layer's own header grid.
+
+---
+
 ## Ocean profile bins — `ocean.bin`, `hf2a-event-ocean.bin`
 
 `bake/bake_ocean_profiles.py` writes `public/data/ocean.bin` (WOA23 monthly

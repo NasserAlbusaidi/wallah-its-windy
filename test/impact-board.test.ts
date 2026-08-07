@@ -21,6 +21,7 @@ function summaryWith(over: Partial<ImpactSummary> = {}): ImpactSummary {
     maxLandRainMm: 0,
     floodRisk: 'minimal',
     live: null,
+    regions: null,
     ...over,
   };
 }

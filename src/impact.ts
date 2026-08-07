@@ -37,7 +37,13 @@ import {
   type RainAccumulationWindow,
 } from './rain-accumulation';
 import { hollandWindSpeedKt } from './structure';
-import type { BinLayer, LatLon, RainAccumView, StormState } from './types';
+import type {
+  BinLayer,
+  LatLon,
+  ParsedBin,
+  RainAccumView,
+  StormState,
+} from './types';
 import {
   SIMULATED_WIND_CONVENTION,
   northIndianOceanClassification,
@@ -87,6 +93,36 @@ export interface CityImpact {
   rainMm: number;
 }
 
+/** Id -> display-name tables parsed from regions.json. */
+export interface RegionNamesTable {
+  admin1: Record<string, string>;
+  wadi: Record<string, string>;
+}
+
+export interface RegionRainRow {
+  id: number;
+  name: string;
+  kind: 'governorate' | 'wadi';
+  /** Max cell value in the selected display window, mm — the ranking key. */
+  windowMaxMm: number;
+  /** Max cell value in the storm-total grid, mm. */
+  stormMaxMm: number;
+  /** Mean over the region's in-domain cells, storm total, mm. */
+  stormMeanMm: number;
+}
+
+/**
+ * Ranked worst-hit regions over the parametric rain ledger. Areal values are
+ * the same proxy the grid is — labelled, never flood-tiered (tiers are
+ * point-burst proxies; see floodRiskTier).
+ */
+export interface RegionRainSummary {
+  /** The window the windowMaxMm column reflects. */
+  window: RainAccumulationWindow;
+  /** windowMaxMm desc, stormMaxMm tie-break, id tie-break; capped, >=1 mm. */
+  rows: RegionRainRow[];
+}
+
 export interface ImpactSummary {
   /** Cities ordered by peak experienced wind, strongest first. */
   cities: CityImpact[];
@@ -96,7 +132,13 @@ export interface ImpactSummary {
   floodRisk: FloodRisk;
   /** The city currently most exposed (closest with meaningful wind), or null. */
   live: CityImpact | null;
+  /** Regional rain aggregation, or null until regions.bin/json arrive. */
+  regions: RegionRainSummary | null;
 }
+
+/** Regions block: rows shown and the storm-total floor for inclusion. */
+const REGION_ROW_CAP = 6;
+const REGION_MIN_STORM_MM = 1;
 
 /**
  * Instantaneous parametric surface wind at one geographic point. Point probes,
@@ -143,6 +185,141 @@ export class ImpactTracker {
     ).breaksMm,
     version: 0,
   };
+
+  // --- Regional aggregation (read-only over the ledger; UX v2 phase 3) -----
+  /** Region id per impact cell (0 = none), resampled from regions.bin. */
+  private admin1Id: Uint16Array | null = null;
+  private wadiId: Uint16Array | null = null;
+  private regionNames: RegionNamesTable | null = null;
+  /** Scratch sized max-id+1, allocated once per setRegions. */
+  private adminScratch: RegionScratch | null = null;
+  private wadiScratch: RegionScratch | null = null;
+  /** Bumped by setRegions so the cache never survives a data swap. */
+  private regionsEpoch = 0;
+  private regionCacheKey = '';
+  private regionCacheRows: RegionRainRow[] = [];
+
+  /**
+   * Wire the baked region-id rasters + name tables (regions.bin/regions.json).
+   * Ids are nearest-resampled through each layer's own header grid — the
+   * runtime never assumes the baked geometry. Null (either input) disables
+   * the regional block.
+   */
+  setRegions(bin: ParsedBin | null, names: RegionNamesTable | null): void {
+    this.regionsEpoch++;
+    const admin = bin?.layers.get('admin1') ?? null;
+    const wadi = bin?.layers.get('wadi') ?? null;
+    if (!bin || !names || (!admin && !wadi)) {
+      this.admin1Id = null;
+      this.wadiId = null;
+      this.regionNames = null;
+      this.adminScratch = null;
+      this.wadiScratch = null;
+      return;
+    }
+    this.regionNames = names;
+    this.admin1Id = admin ? this.resampleIds(admin) : null;
+    this.wadiId = wadi ? this.resampleIds(wadi) : null;
+    this.adminScratch = makeRegionScratch(this.admin1Id);
+    this.wadiScratch = makeRegionScratch(this.wadiId);
+  }
+
+  /** Nearest-resample a categorical id layer onto the impact grid. */
+  private resampleIds(layer: BinLayer): Uint16Array {
+    const out = new Uint16Array(this.nx * this.ny);
+    for (let row = 0; row < this.ny; row++) {
+      for (let col = 0; col < this.nx; col++) {
+        const { lat, lon } = cellToLatLon(
+          { nx: this.nx, ny: this.ny, bbox: DOMAIN },
+          col,
+          row,
+        );
+        const cell = latLonToCell(
+          { nx: layer.nx, ny: layer.ny, bbox: layer.bbox },
+          lat,
+          lon,
+        );
+        const c = Math.max(0, Math.min(layer.nx - 1, Math.round(cell.col)));
+        const r = Math.max(0, Math.min(layer.ny - 1, Math.round(cell.row)));
+        out[row * this.nx + col] = Math.round(layer.data[r * layer.nx + c]);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Ranked worst-hit regions, cached per (ledger version, window, data epoch)
+   * so steady frames pay nothing. Pure over the tick sequence: fixed
+   * row-major scans, no clock, no RNG.
+   */
+  private regionRows(): RegionRainRow[] {
+    const key = `${this.version}|${this.rainWindow}|${this.regionsEpoch}`;
+    if (key === this.regionCacheKey) return this.regionCacheRows;
+    const windowGrid = this.view.mm;
+    const rows: RegionRainRow[] = [];
+    const names = this.regionNames;
+    const collect = (
+      ids: Uint16Array | null,
+      scratch: RegionScratch | null,
+      kind: RegionRainRow['kind'],
+      table: Record<string, string>,
+      fallback: (id: number) => string,
+    ): void => {
+      if (!ids || !scratch) return;
+      scratch.stormSum.fill(0);
+      scratch.stormMax.fill(0);
+      scratch.windowMax.fill(0);
+      scratch.count.fill(0);
+      for (let index = 0; index < ids.length; index++) {
+        const id = ids[index];
+        if (id === 0) continue;
+        const total = this.totalMm[index];
+        scratch.count[id]++;
+        scratch.stormSum[id] += total;
+        if (total > scratch.stormMax[id]) scratch.stormMax[id] = total;
+        const win = windowGrid[index];
+        if (win > scratch.windowMax[id]) scratch.windowMax[id] = win;
+      }
+      for (let id = 1; id < scratch.count.length; id++) {
+        if (scratch.count[id] === 0) continue;
+        if (scratch.stormMax[id] < REGION_MIN_STORM_MM) continue;
+        rows.push({
+          id,
+          name: table[String(id)] ?? fallback(id),
+          kind,
+          windowMaxMm: scratch.windowMax[id],
+          stormMaxMm: scratch.stormMax[id],
+          stormMeanMm: scratch.stormSum[id] / scratch.count[id],
+        });
+      }
+    };
+    if (names) {
+      collect(
+        this.admin1Id,
+        this.adminScratch,
+        'governorate',
+        names.admin1,
+        (id) => `governorate ${id}`,
+      );
+      collect(
+        this.wadiId,
+        this.wadiScratch,
+        'wadi',
+        names.wadi,
+        (id) => `unnamed basin ${id}`,
+      );
+    }
+    rows.sort(
+      (a, b) =>
+        b.windowMaxMm - a.windowMaxMm ||
+        b.stormMaxMm - a.stormMaxMm ||
+        (a.kind === b.kind ? a.id - b.id : a.kind === 'governorate' ? -1 : 1),
+    );
+    rows.length = Math.min(rows.length, REGION_ROW_CAP);
+    this.regionCacheKey = key;
+    this.regionCacheRows = rows;
+    return rows;
+  }
 
   /** Wire the baked land mask; refreshes the per-cell land flags. */
   setLandMask(layer: BinLayer | null): void {
@@ -403,13 +580,39 @@ export class ImpactTracker {
         }
       }
     }
+    const hasRegions =
+      this.regionNames !== null &&
+      (this.admin1Id !== null || this.wadiId !== null);
     return {
       cities,
       maxLandRainMm: this.maxLandRainMm,
       floodRisk: floodRiskTier(this.maxLandRainMm),
       live,
+      regions: hasRegions
+        ? { window: this.rainWindow, rows: this.regionRows() }
+        : null,
     };
   }
+}
+
+/** Per-region accumulators sized max-id+1, reused across aggregation passes. */
+interface RegionScratch {
+  stormSum: Float64Array;
+  stormMax: Float64Array;
+  windowMax: Float64Array;
+  count: Uint32Array;
+}
+
+function makeRegionScratch(ids: Uint16Array | null): RegionScratch | null {
+  if (!ids) return null;
+  let maxId = 0;
+  for (const id of ids) if (id > maxId) maxId = id;
+  return {
+    stormSum: new Float64Array(maxId + 1),
+    stormMax: new Float64Array(maxId + 1),
+    windowMax: new Float64Array(maxId + 1),
+    count: new Uint32Array(maxId + 1),
+  };
 }
 
 function smoothstep(edge0: number, edge1: number, value: number): number {

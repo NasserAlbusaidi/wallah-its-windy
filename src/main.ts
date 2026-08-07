@@ -25,6 +25,7 @@ import './style.css';
 import { injectCssVars, TOKENS } from './tokens';
 import { readHash, writeHash, clearHash, isEnvHashKey } from './rng';
 import { DOMAIN, cellToLatLon, inBBox } from './grid';
+import type { RegionNamesTable } from './impact';
 import {
   HOME_VIEW,
   computeViewTransform,
@@ -702,6 +703,10 @@ const MANIFEST: LoadItem[] = [
   { url: asset('data/tracks.json'), label: 'historic tracks', kind: 'json', key: 'tracks', weight: 1 },
   // Scenario catalogue (C8). Missing/404 -> null -> the scenario picker disables.
   { url: asset('data/scenarios.json'), label: 'scenarios', kind: 'json', key: 'scenarios', weight: 1 },
+  // Regional rain ledger geography (UX v2 phase 3). Either file missing/404
+  // degrades to null -> the impact board's regions block simply hides.
+  { url: asset('data/regions.bin'), label: 'regions', kind: 'bin', key: 'regions', weight: 1 },
+  { url: asset('data/regions.json'), label: 'region names', kind: 'json', key: 'regionNames', weight: 1 },
 ];
 
 const loadedWeight = new Map<string, number>();
@@ -710,6 +715,8 @@ let genesisPoints: LatLon[] = [];
 let parsedTracks: StormTrack[] | null = null;
 /** Parsed scenario catalogue, or null when the file is absent/malformed. */
 let parsedScenarios: Scenario[] | null = null;
+/** Parsed regions.json name tables, or null when absent/malformed. */
+let parsedRegionNames: RegionNamesTable | null = null;
 /** Ghost polylines for the render facade, retained across scenario switches. */
 let ghostTracks: GhostPolyline[] = [];
 
@@ -767,6 +774,7 @@ function routeLoaded(item: LoadItem, buf: ArrayBuffer, bins: Map<string, ParsedB
       if (item.key === 'genesis') genesisPoints = parseGenesis(json);
       else if (item.key === 'tracks') parsedTracks = parseTracks(json);
       else if (item.key === 'scenarios') parsedScenarios = parseScenarios(json);
+      else if (item.key === 'regionNames') parsedRegionNames = parseRegionNames(json);
     }
   } catch (err) {
     console.warn(`[load] ${item.label} parsed badly, skipping:`, err);
@@ -775,6 +783,29 @@ function routeLoaded(item: LoadItem, buf: ArrayBuffer, bins: Map<string, ParsedB
     // instead of silently degrading to the analytic fallback + sea-ring mask.
     if (item.kind === 'bin') ui.notifyDataError();
   }
+}
+
+/** Validate regions.json's id->name tables (BINARY-FORMATS.md schema). */
+function parseRegionNames(json: unknown): RegionNamesTable | null {
+  const rec = json as {
+    admin1?: unknown;
+    wadi?: unknown;
+  } | null;
+  const table = (value: unknown): Record<string, string> | null => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return null;
+    }
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (typeof v !== 'string' || !/^\d+$/.test(k)) return null;
+      out[k] = v;
+    }
+    return out;
+  };
+  const admin1 = table(rec?.admin1);
+  const wadi = table(rec?.wadi);
+  if (!admin1 || !wadi) return null;
+  return { admin1, wadi };
 }
 
 /** Validate genesis.json into LatLon[] (BINARY-FORMATS.md schema). */
@@ -844,6 +875,7 @@ async function loadAll(): Promise<void> {
   mergedTerrainBin = mergedTerrain(bins);
   ui.setLandMask(findLandMask(mergedTerrainBin));
   impact.setLandMask(findLandMask(mergedTerrainBin));
+  impact.setRegions(bins.get('regions') ?? null, parsedRegionNames);
   ui.setGenesis(genesisPoints);
   climatologyBin = bins.get('env') ?? null;
   envBin = climatologyBin;

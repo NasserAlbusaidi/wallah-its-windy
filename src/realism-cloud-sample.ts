@@ -317,12 +317,16 @@ export function sampleCloudProxy(
   const steerAxisY = steerLen > 0.05 ? -u.steerAtStorm.y / steerLen : -0.51;
   const veilPx = cell.u * 8.0 + seed * 5.0;
   const veilPy = cell.v * 5.2 + seed * 5.0;
+  const veilWarp = (synopticNoise - 0.5) * 1.2;
   const veilTexture = noise.tap(
-    (veilPx * -steerAxisY + veilPy * steerAxisX) * 0.058,
-    (veilPx * steerAxisX + veilPy * steerAxisY) * 0.013 - u.ageH * 0.0035,
+    (veilPx * -steerAxisY + veilPy * steerAxisX + veilWarp) * 0.058,
+    (veilPx * steerAxisX + veilPy * steerAxisY) * 0.024 - u.ageH * 0.0035,
     2,
   );
-  const veil = smoothstep(0.52, 0.88, veilTexture) * mix(0.08, 0.38, rhDrive);
+  const veil =
+    smoothstep(0.55, 0.9, veilTexture) *
+    smoothstep(0.35, 0.75, patchNoise + 0.25 * rhDrive) *
+    mix(0.04, 0.3, rhDrive);
   const ambientCloud = deckCover + veil * (1.0 - deckCover);
 
   const moisture = clamp01((u.midlevelRh - 0.25) / 0.62);

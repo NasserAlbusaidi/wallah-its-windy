@@ -259,15 +259,22 @@ ${CLOUD_CORE_GLSL.wobble}
   // Streamed veils: thin high cloud drawn along the steering axis. The axis is
   // the sampled storm-centre steering — deterministic and advection-consistent
   // with synopticDrift; event-aligned upper flow is RGR-011 (HF-7 charter).
+  // Straight uniform ribbons read synthetic (browser A/B, 2026-08-07): the
+  // cross coordinate is warped by the synoptic noise so streamers wave and
+  // fray, the along frequency breaks each one at a few hundred km, and the
+  // component is gated to moist synoptic sectors instead of the whole basin.
   vec2 steerAxis = length(u_steerAtStorm) > 0.05
     ? normalize(vec2(u_steerAtStorm.x, -u_steerAtStorm.y))
     : vec2(0.86, -0.51);
   vec2 veilP = v_uv * vec2(8.0, 5.2) + seed * 5.0;
+  float veilWarp = (synopticNoise - 0.5) * 1.2;
   float veilTexture = texture(u_cloudNoise, vec2(
-    dot(veilP, vec2(-steerAxis.y, steerAxis.x)) * 0.058,
-    dot(veilP, steerAxis) * 0.013 - u_ageH * 0.0035
+    (dot(veilP, vec2(-steerAxis.y, steerAxis.x)) + veilWarp) * 0.058,
+    dot(veilP, steerAxis) * 0.024 - u_ageH * 0.0035
   )).b;
-  float veil = smoothstep(0.52, 0.88, veilTexture) * mix(0.08, 0.38, rhDrive);
+  float veil = smoothstep(0.55, 0.90, veilTexture) *
+    smoothstep(0.35, 0.75, patchNoise + 0.25 * rhDrive) *
+    mix(0.04, 0.30, rhDrive);
   // Structural bound: deckCover tops out at 0.92 and the veil fills at most
   // the remaining gap's 0.38, so ambient cover stays below 0.96 — the deck
   // can read overcast but never solid, and the composite below still lets

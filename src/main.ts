@@ -145,6 +145,7 @@ import {
 import type { EnsembleRunHandle } from './ensemble-client';
 import { buildEnsembleEnvelope } from './ensemble-envelope';
 import type { EnsembleEnvelope } from './ensemble-envelope';
+import type { EnsembleBoardSummary } from './impact-board';
 import type {
   EnsembleResult,
   EnvironmentPerturbation,
@@ -424,6 +425,12 @@ const ui = new UiController({
   monthSelect,
   reducedMotion: prefersReducedMotion,
 });
+// Impact-board "show member tracks" toggle: presentation state only — the
+// ensemble result itself never changes with visibility.
+ui.onEnsembleMembersToggle(() => {
+  ensembleMembersShown = !ensembleMembersShown;
+  renderCtrl?.setEnsembleMembersVisible?.(ensembleMembersShown);
+});
 const session = new StormSession();
 // Deterministic landfall-impact bookkeeping (rain grid + city exposure); reset
 // per spawn, fed the same fixed ticks the recorder sees.
@@ -499,6 +506,10 @@ let activeRainAccumulationWindow: RainAccumulationWindow =
 let analysisRequestSeq = 0;
 /** In-flight ensemble run (manual or auto) — cancelled on supersession. */
 let activeEnsembleRun: EnsembleRunHandle | null = null;
+/** Board-facing ensemble state (running progress or done counts). */
+let ensembleBoardSummary: EnsembleBoardSummary | null = null;
+/** Member-spaghetti toggle — reset off on every spawn. */
+let ensembleMembersShown = false;
 /** Pending post-spawn settle timer for the automatic ensemble. */
 let autoEnsembleTimer: number | null = null;
 /** Device eligibility for the auto run (AUTO_ENSEMBLE_BUDGET); set in resize(). */
@@ -1147,6 +1158,8 @@ function doSpawn(
   clearAutoEnsembleTimer();
   activeEnsembleRun?.cancel();
   activeEnsembleRun = null;
+  ensembleBoardSummary = null;
+  ensembleMembersShown = false;
   renderCtrl?.setEnsemble?.(null, null);
   renderCtrl?.setEnsembleMembersVisible?.(false);
   analysisRequestSeq++;
@@ -2418,6 +2431,13 @@ function startEnsembleRun(
   ensembleRun.disabled = true;
   ensembleResults.hidden = true;
   ensembleStatus.value = `${label}starting ${count}-member worker ensemble…`;
+  ensembleBoardSummary = {
+    state: 'running',
+    memberCount: count,
+    completed: 0,
+    hurricaneCount: 0,
+    landfallCount: 0,
+  };
   const urls = currentAnalysisUrls();
   const handle = requestEnsemble(
     {
@@ -2430,6 +2450,13 @@ function startEnsembleRun(
     (completed, total) => {
       if (requestSeq === analysisRequestSeq) {
         ensembleStatus.value = `${label}running members ${completed}/${total}`;
+        ensembleBoardSummary = {
+          state: 'running',
+          memberCount: total,
+          completed,
+          hurricaneCount: 0,
+          landfallCount: 0,
+        };
       }
     },
   );
@@ -2438,6 +2465,15 @@ function startEnsembleRun(
     .then((result) => {
       if (requestSeq !== analysisRequestSeq) return;
       renderCtrl?.setEnsemble?.(result, buildEnsembleEnvelope(result.members));
+      const members = result.members.length;
+      // Frequencies are exact member fractions; rounding recovers the counts.
+      ensembleBoardSummary = {
+        state: 'done',
+        memberCount: members,
+        completed: members,
+        hurricaneCount: Math.round(result.hurricaneProbability * members),
+        landfallCount: Math.round(result.landfallProbability * members),
+      };
       ensemblePeak.textContent =
         `${result.peakKt.p10.toFixed(0)}–${result.peakKt.p90.toFixed(0)} kt ` +
         `(median ${result.peakKt.median.toFixed(0)})`;
@@ -2455,6 +2491,7 @@ function startEnsembleRun(
       if (error instanceof EnsembleCancelledError) return;
       if (requestSeq !== analysisRequestSeq) return;
       renderCtrl?.setEnsemble?.(null, null);
+      ensembleBoardSummary = null;
       ensembleStatus.value =
         error instanceof Error ? `ensemble failed · ${error.message}` : 'ensemble failed';
     })
@@ -3114,6 +3151,8 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
     landfallKt: landfallWindKt(),
     intensitySeries: session.recorder.intensitySeries(),
     historicalAnalog: storm?.isDemo ? null : activeAnalog(),
+    ensemble: ensembleBoardSummary,
+    ensembleMembersShown,
   });
 }
 

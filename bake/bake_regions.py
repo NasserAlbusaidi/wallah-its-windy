@@ -155,18 +155,25 @@ def build_admin1() -> tuple[np.ndarray, dict[int, str]]:
 
 def build_impact_landmask() -> np.ndarray:
     """Terrain landmask nearest-sampled at impact cell centres — the exact
-    resample src/impact.ts setLandMask performs at runtime."""
+    resample src/impact.ts setLandMask performs at runtime.
+
+    Rounding must be JS Math.round (half-UP): the 200-column impact grid over
+    the 1040-column terrain grid produces exact .5 ties on 40 columns, and
+    numpy's np.round (half-to-EVEN) would sample the terrain cell one column
+    west of the runtime's on every one of them. np.floor(x + 0.5) reproduces
+    the half-up semantics.
+    """
     _elev, terrain_land = sources.load_terrain()
     t_ny, t_nx = terrain_land.shape
     lon = sources.lon_centers(NX)
     lat = sources.lat_centers(NY)
     lon_min, lon_max, lat_min, lat_max = DOMAIN
     col = np.clip(
-        np.round((lon - lon_min) / (lon_max - lon_min) * t_nx - 0.5).astype(int),
+        np.floor((lon - lon_min) / (lon_max - lon_min) * t_nx - 0.5 + 0.5).astype(int),
         0, t_nx - 1,
     )
     row = np.clip(
-        np.round((lat_max - lat) / (lat_max - lat_min) * t_ny - 0.5).astype(int),
+        np.floor((lat_max - lat) / (lat_max - lat_min) * t_ny - 0.5 + 0.5).astype(int),
         0, t_ny - 1,
     )
     return terrain_land[np.ix_(row, col)].astype(np.uint8)

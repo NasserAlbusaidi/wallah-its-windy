@@ -187,8 +187,32 @@ describe('regional rain aggregation', () => {
   it('falls back to "unnamed basin <id>" when the wadi has no name entry', () => {
     const tracker = trackedRun({ admin1: NAMES.admin1, wadi: {} });
     const regions = tracker.summary(null).regions!;
+    // Unconditional: the NE wadi box gets outer-band rain from the 61E storm,
+    // and losing that row must fail loudly, not skip the assertion.
     const wadi = regions.rows.find((row) => row.kind === 'wadi');
-    if (wadi) expect(wadi.name).toBe('unnamed basin 7');
+    expect(wadi).toBeDefined();
+    expect(wadi!.name).toBe('unnamed basin 7');
+  });
+
+  it('governorates precede wadis on exact value ties', () => {
+    // Both layers cover the IDENTICAL east half, so every aggregate ties and
+    // only the kind tie-break decides the order.
+    const admin1 = idLayer('admin1', (col) => (col >= 60 ? 2 : 0));
+    const wadi = idLayer('wadi', (col) => (col >= 60 ? 7 : 0));
+    const bin: ParsedBin = {
+      version: 1,
+      layers: new Map([
+        ['admin1', admin1],
+        ['wadi', wadi],
+      ]),
+    };
+    const tracker = new ImpactTracker();
+    tracker.setRegions(bin, NAMES);
+    const active = storm(22, 61, 90);
+    for (let i = 0; i < 24; i++) tracker.record(active, 0.25);
+    const rows = tracker.summary(null).regions!.rows;
+    expect(rows.map((row) => row.kind)).toEqual(['governorate', 'wadi']);
+    expect(rows[0].windowMaxMm).toBeCloseTo(rows[1].windowMaxMm, 12);
   });
 
   it('caches: repeated summaries without a tick reuse the same rows array', () => {
@@ -213,22 +237,33 @@ describe('regional rain aggregation', () => {
   });
 
   it('resamples through the layer header grid, not assumed dimensions', () => {
-    // A half-resolution layer must still land ids on the right cells.
-    const coarse = idLayer('admin1', () => 0);
+    // A half-resolution layer split at lon 56 (its own col 30) must map ids
+    // onto the correct impact cells: the 61E storm rains ONLY into the east
+    // id. A flipped or mis-scaled mapping would light the west id instead —
+    // the non-uniform fill makes the test falsifiable.
+    const half = new Float32Array(100 * 60);
+    for (let row = 0; row < 60; row++) {
+      for (let col = 0; col < 100; col++) {
+        half[row * 100 + col] = col < 30 ? 3 : 4;
+      }
+    }
     const small: BinLayer = {
-      ...coarse,
+      ...idLayer('admin1', () => 0),
       nx: 100,
       ny: 60,
-      data: new Float32Array(100 * 60).fill(3),
+      data: half,
     };
     const bin: ParsedBin = {
       version: 1,
       layers: new Map([['admin1', small]]),
     };
     const tracker = new ImpactTracker();
-    tracker.setRegions(bin, { admin1: { '3': 'everywhere' }, wadi: {} });
+    tracker.setRegions(bin, {
+      admin1: { '3': 'west half', '4': 'east half' },
+      wadi: {},
+    });
     for (let i = 0; i < 8; i++) tracker.record(storm(22, 61, 90), 0.25);
     const regions = tracker.summary(null).regions!;
-    expect(regions.rows[0]?.name).toBe('everywhere');
+    expect(regions.rows.map((row) => row.name)).toEqual(['east half']);
   });
 });

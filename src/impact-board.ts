@@ -237,6 +237,13 @@ export class ImpactBoardView {
         const item = document.createElement('div');
         item.className = 'impact-board-region';
         item.setAttribute('role', 'listitem');
+        // The visual column headers are aria-hidden; give screen readers the
+        // column meaning per row instead of two bare numbers.
+        item.setAttribute(
+          'aria-label',
+          `${row.label}: ${row.windowText} in the selected window, ` +
+            `${row.stormText} storm total, simulated`,
+        );
         const label = document.createElement('span');
         label.className = 'impact-board-city';
         label.textContent = row.label;

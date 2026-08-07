@@ -491,6 +491,17 @@
           <span>city</span><span>now</span><span>peak</span><span>rain</span>
         </div>
         <div id="impact-board-cities" role="list" aria-label="Ranked city exposure"></div>
+        <!-- Regional rain ledger (UX v2 phase 3): governorate + wadi-basin
+             aggregation of the same parametric grid — never observations,
+             never flood-tiered (tiers are point proxies). -->
+        <div id="impact-board-regions" hidden>
+          <p id="impact-board-regions-title" class="impact-board-regions-title">worst-hit regions</p>
+          <p class="impact-board-regions-note">parametric rain · not validated against observed rainfall</p>
+          <div class="impact-board-rcols" aria-hidden="true">
+            <span>region</span><span>window</span><span>storm</span>
+          </div>
+          <div id="impact-board-region-rows" role="list" aria-label="Worst-hit regions by simulated rain"></div>
+        </div>
         <p id="impact-board-allclear" hidden></p>
       </aside>
 

@@ -3160,6 +3160,82 @@ html[data-compact='true'] .ghost-label:not(.active) {
   display: none;
 }
 
+/* Regional rain ledger block (UX v2 phase 3). Plain values only — areal
+   aggregates never borrow the flood data-risk styling (point proxies). */
+#app #impact-board-regions {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--ridge-hi, #2c343c) 42%, transparent);
+}
+
+#app #impact-board-regions[hidden] {
+  display: none;
+}
+
+#app #impact-board .impact-board-regions-title {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#app #impact-board .impact-board-regions-note {
+  margin: 2px 0 0;
+  color: var(--text-mut);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+#app #impact-board .impact-board-rcols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px 52px;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+#app #impact-board .impact-board-rcols span:first-child {
+  text-align: left;
+}
+
+#app #impact-board-region-rows {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+#app #impact-board .impact-board-region {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px 52px;
+  gap: 6px;
+  align-items: baseline;
+  padding: 2px 4px;
+  color: var(--text-hi);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  text-align: right;
+}
+
+/* The shared label class is styled under .impact-board-row above; region
+   rows need the same left-aligned treatment under their own parent. */
+#app #impact-board .impact-board-region .impact-board-city {
+  overflow: hidden;
+  color: var(--text-mut);
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 #app #timeline {
   right: 16px;
   bottom: 16px;
@@ -3745,6 +3821,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
   #app #impact-board .impact-board-vitals,
   #app #impact-board .impact-board-cols,
   #app #impact-board-cities,
+  #app #impact-board-regions,
   #app #impact-board-allclear {
     display: none;
   }
@@ -3769,6 +3846,7 @@ html[data-compact='true'] .ghost-label:not(.active) {
     display: grid;
   }
 
+  #app #impact-board[data-expanded='true'] #impact-board-regions:not([hidden]),
   #app #impact-board[data-expanded='true'] #impact-board-allclear:not([hidden]) {
     display: block;
   }

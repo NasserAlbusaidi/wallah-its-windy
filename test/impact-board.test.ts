@@ -166,6 +166,89 @@ describe('impact board model', () => {
     expect(buildImpactBoardModel(inputWith({ impact })).allClearText).toBeNull();
   });
 
+  it('regions block hidden when regions are null or empty', () => {
+    expect(buildImpactBoardModel(inputWith()).regionsTitle).toBeNull();
+    expect(buildImpactBoardModel(inputWith()).regionRows).toEqual([]);
+    const impact = summaryWith({ regions: { window: 'storm', rows: [] } });
+    const model = buildImpactBoardModel(inputWith({ impact }));
+    expect(model.regionsTitle).toBeNull();
+    expect(model.regionRows).toEqual([]);
+  });
+
+  it('builds ranked region rows with rounded window and storm columns', () => {
+    const impact = summaryWith({
+      regions: {
+        window: '3h',
+        rows: [
+          {
+            id: 9,
+            name: 'dhofar',
+            kind: 'governorate' as const,
+            windowMaxMm: 61.4,
+            stormMaxMm: 143.6,
+            stormMeanMm: 22.1,
+          },
+          {
+            id: 116,
+            name: 'wadi ghul',
+            kind: 'wadi' as const,
+            windowMaxMm: 30.2,
+            stormMaxMm: 88.4,
+            stormMeanMm: 40.0,
+          },
+        ],
+      },
+    });
+    const model = buildImpactBoardModel(inputWith({ impact }));
+    expect(model.regionsTitle).toBe('worst-hit regions · trailing 3 h');
+    expect(model.regionRows).toEqual([
+      { id: 'governorate:9', label: 'dhofar', windowText: '61 mm', stormText: '144 mm' },
+      { id: 'wadi:116', label: 'wadi ghul', windowText: '30 mm', stormText: '88 mm' },
+    ]);
+    // Region rows never carry flood-tier styling — areal values stay plain.
+    expect(JSON.stringify(model.regionRows)).not.toContain('tint');
+  });
+
+  it('storm-total window titles the block accordingly', () => {
+    const impact = summaryWith({
+      regions: {
+        window: 'storm',
+        rows: [
+          {
+            id: 1,
+            name: 'muscat',
+            kind: 'governorate' as const,
+            windowMaxMm: 12,
+            stormMaxMm: 12,
+            stormMeanMm: 4,
+          },
+        ],
+      },
+    });
+    const model = buildImpactBoardModel(inputWith({ impact }));
+    expect(model.regionsTitle).toBe('worst-hit regions · storm total');
+  });
+
+  it('key moves when only the region window changes', () => {
+    const rows = [
+      {
+        id: 1,
+        name: 'muscat',
+        kind: 'governorate' as const,
+        windowMaxMm: 12,
+        stormMaxMm: 12,
+        stormMeanMm: 4,
+      },
+    ];
+    const a = buildImpactBoardModel(
+      inputWith({ impact: summaryWith({ regions: { window: 'storm', rows } }) }),
+    );
+    const b = buildImpactBoardModel(
+      inputWith({ impact: summaryWith({ regions: { window: '1h', rows } }) }),
+    );
+    expect(a.key).not.toBe(b.key);
+  });
+
   it('key is stable for identical inputs and moves on any visible change', () => {
     const a = buildImpactBoardModel(inputWith());
     const b = buildImpactBoardModel(inputWith());

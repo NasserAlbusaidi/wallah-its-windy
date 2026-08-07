@@ -18,7 +18,9 @@ import {
   IMPACT_CITIES,
   type FloodRisk,
   type ImpactSummary,
+  type RegionRainSummary,
 } from './impact';
+import { rainAccumulationDefinition } from './rain-accumulation';
 import type { StormDebrief } from './flight-recorder';
 import { categoryRgba } from './category';
 import {
@@ -58,6 +60,14 @@ export interface ImpactBoardCityRow {
   tint: string | null;
 }
 
+/** One worst-hit-region row: plain text, never flood-tiered (areal proxy). */
+export interface ImpactBoardRegionRow {
+  id: string;
+  label: string;
+  windowText: string;
+  stormText: string;
+}
+
 export interface ImpactBoardModel {
   visible: boolean;
   headline: string;
@@ -67,6 +77,9 @@ export interface ImpactBoardModel {
   floodRisk: FloodRisk | null;
   floodText: string;
   rows: ImpactBoardCityRow[];
+  /** null hides the regions block (data absent or nothing >= 1 mm yet). */
+  regionsTitle: string | null;
+  regionRows: ImpactBoardRegionRow[];
   allClearText: string | null;
   key: string;
 }
@@ -80,9 +93,32 @@ const HIDDEN_MODEL: ImpactBoardModel = {
   floodRisk: null,
   floodText: '',
   rows: [],
+  regionsTitle: null,
+  regionRows: [],
   allClearText: null,
   key: '',
 };
+
+function regionsBlock(regions: RegionRainSummary | null): {
+  title: string | null;
+  rows: ImpactBoardRegionRow[];
+} {
+  if (!regions || regions.rows.length === 0) return { title: null, rows: [] };
+  const definition = rainAccumulationDefinition(regions.window);
+  const title =
+    definition.hours === null
+      ? 'worst-hit regions · storm total'
+      : `worst-hit regions · trailing ${definition.label}`;
+  return {
+    title,
+    rows: regions.rows.map((row) => ({
+      id: `${row.kind}:${row.id}`,
+      label: row.name,
+      windowText: `${Math.round(row.windowMaxMm)} mm`,
+      stormText: `${Math.round(row.stormMaxMm)} mm`,
+    })),
+  };
+}
 
 /** Threshold below which a city's run exposure counts as no damaging wind. */
 const DAMAGING_WIND_KT = 20;
@@ -152,6 +188,10 @@ export interface ImpactBoardElements {
   rain: HTMLElement;
   flood: HTMLElement;
   cities: HTMLElement;
+  /** Regions block wrapper (hidden when the model has no rows). */
+  regionsWrap: HTMLElement;
+  regionsTitle: HTMLElement;
+  regionRows: HTMLElement;
   allClear: HTMLElement;
 }
 
@@ -190,6 +230,24 @@ export class ImpactBoardView {
     this.el.flood.textContent = model.floodText;
     this.el.allClear.hidden = model.allClearText === null;
     this.el.allClear.textContent = model.allClearText ?? '';
+    this.el.regionsWrap.hidden = model.regionsTitle === null;
+    this.el.regionsTitle.textContent = model.regionsTitle ?? '';
+    this.el.regionRows.replaceChildren(
+      ...model.regionRows.map((row) => {
+        const item = document.createElement('div');
+        item.className = 'impact-board-region';
+        item.setAttribute('role', 'listitem');
+        const label = document.createElement('span');
+        label.className = 'impact-board-city';
+        label.textContent = row.label;
+        const win = document.createElement('span');
+        win.textContent = row.windowText;
+        const total = document.createElement('span');
+        total.textContent = row.stormText;
+        item.append(label, win, total);
+        return item;
+      }),
+    );
     this.el.cities.replaceChildren(
       ...model.rows.map((row) => {
         const button = document.createElement('button');
@@ -254,6 +312,7 @@ export function buildImpactBoardModel(
   const landfallText = landfallFact(debrief, input.landfallAgeH);
   const rainText = `max storm-total ${Math.round(impact.maxLandRainMm)} mm over land`;
   const floodText = `flash-flood proxy ${impact.floodRisk}`;
+  const regions = regionsBlock(impact.regions);
   const allClearText = rows.every((row) => row.peakKt < DAMAGING_WIND_KT)
     ? 'no damaging winds reached any city'
     : null;
@@ -265,6 +324,10 @@ export function buildImpactBoardModel(
     rainText,
     floodText,
     allClearText ?? '',
+    regions.title ?? '',
+    ...regions.rows.map(
+      (row) => `${row.id}:${row.windowText}:${row.stormText}`,
+    ),
     // tint participates so an unrounded threshold crossing (peak 19.9 -> 20.1
     // or a category boundary) repaints even when every rounded text is stable.
     ...cityRows.map(
@@ -282,6 +345,8 @@ export function buildImpactBoardModel(
     floodRisk: impact.floodRisk,
     floodText,
     rows: cityRows,
+    regionsTitle: regions.title,
+    regionRows: regions.rows,
     allClearText,
     key,
   };

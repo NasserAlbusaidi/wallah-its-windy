@@ -128,7 +128,12 @@ Months outside May–Nov are not baked (no Arabian-Sea cyclone season) — clamp
   `https://data.hydrosheds.org/file/hydrosheds-v1-acc/hyd_eu_acc_30s.zip`
   `https://data.hydrosheds.org/file/hydrosheds-v1-dir/hyd_eu_dir_30s.zip`
   License: HydroSHEDS © WWF; cite Lehner, B., Verdin, K., Jarvis, A. (2008),
-  *Eos* 89(10).
+  *Eos* 89(10). Also reused by `bake_regions.py` to derive the 0.1° wadi
+  basin ids for `regions.bin`.
+- **Natural Earth 10m admin-1** states/provinces GeoJSON, pinned release
+  v5.1.2, filtered to Oman for the `regions.bin` governorate raster.
+  `https://github.com/nvkelso/natural-earth-vector/raw/v5.1.2/geojson/ne_10m_admin_1_states_provinces.geojson`
+  License: public domain (Natural Earth).
 - **ERA5** pressure-level winds for climatological samples and event windows —
   see the active pipeline below.
 - **ERA5** 600/700-hPa relative humidity and event-time SST, fetched by

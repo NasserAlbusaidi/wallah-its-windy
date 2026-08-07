@@ -592,6 +592,14 @@ incident record.
    one concern per file; grid.ts remains the data-space owner. The rain
    accumulator moved to a domain-fixed 1000×600 grid in the same PR (it was
    screen-registered state that any camera move would have corrupted).
+7b. **Complete (2026-08-07): regional rain ledger — UX v2 phase 3.** Baked
+   region-id rasters (`regions.bin`: Natural Earth v5.1.2 Oman governorates +
+   HydroSHEDS-derived 0.1° wadi basins, geography-keyed names in
+   `regions.json`) through the three-way bin contract; read-only per-region
+   sum/mean/max over the deterministic rain ledger in `impact.summary()`;
+   ranked worst-hit block on the impact board following the accum-window
+   selection. Areal values keep the parametric-proxy label and are never
+   flood-tiered. Phase 4 (ensemble on-map) remains.
 
 ### Next
 

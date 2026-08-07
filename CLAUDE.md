@@ -99,6 +99,12 @@ self-describing `.bin` assets the browser loads.
   work.
 - Dims, bbox, and quantization come from file headers — the runtime hardcodes
   no grid geometry. Do not add a second parser or inline byte offsets.
+- `regions.bin` region ids are categorical: unquantized uint8/uint16 with
+  scale 1 offset 0 so they survive the loader's Float32 dequantize bit-exact.
+  Wadi names in `regions.json` are resolved from geography-keyed anchor
+  coordinates at bake time (`bake/bake_regions.py`) — never hand-edit the id
+  tables; rebake instead. The runtime resamples through the layer's own
+  header grid and treats a missing file as "no regions block", never an error.
 - `public/data/upper.bin`'s planes must carry the same picked real years as
   `env.bin`'s (plane k = same year, both files). `bake/bake_upper_winds.py`
   enforces this by reconstructing env.bin's year-picked layers byte-for-byte

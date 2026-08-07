@@ -1,0 +1,46 @@
+{
+  "admin1": {
+    "1": "ad dakhiliyah",
+    "10": "musandam",
+    "11": "muscat",
+    "2": "ad dhahirah",
+    "3": "al batinah north",
+    "4": "al batinah south",
+    "5": "al buraimi",
+    "6": "al wusta",
+    "7": "ash sharqiyah north",
+    "8": "ash sharqiyah south",
+    "9": "dhofar"
+  },
+  "bin": "data/regions.bin",
+  "grid": {
+    "bbox": [
+      50.0,
+      70.0,
+      15.0,
+      27.0
+    ],
+    "nx": 200,
+    "ny": 120
+  },
+  "source": {
+    "admin1": "Natural Earth 10m admin-1 v5.1.2 (public domain), Oman governorates",
+    "wadi": "Derived on the 0.1-deg impact grid from HydroSHEDS v1.1 EU/Middle-East 30s DIR+ACC (c) WWF; Lehner, Verdin & Jarvis 2008. Basin ids are bake-derived outlets, not official HydroSHEDS ids; names resolved from curated in-channel anchor coordinates at bake time."
+  },
+  "version": 1,
+  "wadi": {
+    "104": "wadi hawasinah",
+    "108": "wadi sahtan",
+    "111": "wadi bani awf",
+    "112": "wadi mistal",
+    "115": "wadi samail",
+    "116": "wadi ghul",
+    "117": "wadi aday",
+    "124": "wadi halfayn",
+    "125": "wadi dayqah",
+    "127": "wadi bani khalid",
+    "183": "wadi darbat",
+    "85": "wadi al jizzi"
+  },
+  "wadiBasinCount": 202
+}

@@ -58,6 +58,8 @@
     "data:realism:variance": "node bake/run-python.mjs bake/realism_env_variance.py",
     "data:upper": "node bake/run-python.mjs bake/bake_upper_winds.py",
     "data:upper:check": "node bake/run-python.mjs bake/bake_upper_winds.py --check",
+    "data:regions": "node bake/run-python.mjs bake/bake_regions.py",
+    "data:regions:check": "node bake/run-python.mjs bake/bake_regions.py --check",
     "hf6:observation-audit": "node bake/run-python.mjs bake/hf6_observation_audit.py",
     "data:hf6:bake": "node bake/run-python.mjs bake/bake_hf6_benchmark.py",
     "hf6:verify": "node calibration/hf6-verify.mjs",

@@ -29,9 +29,20 @@ export interface SensitivityWorkerRequest extends WorkerBaseRequest {
   organizationDelta: number;
 }
 
+/**
+ * Cooperative cancellation: the worker checks the cancelled set between
+ * members (it yields a macrotask so this message can deliver mid-run) and
+ * abandons the remaining computation. Applies to ensemble runs only.
+ */
+export interface CancelWorkerRequest {
+  type: 'cancel';
+  requestId: number;
+}
+
 export type AnalysisWorkerRequest =
   | EnsembleWorkerRequest
-  | SensitivityWorkerRequest;
+  | SensitivityWorkerRequest
+  | CancelWorkerRequest;
 
 export interface SensitivityResult {
   baseline: StormRun;
@@ -54,6 +65,10 @@ export type AnalysisWorkerResponse =
       type: 'sensitivity-result';
       requestId: number;
       result: SensitivityResult;
+    }
+  | {
+      type: 'cancelled';
+      requestId: number;
     }
   | {
       type: 'error';

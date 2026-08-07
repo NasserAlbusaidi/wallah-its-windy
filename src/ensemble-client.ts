@@ -36,7 +36,9 @@ function acquireWorker(): Worker {
         return;
       }
       pending.delete(message.requestId);
-      if (message.type === 'error') {
+      if (message.type === 'cancelled') {
+        request.reject(new EnsembleCancelledError());
+      } else if (message.type === 'error') {
         request.reject(new Error(message.message));
       } else {
         request.resolve(message.result);
@@ -68,14 +70,52 @@ function requestWorker<T extends Result>(
   });
 }
 
+/** Rejection marker for a run cancelled by the caller — treat as a no-op. */
+export class EnsembleCancelledError extends Error {
+  constructor() {
+    super('ensemble run cancelled');
+    this.name = 'EnsembleCancelled';
+  }
+}
+
+export interface EnsembleRunHandle {
+  result: Promise<EnsembleResult>;
+  /**
+   * Reject the pending promise immediately with EnsembleCancelledError and
+   * tell the worker to abandon the remaining members. Safe to call after
+   * completion (no-op).
+   */
+  cancel(): void;
+}
+
 export function requestEnsemble(
   request: Omit<
     Extract<AnalysisWorkerRequest, { type: 'ensemble' }>,
     'requestId'
   >,
   onProgress?: (completed: number, total: number) => void,
-): Promise<EnsembleResult> {
-  return requestWorker<EnsembleResult>(request, onProgress);
+): EnsembleRunHandle {
+  const requestId = nextRequestId++;
+  const result = new Promise<EnsembleResult>((resolve, reject) => {
+    pending.set(requestId, {
+      resolve: (value) => resolve(value as EnsembleResult),
+      reject,
+      onProgress,
+    });
+    acquireWorker().postMessage({ ...request, requestId });
+  });
+  return {
+    result,
+    cancel: () => {
+      const entry = pending.get(requestId);
+      if (!entry) return;
+      pending.delete(requestId);
+      entry.reject(new EnsembleCancelledError());
+      // The worker checks between members; a late 'cancelled' or result
+      // message for this id finds no pending entry and is ignored.
+      worker?.postMessage({ type: 'cancel', requestId });
+    },
+  };
 }
 
 export function requestSensitivity(

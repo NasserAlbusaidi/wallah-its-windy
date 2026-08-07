@@ -138,6 +138,7 @@ import {
   requiresObservationAcknowledgement,
 } from './product-identity';
 import {
+  EnsembleCancelledError,
   requestEnsemble,
   requestSensitivity,
 } from './ensemble-client';
@@ -2379,7 +2380,7 @@ ensembleRun.addEventListener('click', () => {
   ensembleResults.hidden = true;
   ensembleStatus.value = `starting ${count}-member worker ensemble…`;
   const urls = currentAnalysisUrls();
-  void requestEnsemble(
+  const handle = requestEnsemble(
     {
       type: 'ensemble',
       ...urls,
@@ -2392,7 +2393,8 @@ ensembleRun.addEventListener('click', () => {
         ensembleStatus.value = `running members ${completed}/${total}`;
       }
     },
-  )
+  );
+  void handle.result
     .then((result) => {
       if (requestSeq !== analysisRequestSeq) return;
       activeEnsemble = result;
@@ -2410,6 +2412,7 @@ ensembleRun.addEventListener('click', () => {
         'perturbation-frequency field on map';
     })
     .catch((error: unknown) => {
+      if (error instanceof EnsembleCancelledError) return;
       if (requestSeq !== analysisRequestSeq) return;
       activeEnsemble = null;
       ensembleStatus.value =

@@ -14,12 +14,24 @@ import { sampleOceanProfileBin } from './ocean-profile-sampler';
 import type {
   AnalysisWorkerRequest,
   AnalysisWorkerResponse,
+  CancelWorkerRequest,
 } from './ensemble-protocol';
 import type { ParsedBin } from './types';
 
 const scope = self as DedicatedWorkerGlobalScope;
 const binCache = new Map<string, Promise<ParsedBin>>();
 const ANALYSIS_HORIZON_H = 240;
+/** Request ids whose remaining computation should be abandoned. */
+const cancelled = new Set<number>();
+
+/**
+ * Yield one macrotask so queued messages (a 'cancel' for the running
+ * request, typically) deliver between members. Scheduling only — member
+ * results are unaffected.
+ */
+function yieldToMessages(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 function loadBin(url: string): Promise<ParsedBin> {
   let pending = binCache.get(url);
@@ -41,7 +53,9 @@ function post(response: AnalysisWorkerResponse): void {
   }
 }
 
-async function handle(request: AnalysisWorkerRequest): Promise<void> {
+async function handle(
+  request: Exclude<AnalysisWorkerRequest, CancelWorkerRequest>,
+): Promise<void> {
   const [envBin, terrainBin, steeringBin, oceanBin] = await Promise.all([
     loadBin(request.envUrl),
     loadBin(request.terrainUrl),
@@ -70,6 +84,11 @@ async function handle(request: AnalysisWorkerRequest): Promise<void> {
     const members = makeEnsembleMembers(request.spawn, request.count);
     const runs = [];
     for (const member of members) {
+      if (cancelled.has(request.requestId)) {
+        cancelled.delete(request.requestId);
+        post({ type: 'cancelled', requestId: request.requestId });
+        return;
+      }
       runs.push(
         runStorm({
           member: member.member,
@@ -88,7 +107,9 @@ async function handle(request: AnalysisWorkerRequest): Promise<void> {
         completed: runs.length,
         total: members.length,
       });
+      await yieldToMessages();
     }
+    cancelled.delete(request.requestId);
     post({
       type: 'ensemble-result',
       requestId: request.requestId,
@@ -129,6 +150,10 @@ async function handle(request: AnalysisWorkerRequest): Promise<void> {
 }
 
 scope.addEventListener('message', (event: MessageEvent<AnalysisWorkerRequest>) => {
+  if (event.data.type === 'cancel') {
+    cancelled.add(event.data.requestId);
+    return;
+  }
   void handle(event.data).catch((error: unknown) => {
     post({
       type: 'error',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildImpactBoardModel,
   formatLatLon,
+  type EnsembleBoardSummary,
   type ImpactBoardInput,
 } from '../src/impact-board';
 import { IMPACT_CITIES, type ImpactSummary } from '../src/impact';
@@ -36,9 +37,19 @@ function inputWith(over: Partial<ImpactBoardInput> = {}): ImpactBoardInput {
     landfallAgeH: null,
     peakSoFarKt: 45,
     nowWindsKt: new Map(),
+    ensemble: null,
+    ensembleMembersShown: false,
     ...over,
   };
 }
+
+const DONE_ENSEMBLE: EnsembleBoardSummary = {
+  state: 'done',
+  memberCount: 20,
+  completed: 20,
+  hurricaneCount: 13,
+  landfallCount: 9,
+};
 
 describe('impact board model', () => {
   it('hides without a storm, on demo, or without impact data', () => {
@@ -267,5 +278,70 @@ describe('impact board model', () => {
     expect(muscat.nowText).toBe('42 kt');
     const zero = buildImpactBoardModel(inputWith());
     expect(zero.rows.every((row) => row.nowText === '—')).toBe(true);
+  });
+});
+
+describe('impact board ensemble block', () => {
+  it('hides when no ensemble summary exists', () => {
+    const model = buildImpactBoardModel(inputWith());
+    expect(model.ensembleTitle).toBeNull();
+    expect(model.ensembleLines).toEqual([]);
+    expect(model.ensembleToggleText).toBeNull();
+  });
+
+  it('shows running progress without a toggle', () => {
+    const model = buildImpactBoardModel(
+      inputWith({
+        ensemble: {
+          state: 'running',
+          memberCount: 20,
+          completed: 7,
+          hurricaneCount: 0,
+          landfallCount: 0,
+        },
+      }),
+    );
+    expect(model.ensembleTitle).toBe(
+      'ensemble outlook · perturbation frequency',
+    );
+    expect(model.ensembleLines).toEqual(['computing members 7/20…']);
+    expect(model.ensembleToggleText).toBeNull();
+  });
+
+  it('renders member counts — never percentages or probability wording', () => {
+    const model = buildImpactBoardModel(inputWith({ ensemble: DONE_ENSEMBLE }));
+    expect(model.ensembleLines).toEqual([
+      'hurricane-strength — 13 of 20 members',
+      'landfall — 9 of 20 members',
+    ]);
+    const text = [model.ensembleTitle, ...model.ensembleLines].join(' ');
+    expect(text).not.toContain('%');
+    expect(text.toLowerCase()).not.toContain('probability');
+    expect(model.ensembleToggleText).toBe('show member tracks');
+  });
+
+  it('toggle label follows the members-shown state and moves the key', () => {
+    const off = buildImpactBoardModel(inputWith({ ensemble: DONE_ENSEMBLE }));
+    const on = buildImpactBoardModel(
+      inputWith({ ensemble: DONE_ENSEMBLE, ensembleMembersShown: true }),
+    );
+    expect(on.ensembleToggleText).toBe('hide member tracks');
+    expect(on.key).not.toBe(off.key);
+  });
+
+  it('key moves as members complete', () => {
+    const at = (completed: number) =>
+      buildImpactBoardModel(
+        inputWith({
+          ensemble: {
+            state: 'running',
+            memberCount: 20,
+            completed,
+            hurricaneCount: 0,
+            landfallCount: 0,
+          },
+        }),
+      ).key;
+    expect(at(4)).not.toBe(at(3));
   });
 });

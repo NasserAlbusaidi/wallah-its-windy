@@ -35,6 +35,22 @@ export function formatLatLon(lat: number, lon: number): string {
   return `${Math.abs(lat).toFixed(1)}°${ns} ${Math.abs(lon).toFixed(1)}°${ew}`;
 }
 
+/**
+ * Async ensemble state for the board block. Counts are members, never
+ * percentages: HF-4 rejected the calibrated-probability claim, so the board
+ * reports raw perturbation frequencies as "N of M members".
+ */
+export interface EnsembleBoardSummary {
+  state: 'running' | 'done';
+  memberCount: number;
+  /** Members completed so far (running state; equals memberCount when done). */
+  completed: number;
+  /** Members whose peak reached hurricane strength (>= 64 kt 1-min). */
+  hurricaneCount: number;
+  /** Members that made landfall. */
+  landfallCount: number;
+}
+
 export interface ImpactBoardInput {
   storm: StormState | null;
   isDemo: boolean;
@@ -48,6 +64,10 @@ export interface ImpactBoardInput {
   peakSoFarKt: number;
   /** City id -> parametric wind at the displayed frame (replay-aware). */
   nowWindsKt: ReadonlyMap<string, number>;
+  /** null hides the ensemble block (no run yet, cleared on spawn). */
+  ensemble: EnsembleBoardSummary | null;
+  /** Whether member spaghetti is currently shown (drives the toggle label). */
+  ensembleMembersShown: boolean;
 }
 
 export interface ImpactBoardCityRow {
@@ -80,6 +100,11 @@ export interface ImpactBoardModel {
   /** null hides the regions block (data absent or nothing >= 1 mm yet). */
   regionsTitle: string | null;
   regionRows: ImpactBoardRegionRow[];
+  /** null hides the ensemble block. */
+  ensembleTitle: string | null;
+  ensembleLines: string[];
+  /** null hides the member-tracks toggle (while running). */
+  ensembleToggleText: string | null;
   allClearText: string | null;
   key: string;
 }
@@ -95,6 +120,9 @@ const HIDDEN_MODEL: ImpactBoardModel = {
   rows: [],
   regionsTitle: null,
   regionRows: [],
+  ensembleTitle: null,
+  ensembleLines: [],
+  ensembleToggleText: null,
   allClearText: null,
   key: '',
 };
@@ -117,6 +145,30 @@ function regionsBlock(regions: RegionRainSummary | null): {
       windowText: `${Math.round(row.windowMaxMm)} mm`,
       stormText: `${Math.round(row.stormMaxMm)} mm`,
     })),
+  };
+}
+
+function ensembleBlock(
+  summary: EnsembleBoardSummary | null,
+  membersShown: boolean,
+): { title: string | null; lines: string[]; toggleText: string | null } {
+  if (!summary) return { title: null, lines: [], toggleText: null };
+  const title = 'ensemble outlook · perturbation frequency';
+  if (summary.state === 'running') {
+    return {
+      title,
+      lines: [`computing members ${summary.completed}/${summary.memberCount}…`],
+      toggleText: null,
+    };
+  }
+  const of = `of ${summary.memberCount} members`;
+  return {
+    title,
+    lines: [
+      `hurricane-strength — ${summary.hurricaneCount} ${of}`,
+      `landfall — ${summary.landfallCount} ${of}`,
+    ],
+    toggleText: membersShown ? 'hide member tracks' : 'show member tracks',
   };
 }
 
@@ -192,6 +244,11 @@ export interface ImpactBoardElements {
   regionsWrap: HTMLElement;
   regionsTitle: HTMLElement;
   regionRows: HTMLElement;
+  /** Ensemble block wrapper (hidden when no run exists for this storm). */
+  ensembleWrap: HTMLElement;
+  ensembleTitle: HTMLElement;
+  ensembleLines: HTMLElement;
+  ensembleToggle: HTMLButtonElement;
   allClear: HTMLElement;
 }
 
@@ -205,6 +262,7 @@ export class ImpactBoardView {
   constructor(
     private readonly el: ImpactBoardElements,
     private readonly onCitySelect: (cityId: string) => void,
+    onToggleMembers: () => void,
   ) {
     // Compact-strip expander: CSS only reacts to data-expanded under the
     // mobile breakpoints, so this toggle is inert on desktop.
@@ -212,6 +270,7 @@ export class ImpactBoardView {
       el.root.dataset.expanded =
         el.root.dataset.expanded === 'true' ? 'false' : 'true';
     });
+    el.ensembleToggle.addEventListener('click', onToggleMembers);
   }
 
   update(model: ImpactBoardModel): void {
@@ -255,6 +314,19 @@ export class ImpactBoardView {
         return item;
       }),
     );
+    this.el.ensembleWrap.hidden = model.ensembleTitle === null;
+    this.el.ensembleTitle.textContent = model.ensembleTitle ?? '';
+    this.el.ensembleLines.replaceChildren(
+      ...model.ensembleLines.map((line) => {
+        const item = document.createElement('div');
+        item.className = 'impact-board-ensemble-line';
+        item.setAttribute('role', 'listitem');
+        item.textContent = line;
+        return item;
+      }),
+    );
+    this.el.ensembleToggle.hidden = model.ensembleToggleText === null;
+    this.el.ensembleToggle.textContent = model.ensembleToggleText ?? '';
     this.el.cities.replaceChildren(
       ...model.rows.map((row) => {
         const button = document.createElement('button');
@@ -320,6 +392,7 @@ export function buildImpactBoardModel(
   const rainText = `max storm-total ${Math.round(impact.maxLandRainMm)} mm over land`;
   const floodText = `flash-flood proxy ${impact.floodRisk}`;
   const regions = regionsBlock(impact.regions);
+  const ensemble = ensembleBlock(input.ensemble, input.ensembleMembersShown);
   const allClearText = rows.every((row) => row.peakKt < DAMAGING_WIND_KT)
     ? 'no damaging winds reached any city'
     : null;
@@ -335,6 +408,9 @@ export function buildImpactBoardModel(
     ...regions.rows.map(
       (row) => `${row.id}:${row.windowText}:${row.stormText}`,
     ),
+    ensemble.title ?? '',
+    ...ensemble.lines,
+    ensemble.toggleText ?? '',
     // tint participates so an unrounded threshold crossing (peak 19.9 -> 20.1
     // or a category boundary) repaints even when every rounded text is stable.
     ...cityRows.map(
@@ -354,6 +430,9 @@ export function buildImpactBoardModel(
     rows: cityRows,
     regionsTitle: regions.title,
     regionRows: regions.rows,
+    ensembleTitle: ensemble.title,
+    ensembleLines: ensemble.lines,
+    ensembleToggleText: ensemble.toggleText,
     allClearText,
     key,
   };

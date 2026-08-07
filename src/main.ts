@@ -24,7 +24,7 @@
 import './style.css';
 import { injectCssVars, TOKENS } from './tokens';
 import { readHash, writeHash, clearHash, isEnvHashKey } from './rng';
-import { DOMAIN, cellToLatLon, inBBox } from './grid';
+import { DOMAIN, inBBox } from './grid';
 import type { RegionNamesTable } from './impact';
 import {
   HOME_VIEW,
@@ -78,7 +78,7 @@ import {
   makeDebriefCard,
   makeReplayVideo,
 } from './export';
-import { chooseRenderProfile } from './performance';
+import { AUTO_ENSEMBLE_BUDGET, chooseRenderProfile } from './performance';
 import { TapGesture } from './tap-gesture';
 import { cloneStormStructure } from './structure';
 import { scoreHindcast, type HindcastScore } from './hindcast';
@@ -138,9 +138,14 @@ import {
   requiresObservationAcknowledgement,
 } from './product-identity';
 import {
+  EnsembleCancelledError,
   requestEnsemble,
   requestSensitivity,
 } from './ensemble-client';
+import type { EnsembleRunHandle } from './ensemble-client';
+import { buildEnsembleEnvelope } from './ensemble-envelope';
+import type { EnsembleEnvelope } from './ensemble-envelope';
+import type { EnsembleBoardSummary } from './impact-board';
 import type {
   EnsembleResult,
   EnvironmentPerturbation,
@@ -420,6 +425,12 @@ const ui = new UiController({
   monthSelect,
   reducedMotion: prefersReducedMotion,
 });
+// Impact-board "show member tracks" toggle: presentation state only — the
+// ensemble result itself never changes with visibility.
+ui.onEnsembleMembersToggle(() => {
+  ensembleMembersShown = !ensembleMembersShown;
+  renderCtrl?.setEnsembleMembersVisible?.(ensembleMembersShown);
+});
 const session = new StormSession();
 // Deterministic landfall-impact bookkeeping (rain grid + city exposure); reset
 // per spawn, fed the same fixed ticks the recorder sees.
@@ -492,8 +503,29 @@ let radarPlaying = false;
 let radarPlayTimer: number | null = null;
 let activeRainAccumulationWindow: RainAccumulationWindow =
   DEFAULT_RAIN_ACCUMULATION_WINDOW;
-let activeEnsemble: EnsembleResult | null = null;
 let analysisRequestSeq = 0;
+/** In-flight ensemble run (manual or auto) — cancelled on supersession. */
+let activeEnsembleRun: EnsembleRunHandle | null = null;
+/** Board-facing ensemble state (running progress or done counts). */
+let ensembleBoardSummary: EnsembleBoardSummary | null = null;
+/** Member-spaghetti toggle — reset off on every spawn. */
+let ensembleMembersShown = false;
+/** Pending post-spawn settle timer for the automatic ensemble. */
+let autoEnsembleTimer: number | null = null;
+
+/**
+ * Device eligibility for the auto run (AUTO_ENSEMBLE_BUDGET), evaluated at
+ * scheduling time — a boot-time cache would freeze whatever tier the first
+ * pre-layout resize() saw and never recover on windows that never resize.
+ */
+function autoEnsembleAllowed(): boolean {
+  return chooseRenderProfile({
+    width: glCanvas.clientWidth,
+    dpr: window.devicePixelRatio || 1,
+    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+    hardwareConcurrency: navigator.hardwareConcurrency || 8,
+  }).autoEnsemble;
+}
 
 // --- Sim + render construction (defensive against half-done siblings) --------
 let engine: SimEngine | null = null;
@@ -1131,12 +1163,29 @@ function doSpawn(
     return;
   }
   currentSpawn = { ...spawn };
-  activeEnsemble = null;
+  // ROADMAP "Automatic ensemble envelope": a respawn or environment change
+  // cancels the stale job for real (worker abandons remaining members), not
+  // just its result.
+  clearAutoEnsembleTimer();
+  activeEnsembleRun?.cancel();
+  activeEnsembleRun = null;
+  ensembleBoardSummary = null;
+  ensembleMembersShown = false;
+  renderCtrl?.setEnsemble?.(null, null);
+  renderCtrl?.setEnsembleMembersVisible?.(false);
   analysisRequestSeq++;
   ensembleResults.hidden = true;
   ensembleStatus.value = spawn.isDemo
     ? 'spawn or select a storm'
     : 'ready · worker cache will reuse this environment';
+  if (!spawn.isDemo && autoEnsembleAllowed()) {
+    const spawnRef = currentSpawn;
+    autoEnsembleTimer = window.setTimeout(() => {
+      autoEnsembleTimer = null;
+      if (currentSpawn !== spawnRef) return;
+      startEnsembleRun(spawnRef, AUTO_ENSEMBLE_BUDGET.memberCount, 'auto');
+    }, AUTO_ENSEMBLE_BUDGET.settleMs);
+  }
   const s = engine.getState();
   const generatedName = neutralSimulatedStormName(spawn.seed);
   currentRunName =
@@ -2362,24 +2411,47 @@ function currentAnalysisUrls(): {
   };
 }
 
-function percentage(value: number): string {
-  return `${Math.round(value * 100)}%`;
+/** "13 of 20 members" — frequencies are exact member fractions. */
+function memberCount(frequency: number, members: number): string {
+  return `${Math.round(frequency * members)} of ${members} members`;
 }
 
-ensembleRun.addEventListener('click', () => {
-  const spawn = currentSpawn;
-  if (!spawn || spawn.isDemo) {
-    ensembleStatus.value = 'spawn or select a non-demo storm first';
-    return;
+function clearAutoEnsembleTimer(): void {
+  if (autoEnsembleTimer !== null) {
+    window.clearTimeout(autoEnsembleTimer);
+    autoEnsembleTimer = null;
   }
-  const count = Number(ensembleSize.value);
+}
+
+/**
+ * Start a worker ensemble run — the manual dock click or the automatic
+ * post-spawn run. Cancels any in-flight run and any pending auto-run first.
+ * The request payload is identical for both origins, so what an ensemble
+ * computes never depends on how it was started; AUTO_ENSEMBLE_BUDGET gates
+ * scheduling only.
+ */
+function startEnsembleRun(
+  spawn: SpawnParams,
+  count: number,
+  origin: 'manual' | 'auto',
+): void {
+  clearAutoEnsembleTimer();
+  activeEnsembleRun?.cancel();
+  const label = origin === 'auto' ? 'auto ensemble · ' : '';
   const requestSeq = ++analysisRequestSeq;
   const startedAt = performance.now();
   ensembleRun.disabled = true;
   ensembleResults.hidden = true;
-  ensembleStatus.value = `starting ${count}-member worker ensemble…`;
+  ensembleStatus.value = `${label}starting ${count}-member worker ensemble…`;
+  ensembleBoardSummary = {
+    state: 'running',
+    memberCount: count,
+    completed: 0,
+    hurricaneCount: 0,
+    landfallCount: 0,
+  };
   const urls = currentAnalysisUrls();
-  void requestEnsemble(
+  const handle = requestEnsemble(
     {
       type: 'ensemble',
       ...urls,
@@ -2389,35 +2461,70 @@ ensembleRun.addEventListener('click', () => {
     },
     (completed, total) => {
       if (requestSeq === analysisRequestSeq) {
-        ensembleStatus.value = `running members ${completed}/${total}`;
+        ensembleStatus.value = `${label}running members ${completed}/${total}`;
+        ensembleBoardSummary = {
+          state: 'running',
+          memberCount: total,
+          completed,
+          hurricaneCount: 0,
+          landfallCount: 0,
+        };
       }
     },
-  )
+  );
+  activeEnsembleRun = handle;
+  void handle.result
     .then((result) => {
       if (requestSeq !== analysisRequestSeq) return;
-      activeEnsemble = result;
+      const envelope = buildEnsembleEnvelope(result.members);
+      renderCtrl?.setEnsemble?.(result, envelope);
+      const members = result.members.length;
+      // Frequencies are exact member fractions; rounding recovers the counts.
+      ensembleBoardSummary = {
+        state: 'done',
+        memberCount: members,
+        completed: members,
+        hurricaneCount: Math.round(result.hurricaneProbability * members),
+        landfallCount: Math.round(result.landfallProbability * members),
+      };
       ensemblePeak.textContent =
         `${result.peakKt.p10.toFixed(0)}–${result.peakKt.p90.toFixed(0)} kt ` +
         `(median ${result.peakKt.median.toFixed(0)})`;
-      ensembleHurricane.textContent = percentage(result.hurricaneProbability);
-      ensembleMajor.textContent = percentage(result.majorProbability);
-      ensembleLandfall.textContent = percentage(result.landfallProbability);
+      // Counts, not percentages: HF-4 rejected the calibrated-probability
+      // claim, and the auto run surfaces these without a user click.
+      ensembleHurricane.textContent = memberCount(result.hurricaneProbability, members);
+      ensembleMajor.textContent = memberCount(result.majorProbability, members);
+      ensembleLandfall.textContent = memberCount(result.landfallProbability, members);
       ensembleResults.hidden = false;
       ensembleStatus.value =
-        `${currentRunName?.label ?? 'historical hindcast'} · ` +
+        `${label}${currentRunName?.label ?? 'historical hindcast'} · ` +
         `${result.members.length} deterministic members · ` +
         `${((performance.now() - startedAt) / 1000).toFixed(1)} s · ` +
-        'perturbation-frequency field on map';
+        (envelope
+          ? 'perturbation-frequency envelope on map'
+          : 'perturbation-frequency field on map · members dissipated before an envelope formed');
     })
     .catch((error: unknown) => {
+      if (error instanceof EnsembleCancelledError) return;
       if (requestSeq !== analysisRequestSeq) return;
-      activeEnsemble = null;
+      renderCtrl?.setEnsemble?.(null, null);
+      ensembleBoardSummary = null;
       ensembleStatus.value =
         error instanceof Error ? `ensemble failed · ${error.message}` : 'ensemble failed';
     })
     .finally(() => {
+      if (activeEnsembleRun === handle) activeEnsembleRun = null;
       ensembleRun.disabled = false;
     });
+}
+
+ensembleRun.addEventListener('click', () => {
+  const spawn = currentSpawn;
+  if (!spawn || spawn.isDemo) {
+    ensembleStatus.value = 'spawn or select a non-demo storm first';
+    return;
+  }
+  startEnsembleRun(spawn, Number(ensembleSize.value), 'manual');
 });
 
 function signed(value: number, digits: number): string {
@@ -2456,6 +2563,17 @@ sensitivityRun.addEventListener('click', () => {
     shearDeltaMs: Number(sensitivityShear.value),
     ohcScale: Number(sensitivityOhc.value),
   };
+  // The shared seq would discard the ensemble's result anyway; cancel it so
+  // the worker frees up for this run instead of finishing dead members. The
+  // canceller owns the cleanup: without the summary/status reset the board
+  // would claim "computing members k/20…" forever.
+  clearAutoEnsembleTimer();
+  if (activeEnsembleRun) {
+    activeEnsembleRun.cancel();
+    activeEnsembleRun = null;
+    ensembleBoardSummary = null;
+    ensembleStatus.value = 'cancelled · sensitivity run took the worker';
+  }
   const requestSeq = ++analysisRequestSeq;
   const startedAt = performance.now();
   sensitivityRun.disabled = true;
@@ -2951,54 +3069,6 @@ function buildStorm(): { storm: StormState | null; prev: StormState | null } {
   return { storm: live, prev };
 }
 
-function drawEnsembleOverlay(
-  result: EnsembleResult | null,
-  view: ViewTransform,
-): void {
-  if (!result) return;
-  const { nx, ny, probability } = result.grid;
-  const w = overlayCanvas.width;
-  const h = overlayCanvas.height;
-  // The ensemble grid spans the DOMAIN; each cell projects through the view
-  // (geo-anchored) rather than mapping grid indices straight to the canvas.
-  const spec = { nx, ny, bbox: DOMAIN };
-  overlay.save();
-  overlay.globalCompositeOperation = 'screen';
-  const accent = TOKENS.accent.rgba01;
-  for (let index = 0; index < probability.length; index++) {
-    const chance = probability[index];
-    if (chance < 0.025) continue;
-    const col = index % nx;
-    const row = Math.floor(index / nx);
-    // Cell corners: cell centres sit at integer (col,row); corners at ±0.5.
-    const nw = cellToLatLon(spec, col - 0.5, row - 0.5);
-    const se = cellToLatLon(spec, col + 0.5, row + 0.5);
-    const a = latLonToScreen(view, nw.lat, nw.lon, w, h);
-    const b = latLonToScreen(view, se.lat, se.lon, w, h);
-    overlay.fillStyle =
-      `rgba(${Math.round(accent[0] * 255)},${Math.round(accent[1] * 255)},` +
-      `${Math.round(accent[2] * 255)},${Math.min(0.28, 0.025 + chance * 0.32)})`;
-    overlay.fillRect(a.x, a.y, b.x - a.x + 1, b.y - a.y + 1);
-  }
-  const trackColor = TOKENS.track.rgba01;
-  overlay.strokeStyle =
-    `rgba(${Math.round(trackColor[0] * 255)},${Math.round(trackColor[1] * 255)},` +
-    `${Math.round(trackColor[2] * 255)},0.13)`;
-  overlay.lineWidth = Math.max(0.6, window.devicePixelRatio * 0.45);
-  for (const member of result.members) {
-    if (member.track.length < 2) continue;
-    overlay.beginPath();
-    for (let index = 0; index < member.track.length; index++) {
-      const point = member.track[index];
-      const p = latLonToScreen(view, point.lat, point.lon, w, h);
-      if (index === 0) overlay.moveTo(p.x, p.y);
-      else overlay.lineTo(p.x, p.y);
-    }
-    overlay.stroke();
-  }
-  overlay.restore();
-}
-
 function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
   const { storm, prev } = buildStorm();
   const handoffComplete = activeSatelliteSource === 'handoff' &&
@@ -3060,7 +3130,6 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
       console.warn('[render] layer draw threw (skipping this frame):', err);
     }
   }
-  drawEnsembleOverlay(activeEnsemble, view);
   flushMapCaptures();
   prevFrameStorm = storm;
 
@@ -3105,6 +3174,8 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
     landfallKt: landfallWindKt(),
     intensitySeries: session.recorder.intensitySeries(),
     historicalAnalog: storm?.isDemo ? null : activeAnalog(),
+    ensemble: ensembleBoardSummary,
+    ensembleMembersShown,
   });
 }
 
@@ -3191,6 +3262,10 @@ type RenderController = RenderLayer & {
   setCloudTape?(tape: CloudTape | null): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;
+  /** Ensemble overlay: result + precomputed percentile envelope; null clears. */
+  setEnsemble?(result: EnsembleResult | null, envelope: EnsembleEnvelope | null): void;
+  /** Member spaghetti on demand (the envelope is the default product). */
+  setEnsembleMembersVisible?(visible: boolean): void;
   /** Screen-registered wind-trail history is stale after any camera move. */
   clearWindTrails?(): void;
 };

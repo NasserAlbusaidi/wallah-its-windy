@@ -149,7 +149,7 @@ Notes verified in code:
 | `rain-accumulation.ts` | Fixed accumulation-window definitions, physical millimetre breaks, and piecewise GPU normalization. No DOM or wall clock. | `RAIN_ACCUMULATION_WINDOWS`, `rainAccumulationDefinition`, `normalizeRainAccumulationMm` |
 | `narrative.ts` | Translates the exact intensity budget into one causal sentence. | `explainIntensity`, `CausalNarrative` |
 | `intensity-sparkline.ts` | Pure geometry for the flight-tape wind-vs-time sparkline. | `buildIntensitySparkline`, `nearestIntensityIndex` |
-| `impact-board.ts` | The one always-visible impact surface: pure view-model builder over the impact ledger + debrief (ranked 8-city table, vitals, live/complete headline; landfall is recorded fact, never an ETA; ranked worst-hit regions following the accum-window selection) and a thin key-cached DOM view. Fed from `ui.ts:updateFlightRecorder`; supersedes the old debrief impact report and `#impact-live` line. | `buildImpactBoardModel`, `ImpactBoardView`, `formatLatLon` |
+| `impact-board.ts` | The one always-visible impact surface: pure view-model builder over the impact ledger + debrief (ranked 8-city table, vitals, live/complete headline; landfall is recorded fact, never an ETA; ranked worst-hit regions following the accum-window selection; ensemble outlook as "N of 20 members" counts with the member-tracks toggle) and a thin key-cached DOM view. Fed from `ui.ts:updateFlightRecorder`; supersedes the old debrief impact report and `#impact-live` line. | `buildImpactBoardModel`, `ImpactBoardView`, `EnsembleBoardSummary`, `formatLatLon` |
 | `point-probe.ts` | Pure point-probe reading from the same environment + vortex data the sim uses, with selected-window rain supplied by the deterministic impact ledger; DOM positioning lives in main/ui. | `createPointProbeReading`, `PointProbeReading` |
 | `export.ts` | Dependency-free storm artifacts: PNG debrief card and WebM replay loop rendered from the immutable tape, never by rewinding the engine. | `makeDebriefCard`, `makeReplayVideo`, `exportFileStem`, `downloadBlob` |
 | `historical-analog.ts` | Deterministic geometric/intensity similarity against shipped historic ghosts; educational analogue, not a forecast claim. | `findHistoricalAnalog`, `HistoricalAnalog` |
@@ -170,9 +170,10 @@ Notes verified in code:
 | file | responsibility | key exports |
 |---|---|---|
 | `ensemble.ts` | Deterministic ensemble + sensitivity runner shared by worker, tests, and offline calibration. No DOM, no wall clock. | `runStorm`, `makeEnsembleMembers`, `perturbEnvironment`, `summarizeEnsemble`, `runEnsemble`, `EnsembleResult` |
-| `ensemble-protocol.ts` | Typed worker request/response messages (ensemble, sensitivity, progress, error), correlated by `requestId`. | `AnalysisWorkerRequest`, `AnalysisWorkerResponse`, `SensitivityResult` |
-| `ensemble.worker.ts` | The dedicated worker: fetches + parses its own bins (private cache), builds samplers, runs members, posts progress, transfers the probability grid buffer. | (worker entry, no exports) |
-| `ensemble-client.ts` | Main-thread client: lazy single worker, pending-request map, progress callbacks, terminates + rejects all on worker error. | `requestEnsemble`, `requestSensitivity` |
+| `ensemble-protocol.ts` | Typed worker request/response messages (ensemble, sensitivity, cancel, progress, cancelled, error), correlated by `requestId`. | `AnalysisWorkerRequest`, `AnalysisWorkerResponse`, `CancelWorkerRequest`, `SensitivityResult` |
+| `ensemble.worker.ts` | The dedicated worker: fetches + parses its own bins (private cache), builds samplers, runs members (yielding a macrotask between members so cancels deliver mid-run), posts progress, transfers the probability grid buffer. | (worker entry, no exports) |
+| `ensemble-client.ts` | Main-thread client: lazy single worker, pending-request map, progress callbacks, cancellable ensemble handles, terminates + rejects all on worker error. | `requestEnsemble`, `requestSensitivity`, `EnsembleRunHandle`, `EnsembleCancelledError` |
+| `ensemble-envelope.ts` | Pure time-indexed percentile envelope over member tracks: per-lead median centre + p90 great-circle radius, membership floor, ribbon polygon in lat/lon. Computed once per result; never reads the camera. | `buildEnsembleEnvelope`, `EnsembleEnvelope`, `ENVELOPE_RADIUS_PERCENTILE` |
 
 ### src/ — offline verification (browser-neutral)
 
@@ -231,6 +232,7 @@ Notes verified in code:
 | `vortex.ts` | THE analytic Holland vortex, defined once for two consumers: a TS function for CPU advection and a GLSL string pasted into the rain shader, so rain and spiral never disagree. | `vortexWind`, `hollandSpeed`, `VORTEX_GLSL`, `VortexParams` |
 | `track.ts` | Live storm track + intensity halo on the 2D overlay; the prefers-reduced-motion stand-in for the particle swarm; aftermath fade. | `TrackLayer` |
 | `ghosts.ts` | Historic IBTrACS ghost tracks on the 2D overlay: faint, static, drawn below the live track. | `GhostLayer` |
+| `ensemble.ts` (render/) | Ensemble overlay on the 2D overlay, between ghosts and the live track: perturbation-frequency grid, percentile envelope ribbon (default), member spaghetti on demand. Geometry arrives precomputed; the layer only re-projects per frame. | `EnsembleLayer` |
 | `cloud-noise.ts` | Deterministic tileable multiscale value noise for simulated clouds. | `cloudNoiseBytes` |
 
 ## Key contracts
@@ -310,6 +312,7 @@ terminates the worker.
 | Change colours/palette | `src/tokens.ts` only — CSS vars and shader uniforms both derive from it |
 | Change category thresholds or labels | `src/category.ts` |
 | Change ensemble size, perturbations, summary grid | `src/ensemble.ts`; message shapes in `src/ensemble-protocol.ts` |
+| Change the auto-ensemble trigger, envelope, or on-map look | Budget + eligibility in `src/performance.ts` (`AUTO_ENSEMBLE_BUDGET`, `RenderProfile.autoEnsemble`); scheduling + lifecycle in `src/main.ts` (`startEnsembleRun`, doSpawn); envelope math in `src/ensemble-envelope.ts`; drawing in `src/render/ensemble.ts`; board block in `src/impact-board.ts` + `index.html` `#impact-board-ensemble` |
 | Change time model / pacing | `src/main.ts` (`SIM_DT_MIN`, accumulator), `src/ui.ts` (`timescaleHoursPerSec`) |
 | Change device/perf budgets | `src/performance.ts` |
 | Storm naming roster | `src/storm-names.ts` (versioned; update source snapshot note) |

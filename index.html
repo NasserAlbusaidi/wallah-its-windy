@@ -491,6 +491,15 @@
           <span>city</span><span>now</span><span>peak</span><span>rain</span>
         </div>
         <div id="impact-board-cities" role="list" aria-label="Ranked city exposure"></div>
+        <!-- Ensemble outlook (UX v2 phase 4): counts of perturbed members,
+             never a percentage or probability — HF-4 rejected the calibrated
+             claim, so the wording stays perturbation frequency. -->
+        <div id="impact-board-ensemble" hidden>
+          <p id="impact-board-ensemble-title" class="impact-board-regions-title">ensemble outlook</p>
+          <p class="impact-board-regions-note">perturbation frequency · not a calibrated probability</p>
+          <div id="impact-board-ensemble-lines" role="list" aria-label="Ensemble outlook, member counts"></div>
+          <button id="impact-board-ensemble-toggle" type="button" hidden></button>
+        </div>
         <!-- Regional rain ledger (UX v2 phase 3): governorate + wadi-basin
              aggregation of the same parametric grid — never observations,
              never flood-tiered (tiers are point proxies). -->

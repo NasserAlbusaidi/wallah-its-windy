@@ -41,6 +41,11 @@ const RAW: readonly RawToken[] = [
   // track (120,220,255), at genesis-glow luminance (a 0.12) — clearly below the
   // live track's 0.12–0.62 alpha range so ghosts never compete with the storm.
   { key: 'ghostTrack', cssVar: '--ghost-track', rgb: [96, 168, 200], a: 0.12 },
+  // Ensemble percentile envelope (UX v2 phase 4): a cool periwinkle wash,
+  // hue-separated from both the live track cyan and the accent-amber
+  // frequency grid so spread shape and visit frequency stay distinguishable.
+  // Luminance sits between ghosts (0.12) and the live track (0.5).
+  { key: 'ensembleEnvelope', cssVar: '--ensemble-envelope', rgb: [150, 170, 255], a: 0.14 },
   { key: 'text', cssVar: '--text', rgb: [127, 212, 232], a: 1 },
   { key: 'accent', cssVar: '--accent', rgb: [255, 183, 77], a: 1 },
   // Operational weather-product palettes. These remain tokens—even when only

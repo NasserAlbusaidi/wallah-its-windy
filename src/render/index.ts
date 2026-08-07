@@ -75,6 +75,9 @@ import { RainLayer } from './rain';
 import { RadarLayer } from './radar';
 import { TrackLayer } from './track';
 import { GhostLayer } from './ghosts';
+import { EnsembleLayer } from './ensemble';
+import type { EnsembleResult } from '../ensemble';
+import type { EnsembleEnvelope } from '../ensemble-envelope';
 import { parseTracks, toGhostPolylines } from '../tracks';
 import type { GhostPolyline } from '../tracks';
 import {
@@ -227,6 +230,7 @@ export class RenderPipeline implements RenderLayer {
   private rain = new RainLayer();
   private radar = new RadarLayer();
   private ghosts = new GhostLayer();
+  private ensemble = new EnsembleLayer();
   private track = new TrackLayer();
   /** Version of the impact rain grid currently uploaded (-1 = none). */
   private accumVersion = -1;
@@ -278,6 +282,7 @@ export class RenderPipeline implements RenderLayer {
     this.rain.resize(this.width, this.height);
     this.radar.resize(this.width, this.height);
     this.ghosts.resize(this.width, this.height);
+    this.ensemble.resize(this.width, this.height);
     this.track.resize(this.width, this.height);
   }
 
@@ -366,6 +371,9 @@ export class RenderPipeline implements RenderLayer {
       this.overlay.clearRect(0, 0, this.width, this.height);
       // Ghosts sit BELOW the live track in luminance: dimmer, drawn first (C7).
       this.ghosts.draw(ctx.view);
+      // The ensemble wash sits between: brighter than the static ghosts,
+      // below the live storm track it contextualizes (phase 4).
+      this.ensemble.draw(ctx.view);
       this.track.draw(ctx); // ripples land on top when ui.drawOverlay runs after
     }
   }
@@ -390,6 +398,7 @@ export class RenderPipeline implements RenderLayer {
     this.rain.dispose();
     this.radar.dispose();
     this.ghosts.dispose();
+    this.ensemble.dispose();
     this.track.dispose();
     this.gl = null;
     this.overlay = null;
@@ -482,6 +491,19 @@ export class RenderPipeline implements RenderLayer {
 
   /** Highlight one ghost polyline (~2x alpha) as the active scenario; null clears
    *  it. The matching DOM label is highlighted separately via ui.highlightGhost. */
+  /** Push (or clear) the ensemble overlay: result + precomputed envelope. */
+  setEnsemble(
+    result: EnsembleResult | null,
+    envelope: EnsembleEnvelope | null,
+  ): void {
+    this.ensemble.setEnsemble(result, envelope);
+  }
+
+  /** Member spaghetti is on-demand; the envelope stays the default product. */
+  setEnsembleMembersVisible(visible: boolean): void {
+    this.ensemble.setShowMembers(visible);
+  }
+
   setActiveGhost(id: string | null): void {
     this.ghosts.setActiveGhostId(id);
   }
@@ -613,6 +635,7 @@ export class RenderPipeline implements RenderLayer {
     this.radar.init(gl);
     if (this.overlay) {
       this.ghosts.init(this.overlay);
+      this.ensemble.init(this.overlay);
       this.track.init(this.overlay);
     }
     this.env.resize(this.width, this.height);
@@ -624,6 +647,7 @@ export class RenderPipeline implements RenderLayer {
     this.rain.resize(this.width, this.height);
     this.radar.resize(this.width, this.height);
     this.ghosts.resize(this.width, this.height);
+    this.ensemble.resize(this.width, this.height);
     this.track.resize(this.width, this.height);
     this.rebuildAllTextures();
     this.applyTracks(); // re-seed ghost polylines after (re)init (e.g. context loss)

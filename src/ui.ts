@@ -64,6 +64,7 @@ import {
   buildImpactBoardModel,
   formatLatLon,
   ImpactBoardView,
+  type EnsembleBoardSummary,
 } from './impact-board';
 import {
   SIMULATED_WIND_CONVENTION,
@@ -169,6 +170,10 @@ export interface FlightRecorderView {
   intensitySeries: readonly FlightIntensityPoint[];
   /** Closest shipped track under the explicitly geometric similarity metric. */
   historicalAnalog: HistoricalAnalog | null;
+  /** Async ensemble outlook for the board (null = no run for this storm). */
+  ensemble: EnsembleBoardSummary | null;
+  /** Member-tracks visibility (drives the board's toggle label). */
+  ensembleMembersShown: boolean;
 }
 
 export interface PointProbePlacement {
@@ -300,6 +305,8 @@ export class UiController {
   /** Displayed-frame parametric wind per city; markers, detail card and the
    * impact board all read this one computation (updateCityMarkers fills it). */
   private readonly cityNowWindsKt = new Map<string, number>();
+  /** Registered by main (owns the render facade + ensemble run state). */
+  private ensembleMembersToggleHandler: (() => void) | null = null;
   private readonly impactBoard = new ImpactBoardView(
     {
       root: dom('impact-board'),
@@ -312,10 +319,20 @@ export class UiController {
       regionsWrap: dom('impact-board-regions'),
       regionsTitle: dom('impact-board-regions-title'),
       regionRows: dom('impact-board-region-rows'),
+      ensembleWrap: dom('impact-board-ensemble'),
+      ensembleTitle: dom('impact-board-ensemble-title'),
+      ensembleLines: dom('impact-board-ensemble-lines'),
+      ensembleToggle: dom<HTMLButtonElement>('impact-board-ensemble-toggle'),
       allClear: dom('impact-board-allclear'),
     },
     (cityId) => this.openCityDetail(cityId),
+    () => this.ensembleMembersToggleHandler?.(),
   );
+
+  /** Main registers the member-tracks toggle action here at boot. */
+  onEnsembleMembersToggle(handler: () => void): void {
+    this.ensembleMembersToggleHandler = handler;
+  }
   private readonly pointProbe = dom('point-probe');
   private readonly pointProbePin = dom<HTMLButtonElement>('point-probe-pin');
   private sparklineSeries: readonly FlightIntensityPoint[] = [];
@@ -1017,6 +1034,8 @@ export class UiController {
           landfallAgeH: null,
           peakSoFarKt: 0,
           nowWindsKt: this.cityNowWindsKt,
+          ensemble: null,
+          ensembleMembersShown: false,
         }),
       );
       return;
@@ -1216,6 +1235,8 @@ export class UiController {
         landfallAgeH,
         peakSoFarKt,
         nowWindsKt: this.cityNowWindsKt,
+        ensemble: view.ensemble,
+        ensembleMembersShown: view.ensembleMembersShown,
       }),
     );
 

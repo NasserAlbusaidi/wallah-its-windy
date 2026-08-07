@@ -2400,8 +2400,9 @@ function currentAnalysisUrls(): {
   };
 }
 
-function percentage(value: number): string {
-  return `${Math.round(value * 100)}%`;
+/** "13 of 20 members" — frequencies are exact member fractions. */
+function memberCount(frequency: number, members: number): string {
+  return `${Math.round(frequency * members)} of ${members} members`;
 }
 
 function clearAutoEnsembleTimer(): void {
@@ -2464,7 +2465,8 @@ function startEnsembleRun(
   void handle.result
     .then((result) => {
       if (requestSeq !== analysisRequestSeq) return;
-      renderCtrl?.setEnsemble?.(result, buildEnsembleEnvelope(result.members));
+      const envelope = buildEnsembleEnvelope(result.members);
+      renderCtrl?.setEnsemble?.(result, envelope);
       const members = result.members.length;
       // Frequencies are exact member fractions; rounding recovers the counts.
       ensembleBoardSummary = {
@@ -2477,15 +2479,19 @@ function startEnsembleRun(
       ensemblePeak.textContent =
         `${result.peakKt.p10.toFixed(0)}–${result.peakKt.p90.toFixed(0)} kt ` +
         `(median ${result.peakKt.median.toFixed(0)})`;
-      ensembleHurricane.textContent = percentage(result.hurricaneProbability);
-      ensembleMajor.textContent = percentage(result.majorProbability);
-      ensembleLandfall.textContent = percentage(result.landfallProbability);
+      // Counts, not percentages: HF-4 rejected the calibrated-probability
+      // claim, and the auto run surfaces these without a user click.
+      ensembleHurricane.textContent = memberCount(result.hurricaneProbability, members);
+      ensembleMajor.textContent = memberCount(result.majorProbability, members);
+      ensembleLandfall.textContent = memberCount(result.landfallProbability, members);
       ensembleResults.hidden = false;
       ensembleStatus.value =
         `${label}${currentRunName?.label ?? 'historical hindcast'} · ` +
         `${result.members.length} deterministic members · ` +
         `${((performance.now() - startedAt) / 1000).toFixed(1)} s · ` +
-        'perturbation-frequency envelope on map';
+        (envelope
+          ? 'perturbation-frequency envelope on map'
+          : 'perturbation-frequency field on map · members dissipated before an envelope formed');
     })
     .catch((error: unknown) => {
       if (error instanceof EnsembleCancelledError) return;
@@ -2547,10 +2553,16 @@ sensitivityRun.addEventListener('click', () => {
     ohcScale: Number(sensitivityOhc.value),
   };
   // The shared seq would discard the ensemble's result anyway; cancel it so
-  // the worker frees up for this run instead of finishing dead members.
+  // the worker frees up for this run instead of finishing dead members. The
+  // canceller owns the cleanup: without the summary/status reset the board
+  // would claim "computing members k/20…" forever.
   clearAutoEnsembleTimer();
-  activeEnsembleRun?.cancel();
-  activeEnsembleRun = null;
+  if (activeEnsembleRun) {
+    activeEnsembleRun.cancel();
+    activeEnsembleRun = null;
+    ensembleBoardSummary = null;
+    ensembleStatus.value = 'cancelled · sensitivity run took the worker';
+  }
   const requestSeq = ++analysisRequestSeq;
   const startedAt = performance.now();
   sensitivityRun.disabled = true;

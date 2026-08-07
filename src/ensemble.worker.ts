@@ -56,6 +56,13 @@ function post(response: AnalysisWorkerResponse): void {
 async function handle(
   request: Exclude<AnalysisWorkerRequest, CancelWorkerRequest>,
 ): Promise<void> {
+  // Request ids are minted monotonically and the client always posts a
+  // request before it can post that request's cancel, so any cancelled entry
+  // older than the request now starting belongs to a finished run whose
+  // cancel lost the race — purge them or the set grows for the session.
+  for (const id of cancelled) {
+    if (id < request.requestId) cancelled.delete(id);
+  }
   const [envBin, terrainBin, steeringBin, oceanBin] = await Promise.all([
     loadBin(request.envUrl),
     loadBin(request.terrainUrl),

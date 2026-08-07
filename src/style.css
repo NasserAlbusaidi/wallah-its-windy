@@ -3261,10 +3261,13 @@ html[data-compact='true'] .ghost-label:not(.active) {
   margin-top: 4px;
 }
 
+/* The block's only control must read as a button: opaque chrome border (the
+   --ensemble-envelope token carries the map-fill alpha 0.14 and would render
+   near-invisible through color-mix). */
 #app #impact-board-ensemble-toggle {
   margin-top: 4px;
   padding: 2px 8px;
-  border: 1px solid color-mix(in srgb, var(--ensemble-envelope, #96aaff) 45%, transparent);
+  border: 1px solid var(--ridge-hi, #2c343c);
   border-radius: var(--radius-ctl, 7px);
   background: transparent;
   color: var(--text-mut);
@@ -3274,8 +3277,10 @@ html[data-compact='true'] .ghost-label:not(.active) {
   cursor: pointer;
 }
 
-#app #impact-board-ensemble-toggle:hover {
+#app #impact-board-ensemble-toggle:hover,
+#app #impact-board-ensemble-toggle:focus-visible {
   color: var(--text-hi);
+  border-color: var(--accent, #ffb74d);
 }
 
 #app #impact-board-ensemble-toggle[hidden] {

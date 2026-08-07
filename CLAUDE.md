@@ -53,8 +53,9 @@ self-describing `.bin` assets the browser loads.
   particle budget, compact layout, and WHETHER the auto ensemble is
   scheduled (`RenderProfile.autoEnsemble` / `AUTO_ENSEMBLE_BUDGET`) — never
   WHAT an ensemble computes: the worker request stays a pure function of
-  (spawn, samplingMode, count) on every tier. Physics and recorded results
-  never read device traits or the clock.
+  (spawn, environment bin URLs, samplingMode, count) on every tier — the
+  bin URLs follow the active scenario, never the device. Physics and
+  recorded results never read device traits or the clock.
 - Replay reads the immutable flight-recorder tape
   (`src/flight-recorder.ts`); scrubbing rebuilds state from copied frames and
   never rewinds or re-drives the engine, so replay cannot corrupt the run.

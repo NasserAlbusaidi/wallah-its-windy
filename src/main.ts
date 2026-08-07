@@ -78,7 +78,7 @@ import {
   makeDebriefCard,
   makeReplayVideo,
 } from './export';
-import { chooseRenderProfile } from './performance';
+import { AUTO_ENSEMBLE_BUDGET, chooseRenderProfile } from './performance';
 import { TapGesture } from './tap-gesture';
 import { cloneStormStructure } from './structure';
 import { scoreHindcast, type HindcastScore } from './hindcast';
@@ -142,6 +142,7 @@ import {
   requestEnsemble,
   requestSensitivity,
 } from './ensemble-client';
+import type { EnsembleRunHandle } from './ensemble-client';
 import { buildEnsembleEnvelope } from './ensemble-envelope';
 import type { EnsembleEnvelope } from './ensemble-envelope';
 import type {
@@ -496,6 +497,12 @@ let radarPlayTimer: number | null = null;
 let activeRainAccumulationWindow: RainAccumulationWindow =
   DEFAULT_RAIN_ACCUMULATION_WINDOW;
 let analysisRequestSeq = 0;
+/** In-flight ensemble run (manual or auto) — cancelled on supersession. */
+let activeEnsembleRun: EnsembleRunHandle | null = null;
+/** Pending post-spawn settle timer for the automatic ensemble. */
+let autoEnsembleTimer: number | null = null;
+/** Device eligibility for the auto run (AUTO_ENSEMBLE_BUDGET); set in resize(). */
+let autoEnsembleEligible = false;
 
 // --- Sim + render construction (defensive against half-done siblings) --------
 let engine: SimEngine | null = null;
@@ -610,6 +617,7 @@ function resize(): void {
   const h = Math.floor(glCanvas.clientHeight * dpr);
   document.documentElement.dataset.compact = String(profile.compact);
   renderCtrl?.setParticleBudget?.(profile.particleBudget);
+  autoEnsembleEligible = profile.autoEnsemble;
   for (const c of [glCanvas, overlayCanvas]) {
     if (c.width !== w || c.height !== h) {
       c.width = w;
@@ -1133,12 +1141,27 @@ function doSpawn(
     return;
   }
   currentSpawn = { ...spawn };
+  // ROADMAP "Automatic ensemble envelope": a respawn or environment change
+  // cancels the stale job for real (worker abandons remaining members), not
+  // just its result.
+  clearAutoEnsembleTimer();
+  activeEnsembleRun?.cancel();
+  activeEnsembleRun = null;
   renderCtrl?.setEnsemble?.(null, null);
+  renderCtrl?.setEnsembleMembersVisible?.(false);
   analysisRequestSeq++;
   ensembleResults.hidden = true;
   ensembleStatus.value = spawn.isDemo
     ? 'spawn or select a storm'
     : 'ready · worker cache will reuse this environment';
+  if (!spawn.isDemo && autoEnsembleEligible) {
+    const spawnRef = currentSpawn;
+    autoEnsembleTimer = window.setTimeout(() => {
+      autoEnsembleTimer = null;
+      if (currentSpawn !== spawnRef) return;
+      startEnsembleRun(spawnRef, AUTO_ENSEMBLE_BUDGET.memberCount, 'auto');
+    }, AUTO_ENSEMBLE_BUDGET.settleMs);
+  }
   const s = engine.getState();
   const generatedName = neutralSimulatedStormName(spawn.seed);
   currentRunName =
@@ -2368,18 +2391,33 @@ function percentage(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-ensembleRun.addEventListener('click', () => {
-  const spawn = currentSpawn;
-  if (!spawn || spawn.isDemo) {
-    ensembleStatus.value = 'spawn or select a non-demo storm first';
-    return;
+function clearAutoEnsembleTimer(): void {
+  if (autoEnsembleTimer !== null) {
+    window.clearTimeout(autoEnsembleTimer);
+    autoEnsembleTimer = null;
   }
-  const count = Number(ensembleSize.value);
+}
+
+/**
+ * Start a worker ensemble run — the manual dock click or the automatic
+ * post-spawn run. Cancels any in-flight run and any pending auto-run first.
+ * The request payload is identical for both origins, so what an ensemble
+ * computes never depends on how it was started; AUTO_ENSEMBLE_BUDGET gates
+ * scheduling only.
+ */
+function startEnsembleRun(
+  spawn: SpawnParams,
+  count: number,
+  origin: 'manual' | 'auto',
+): void {
+  clearAutoEnsembleTimer();
+  activeEnsembleRun?.cancel();
+  const label = origin === 'auto' ? 'auto ensemble · ' : '';
   const requestSeq = ++analysisRequestSeq;
   const startedAt = performance.now();
   ensembleRun.disabled = true;
   ensembleResults.hidden = true;
-  ensembleStatus.value = `starting ${count}-member worker ensemble…`;
+  ensembleStatus.value = `${label}starting ${count}-member worker ensemble…`;
   const urls = currentAnalysisUrls();
   const handle = requestEnsemble(
     {
@@ -2391,10 +2429,11 @@ ensembleRun.addEventListener('click', () => {
     },
     (completed, total) => {
       if (requestSeq === analysisRequestSeq) {
-        ensembleStatus.value = `running members ${completed}/${total}`;
+        ensembleStatus.value = `${label}running members ${completed}/${total}`;
       }
     },
   );
+  activeEnsembleRun = handle;
   void handle.result
     .then((result) => {
       if (requestSeq !== analysisRequestSeq) return;
@@ -2407,10 +2446,10 @@ ensembleRun.addEventListener('click', () => {
       ensembleLandfall.textContent = percentage(result.landfallProbability);
       ensembleResults.hidden = false;
       ensembleStatus.value =
-        `${currentRunName?.label ?? 'historical hindcast'} · ` +
+        `${label}${currentRunName?.label ?? 'historical hindcast'} · ` +
         `${result.members.length} deterministic members · ` +
         `${((performance.now() - startedAt) / 1000).toFixed(1)} s · ` +
-        'perturbation-frequency field on map';
+        'perturbation-frequency envelope on map';
     })
     .catch((error: unknown) => {
       if (error instanceof EnsembleCancelledError) return;
@@ -2420,8 +2459,18 @@ ensembleRun.addEventListener('click', () => {
         error instanceof Error ? `ensemble failed · ${error.message}` : 'ensemble failed';
     })
     .finally(() => {
+      if (activeEnsembleRun === handle) activeEnsembleRun = null;
       ensembleRun.disabled = false;
     });
+}
+
+ensembleRun.addEventListener('click', () => {
+  const spawn = currentSpawn;
+  if (!spawn || spawn.isDemo) {
+    ensembleStatus.value = 'spawn or select a non-demo storm first';
+    return;
+  }
+  startEnsembleRun(spawn, Number(ensembleSize.value), 'manual');
 });
 
 function signed(value: number, digits: number): string {
@@ -2460,6 +2509,11 @@ sensitivityRun.addEventListener('click', () => {
     shearDeltaMs: Number(sensitivityShear.value),
     ohcScale: Number(sensitivityOhc.value),
   };
+  // The shared seq would discard the ensemble's result anyway; cancel it so
+  // the worker frees up for this run instead of finishing dead members.
+  clearAutoEnsembleTimer();
+  activeEnsembleRun?.cancel();
+  activeEnsembleRun = null;
   const requestSeq = ++analysisRequestSeq;
   const startedAt = performance.now();
   sensitivityRun.disabled = true;

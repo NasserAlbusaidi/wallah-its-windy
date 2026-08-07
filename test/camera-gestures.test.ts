@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   CameraGestureController,
   PAN_THRESHOLD_PX,
+  normalizeWheelDelta,
 } from '../src/camera-gestures';
 import {
   HOME_VIEW,
   MAX_ZOOM,
+  MIN_ZOOM,
   computeViewTransform,
   worldToNdc,
   ndcToWorld,
+  viewStateOf,
 } from '../src/camera';
 import type { ViewState } from '../src/camera';
 
@@ -24,7 +27,28 @@ function controllerAt(view: ViewState = { center: { x: 0, y: 0 }, zoom: 3 }) {
   return new CameraGestureController(view);
 }
 
+function expectTransformClose(
+  actual: ReturnType<typeof computeViewTransform>,
+  expected: ReturnType<typeof computeViewTransform>,
+): void {
+  for (const key of ['scaleX', 'scaleY', 'offsetX', 'offsetY'] as const) {
+    expect(actual[key]).toBeCloseTo(expected[key], 12);
+  }
+  for (const key of ['lonMin', 'lonMax', 'latMin', 'latMax'] as const) {
+    expect(actual.bbox[key]).toBeCloseTo(expected.bbox[key], 10);
+  }
+}
+
 describe('camera gesture controller', () => {
+  it('normalizes wheel delta modes to bounded CSS pixels', () => {
+    expect(normalizeWheelDelta(100, 0, H)).toBe(100);
+    expect(normalizeWheelDelta(3, 1, H)).toBe(120);
+    expect(normalizeWheelDelta(1, 2, H)).toBe(240);
+    expect(normalizeWheelDelta(-1, 2, H)).toBe(-240);
+    expect(normalizeWheelDelta(10_000, 0, H)).toBe(240);
+    expect(normalizeWheelDelta(Number.NaN, 0, H)).toBe(0);
+  });
+
   it('a sub-threshold move is not a pan and leaves the camera alone', () => {
     const c = controllerAt();
     const before = c.view();
@@ -82,13 +106,102 @@ describe('camera gesture controller', () => {
     expect(c.pointerUp(1)).toBe(true);
   });
 
+  it('moves the map with a translating pinch midpoint', () => {
+    const c = controllerAt();
+    c.pointerDown(1, 700, 500);
+    c.pointerDown(2, 900, 500);
+    const initialMidX = 800;
+    const initialMidY = 500;
+    const initialTransform = t(c.view());
+    const anchor = ndcToWorld(
+      initialTransform,
+      (initialMidX / W) * 2 - 1,
+      1 - (initialMidY / H) * 2,
+    );
+
+    const first = c.pointerMove(t(c.view()), 1, 720, 500, W, H);
+    expect(first.view).not.toBeNull();
+    const second = c.pointerMove(t(c.view()), 2, 920, 500, W, H);
+    expect(second.view).not.toBeNull();
+
+    const projected = worldToNdc(t(second.view!), anchor.x, anchor.y);
+    expect(((projected.x + 1) / 2) * W).toBeCloseTo(initialMidX + 20, 6);
+    expect(((1 - projected.y) / 2) * H).toBeCloseTo(initialMidY, 6);
+    expect(second.view!.zoom).toBeCloseTo(3, 6);
+  });
+
   it('zoom clamps to MAX_ZOOM and to the cover-fit floor', () => {
     const c = controllerAt({ center: { x: 0, y: 0 }, zoom: MAX_ZOOM });
     const v = c.wheel(t(c.view()), -10000, W / 2, H / 2, W, H);
     expect(v.zoom).toBe(MAX_ZOOM);
     const c2 = controllerAt({ center: { x: 0, y: 0 }, zoom: 1 });
     const v2 = c2.wheel(t(c2.view()), 10000, W / 2, H / 2, W, H);
-    expect(v2.zoom).toBeGreaterThanOrEqual(1);
+    expect(v2.zoom).toBe(
+      computeViewTransform(
+        { center: { x: 0, y: 0 }, zoom: MIN_ZOOM },
+        ASPECT,
+      ).scaleY,
+    );
+  });
+
+  it('does not pan when wheel or pinch asks to zoom below the aspect floor', () => {
+    const wideW = 2000;
+    const wideH = 1000;
+    const homeTransform = computeViewTransform(HOME_VIEW, wideW / wideH);
+    const clampedHome = viewStateOf(homeTransform);
+    const wheel = new CameraGestureController(clampedHome);
+    const wheelView = wheel.wheel(
+      homeTransform,
+      240,
+      wideW * 0.82,
+      wideH * 0.25,
+      wideW,
+      wideH,
+    );
+    expectTransformClose(
+      computeViewTransform(wheelView, wideW / wideH),
+      homeTransform,
+    );
+
+    const pinch = new CameraGestureController(clampedHome);
+    pinch.pointerDown(1, 500, 500);
+    pinch.pointerDown(2, 1500, 500);
+    const first = pinch.pointerMove(
+      homeTransform,
+      1,
+      600,
+      500,
+      wideW,
+      wideH,
+    );
+    expect(first.view).not.toBeNull();
+    const second = pinch.pointerMove(
+      computeViewTransform(first.view!, wideW / wideH),
+      2,
+      1400,
+      500,
+      wideW,
+      wideH,
+    );
+    expect(second.view).not.toBeNull();
+    expectTransformClose(
+      computeViewTransform(second.view!, wideW / wideH),
+      homeTransform,
+    );
+  });
+
+  it('keeps containment invariant when the aspect floor exceeds MAX_ZOOM', () => {
+    const extremeW = 30_000;
+    const extremeH = 1000;
+    const transform = computeViewTransform(HOME_VIEW, extremeW / extremeH);
+    expect(transform.scaleY).toBeGreaterThan(MAX_ZOOM);
+    const c = new CameraGestureController(viewStateOf(transform));
+    const out = c.key(transform, 'Minus', extremeW, extremeH);
+    expect(out).not.toBeNull();
+    expectTransformClose(
+      computeViewTransform(out!, extremeW / extremeH),
+      transform,
+    );
   });
 
   it('keyboard pans, zooms, and homes', () => {
@@ -111,5 +224,22 @@ describe('camera gesture controller', () => {
     c.reset({ center: { x: 0.5, y: 0.5 }, zoom: 4 });
     expect(c.view().zoom).toBe(4);
     expect(c.view().center.x).toBeCloseTo(0.5, 12);
+  });
+
+  it('cancelAll invalidates an in-flight pan or pinch without changing the view', () => {
+    const c = controllerAt();
+    const before = c.view();
+    c.pointerDown(1, 300, 300);
+    c.pointerDown(2, 500, 300);
+
+    c.cancelAll();
+
+    expect(c.activePointers()).toBe(0);
+    expect(c.pointerUp(1)).toBe(false);
+    expect(c.pointerMove(t(c.view()), 2, 520, 300, W, H)).toEqual({
+      view: null,
+      becamePan: false,
+    });
+    expect(c.view()).toEqual(before);
   });
 });

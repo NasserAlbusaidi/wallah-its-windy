@@ -25,6 +25,40 @@ export const RAINBAND_INNER_FULL_Q = 2.0;
 export const RAINBAND_OUTER_FADE_Q = 6.0;
 export const RAINBAND_OUTER_Q = 8.0;
 
+/**
+ * Maximum instantaneous rainband radius shared by display and impact products.
+ * The impact ledger historically applied this 500 km ceiling by itself, which
+ * let wide-RMW radar/IR/rain shaders advertise a larger footprint than the
+ * recorded rain field. Keep the two-RMW outer taper while bringing every
+ * consumer onto the same physical bound.
+ */
+export const RAINBAND_MAX_RADIUS_KM = 500;
+export const RAINBAND_OUTER_TAPER_Q =
+  RAINBAND_OUTER_Q - RAINBAND_OUTER_FADE_Q;
+
+export interface RainbandOuterBounds {
+  fadeQ: number;
+  outerQ: number;
+  outerKm: number;
+}
+
+export function rainbandOuterBounds(rmwKm: number): RainbandOuterBounds {
+  const safeRmwKm = Math.max(8, Number.isFinite(rmwKm) ? rmwKm : 8);
+  const outerQ = Math.max(
+    RAINBAND_INNER_FULL_Q + 0.01,
+    Math.min(RAINBAND_OUTER_Q, RAINBAND_MAX_RADIUS_KM / safeRmwKm),
+  );
+  const fadeQ = Math.max(
+    RAINBAND_INNER_FULL_Q,
+    outerQ - RAINBAND_OUTER_TAPER_Q,
+  );
+  return {
+    fadeQ,
+    outerQ,
+    outerKm: safeRmwKm * outerQ,
+  };
+}
+
 /** Gaussian eyewall half-width in RMW multiples. */
 export const EYEWALL_WIDTH_Q = 0.38;
 

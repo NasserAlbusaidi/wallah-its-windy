@@ -22,4 +22,13 @@ describe('TapGesture', () => {
     expect(tap.end(3, 100, 100, 80)).toBe(false);
     expect(tap.end(4, 120, 100, 80)).toBe(false);
   });
+
+  it('invalidates a pending contact when the map layout changes', () => {
+    const tap = new TapGesture();
+    tap.start(1, 100, 100, 0);
+
+    tap.cancelAll();
+
+    expect(tap.end(1, 100, 100, 100)).toBe(false);
+  });
 });

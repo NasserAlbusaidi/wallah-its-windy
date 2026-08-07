@@ -14,6 +14,8 @@
     "calibrate:demo": "node --experimental-strip-types calibration/select-demo.mjs",
     "assets:manifest": "node calibration/asset-manifest.mjs --write",
     "assets:check": "node calibration/asset-manifest.mjs",
+    "data:context-terrain": "node bake/run-python.mjs bake/bake_context_terrain.py",
+    "data:context-terrain:check": "node bake/run-python.mjs bake/bake_context_terrain.py --check",
     "data:fidelity:catalog": "node bake/run-python.mjs bake/fidelity_catalog.py",
     "data:fidelity:fetch": "node bake/run-python.mjs -u bake/fetch_fidelity_benchmark.py",
     "data:fidelity:bake": "node bake/run-python.mjs bake/bake_fidelity_benchmark.py",

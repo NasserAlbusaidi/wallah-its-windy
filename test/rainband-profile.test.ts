@@ -6,10 +6,12 @@ import {
   RAINBAND_INNER_Q,
   RAINBAND_OUTER_FADE_Q,
   RAINBAND_OUTER_Q,
+  RAINBAND_MAX_RADIUS_KM,
   RAINBAND_SPIRAL_AMPLITUDE,
   RAINBAND_SPIRAL_ARMS,
   RAINBAND_SPIRAL_PITCH,
   RAINBAND_SPIRAL_ROTATION_PER_H,
+  rainbandOuterBounds,
   rainbandSpiral,
 } from '../src/rainband-profile';
 
@@ -58,5 +60,18 @@ describe('rainband profile', () => {
     expect(RAINBAND_SPIRAL_ARMS).toBe(3);
     expect(RAINBAND_SPIRAL_PITCH).toBe(1.35);
     expect(RAINBAND_SPIRAL_ROTATION_PER_H).toBe(0.035);
+  });
+
+  it('uses one 500 km outer bound for wide-RMW products', () => {
+    expect(RAINBAND_MAX_RADIUS_KM).toBe(500);
+    expect(rainbandOuterBounds(40)).toEqual({
+      fadeQ: 6,
+      outerQ: 8,
+      outerKm: 320,
+    });
+    const wide = rainbandOuterBounds(95);
+    expect(wide.outerKm).toBeCloseTo(500, 12);
+    expect(wide.outerQ).toBeCloseTo(500 / 95, 12);
+    expect(wide.fadeQ).toBeCloseTo(500 / 95 - 2, 12);
   });
 });

@@ -16,7 +16,7 @@
       <!-- The chart: an aspect-correct, framed map (JS sizes it in resize()).
            Ghost labels are appended here at runtime so they track the frame. -->
       <div id="map-frame">
-        <!-- WebGL2 map (terrain, env glow, particles, rain) -->
+        <!-- WebGL2 map (regional terrain, diagnostic weather, selected flow) -->
         <canvas id="gl-canvas"></canvas>
         <!-- 2D vector overlay (track dots, halos, debug) above the map -->
         <canvas id="overlay-canvas"></canvas>
@@ -587,10 +587,15 @@
       <div id="hint-chips" aria-label="Map controls">
         <!-- Caption stays live: main.ts replaces this text with spawn feedback
              and storm epitaphs without changing the hint-chip structure. -->
-        <p id="caption" class="chrome hint">click the sea to spawn your own</p>
+        <p id="caption" class="chrome hint">click open water inside the outline to spawn</p>
         <aside id="interaction-guide" class="chrome">
           <span>hover · hold to inspect</span>
         </aside>
+        <nav id="map-navigation" class="chrome" aria-label="Map navigation">
+          <button id="map-zoom-out" type="button" aria-label="Zoom map out" title="Zoom out (−)">−</button>
+          <button id="map-home" type="button" aria-label="Show regional map" title="Regional view (Home)">⌂</button>
+          <button id="map-zoom-in" type="button" aria-label="Zoom map in" title="Zoom in (+)">+</button>
+        </nav>
       </div>
 
       <footer id="timeline" class="chrome" aria-label="Storm timeline">

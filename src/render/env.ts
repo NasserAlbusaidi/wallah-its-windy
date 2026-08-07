@@ -1,15 +1,15 @@
 /**
  * GPU weather-map pass.
  *
- * Terrain mode retains the original faint SST fuel glow. Scalar modes expose
- * the exact baked plane physics is reading. Infrared is explicitly a simulated
+ * Terrain mode is transparent so the real relief base stays inspectable.
+ * Scalar modes expose the exact baked plane physics is reading. Infrared is explicitly a simulated
  * cloud-top brightness-temperature proxy derived from the live vortex—not
  * satellite data. Rain mode darkens the base so the separate rain accumulator
  * reads like an operational reflectivity product.
  */
 
 import { TOKENS } from '../tokens';
-import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H } from '../rainband-profile';
+import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H, rainbandOuterBounds } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
 import { CLOUD_MEMORY_DT_H, CLOUD_MEMORY_MACRO_GAIN, DEBRIS_MAX_CLOUD } from './cloud-memory';
 import { AMBIENT_RH_DRIVE_HI, AMBIENT_RH_DRIVE_LO, AMBIENT_TOP_CONGESTUS_COLD_C, AMBIENT_TOP_CONGESTUS_WARM_C, AMBIENT_TOP_CUMULUS_COLD_C, AMBIENT_TOP_CUMULUS_WARM_C, AMBIENT_TOP_VEIL_C, CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, cloudMetricX, cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
@@ -29,6 +29,7 @@ import type { GlCaps, RenderTarget } from './gl-utils';
 import { PRECIPITATING_CLOUD_BAND_MAX, PRECIPITATING_CLOUD_BAND_FULL_MM_H, PRECIPITATING_CLOUD_EYE_FULL_MM_H, PRECIPITATING_CLOUD_RAIN_START_MM_H, PRECIPITATING_CLOUD_SPIRAL_FLOOR, PRECIPITATING_CLOUD_TEXTURE_FLOOR, rainCenterClip } from './precipitating-cloud';
 import {
   CANOPY_COEFFICIENT_DIVISOR,
+  HALF_DOMAIN_HEIGHT_KM,
   RENDER_RADIUS_FLOOR,
   stormRenderRadii,
 } from './storm-radii';
@@ -86,6 +87,8 @@ uniform vec2 u_center;
 uniform vec2 u_rainCenter;
 uniform float u_rMax;
 uniform float u_rCanopy;
+uniform float u_rainOuterFadeQ;
+uniform float u_rainOuterQ;
 uniform float u_intensity;
 uniform float u_organization;
 uniform float u_ageH;
@@ -366,8 +369,8 @@ ${CLOUD_CORE_GLSL.wobble}
   float precipBandEnvelope =
     smoothstep(${RAINBAND_INNER_Q}, ${RAINBAND_INNER_FULL_Q.toFixed(1)}, rainQ) *
     (1.0 - smoothstep(
-      ${RAINBAND_OUTER_FADE_Q.toFixed(1)},
-      ${RAINBAND_OUTER_Q.toFixed(1)},
+      u_rainOuterFadeQ,
+      u_rainOuterQ,
       rainQ
     ));
   float precipSpiral =
@@ -514,6 +517,10 @@ vec4 addCloudContext(vec3 baseColor, float baseAlpha, CloudField field, float st
 }
 
 void main() {
+  // v_uv is the simulation raster coordinate produced by VIEW_QUAD_VS. The
+  // camera can now reveal a larger presentation-only terrain context; reject
+  // unsupported geography instead of clamping and repeating edge texels.
+  if (any(lessThan(v_uv, vec2(0.0))) || any(greaterThan(v_uv, vec2(1.0)))) discard;
   float land = texture(u_land, v_uv).r;
   float sstN = mix(
     texture(u_sst, v_uv).r,
@@ -523,11 +530,10 @@ void main() {
   float sstC = sstN * (u_sstRange.y - u_sstRange.x) + u_sstRange.x;
 
   if (u_mode == 0) {
-    float warm = smoothstep(26.0, 30.0, sstC);
-    float alpha = u_warm.a * warm * (1.0 - smoothstep(0.4, 0.6, land)) * u_fade;
-    CloudField field = sampleCloud(land, sstC);
-    vec4 composed = addCloudContext(u_warm.rgb, alpha / max(u_fade, 0.001), field, 0.26);
-    o = vec4(composed.rgb, composed.a * u_fade);
+    // Terrain is the clean chart instrument. SST fuel and cloud context belong
+    // to their weather products; painting them here concealed bathymetry and
+    // made a warm field look like part of the base map.
+    o = vec4(0.0);
     return;
   }
 
@@ -897,6 +903,11 @@ export class EnvLayer implements RenderModule {
       : { rMax: 0.04, rCanopy: 0.18 };
     gl.uniform1f(u('u_rMax'), renderRadii.rMax);
     gl.uniform1f(u('u_rCanopy'), renderRadii.rCanopy);
+    const rainbandBounds = rainbandOuterBounds(
+      ctx.structure?.rmwKm ?? renderRadii.rMax * HALF_DOMAIN_HEIGHT_KM,
+    );
+    gl.uniform1f(u('u_rainOuterFadeQ'), rainbandBounds.fadeQ);
+    gl.uniform1f(u('u_rainOuterQ'), rainbandBounds.outerQ);
     gl.uniform1f(u('u_intensity'), ctx.intensity01);
     gl.uniform1f(
       u('u_organization'),

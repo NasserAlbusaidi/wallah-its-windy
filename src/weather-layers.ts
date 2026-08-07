@@ -6,6 +6,8 @@
  * the terrain instrument closes the list as the plain base chart.
  */
 
+import { radarLegendText } from './radar-reflectivity';
+
 export type WeatherLayerId =
   | 'wind'
   | 'rain'
@@ -94,8 +96,8 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     iconSvg: railIcon(
       '<path d="M2 13a7 7 0 0 1 12-5"/><path d="M5 13a4.5 4.5 0 0 1 7.5-3.4"/><circle cx="8.6" cy="10.6" r="1.1"/>',
     ),
-    legend: 'light · moderate · heavy · extreme',
-    unit: 'reflectivity-style rain-rate proxy',
+    legend: radarLegendText(),
+    unit: 'Marshall–Palmer reflectivity proxy · simulated',
     simulated: true,
   },
   {
@@ -182,8 +184,8 @@ export const WEATHER_LAYERS: readonly WeatherLayerDefinition[] = [
     iconSvg: railIcon(
       '<path d="m1.5 13 4.5-8 3 5 2-3 3.5 6Z"/>',
     ),
-    legend: 'bathymetry · topography · storm structure',
-    unit: 'bathymetry · topography',
+    legend: 'bathymetry · 500 m contours · topography',
+    unit: 'GMRT regional relief · metres',
     simulated: false,
   },
 ] as const;

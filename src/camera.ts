@@ -10,18 +10,46 @@
  * calibrated product keep operating on world coordinates.
  *
  * The camera is presentation-only. It never enters sim state, the flight
- * tape, the URL hash, or any sealed-gate surface, and it is clamped so the
- * visible bbox always lies inside DOMAIN — out-of-domain sampling cannot
- * occur by construction.
+ * tape, the URL hash, or any sealed-gate surface. World coordinates remain
+ * anchored to DOMAIN, while camera movement is clamped to the larger, real
+ * terrain-backed DISPLAY_CONTEXT_DOMAIN. Render passes mask DOMAIN-bound
+ * weather outside the simulation box; widening the view never invents
+ * atmospheric coverage.
  */
 
 import type { ViewState, ViewTransform } from './types';
 import { DOMAIN, clipToLatLon, latLonToClip } from './grid';
+import { DISPLAY_CONTEXT_DOMAIN } from './display-domain';
 
 export type { ViewState, ViewTransform } from './types';
 
-/** Full-domain default view (cover-fit for whatever canvas aspect rules). */
-export const HOME_VIEW: ViewState = { center: { x: 0, y: 0 }, zoom: 1 };
+const displaySw = latLonToClip(
+  DISPLAY_CONTEXT_DOMAIN.latMin,
+  DISPLAY_CONTEXT_DOMAIN.lonMin,
+);
+const displayNe = latLonToClip(
+  DISPLAY_CONTEXT_DOMAIN.latMax,
+  DISPLAY_CONTEXT_DOMAIN.lonMax,
+);
+const DISPLAY_WORLD = Object.freeze({
+  minX: displaySw.x,
+  maxX: displayNe.x,
+  minY: displaySw.y,
+  maxY: displayNe.y,
+});
+const DISPLAY_CENTER = Object.freeze({
+  x: (DISPLAY_WORLD.minX + DISPLAY_WORLD.maxX) / 2,
+  y: (DISPLAY_WORLD.minY + DISPLAY_WORLD.maxY) / 2,
+});
+
+/** Lowest possible zoom: the display-context latitude span fills the view. */
+export const MIN_ZOOM = 2 / (DISPLAY_WORLD.maxY - DISPLAY_WORLD.minY);
+
+/** Regional context default; viewport aspect decides which edge cover-fits. */
+export const HOME_VIEW: ViewState = {
+  center: { x: DISPLAY_CENTER.x, y: DISPLAY_CENTER.y },
+  zoom: MIN_ZOOM,
+};
 
 /** View half-height at max zoom = (latMax-latMin)/(2*MAX_ZOOM) = 0.75 deg. */
 export const MAX_ZOOM = 8;
@@ -56,10 +84,16 @@ function clampPass(
 ): ClampedView {
   const centreLat = clipToLatLon(0, cy).lat;
   const m = metricX(centreLat);
-  // Domain containment outranks MAX_ZOOM: on a hyper-wide canvas the
-  // cover-fit floor (aspect/m) can exceed MAX_ZOOM, and capping at MAX_ZOOM
-  // there would push the visible bbox outside the domain.
-  const floor = Math.max(1, aspect / m);
+  const displayHalfW = (DISPLAY_WORLD.maxX - DISPLAY_WORLD.minX) / 2;
+  const displayHalfH = (DISPLAY_WORLD.maxY - DISPLAY_WORLD.minY) / 2;
+  // Context containment outranks MAX_ZOOM: on an extreme-aspect canvas the
+  // cover-fit floor can exceed MAX_ZOOM, and capping there would expose pixels
+  // beyond the real context raster.
+  const floor = Math.max(
+    MIN_ZOOM,
+    1 / displayHalfH,
+    aspect / (m * displayHalfW),
+  );
   const z = clamp(zoom, floor, Math.max(MAX_ZOOM, floor));
   const halfH = 1 / z;
   const halfW = (aspect * halfH) / m;
@@ -67,8 +101,22 @@ function clampPass(
     zoom: z,
     halfW,
     halfH,
-    cx: halfW >= 1 ? 0 : clamp(cx, -1 + halfW, 1 - halfW),
-    cy: halfH >= 1 ? 0 : clamp(cy, -1 + halfH, 1 - halfH),
+    cx:
+      halfW * 2 >= DISPLAY_WORLD.maxX - DISPLAY_WORLD.minX
+        ? DISPLAY_CENTER.x
+        : clamp(
+            cx,
+            DISPLAY_WORLD.minX + halfW,
+            DISPLAY_WORLD.maxX - halfW,
+          ),
+    cy:
+      halfH * 2 >= DISPLAY_WORLD.maxY - DISPLAY_WORLD.minY
+        ? DISPLAY_CENTER.y
+        : clamp(
+            cy,
+            DISPLAY_WORLD.minY + halfH,
+            DISPLAY_WORLD.maxY - halfH,
+          ),
   };
 }
 
@@ -184,7 +232,7 @@ export function zoomAboutAnchor(
   anchorWorld: { x: number; y: number },
   newZoom: number,
 ): ViewState {
-  const z = clamp(newZoom, 1e-6, MAX_ZOOM);
+  const z = clamp(newZoom, MIN_ZOOM, MAX_ZOOM);
   const r = view.zoom / z;
   const cy = anchorWorld.y - (anchorWorld.y - view.center.y) * r;
   const m0 = metricX(clipToLatLon(0, view.center.y).lat);

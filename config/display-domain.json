@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "arabian-sea-context-v1",
+  "bbox": {
+    "lonMin": 45,
+    "lonMax": 80,
+    "latMin": 8,
+    "latMax": 30
+  },
+  "grid": {
+    "nx": 875,
+    "ny": 550
+  },
+  "asset": {
+    "path": "data/context-terrain.bin",
+    "layers": ["elev", "landmask"]
+  },
+  "source": {
+    "provider": "GMRT GridServer",
+    "resolution": "med",
+    "citation": "Ryan et al. (2009)",
+    "sha256": "bd11c638eb75b5da12c019a1ed97090ddafee909a6e107608600d87f7c3e7c78"
+  }
+}

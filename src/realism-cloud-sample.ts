@@ -25,8 +25,6 @@ import {
   RAINBAND_AZIMUTHAL_MEAN,
   RAINBAND_INNER_FULL_Q,
   RAINBAND_INNER_Q,
-  RAINBAND_OUTER_FADE_Q,
-  RAINBAND_OUTER_Q,
   RAINBAND_SPIRAL_AMPLITUDE,
   RAINBAND_SPIRAL_ARMS,
   RAINBAND_SPIRAL_PITCH,
@@ -96,6 +94,8 @@ export interface CloudUniforms {
   midlevelRh: number;
   eyewallRain: number;
   rainbandRain: number;
+  rainOuterFadeQ: number;
+  rainOuterQ: number;
   cloudSeed: number;
   hasCloudMemory: number;
   /** 0 in the measurement pose - `animGate` is therefore 1. */
@@ -408,7 +408,7 @@ export function sampleCloudProxy(
   const precipEyewall = Math.exp(-(((rainQ - 1.0) / EYEWALL_WIDTH_Q) ** 2));
   const precipBandEnvelope =
     smoothstep(RAINBAND_INNER_Q, RAINBAND_INNER_FULL_Q, rainQ) *
-    (1.0 - smoothstep(RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, rainQ));
+    (1.0 - smoothstep(u.rainOuterFadeQ, u.rainOuterQ, rainQ));
   const precipSpiral =
     RAINBAND_AZIMUTHAL_MEAN +
     RAINBAND_SPIRAL_AMPLITUDE *

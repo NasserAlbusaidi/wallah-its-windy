@@ -544,10 +544,16 @@ if (CHECK) {
   ) {
     console.error(
       `[realism] FAIL results=${resultsMatch} reference=${referenceMatch} ` +
-        `report=${reportMatch} gate=${output.referenceComparison.passed}`,
+        `report=${reportMatch} gate=${output.referenceComparison.passed} ` +
+        `issues=${output.referenceComparison.issues.length}`,
     );
     for (const issue of output.referenceComparison.issues.slice(0, 20)) {
       console.error(`[realism]   ${issue.kind} at ${issue.path}`);
+    }
+    if (output.referenceComparison.issues.length > 20) {
+      console.error(
+        `[realism]   ... ${output.referenceComparison.issues.length - 20} more issue(s)`,
+      );
     }
     process.exitCode = 1;
   } else {

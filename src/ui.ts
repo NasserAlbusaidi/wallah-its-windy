@@ -30,6 +30,7 @@ import { DeathReason, AFTERMATH_FADE_MS } from './types';
 import { randomSeed, type HashState } from './rng';
 import { DOMAIN, latLonToCell, latLonToClip } from './grid';
 import { latLonToScreen, viewKey } from './camera';
+import { domainCanvasRect } from './domain-clip';
 import { TOKENS } from './tokens';
 import { categoryRgba, intensityFraction, stormCategory } from './category';
 import { IMPACT_CITIES, windAtPointKt } from './impact';
@@ -125,9 +126,9 @@ const RIPPLE_MS = 700;
 const ACK_MS = 1600;
 
 /** Post-demo idle copy — frames landfall rarity as the lesson (eng task T8). */
-const RARITY_COPY = "most storms miss — that's why Gonu was historic. click the sea to try again.";
-const FIRST_HINT = 'click the sea to spawn your own.';
-const SHARED_HINT = 'shared storm loaded. click the sea to spawn your own.';
+const RARITY_COPY = "most storms miss — that's why Gonu was historic. click open water inside the outline to try again.";
+const FIRST_HINT = 'click open water inside the outline to spawn.';
+const SHARED_HINT = 'shared storm loaded. click open water inside the outline to spawn.';
 const LAND_ACK = 'storms are born at sea. click the open water.';
 const ALIVE_HINT = 'let it take course…';
 
@@ -791,6 +792,15 @@ export class UiController {
     this.setCaption('map data is stale — hard-refresh to re-download.', false);
   }
 
+  /** The wider camera must never silently imply geography without its source. */
+  notifyContextError(): void {
+    this.dataError = true;
+    this.setCaption(
+      'regional terrain unavailable — reload before using the expanded view.',
+      false,
+    );
+  }
+
   /**
    * Loading finished. Reveal the map, hide the progress line, and decide the
    * first storm: a shared storm from the URL hash, else the ambient demo.
@@ -951,7 +961,7 @@ export class UiController {
     this.setCaption(
       mode === 'hindcast'
         ? `${label} hindcast — initialized from the observed storm; no track nudging.`
-        : `${label} — the counterfactual. click the sea to place your own.`,
+        : `${label} — the counterfactual. click inside the outline to place your own.`,
       true,
     );
   }
@@ -1534,24 +1544,35 @@ export class UiController {
    * clear. Reduced motion freezes the ripple animation to a static tick. Owning
    * the glow here (a UI concern per task T8's file list, on the overlay we
    * control) keeps it robust regardless of the render module's data intake; at
-   * ~12% alpha it stays faint, honouring the luminance ranking.
+   * a bounded source-over wash it stays faint, honouring the luminance ranking.
    */
-  drawOverlay(nowMs: number): void {
+  drawOverlay(nowMs: number, showGenesis = true): void {
     const { overlayCtx: ctx, overlayCanvas: cv } = this.host;
     const w = cv.width;
     const h = cv.height;
 
     this.drawGraticule(ctx, w, h);
 
-    if (this.genesis.length > 0) {
-      const glowR = Math.max(w, h) * 0.06;
+    // Genesis hints and click ripples describe interactions/products that are
+    // only valid inside the simulation DOMAIN. Keep the wider terrain context
+    // clean while the full-context graticule remains visible.
+    const validity = this.view
+      ? domainCanvasRect(this.view, w, h)
+      : { x: 0, y: 0, width: w, height: h };
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(validity.x, validity.y, validity.width, validity.height);
+    ctx.clip();
+
+    if (showGenesis && this.genesis.length > 0) {
+      const glowR = Math.max(w, h) * 0.035;
       ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalCompositeOperation = 'source-over';
       for (const g of this.genesis) {
         const px = this.pxX(g.lon, w);
         const py = this.pxY(g.lat, h);
         const grad = ctx.createRadialGradient(px, py, 0, px, py, glowR);
-        grad.addColorStop(0, genesisRgba(GENESIS_ALPHA));
+        grad.addColorStop(0, genesisRgba(GENESIS_ALPHA * 0.55));
         grad.addColorStop(1, genesisRgba(0));
         ctx.fillStyle = grad;
         ctx.beginPath();
@@ -1561,7 +1582,10 @@ export class UiController {
       ctx.restore();
     }
 
-    if (this.ripples.length === 0) return;
+    if (this.ripples.length === 0) {
+      ctx.restore();
+      return;
+    }
     const maxR = Math.max(w, h) * 0.035;
     this.ripples = this.ripples.filter((r) => nowMs - r.startMs < RIPPLE_MS);
     for (const r of this.ripples) {
@@ -1576,6 +1600,7 @@ export class UiController {
       ctx.lineWidth = Math.max(1, w * 0.0015);
       ctx.stroke();
     }
+    ctx.restore();
   }
 
   /**

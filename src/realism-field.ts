@@ -18,6 +18,7 @@ import type { CloudUniforms } from './realism-cloud-sample';
 import { cellUv, clamp01, mix } from './realism-glsl';
 import type { RealismNoise } from './realism-glsl';
 import type { DebrisState } from './realism-proxy';
+import { rainbandOuterBounds } from './rainband-profile';
 import { cloudMetricX, cloudSeedFromGenesis } from './render/cloud-motion';
 import { rainCenterClip } from './render/precipitating-cloud';
 import {
@@ -236,6 +237,7 @@ export function buildRealismField(
   const n = REALISM_GRID_N;
   const frame = ctx.frame;
   const radii = stormRenderRadii(frame.structure);
+  const rainbandBounds = rainbandOuterBounds(frame.structure.rmwKm);
   const center = latLonToClip(frame.lat, frame.lon, DOMAIN);
   const metricX = cloudMetricX(frame.lat);
   const u: CloudUniforms = {
@@ -257,6 +259,8 @@ export function buildRealismField(
     midlevelRh: ctx.midlevelRh01,
     eyewallRain: frame.diagnostics.eyewallRainMmH,
     rainbandRain: frame.diagnostics.rainbandRainMmH,
+    rainOuterFadeQ: rainbandBounds.fadeQ,
+    rainOuterQ: rainbandBounds.outerQ,
     cloudSeed: cloudSeedFromGenesis(ctx.genesis),
     hasCloudMemory: sources.debris ? 1 : 0,
     reducedMotion: 0,

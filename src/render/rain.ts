@@ -39,11 +39,10 @@ import {
   RAINBAND_AZIMUTHAL_MEAN,
   RAINBAND_INNER_FULL_Q,
   RAINBAND_INNER_Q,
-  RAINBAND_OUTER_FADE_Q,
-  RAINBAND_OUTER_Q,
   RAINBAND_SPIRAL_AMPLITUDE,
   RAINBAND_SPIRAL_ARMS,
   RAINBAND_SPIRAL_PITCH,
+  rainbandOuterBounds,
 } from '../rainband-profile';
 import type { DrawCtx, GpuTextures } from './context';
 import {
@@ -97,6 +96,8 @@ uniform float u_fallbackTransportPerH;
 uniform float u_dtH;
 uniform vec2 u_center;      // storm centre, clip
 uniform float u_rMax;
+uniform float u_rainOuterFadeQ;
+uniform float u_rainOuterQ;
 uniform float u_hollandB;
 uniform vec2 u_motion;
 uniform float u_asymmetry;
@@ -163,8 +164,8 @@ void main() {
   float bandEnvelope =
     smoothstep(${RAINBAND_INNER_Q}, ${RAINBAND_INNER_FULL_Q.toFixed(1)}, q) *
     (1.0 - smoothstep(
-      ${RAINBAND_OUTER_FADE_Q.toFixed(1)},
-      ${RAINBAND_OUTER_Q.toFixed(1)},
+      u_rainOuterFadeQ,
+      u_rainOuterQ,
       q
     ));
   float azimuth = atan(radial.y, radial.x);
@@ -345,6 +346,11 @@ export class RainLayer {
       : RMAX_BASE * (0.7 + 0.6 * ctx.intensity01);
     const maximumWind = Math.max(1, structure?.maximumWindKt ?? ctx.vKt);
     gl.uniform1f(u('u_rMax'), rMax);
+    const rainbandBounds = rainbandOuterBounds(
+      structure?.rmwKm ?? rMax * HALF_DOMAIN_HEIGHT_KM,
+    );
+    gl.uniform1f(u('u_rainOuterFadeQ'), rainbandBounds.fadeQ);
+    gl.uniform1f(u('u_rainOuterQ'), rainbandBounds.outerQ);
     gl.uniform1f(u('u_hollandB'), structure?.hollandB ?? 1.35);
     gl.uniform2f(
       u('u_motion'),

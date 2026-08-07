@@ -470,6 +470,7 @@ export class CloudMemoryPass implements RenderModule {
     );
 
     try {
+      gl.disable(gl.SCISSOR_TEST);
       gl.disable(gl.BLEND);
       gl.bindFramebuffer(gl.FRAMEBUFFER, workA.fbo);
       gl.viewport(0, 0, this.sizePx, this.sizePx);

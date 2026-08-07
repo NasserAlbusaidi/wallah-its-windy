@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   HOME_VIEW,
+  MIN_ZOOM,
   MAX_ZOOM,
   computeViewTransform,
   latLonToScreen,
@@ -13,13 +14,17 @@ import {
   zoomAboutAnchor,
   type ViewState,
 } from '../src/camera';
-import { DOMAIN } from '../src/grid';
+import { DISPLAY_CONTEXT_DOMAIN } from '../src/display-domain';
 
-/** Canvas aspect at which the home view is exactly the legacy identity map. */
-const DOMAIN_METRIC_ASPECT =
-  ((DOMAIN.lonMax - DOMAIN.lonMin) *
-    Math.cos((((DOMAIN.latMin + DOMAIN.latMax) / 2) * Math.PI) / 180)) /
-  (DOMAIN.latMax - DOMAIN.latMin);
+/** Canvas aspect at which Home shows the whole real context raster. */
+const CONTEXT_METRIC_ASPECT =
+  ((DISPLAY_CONTEXT_DOMAIN.lonMax - DISPLAY_CONTEXT_DOMAIN.lonMin) *
+    Math.cos(
+      (((DISPLAY_CONTEXT_DOMAIN.latMin + DISPLAY_CONTEXT_DOMAIN.latMax) / 2) *
+        Math.PI) /
+        180,
+    )) /
+  (DISPLAY_CONTEXT_DOMAIN.latMax - DISPLAY_CONTEXT_DOMAIN.latMin);
 
 function metricAspectOf(bbox: {
   lonMin: number;
@@ -39,37 +44,34 @@ function view(cx: number, cy: number, zoom: number): ViewState {
 }
 
 describe('camera view transform', () => {
-  it('home view at the domain metric aspect is the identity transform', () => {
-    const t = computeViewTransform(HOME_VIEW, DOMAIN_METRIC_ASPECT);
-    expect(t.scaleX).toBeCloseTo(1, 12);
-    expect(t.scaleY).toBeCloseTo(1, 12);
-    expect(t.offsetX).toBeCloseTo(0, 12);
-    expect(t.offsetY).toBeCloseTo(0, 12);
-    expect(t.bbox.lonMin).toBeCloseTo(DOMAIN.lonMin, 9);
-    expect(t.bbox.lonMax).toBeCloseTo(DOMAIN.lonMax, 9);
-    expect(t.bbox.latMin).toBeCloseTo(DOMAIN.latMin, 9);
-    expect(t.bbox.latMax).toBeCloseTo(DOMAIN.latMax, 9);
+  it('home view shows the complete real context at its metric aspect', () => {
+    const t = computeViewTransform(HOME_VIEW, CONTEXT_METRIC_ASPECT);
+    expect(t.scaleY).toBeCloseTo(MIN_ZOOM, 12);
+    expect(t.bbox.lonMin).toBeCloseTo(DISPLAY_CONTEXT_DOMAIN.lonMin, 9);
+    expect(t.bbox.lonMax).toBeCloseTo(DISPLAY_CONTEXT_DOMAIN.lonMax, 9);
+    expect(t.bbox.latMin).toBeCloseTo(DISPLAY_CONTEXT_DOMAIN.latMin, 9);
+    expect(t.bbox.latMax).toBeCloseTo(DISPLAY_CONTEXT_DOMAIN.latMax, 9);
   });
 
-  it('cover-fit on a wide canvas crops latitude, stays inside the domain, unstretched', () => {
+  it('cover-fit on a wide canvas crops context latitude without stretching', () => {
     const aspect = 2.0;
     const t = computeViewTransform(HOME_VIEW, aspect);
-    expect(t.bbox.lonMin).toBeGreaterThanOrEqual(DOMAIN.lonMin - 1e-9);
-    expect(t.bbox.lonMax).toBeLessThanOrEqual(DOMAIN.lonMax + 1e-9);
-    expect(t.bbox.latMin).toBeGreaterThanOrEqual(DOMAIN.latMin - 1e-9);
-    expect(t.bbox.latMax).toBeLessThanOrEqual(DOMAIN.latMax + 1e-9);
+    expect(t.bbox.lonMin).toBeGreaterThanOrEqual(DISPLAY_CONTEXT_DOMAIN.lonMin - 1e-9);
+    expect(t.bbox.lonMax).toBeLessThanOrEqual(DISPLAY_CONTEXT_DOMAIN.lonMax + 1e-9);
+    expect(t.bbox.latMin).toBeGreaterThanOrEqual(DISPLAY_CONTEXT_DOMAIN.latMin - 1e-9);
+    expect(t.bbox.latMax).toBeLessThanOrEqual(DISPLAY_CONTEXT_DOMAIN.latMax + 1e-9);
     // Width binds: full lon span, cropped lat span.
-    expect(t.bbox.lonMax - t.bbox.lonMin).toBeCloseTo(20, 6);
-    expect(t.bbox.latMax - t.bbox.latMin).toBeLessThan(12);
+    expect(t.bbox.lonMax - t.bbox.lonMin).toBeCloseTo(35, 6);
+    expect(t.bbox.latMax - t.bbox.latMin).toBeLessThan(22);
     // Unstretched: visible metric aspect matches the canvas aspect.
     expect(metricAspectOf(t.bbox) / aspect).toBeCloseTo(1, 2);
   });
 
-  it('cover-fit on a squarer canvas crops longitude instead', () => {
+  it('cover-fit on a squarer canvas shows full context latitude', () => {
     const aspect = 1.0;
     const t = computeViewTransform(HOME_VIEW, aspect);
-    expect(t.bbox.latMax - t.bbox.latMin).toBeCloseTo(12, 6);
-    expect(t.bbox.lonMax - t.bbox.lonMin).toBeLessThan(20);
+    expect(t.bbox.latMax - t.bbox.latMin).toBeCloseTo(22, 6);
+    expect(t.bbox.lonMax - t.bbox.lonMin).toBeLessThan(35);
     expect(metricAspectOf(t.bbox) / aspect).toBeCloseTo(1, 2);
   });
 
@@ -89,7 +91,7 @@ describe('camera view transform', () => {
 
   it('screen<->geo round-trips across zooms and centres', () => {
     const cases: Array<[ViewState, number]> = [
-      [HOME_VIEW, DOMAIN_METRIC_ASPECT],
+      [HOME_VIEW, CONTEXT_METRIC_ASPECT],
       [view(0, 0, 2.5), 1.9],
       [view(0.7, 0.6, 8), 1.3],
     ];
@@ -110,27 +112,27 @@ describe('camera view transform', () => {
     }
   });
 
-  it('clamps the centre so the view never leaves the domain', () => {
-    const t = computeViewTransform(view(0.99, 0.99, 2), 1.6);
-    expect(t.bbox.lonMax).toBeLessThanOrEqual(DOMAIN.lonMax + 1e-9);
-    expect(t.bbox.latMax).toBeLessThanOrEqual(DOMAIN.latMax + 1e-9);
-    expect(t.bbox.lonMin).toBeGreaterThanOrEqual(DOMAIN.lonMin - 1e-9);
-    expect(t.bbox.latMin).toBeGreaterThanOrEqual(DOMAIN.latMin - 1e-9);
+  it('clamps the centre so the view never leaves real display context', () => {
+    const t = computeViewTransform(view(20, 20, 2), 1.6);
+    expect(t.bbox.lonMax).toBeLessThanOrEqual(DISPLAY_CONTEXT_DOMAIN.lonMax + 1e-9);
+    expect(t.bbox.latMax).toBeLessThanOrEqual(DISPLAY_CONTEXT_DOMAIN.latMax + 1e-9);
+    expect(t.bbox.lonMin).toBeGreaterThanOrEqual(DISPLAY_CONTEXT_DOMAIN.lonMin - 1e-9);
+    expect(t.bbox.latMin).toBeGreaterThanOrEqual(DISPLAY_CONTEXT_DOMAIN.latMin - 1e-9);
   });
 
   it('containment outranks MAX_ZOOM on hyper-wide canvases', () => {
-    // aspect 13 > metricX * MAX_ZOOM (~12.45): the cover-fit floor exceeds
+    // Extreme aspect pushes the context cover-fit floor above MAX_ZOOM;
     // MAX_ZOOM, and the view must still stay inside the domain.
-    const t = computeViewTransform(view(0, 0, 4), 13);
-    expect(t.bbox.lonMin).toBeGreaterThanOrEqual(DOMAIN.lonMin - 1e-9);
-    expect(t.bbox.lonMax).toBeLessThanOrEqual(DOMAIN.lonMax + 1e-9);
-    expect(t.bbox.lonMax - t.bbox.lonMin).toBeCloseTo(20, 6);
+    const t = computeViewTransform(view(0, 0, 4), 30);
+    expect(t.bbox.lonMin).toBeGreaterThanOrEqual(DISPLAY_CONTEXT_DOMAIN.lonMin - 1e-9);
+    expect(t.bbox.lonMax).toBeLessThanOrEqual(DISPLAY_CONTEXT_DOMAIN.lonMax + 1e-9);
+    expect(t.bbox.lonMax - t.bbox.lonMin).toBeCloseTo(35, 6);
   });
 
   it('clamps zoom to the cover-fit minimum and MAX_ZOOM', () => {
     const wide = computeViewTransform(view(0, 0, 0.2), 2.0);
-    // Under-zoom clamps to cover-fit: canvas fully covered by domain data.
-    expect(wide.bbox.lonMax - wide.bbox.lonMin).toBeCloseTo(20, 6);
+    // Under-zoom clamps to cover-fit: canvas stays covered by context data.
+    expect(wide.bbox.lonMax - wide.bbox.lonMin).toBeCloseTo(35, 6);
     const deep = computeViewTransform(view(0, 0, 50), 1.6);
     // Over-zoom clamps to MAX_ZOOM: view height = 12/MAX_ZOOM degrees.
     expect(deep.bbox.latMax - deep.bbox.latMin).toBeCloseTo(12 / MAX_ZOOM, 6);
@@ -166,11 +168,11 @@ describe('camera view transform', () => {
     // Panning far past the edge clamps once the transform is derived.
     const vFar = panByPixels(v0, t0, 1e7, 0, w, h);
     const tFar = computeViewTransform(vFar, aspect);
-    expect(tFar.bbox.lonMax).toBeLessThanOrEqual(DOMAIN.lonMax + 1e-9);
+    expect(tFar.bbox.lonMax).toBeLessThanOrEqual(DISPLAY_CONTEXT_DOMAIN.lonMax + 1e-9);
   });
 
   it('viewStateOf recovers the clamped state a transform encodes', () => {
-    const requested = view(0.95, 0.9, 2.5); // centre gets clamped
+    const requested = view(20, 20, 2.5); // centre gets clamped
     const t = computeViewTransform(requested, 1.7);
     const clamped = viewStateOf(t);
     expect(clamped.zoom).toBeCloseTo(2.5, 12);

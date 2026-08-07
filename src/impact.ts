@@ -28,8 +28,7 @@ import {
   RAINBAND_AZIMUTHAL_MEAN,
   RAINBAND_INNER_FULL_Q,
   RAINBAND_INNER_Q,
-  RAINBAND_OUTER_FADE_Q,
-  RAINBAND_OUTER_Q,
+  rainbandOuterBounds,
 } from './rainband-profile';
 import {
   DEFAULT_RAIN_ACCUMULATION_WINDOW,
@@ -402,7 +401,8 @@ export class ImpactTracker {
       s.rainOffsetEastKm /
         (111 * Math.max(0.2, Math.cos((storm.lat * Math.PI) / 180)));
     const rmwKm = Math.max(8, s.rmwKm);
-    const outerKm = Math.min(500, rmwKm * RAINBAND_OUTER_Q);
+    const rainbandBounds = rainbandOuterBounds(rmwKm);
+    const outerKm = rainbandBounds.outerKm;
 
     // Cell footprint in grid units around the rain centre.
     const kmPerRow = ((DOMAIN.latMax - DOMAIN.latMin) * 111) / this.ny;
@@ -431,7 +431,7 @@ export class ImpactTracker {
           const bandEnvelope =
             smoothstep(RAINBAND_INNER_Q, RAINBAND_INNER_FULL_Q, q) *
             (1 -
-              smoothstep(RAINBAND_OUTER_FADE_Q, RAINBAND_OUTER_Q, q));
+              smoothstep(rainbandBounds.fadeQ, rainbandBounds.outerQ, q));
           const index = row * this.nx + col;
           const onLand = this.land[index] === 1;
           const rateMmH =

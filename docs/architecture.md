@@ -31,7 +31,7 @@ flowchart TD
   end
 
   subgraph assets["public/data/ (self-describing WIWB .bin + JSON)"]
-    BINS["terrain.bin · env.bin · ocean.bin · flowacc.bin<br/>env_&lt;event&gt;.bin · steering_&lt;event&gt;.bin"]
+    BINS["terrain.bin · context-terrain.bin · env.bin · ocean.bin · flowacc.bin<br/>env_&lt;event&gt;.bin · steering_&lt;event&gt;.bin"]
     JSONS["genesis.json · tracks.json · scenarios.json<br/>satellite/ manifest + frames"]
   end
 
@@ -87,7 +87,8 @@ flowchart TD
 
 Notes verified in code:
 
-- The browser loads `terrain.bin`, `env.bin`, `ocean.bin`, `flowacc.bin`,
+- The browser loads `terrain.bin`, presentation-only `context-terrain.bin`,
+  `env.bin`, `ocean.bin`, `flowacc.bin`,
   `genesis.json`, `tracks.json`, `scenarios.json` progressively (the
   `MANIFEST` list in `main.ts`); event bins (`env_gonu.bin`, ...) load on
   scenario switch.
@@ -108,13 +109,16 @@ Notes verified in code:
 |---|---|---|
 | `types.ts` | The shared contract surface between sim, render, ui, and data builders. Interfaces, enums, and a few shared constants (`DType`, `MUSCAT`, `AFTERMATH_FADE_MS`); no runtime logic. | `StormState`, `SpawnParams`, `FrameState`, `RenderLayer`, `SimEngine`, `EnvSampler`, `ParsedBin`, `BinLayer`, `EnvSamplingMode` |
 | `grid.ts` | THE coordinate-convention owner: latlon ↔ grid cell ↔ clip space, wind m/s → deg/h, distances. Inline coordinate math elsewhere is a bug. Its clip space is WORLD space (domain edges at ±1) — camera-independent. | `DOMAIN` (50–70°E, 15–27°N), `latLonToCell`, `latLonToClip`, `offsetKm`, `greatCircleKm`, `windToDegPerHour` |
-| `camera.ts` | The ONE world→NDC view transform (pan/zoom camera, UX v2 phase 2). Pure math: cover-fit metric-correct view bbox clamped inside the domain, screen↔geo composition, anchor zoom, pan. Presentation-only — never read by sim, recorded output, or calibration. | `ViewState`, `ViewTransform`, `computeViewTransform`, `latLonToScreen`, `screenToLatLon`, `zoomAboutAnchor`, `panByPixels`, `HOME_VIEW`, `MAX_ZOOM`, `viewKey`, `viewStateOf` |
+| `display-domain.ts` | The presentation-context contract generated from `config/display-domain.json`: larger camera bbox/grid, sidecar path, and explicit sim-raster → context-raster UV mapping. It does not redefine `grid.ts` `DOMAIN` or any physics input. | `DISPLAY_CONTEXT_DOMAIN`, `DISPLAY_CONTEXT_GRID`, `DISPLAY_CONTEXT_ASSET_PATH`, `rasterUvTransform` |
+| `domain-clip.ts` | Converts the geographic simulation-validity bbox to WebGL and Canvas presentation clips while leaving offscreen `DOMAIN` state targets untouched. | `domainScissorRect`, `domainCanvasRect`, `PixelRect` |
+| `camera.ts` | The ONE world→NDC view transform (pan/zoom camera, UX v2 phase 2). Pure math: cover-fit metric-correct view bbox clamped inside the display context, screen↔geo composition, anchor zoom, pan. Presentation-only — never read by sim, recorded output, or calibration. | `ViewState`, `ViewTransform`, `computeViewTransform`, `latLonToScreen`, `screenToLatLon`, `zoomAboutAnchor`, `panByPixels`, `HOME_VIEW`, `MIN_ZOOM`, `MAX_ZOOM`, `viewKey`, `viewStateOf` |
 | `camera-gestures.ts` | Pointer/wheel/keyboard state machine for the camera: pan past 8 px, two-pointer pinch, wheel anchor zoom, arrow/±/h keys. Pure controller; main.ts arbitrates it against tap-to-spawn and the touch probe. | `CameraGestureController`, `PAN_THRESHOLD_PX` |
 | `rng.ts` | Seeded determinism + the shareable-storm URL hash. Never `Math.random()` in sim code. | `mulberry32`, `makeRng`, `randomSeed`, `readHash`/`encodeHash`/`writeHash` |
 | `category.ts` | Secondary Saffir–Simpson comparison palette for legacy diagnostics and track colours. | `CATEGORIES`, `stormCategory`, `categoryRgba`, `intensityFraction` |
 | `wind-conventions.ts` | North Indian Ocean regional classes plus explicit simulator wind averaging, height, exposure, measure, source, and conversion metadata. | `SIMULATED_WIND_CONVENTION`, `NORTH_INDIAN_OCEAN_CATEGORIES`, `northIndianOceanClassification` |
 | `product-identity.ts` | Pure product-mode, model-valid-time, observation-sync, and degraded-input boundary used by the permanent UI identity. | `buildProductIdentity`, `modelValidTimeIso`, `requiresObservationAcknowledgement` |
-| `rainband-profile.ts` | The one spatial contract for the three rain products—simulated radar, land/wadi rain rendering, and the impact ledger—plus the minimum precipitating-cloud support in simulated IR. Its 0.68 mean is an internal-consistency value, not observational validation. | `rainbandSpiral`, `RAINBAND_AZIMUTHAL_MEAN`, envelope/spiral constants |
+| `rainband-profile.ts` | The one spatial contract for simulated radar, land/wadi rain rendering, the impact ledger, and minimum precipitating-cloud support in simulated IR. Its 0.68 mean and 500 km outer cap are internal-consistency values, not observational validation. | `rainbandSpiral`, `rainbandOuterBounds`, envelope/spiral constants |
+| `radar-reflectivity.ts` | Presentation-only Marshall–Palmer transform, one shared physical colour-stop table/legend/CSS ramp, and the bounded sub-grid echo-coverage contract. | `rainRateToDbz`, `RADAR_DBZ_STOPS`, `radarBandCoverage`, `radarCssGradient` |
 | `tokens.ts` | The ONE design-token source: map palette + windy-grade chrome tokens (panel glass, radii, typography colours) mirrored as CSS custom properties and normalized Float32 shader uniforms. | `TOKENS`, `uniform`, `injectCssVars`, `SPACING_UNIT`, `RADIUS`, `PANEL_GLASS` |
 
 ### src/ — data loading and sampling
@@ -215,20 +219,20 @@ Notes verified in code:
 
 | file | responsibility | key exports |
 |---|---|---|
-| `index.ts` | The render facade implementing the public `RenderLayer` contract; owns layer construction, GPU texture bundle, and per-frame composition in luminance order: terrain → observed satellite → env glow → simulated/observed radar → rain → wind/particles → ghosts → track. | `RenderPipeline`, `createRenderer`, `createRenderLayers`, `RenderResources` |
+| `index.ts` | The render facade implementing the public `RenderLayer` contract; owns layer construction, GPU texture bundle (including the optional context terrain), and per-frame composition in luminance order: terrain → satellite/environment → simulated/observed radar → model rain → selected wind flow → ghosts → track. Generic storm particles are not laid over diagnostic products. Final weather composites are clipped to the simulation `DOMAIN`; offscreen state passes are never screen-scissored. | `RenderPipeline`, `createRenderer`, `createRenderLayers`, `RenderResources`, `radarPresentation` |
 | `context.ts` | Internal seam: the facade derives a richer `DrawCtx` (interpolated centre in clip space, env at storm, aftermath fade, texture bundle) once per frame for the layer modules. Not exported to other builders. | `DrawCtx`, `GpuTextures`, `RenderModule`, `EnvAtStorm` |
 | `gl-utils.ts` | Thin WebGL2 helpers: program compile/link with loud errors, fullscreen quad VAO, render targets with half-float → UNSIGNED_BYTE fallback. | `makeProgram`, `makeQuadVao`, `makeRenderTarget`, `probeCaps` |
 | `textures.ts` | Turns decoded `BinLayer`s into R8/R16F GPU textures; resolves layer names via candidate lists; plane interpolation helpers. | `buildElevationTex`, `buildR8Tex`, `pickLayer`, `planeOf`, `environmentPlaneInterpolation`, `SST_MIN_C`/`SST_MAX_C` |
 | `storm-radii.ts` | Derives separate render scales from storm structure: inner-core `rMax` from RMW and cloud-canopy `rCanopy` from outer size alone. Consumed by the simulated-infrared environment pass. | `stormRenderRadii`, `StormRenderRadii`, `RENDER_RADIUS_FLOOR` |
 | `precipitating-cloud.ts` | Shared displaced rain centre and minimum cloud-support response used to keep simulated IR, radar, and the render-side rain accumulator spatially aligned without coupling broad canopy morphology to rain physics. The recorded impact ledger retains its stable displacement path. | `rainCenterClip`, `precipitatingCloudSupport`, support constants |
-| `terrain.ts` | Opaque instrument base: hillshaded land + ocean depth tint, fullscreen pass, all colours token uniforms. | `TerrainLayer` |
+| `terrain.ts` | Opaque instrument base: real GMRT regional relief/bathymetry across the display context, the higher-detail simulation terrain inside `DOMAIN`, physically spaced multi-scale hillshade, antialiased 500 m depth contours, and a subtle data-validity boundary. All colours remain token uniforms. | `TerrainLayer` |
 | `env.ts` | GPU weather-map pass: SST glow, scalar env modes, simulated infrared with independent CDO/cirrus morphology plus rain-aligned cloud support (explicitly a proxy, not satellite data), and rain-mode base darkening. Mode/palette tables per `WeatherLayerId`. | `EnvLayer` |
 | `satellite.ts` | Observed satellite image pass; pixels stay isolated from model physics. | `ObservedSatelliteLayer` |
-| `radar.ts` | Reflectivity-style display of the simulated eyewall and spiral rainbands. | `RadarLayer` |
+| `radar.ts` | Model-derived reflectivity display: unchanged shared eye/band rain rates become dBZ colour, while seeded kilometre-scale texture controls only explicitly labelled sub-grid coverage. Uses the shared 500 km rainband cap and never substitutes for missing observed pixels. | `RadarLayer` |
 | `observed-radar.ts` | Provider-alpha-preserving fullscreen pass for the selected timestamped radar mosaic, plus an instrument hatch driven by the separate provider coverage mask. No thresholding, reflectivity conversion, or feedback into rain physics. | `ObservedRadarLayer` |
 | `rain.ts` | Orographic rain accumulation + wadi lighting on a half-res ping-pong render target; in-shader decay + routed transport. | `RainLayer` |
 | `wind.ts` | Windy-style full-map wind flow: ~3k particles through baked steering + the shared Holland vortex, fading trails. Decorative; fixed private RNG seed. | `WindLayer` |
-| `particles.ts` | The storm as a satellite spiral: 8k CPU-advected particles through the shared vortex, aspect-corrected, downshear smear. | `ParticleLayer` |
+| `particles.ts` | Legacy generic storm-swarm module retained in source but intentionally not composited over diagnostic products. | `ParticleLayer` |
 | `vortex.ts` | THE analytic Holland vortex, defined once for two consumers: a TS function for CPU advection and a GLSL string pasted into the rain shader, so rain and spiral never disagree. | `vortexWind`, `hollandSpeed`, `VORTEX_GLSL`, `VortexParams` |
 | `track.ts` | Live storm track + intensity halo on the 2D overlay; the prefers-reduced-motion stand-in for the particle swarm; aftermath fade. | `TrackLayer` |
 | `ghosts.ts` | Historic IBTrACS ghost tracks on the 2D overlay: faint, static, drawn below the live track. | `GhostLayer` |
@@ -304,7 +308,7 @@ terminates the worker.
 | Add a historical event/scenario | `bake/event_catalog.py` (frozen catalogue), rebake `env_<id>.bin`/`steering_<id>.bin` + `public/data/scenarios.json`, shape validated by `src/scenarios.ts` |
 | Change impact scoring, flood tiers, city list | `src/impact.ts` (`ImpactTracker`, `floodRiskTier`, `IMPACT_CITIES`) |
 | Change how impact is presented (board layout, headline copy, ranking) | `src/impact-board.ts` (model + view), fed from `src/ui.ts` `updateFlightRecorder`; skeleton in `index.html` `#impact-board`, styles in the `style.css` P1 section |
-| Change the map viewport, zoom limits, or camera gestures | `src/camera.ts` (view math: cover-fit, clamps, `MAX_ZOOM`), `src/camera-gestures.ts` (input state machine), wiring + gesture arbitration in `src/main.ts`. Shaders receive it as the `u_view` vec4 (`VIEW_QUAD_VS` in `src/render/gl-utils.ts`); offscreen domain passes bind `IDENTITY_VIEW` |
+| Change the map viewport, display-context bounds, zoom limits, or camera gestures | `config/display-domain.json` + `src/display-domain.ts` (presentation extent), `src/camera.ts` (view math: cover-fit, clamps, `MIN_ZOOM`/`MAX_ZOOM`), `src/camera-gestures.ts` (input state machine), wiring + gesture arbitration in `src/main.ts`. Shaders receive it as the `u_view` vec4 (`VIEW_QUAD_VS` in `src/render/gl-utils.ts`); offscreen domain passes bind `IDENTITY_VIEW`. Do not change `grid.ts` `DOMAIN` without a separately versioned physics/data migration |
 | Change region boundaries, wadi names, or the worst-hit block | `bake/bake_regions.py` (Natural Earth governorates + HydroSHEDS basins → `regions.bin`/`regions.json`, `data:regions[:check]`), aggregation in `src/impact.ts` (`setRegions`, `RegionRainSummary`), block rendering in `src/impact-board.ts` + `index.html` `#impact-board-regions` |
 | Change rain accumulation windows or scales | `src/rain-accumulation.ts`; ring integration in `src/impact.ts`; upload normalization in `src/render/index.ts` |
 | Change the observed-radar provider boundary | `src/radar-observations.ts` (manifest/tile validation + reprojection), `src/main.ts` (wall-clock transport/provenance), `src/render/observed-radar.ts` (display-only pass) |

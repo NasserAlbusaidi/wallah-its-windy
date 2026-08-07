@@ -33,22 +33,43 @@ shipping fake RH. The four `fetch_*` scripts require `cdsapi`, which is not in
 `requirements.txt` (the bake itself is offline); install it into the venv
 before fetching.
 
-## Outputs (default bake: ~6.7 MB raw, budget ≤ 7 MB)
+## Outputs (default runtime set: ~7.7 MiB raw, budget ≤ 8.5 MiB)
 
 | file | layers | grid | source |
 |------|--------|------|--------|
 | `terrain.bin` | `elev` (int16 m), `landmask` (uint8) | 1040×668 (~2 km) | GMRT (real bathy+topo) |
+| `context-terrain.bin` | `elev` (int16 m), `landmask` (uint8) | 875×550 (0.04°) | GMRT (real regional bathy+topo; presentation only) |
 | `env.bin` | `sst_MM`,`u_MM`,`v_MM`,`shr_MM`,`shu_MM`,`shv_MM`,`rh_MM`,`ohc_MM` × 7 months | 40×24 (0.5°) | OISST + ERA5 + WOA23 |
 | `flowacc.bin` | `flowacc` (uint16 log), `flowdir` (uint8 D8), `travmin` (uint8 minutes), `basin` (uint16 compatibility) | 1040×668 | HydroSHEDS v1.1 ACC+DIR |
 | `genesis.json` | `[{lat,lon}]` | — | IBTrACS North Indian |
 | `tracks.json` | ten observed ghost-track polylines | — | IBTrACS North Indian |
 
+### Presentation-only regional terrain context
+
+`context-terrain.bin` is a separately reproducible GMRT sidecar for the larger
+display box declared in `config/display-domain.json` (currently 45–80° E,
+8–30° N at 875×550, or 0.04° cells):
+
+```bash
+npm run data:context-terrain
+npm run data:context-terrain:check
+```
+
+It carries only `elev` and `landmask`, and is used for real relief/bathymetry
+outside the fixed 50–70° E, 15–27° N simulation box. It does **not** widen the
+physics domain, repeat weather edge texels, or imply forcing coverage. The
+configuration id (`arabian-sea-context-v1`) versions the bbox/grid contract;
+change the id whenever that contract changes. The raw GMRT SHA-256 is pinned in
+the same contract and verified on every bake. The source NetCDF is cached under
+`data/raw/`, while the compact WIWB output is committed under `public/data/` and
+covered by the static asset hash manifest.
+
 Opt-in bakes commit more under `public/data/` (~26 MB total as committed): ten
 `env_<event>.bin` + `scenarios.json` (event bake, below), ten
 `steering_<event>.bin` (`npm run data:hf3:steering`), `ocean.bin` + `ocean.json`
 WOA23 temperature/salinity profiles (`npm run data:hf2a:profiles`), and
-`satellite/manifest.json` (satellite frames, below). The ≤ 7 MB budget applies
-to the five default files only.
+`satellite/manifest.json` (satellite frames, below). The ≤ 8.5 MiB budget applies
+to the six default runtime files listed above.
 
 The physical-structure calibration subset is a separate offline artifact under
 `calibration/data/`; it never ships in `public/` or the browser bundle. Rebuild

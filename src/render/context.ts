@@ -42,6 +42,10 @@ export interface GpuTextures {
   terrainGrid: GridSpec | null;
   elev: WebGLTexture | null;
   land: WebGLTexture | null;
+  /** Presentation-only regional GMRT sidecar; never sampled by simulation/weather. */
+  contextTerrainGrid: GridSpec | null;
+  contextElev: WebGLTexture | null;
+  contextLand: WebGLTexture | null;
   acc: WebGLTexture | null;
   basin: WebGLTexture | null;
   hasBasin: boolean;

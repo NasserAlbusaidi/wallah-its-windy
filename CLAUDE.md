@@ -65,11 +65,15 @@ self-describing `.bin` assets the browser loads.
   recorded output.
 - The pan/zoom camera (`src/camera.ts` + `src/camera-gestures.ts`) is
   presentation-only: `grid.ts` clip space stays domain-fixed WORLD space
-  (edges at ±1) and the camera is an affine world→NDC view applied at the
-  screen boundary. Sim, recorded output, calibration, and offscreen state
-  passes (cloud-memory, OHC blend, rain accumulator update — they bind
-  `IDENTITY_VIEW`) never read it. Never make `latLonToClip`/`clipToLatLon`
-  camera-aware — realism/fidelity/impact all consume them.
+  (the 50–70°E, 15–27°N simulation edges are ±1) and the camera is an affine
+  world→NDC view applied at the screen boundary. `display-domain.ts` may clamp
+  that camera to the larger 45–80°E, 8–30°N presentation context, but it must
+  never enlarge the physics domain. Sim, recorded output, calibration, and
+  offscreen state passes (cloud-memory, OHC blend, rain accumulator update —
+  they bind `IDENTITY_VIEW`) never read the display context. Weather final
+  composites must reject/clip pixels outside `DOMAIN`; never make
+  `latLonToClip`/`clipToLatLon` camera-aware — realism/fidelity/impact all
+  consume them.
 - The URL-hash format is a frozen compatibility contract: a climatology storm
   must encode to the exact legacy `lat=…&lon=…&month=…&seed=…` string; optional
   keys (the scenario `env` key) append validated and last, and unknown values

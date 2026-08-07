@@ -56,7 +56,9 @@ seed)` — the seed rides in the URL hash, so storms are shareable. The renderer
 interpolates between fixed steps; slow-mo near the coast is a pure timescale knob
 and never touches determinism.
 
-Unified domain everywhere: **50–70°E / 15–27°N**.
+Simulation/data domain: **50–70°E / 15–27°N**. The map can show a wider,
+presentation-only **45–80°E / 8–30°N** GMRT terrain/bathymetry context; weather,
+physics, impacts, and verification remain visibly bounded to the simulation box.
 
 ## Dev commands
 
@@ -73,7 +75,10 @@ npm run profile:ensemble # 20/40/80-member steady-state benchmark
 
 ## Controls
 
-- Click open water to spawn a storm.
+- Click open water inside the outlined simulation region to spawn a storm.
+- Pan with drag or arrow keys; zoom with wheel/trackpad, pinch, the on-map −/+
+  controls, or keyboard −/+. The home control (or H) restores the full regional
+  context. Zooming over a marker or overlay remains map-active.
 - Hover the chart for modeled surface wind, SST, humidity, shear, OHC, and
   plane-aligned ERA5 200-hPa upper wind at the cursor, plus exact millimetres from the selected simulated-rain window. Use
   **pin** to hold the reading; on touch, long-press the chart. The card identifies
@@ -156,7 +161,7 @@ Its shader combines multiscale storm-relative turbulence, an organization- and
 intensity-dependent eye and central overcast, convective cells tied to the
 separated rain rates, humidity-limited spiral bands, and a canopy displaced and
 eroded by the sampled deep-layer shear vector. The same generated cloud field
-adds restrained context to terrain, wind, rain-radar, and storm-total rainfall;
+adds restrained context to wind, rain-radar, and storm-total rainfall;
 it deliberately stays off SST, RH, OHC, and shear so those diagnostic fields
 remain readable. The field evolves with simulated storm time and never feeds
 back into the physics.
@@ -176,8 +181,12 @@ The rain view maps the separated simulated rain rates through a
 Marshall–Palmer-style `Z = 200 R^1.6` transform and a
 reflectivity palette; it follows the
 [NWS reflectivity concept](https://training.weather.gov/nwstc/NEXRAD/RADAR/3-1.htm)
-but is not a radar observation. Its accumulation companion integrates those
-same rates on a fixed 0.1° bookkeeping grid. A bounded 96-step ring preserves
+but is not a radar observation. Colour is the unchanged model-derived dBZ proxy;
+opacity is deterministic sub-grid echo coverage, so broad parametric rainbands
+read as broken arcs/cells rather than observed-looking solid annuli. Radar, IR
+rain support, render-side rain, and the impact ledger share one 500 km maximum
+outer-rain radius. Its accumulation companion integrates those same rates on a
+fixed 0.1° bookkeeping grid. A bounded 96-step ring preserves
 the trailing 24 hours, so changing among 1/3/6/24-hour windows is deterministic
 and changing the display never changes storm physics or storm-total impact
 accounting.
@@ -473,7 +482,7 @@ src/
     context.ts        internal DrawCtx/GPU-texture seam for layers
     gl-utils.ts       WebGL2 program, quad, render-target helpers
     textures.ts       decoded bin layers -> GPU textures
-    terrain.ts        hillshaded land + ocean-depth base pass
+    terrain.ts        physically spaced hillshade + antialiased depth contours
     env.ts            GPU weather-map pass (scalar fields + IR proxy)
     cloud-noise.ts    deterministic tileable noise for simulated clouds
     satellite.ts      observed satellite image pass, physics-isolated
@@ -481,7 +490,7 @@ src/
     observed-radar.ts display-only observed radar texture pass
     rain.ts           rain accumulation + wadi lighting (ping-pong target)
     wind.ts           Windy-style full-map wind flow (particles + trails)
-    particles.ts      storm spiral particle swarm
+    particles.ts      legacy storm swarm module (not composited over products)
     vortex.ts         THE shared analytic Holland vortex (TS + GLSL)
     track.ts          live track polyline + intensity halo overlay
     ghosts.ts         faint historic IBTrACS track overlay

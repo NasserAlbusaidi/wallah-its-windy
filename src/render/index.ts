@@ -28,10 +28,12 @@
  * Either way the facade owns every GPU texture (built from the ParsedBins — the
  * only place that knows the right internal formats; FrameState.envTextures is
  * intentionally unused), clears BOTH surfaces when it draws, and composites in
- * luminance order: terrain (opaque) -> SST/genesis glow -> rain wadi glow ->
- * particles -> track+halo on the overlay (ui ripples land on top afterwards).
- * ui.ts confirms this division: "the facade owns the overlay... draws the track"
- * and "the genesis-zone glow is the render facade's job."
+ * luminance order: terrain (opaque) -> diagnostic weather ->
+ * wind flow where selected -> track+halo on the overlay (ui ripples land on top
+ * afterwards). The old generic storm-particle swarm is deliberately not
+ * composited over diagnostic products because it obscures their values.
+ * ui.ts confirms this division: the facade owns the track overlay while UI
+ * interaction hints are added last.
  */
 
 import { AFTERMATH_FADE_MS } from '../types';
@@ -46,6 +48,10 @@ import type {
 } from '../types';
 import { TOKENS } from '../tokens';
 import { DOMAIN, latLonToClip } from '../grid';
+import {
+  DISPLAY_CONTEXT_ASSET_PATH,
+  matchesDisplayContextGrid,
+} from '../display-domain';
 import { parseBin } from '../loader';
 import { probeCaps } from './gl-utils';
 import type { GlCaps } from './gl-utils';
@@ -68,8 +74,8 @@ import { upperWindLayers } from '../upper-sampler';
 import { sampleLayerBilinear } from '../raster-sampler';
 import type { DrawCtx, EnvAtStorm, GpuTextures } from './context';
 import { TerrainLayer } from './terrain';
+import { domainCanvasRect, domainScissorRect } from '../domain-clip';
 import { EnvLayer } from './env';
-import { ParticleLayer } from './particles';
 import { WindLayer } from './wind';
 import { RainLayer } from './rain';
 import { RadarLayer } from './radar';
@@ -102,6 +108,8 @@ import { cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
 export interface RenderResources {
   /** terrain.bin + flowacc.bin merged: elev + landmask + flowacc + basin layers. */
   terrain: ParsedBin | null;
+  /** Regional GMRT display context. Presentation-only; optional during progressive load. */
+  contextTerrain?: ParsedBin | null;
   /** env.bin: sst/steering/shear magnitude+vector layers (MM = 04..10). */
   env: ParsedBin | null;
   /** upper.bin: plane-aligned ERA5 u200/v200 climatology sidecar. */
@@ -110,6 +118,28 @@ export interface RenderResources {
   genesis: LatLon[];
   /** tracks.json historic-storm polylines (ghost tracks, C7). Empty when absent. */
   tracks: GhostPolyline[];
+}
+
+export interface RadarPresentation {
+  observed: boolean;
+  simulated: boolean;
+}
+
+/**
+ * Resolve radar presentation without silently crossing the observation/model
+ * boundary. An observed request with no frame stays empty; it never falls back
+ * to simulated reflectivity or the model rain-accumulation composite.
+ */
+export function radarPresentation(
+  layer: WeatherLayerId,
+  source: RadarSourceMode,
+  hasObservedFrame: boolean,
+): RadarPresentation {
+  if (layer !== 'rain') return { observed: false, simulated: false };
+  if (source === 'observed') {
+    return { observed: hasObservedFrame, simulated: false };
+  }
+  return { observed: false, simulated: true };
 }
 
 const ELEV_NAMES = ['elev', 'elevation', 'dem', 'z'];
@@ -161,6 +191,9 @@ function emptyGpu(): GpuTextures {
     terrainGrid: null,
     elev: null,
     land: null,
+    contextTerrainGrid: null,
+    contextElev: null,
+    contextLand: null,
     acc: null,
     basin: null,
     hasBasin: false,
@@ -224,7 +257,6 @@ export class RenderPipeline implements RenderLayer {
   private cloudMemory = new CloudMemoryPass();
   private satellite = new ObservedSatelliteLayer();
   private observedRadar = new ObservedRadarLayer();
-  private particles = new ParticleLayer();
   private wind = new WindLayer();
   private upperWind = new WindLayer('upper');
   private rain = new RainLayer();
@@ -240,6 +272,7 @@ export class RenderPipeline implements RenderLayer {
   private lastNowMs = -1;
   private contextLost = false;
   private terrainReadyMs = -1;
+  private contextTerrainReadyMs = -1;
   private glowReadyMs = -1;
 
   private deathMs: number | null = null;
@@ -276,7 +309,6 @@ export class RenderPipeline implements RenderLayer {
     this.cloudMemory.resize(this.width, this.height);
     this.satellite.resize(this.width, this.height);
     this.observedRadar.resize(this.width, this.height);
-    this.particles.resize(this.width, this.height);
     this.wind.resize(this.width, this.height);
     this.upperWind.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
@@ -289,6 +321,10 @@ export class RenderPipeline implements RenderLayer {
   draw(frame: FrameState): void {
     const gl = this.gl;
     if (!gl || this.contextLost) return;
+    // Recover from any previous layer exception before offscreen state passes.
+    // Screen-space scissoring is presentation-only and must never leak into a
+    // cloud-memory, OHC, rain, or trail framebuffer on the next frame.
+    gl.disable(gl.SCISSOR_TEST);
     this.syncEnvPlane(frame);
     this.syncRainAccum(frame);
     const ctx = this.buildCtx(frame);
@@ -306,6 +342,7 @@ export class RenderPipeline implements RenderLayer {
       );
     }
     const terrainFade = this.fadeSince(this.terrainReadyMs, ctx.nowMs);
+    const contextTerrainFade = this.fadeSince(this.contextTerrainReadyMs, ctx.nowMs);
     const glowFade = this.fadeSince(this.glowReadyMs, ctx.nowMs);
 
     // The facade owns both surfaces: clear the GL base and the overlay. (A second
@@ -315,10 +352,25 @@ export class RenderPipeline implements RenderLayer {
     const bg = TOKENS.oceanDeep.rgba01;
     gl.clearColor(bg[0], bg[1], bg[2], 1);
     gl.disable(gl.BLEND);
+    gl.disable(gl.SCISSOR_TEST);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     // Luminance order (back to front). Rain updates offscreen, then composites.
-    this.terrain.draw(ctx, this.gpu, terrainFade);
+    this.terrain.draw(ctx, this.gpu, terrainFade, contextTerrainFade);
+    // Every atmospheric/state texture below is valid only inside grid.ts
+    // DOMAIN. The camera may show a larger real-terrain context, so clip these
+    // passes instead of repeating their edge texels into unsupported geography.
+    // A one-pixel inset leaves the terrain shader's simulation boundary visible.
+    const weatherClip = domainScissorRect(ctx.view, this.width, this.height);
+    const applyWeatherClip = (): void => {
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(
+        weatherClip.x,
+        weatherClip.y,
+        weatherClip.width,
+        weatherClip.height,
+      );
+    };
     let observedWeight = 0;
     let simulatedWeight = 1;
     if (ctx.weatherLayer === 'infrared' && this.satellite.hasFrame()) {
@@ -336,36 +388,45 @@ export class RenderPipeline implements RenderLayer {
         observedWeight = 1 - simulatedWeight;
       }
     }
+    applyWeatherClip();
     this.satellite.draw(observedWeight, ctx.view);
+    // env.draw includes an earth-fixed OHC framebuffer pass. Its final shader
+    // rejects out-of-domain UVs, so do not apply a screen-space scissor while
+    // the offscreen target is bound.
+    gl.disable(gl.SCISSOR_TEST);
     this.env.draw(
       ctx,
       this.gpu,
       glowFade * simulatedWeight,
       this.cloudMemory.texture,
     );
-    const observedRadar =
-      ctx.weatherLayer === 'rain' &&
-      this.radarSource === 'observed' &&
-      this.observedRadar.hasFrame();
-    if (observedRadar) this.observedRadar.draw(0.94, ctx.view);
-    else this.radar.draw(ctx);
+    const radarMode = radarPresentation(
+      ctx.weatherLayer,
+      this.radarSource,
+      this.observedRadar.hasFrame(),
+    );
+    applyWeatherClip();
+    if (radarMode.observed) this.observedRadar.draw(0.94, ctx.view);
+    else if (radarMode.simulated) this.radar.draw(ctx);
+    // Rain accumulation is an earth-fixed DOMAIN target. Screen scissoring is
+    // invalid while its offscreen framebuffer is active; restore it only for
+    // the visible composite and the remaining presentation layers.
+    gl.disable(gl.SCISSOR_TEST);
     this.rain.update(ctx, this.gpu);
-    if (!observedRadar) this.rain.composite(ctx, this.gpu, terrainFade);
-    // The wind layer already renders the vortex flow, so the storm-spiral
-    // swarm yields to it (two swarms would double-draw the same wind field).
-    // Enhanced IR also owns its full cloud field; additive point particles on
-    // top would turn the satellite texture back into an illustrative spiral.
+    applyWeatherClip();
+    if (radarMode.simulated || ctx.weatherLayer !== 'rain') {
+      this.rain.composite(ctx, this.gpu, terrainFade);
+    }
+    gl.disable(gl.SCISSOR_TEST);
+    // Diagnostic layers own their pixels. Do not lay the generic white storm
+    // swarm over radar, terrain, or scalar fields; it obscures numeric colours
+    // and made the map look illustrative rather than operational.
     if (ctx.weatherLayer === 'wind') {
       this.wind.draw(ctx);
     } else if (ctx.weatherLayer === 'upper') {
       this.upperWind.draw(ctx);
-    } else if (
-      ctx.weatherLayer !== 'infrared' &&
-      !observedRadar &&
-      !ctx.reduced
-    ) {
-      this.particles.draw(ctx);
     }
+    gl.disable(gl.SCISSOR_TEST);
 
     if (this.overlay) {
       this.overlay.clearRect(0, 0, this.width, this.height);
@@ -373,8 +434,19 @@ export class RenderPipeline implements RenderLayer {
       this.ghosts.draw(ctx.view);
       // The ensemble wash sits between: brighter than the static ghosts,
       // below the live storm track it contextualizes (phase 4).
+      const overlayClip = domainCanvasRect(ctx.view, this.width, this.height);
+      this.overlay.save();
+      this.overlay.beginPath();
+      this.overlay.rect(
+        overlayClip.x,
+        overlayClip.y,
+        overlayClip.width,
+        overlayClip.height,
+      );
+      this.overlay.clip();
       this.ensemble.draw(ctx.view);
       this.track.draw(ctx); // ripples land on top when ui.drawOverlay runs after
+      this.overlay.restore();
     }
   }
 
@@ -392,7 +464,6 @@ export class RenderPipeline implements RenderLayer {
     this.cloudMemory.dispose();
     this.satellite.dispose();
     this.observedRadar.dispose();
-    this.particles.dispose();
     this.wind.dispose();
     this.upperWind.dispose();
     this.rain.dispose();
@@ -407,10 +478,35 @@ export class RenderPipeline implements RenderLayer {
   // --- data injection (mode A) ----------------------------------------------
 
   setResources(resources: RenderResources): void {
+    const previous = this.res;
     this.injected = true;
     this.res = resources;
-    this.rebuildAllTextures();
-    this.applyTracks(); // ghost polylines are CPU-side, not GL textures
+    const terrainChanged = previous.terrain !== resources.terrain;
+    const contextChanged = previous.contextTerrain !== resources.contextTerrain;
+    const environmentChanged =
+      previous.env !== resources.env || previous.upper !== resources.upper;
+    const genesisChanged = previous.genesis !== resources.genesis;
+    const tracksChanged = previous.tracks !== resources.tracks;
+
+    // Scenario switches replace environment resources but retain the two static
+    // terrain rasters. Updating only changed groups avoids a visible context
+    // fade/flicker and needless re-upload on every switch.
+    if (terrainChanged) this.applyTerrain();
+    if (contextChanged) this.applyContextTerrain();
+    if (environmentChanged) {
+      this.envPlane = -1;
+      this.envNextPlane = -1;
+      this.envPlaneMode = '';
+      this.upperPlane = null;
+      if (this.gl && this.gpu.rainAccum) {
+        this.gl.deleteTexture(this.gpu.rainAccum);
+        this.gpu.rainAccum = null;
+      }
+      this.accumVersion = -1;
+      this.applyEnv(0, 0, null);
+    }
+    if (genesisChanged) this.applyGenesis();
+    if (tracksChanged) this.applyTracks();
   }
 
   /** Ghost tracks are Canvas2D data (no GL state) — apply straight to the layer. */
@@ -478,7 +574,6 @@ export class RenderPipeline implements RenderLayer {
 
   /** Decorative workload only; deterministic physics and flight tapes are untouched. */
   setParticleBudget(count: number): void {
-    this.particles.setBudget(count);
     this.wind.setBudget(count);
     this.upperWind.setBudget(count);
   }
@@ -552,6 +647,10 @@ export class RenderPipeline implements RenderLayer {
     // Deliberate degraded mode-B boundary: upper.bin is not self-fetched here.
     // Mode A is the product path and injects its plane-aligned sidecar from main.
     await Promise.all([
+      this.fetchBin(DISPLAY_CONTEXT_ASSET_PATH).then((b) => {
+        this.res.contextTerrain = b;
+        this.applyContextTerrain();
+      }),
       this.fetchBin('data/terrain.bin').then((b) => {
         this.terrBin = b;
         this.mergeAndApplyTerrain();
@@ -628,7 +727,6 @@ export class RenderPipeline implements RenderLayer {
     this.observedRadar.init(gl);
     this.env.setSatellitePalette(this.satellitePalette);
     this.satellite.setPalette(this.satellitePalette);
-    this.particles.init(gl);
     this.wind.init(gl, this.caps);
     this.upperWind.init(gl, this.caps);
     this.rain.init(gl, this.caps);
@@ -641,7 +739,6 @@ export class RenderPipeline implements RenderLayer {
     this.env.resize(this.width, this.height);
     this.cloudMemory.resize(this.width, this.height);
     this.satellite.resize(this.width, this.height);
-    this.particles.resize(this.width, this.height);
     this.wind.resize(this.width, this.height);
     this.upperWind.resize(this.width, this.height);
     this.rain.resize(this.width, this.height);
@@ -670,6 +767,7 @@ export class RenderPipeline implements RenderLayer {
     this.gpu = emptyGpu();
     this.accumVersion = -1;
     this.applyTerrain();
+    this.applyContextTerrain();
     this.envPlane = -1;
     this.envNextPlane = -1;
     this.envPlaneMode = '';
@@ -682,7 +780,7 @@ export class RenderPipeline implements RenderLayer {
   private applyTerrain(): void {
     const gl = this.gl;
     const bin = this.res.terrain;
-    if (!gl || !bin) return;
+    if (!gl) return;
     const elevL = pickLayer(bin, ELEV_NAMES);
     const landL = pickLayer(bin, LAND_NAMES);
     const accL = pickLayer(bin, ACC_NAMES);
@@ -701,8 +799,13 @@ export class RenderPipeline implements RenderLayer {
     }
     this.gpu.elev = this.gpu.land = this.gpu.acc = this.gpu.basin = null;
     this.gpu.flowDir = this.gpu.travelMin = null;
+    this.gpu.terrainGrid = null;
     this.gpu.hasBasin = false;
     this.gpu.hasFlowRouting = false;
+    if (!bin) {
+      this.terrainReadyMs = -1;
+      return;
+    }
 
     const grid = elevL ?? landL ?? accL ?? flowDirL ?? travelL ?? basinL;
     if (grid) this.gpu.terrainGrid = { nx: grid.nx, ny: grid.ny, bbox: grid.bbox };
@@ -749,6 +852,47 @@ export class RenderPipeline implements RenderLayer {
     if ((this.gpu.elev || this.gpu.land) && this.terrainReadyMs < 0) this.terrainReadyMs = performance.now();
   }
 
+  /**
+   * Upload the presentation-only regional terrain sidecar. Its header must
+   * exactly match config/display-domain.json; rejecting a mismatched raster is
+   * safer than stretching or edge-clamping it into apparently real geography.
+   */
+  private applyContextTerrain(): void {
+    const gl = this.gl;
+    if (!gl) return;
+    for (const texture of [this.gpu.contextElev, this.gpu.contextLand]) {
+      if (texture) gl.deleteTexture(texture);
+    }
+    this.gpu.contextTerrainGrid = null;
+    this.gpu.contextElev = null;
+    this.gpu.contextLand = null;
+    this.contextTerrainReadyMs = -1;
+
+    const bin = this.res.contextTerrain;
+    if (!bin) return;
+    const elev = pickLayer(bin, ELEV_NAMES);
+    const land = pickLayer(bin, LAND_NAMES);
+    if (!elev || !land) {
+      console.warn('[render] context terrain missing elev/landmask; regional context disabled');
+      return;
+    }
+    if (!matchesDisplayContextGrid(elev) || !matchesDisplayContextGrid(land)) {
+      console.warn('[render] context terrain header does not match display-domain.json; regional context disabled');
+      return;
+    }
+
+    this.gpu.contextTerrainGrid = { nx: elev.nx, ny: elev.ny, bbox: elev.bbox };
+    this.gpu.contextElev = buildElevationTex(gl, elev);
+    this.gpu.contextLand = buildR8Tex(
+      gl,
+      land,
+      0,
+      (value) => (value > 0.5 ? 1 : 0),
+      gl.LINEAR,
+    );
+    this.contextTerrainReadyMs = performance.now();
+  }
+
   private applyEnv(
     plane: number,
     nextPlane: number,
@@ -756,15 +900,7 @@ export class RenderPipeline implements RenderLayer {
   ): void {
     const gl = this.gl;
     const bin = this.res.env;
-    if (!gl || !bin) return;
-    const n = envMonthNames(this.monthIndex);
-    const sstL = pickLayer(bin, [n.sst, 'sst']);
-    const rhL = pickLayer(bin, [n.rh, 'rh']);
-    const ohcL = pickLayer(bin, [n.ohc, 'ohc']);
-    const shearL = pickLayer(bin, [n.shr, 'shear', 'shr']);
-    const steerUL = pickLayer(bin, [n.u, 'u']);
-    const steerVL = pickLayer(bin, [n.v, 'v']);
-    const upper = upperWindLayers(this.res.upper, this.monthIndex);
+    if (!gl) return;
     for (const texture of [
       this.gpu.sst,
       this.gpu.sstNext,
@@ -795,6 +931,22 @@ export class RenderPipeline implements RenderLayer {
     this.gpu.steerV = null;
     this.gpu.steerVNext = null;
     this.gpu.upperUV = null;
+    this.gpu.envGrid = null;
+    this.gpu.envBlend = 0;
+    if (!bin) {
+      this.envPlane = plane;
+      this.envNextPlane = nextPlane;
+      this.upperPlane = upperPlane;
+      return;
+    }
+    const n = envMonthNames(this.monthIndex);
+    const sstL = pickLayer(bin, [n.sst, 'sst']);
+    const rhL = pickLayer(bin, [n.rh, 'rh']);
+    const ohcL = pickLayer(bin, [n.ohc, 'ohc']);
+    const shearL = pickLayer(bin, [n.shr, 'shear', 'shr']);
+    const steerUL = pickLayer(bin, [n.u, 'u']);
+    const steerVL = pickLayer(bin, [n.v, 'v']);
+    const upper = upperWindLayers(this.res.upper, this.monthIndex);
     if (sstL) {
       this.gpu.envGrid = { nx: sstL.nx, ny: sstL.ny, bbox: sstL.bbox };
       this.gpu.sst = buildR8Tex(
@@ -1013,6 +1165,8 @@ export class RenderPipeline implements RenderLayer {
     for (const t of [
       g.elev,
       g.land,
+      g.contextElev,
+      g.contextLand,
       g.acc,
       g.basin,
       g.flowDir,
@@ -1152,7 +1306,7 @@ export class RenderPipeline implements RenderLayer {
    * CPU steering sampler for the wind particle layer, reading the SAME
    * plane pair + blend the wind fill shader shows (kept fresh by
    * syncEnvPlane) so trails and fill never disagree mid-interpolation.
-   * Returns null before env.bin lands — the particles then ride vortex-only.
+   * Returns null before env.bin lands — wind flow then rides vortex-only.
    */
   private buildSteeringSampler():
     | ((lat: number, lon: number) => { u: number; v: number })

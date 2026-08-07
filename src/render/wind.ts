@@ -23,6 +23,7 @@ import { makeRng } from '../rng';
 import type { Rng } from '../rng';
 import { DOMAIN, clipToLatLon } from '../grid';
 import { INFLOW_RAD, vortexWind } from './vortex';
+import { domainScissorRect } from '../domain-clip';
 import {
   bindTex,
   makeProgram,
@@ -297,8 +298,18 @@ export class WindLayer implements RenderModule {
       ctx.reduced ||
       (this.fieldKind === 'upper' && !ctx.upperAt)
     ) return;
-    // Track the visible viewport in world coordinates (2% seed margin so
-    // particles drift IN from just offscreen; 4% kill margin outside that).
+    const weatherClip = domainScissorRect(ctx.view, this.width, this.height);
+    if (weatherClip.width <= 0 || weatherClip.height <= 0) {
+      // No supported forcing is visible. Do not sample a clamped edge field in
+      // presentation-only geography, and purge trails before a later pan home.
+      if (this.seeded) this.clearTrails();
+      this.seeded = false;
+      return;
+    }
+
+    // Track only the visible intersection with the simulation's WORLD-space
+    // [-1,1] box. Margins help particles drift in, but never authorize samples
+    // from the larger terrain-only display context.
     const v = ctx.view;
     const vminX = (-1 - v.offsetX) / v.scaleX;
     const vmaxX = (1 - v.offsetX) / v.scaleX;
@@ -307,16 +318,16 @@ export class WindLayer implements RenderModule {
     const mx = (vmaxX - vminX) * 0.02;
     const my = (vmaxY - vminY) * 0.02;
     this.seedRect = {
-      minX: vminX - mx,
-      maxX: vmaxX + mx,
-      minY: vminY - my,
-      maxY: vmaxY + my,
+      minX: Math.max(-1, vminX - mx),
+      maxX: Math.min(1, vmaxX + mx),
+      minY: Math.max(-1, vminY - my),
+      maxY: Math.min(1, vmaxY + my),
     };
     this.killRect = {
-      minX: vminX - 2 * mx,
-      maxX: vmaxX + 2 * mx,
-      minY: vminY - 2 * my,
-      maxY: vmaxY + 2 * my,
+      minX: Math.max(-1, vminX - 2 * mx),
+      maxX: Math.min(1, vmaxX + 2 * mx),
+      minY: Math.max(-1, vminY - 2 * my),
+      maxY: Math.min(1, vmaxY + 2 * my),
     };
     if (!this.seeded) this.seedAll();
     const dt = Math.max(0.001, ctx.dtSec);
@@ -362,6 +373,9 @@ export class WindLayer implements RenderModule {
     }
 
     // 2) Decay the trail buffer, then draw the new segments into it.
+    // A screen-space clip is only valid for the final default-framebuffer
+    // composite, never for this earth-fixed trail-state target.
+    gl.disable(gl.SCISSOR_TEST);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.trails.fbo);
     gl.viewport(0, 0, this.rtW, this.rtH);
     gl.enable(gl.BLEND);
@@ -411,7 +425,15 @@ export class WindLayer implements RenderModule {
       gl.getUniformLocation(this.compProg!, 'u_alpha'),
       0.9 * (ctx.demo ? 0.8 : 1),
     );
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(
+      weatherClip.x,
+      weatherClip.y,
+      weatherClip.width,
+      weatherClip.height,
+    );
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.disable(gl.SCISSOR_TEST);
     gl.bindVertexArray(null);
   }
 
@@ -421,6 +443,7 @@ export class WindLayer implements RenderModule {
     if (!gl || !this.trails) return;
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.trails.fbo);
     gl.viewport(0, 0, this.rtW, this.rtH);
+    gl.disable(gl.SCISSOR_TEST);
     gl.disable(gl.BLEND);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);

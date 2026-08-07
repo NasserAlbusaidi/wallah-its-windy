@@ -35,7 +35,14 @@ import {
   viewStateOf,
 } from './camera';
 import type { ViewTransform } from './camera';
-import { CameraGestureController } from './camera-gestures';
+import {
+  DISPLAY_CONTEXT_ASSET_PATH,
+  matchesDisplayContextGrid,
+} from './display-domain';
+import {
+  CameraGestureController,
+  normalizeWheelDelta,
+} from './camera-gestures';
 import { parseBin } from './loader';
 import type {
   BinLayer,
@@ -128,6 +135,7 @@ import {
   type RadarTimeline,
   type RadarTimelineFrame,
 } from './radar-observations';
+import { radarCssGradient } from './radar-reflectivity';
 import { createPointProbeReading } from './point-probe';
 import { sampleUpperWind, upperWindLayers } from './upper-sampler';
 import { resolveUpperWindMode } from './upper-runtime';
@@ -155,14 +163,14 @@ import {
   fetchPublicCycleManifest,
 } from './public-cycle';
 
-// Render facade. Composited passes in luminance order (terrain -> env glow ->
-// rain -> particles -> track), each with init/resize/draw/dispose, driven by main.
+// Render facade. Composited passes in luminance order (terrain -> weather ->
+// selected wind flow -> track), each with init/resize/draw/dispose, driven by main.
 // main resolves the module by a namespace probe (acquireRender) and PREFERS mode A
 // (createRenderer): main owns the single data-load path and injects the parsed
 // bins via setResources()/setMonth(), so the facade never self-fetches the same
 // four URLs (the double-download seam). It falls back to createRenderLayers (mode
-// B, self-sourcing) only if createRenderer is absent. Either way storm particles +
-// track render from FrameState.storm.
+// B, self-sourcing) only if createRenderer is absent. The track and selected
+// diagnostic flow render from FrameState.storm.
 import * as renderModule from './render';
 import type { CloudTape } from './render/cloud-memory';
 
@@ -208,8 +216,21 @@ const compareClear = must(document.getElementById('compare-clear') as HTMLButton
 const exportCard = must(document.getElementById('export-card') as HTMLButtonElement | null, '#export-card');
 const exportReplay = must(document.getElementById('export-replay') as HTMLButtonElement | null, '#export-replay');
 const mapFrame = must(document.getElementById('map-frame'), '#map-frame');
+const mapZoomOut = must(
+  document.getElementById('map-zoom-out') as HTMLButtonElement | null,
+  '#map-zoom-out',
+);
+const mapHome = must(
+  document.getElementById('map-home') as HTMLButtonElement | null,
+  '#map-home',
+);
+const mapZoomIn = must(
+  document.getElementById('map-zoom-in') as HTMLButtonElement | null,
+  '#map-zoom-in',
+);
 const layerButtons = must(document.getElementById('layer-buttons'), '#layer-buttons');
 const weatherLegend = must(document.getElementById('weather-legend'), '#weather-legend');
+weatherLegend.style.setProperty('--radar-gradient', radarCssGradient());
 const weatherLegendName = must(
   document.getElementById('weather-legend-name'),
   '#weather-legend-name',
@@ -455,6 +476,8 @@ let oceanBin: ParsedBin | null = null;
 let steeringBin: ParsedBin | null = null;
 /** Merged terrain+flowacc bin, retained so a scenario switch can re-inject it. */
 let mergedTerrainBin: ParsedBin | null = null;
+/** Presentation-only regional terrain, retained across scenario switches. */
+let contextTerrainBin: ParsedBin | null = null;
 const envSampler = makeEnvSampler(() => envBin);
 const pressureWindSampler = pressureWindSamplerFromBin(
   () => steeringBin,
@@ -551,7 +574,14 @@ try {
   const acquired = acquireRender(gl);
   layers = acquired.layers;
   renderCtrl = acquired.ctrl;
-  const emptyResources: RenderResourcesLike = { terrain: null, env: null, upper: null, genesis: [], tracks: [] };
+  const emptyResources: RenderResourcesLike = {
+    terrain: null,
+    contextTerrain: null,
+    env: null,
+    upper: null,
+    genesis: [],
+    tracks: [],
+  };
   for (const layer of layers) {
     try {
       if (layer === renderCtrl) {
@@ -600,6 +630,17 @@ function layoutMapFrame(): void {
 
 // --- Camera (presentation-only; never enters sim state or recorded output) --
 const cameraGestures = new CameraGestureController(HOME_VIEW);
+// Contacts must exist before the first resize() call so a relayout can always
+// invalidate pending tap/probe state before moving the map under the pointer.
+const mapTap = new TapGesture();
+let probeTouch: {
+  id: number;
+  startX: number;
+  startY: number;
+  latestX: number;
+  latestY: number;
+  timer: number;
+} | null = null;
 let lastRenderedViewKey = '';
 
 // Dev-only deterministic camera for headless visual QA (?camera=cx,cy,zoom).
@@ -628,6 +669,12 @@ function currentViewTransform(): ViewTransform {
 }
 
 function resize(): void {
+  // A viewport or responsive-layout change moves the map underneath active
+  // contacts. Invalidate every recognizer first so a later pointerup cannot
+  // pan, pin a probe, or spawn a fresh storm at the new geometry.
+  cameraGestures.cancelAll();
+  mapTap.cancelAll();
+  clearProbeTouch();
   layoutMapFrame();
   const profile = chooseRenderProfile({
     width: glCanvas.clientWidth,
@@ -654,6 +701,12 @@ function resize(): void {
       console.warn('[resize] render layer resize failed:', err);
     }
   }
+  // Feed the newly clamped aspect back immediately. Waiting for the next RAF
+  // leaves a short window where a fresh wheel/key gesture starts from the old
+  // aspect's camera state.
+  const view = currentViewTransform();
+  cameraGestures.reset(viewStateOf(view));
+  ui.setView(view);
   // DOM ghost labels are positioned in CSS px and do not auto-reproject like the
   // canvas layers — re-layout them on every resize so they track the map.
   ui.layoutMapOverlays();
@@ -725,6 +778,13 @@ async function loadSatelliteManifest(): Promise<void> {
 // loadWithProgress swallows a 404 and returns null, so a missing artifact cannot
 // brick the boot — the map simply assembles with whatever landed.
 const MANIFEST: LoadItem[] = [
+  {
+    url: asset(DISPLAY_CONTEXT_ASSET_PATH),
+    label: 'regional terrain context',
+    kind: 'bin',
+    key: 'contextTerrain',
+    weight: 2,
+  },
   { url: asset('data/terrain.bin'), label: 'terrain', kind: 'bin', key: 'terrain', weight: 3 },
   { url: asset('data/env.bin'), label: 'environment', kind: 'bin', key: 'env', weight: 2 },
   { url: asset('data/upper.bin'), label: 'upper winds', kind: 'bin', key: 'upper', weight: 1 },
@@ -902,9 +962,20 @@ async function loadAll(): Promise<void> {
   // Hand parsed data to its consumers. terrain's land mask sharpens land-click
   // detection + land decay; env.bin (when baked) drives the real sampler live;
   // genesis points drive the faint glow the UI draws on the overlay. Uploading
-  // terrain/env layers to render GPU textures is the unsettled render data seam
-  // (see build report) — not wired here; storm particles/track still render.
+  // the same parsed resources drive the render GPU textures and storm track.
   mergedTerrainBin = mergedTerrain(bins);
+  const contextCandidate = bins.get('contextTerrain') ?? null;
+  const contextElev = contextCandidate?.layers.get('elev');
+  const contextLand = contextCandidate?.layers.get('landmask');
+  contextTerrainBin =
+    contextCandidate &&
+    contextElev &&
+    contextLand &&
+    matchesDisplayContextGrid(contextElev) &&
+    matchesDisplayContextGrid(contextLand)
+      ? contextCandidate
+      : null;
+  if (!contextTerrainBin) ui.notifyContextError();
   ui.setLandMask(findLandMask(mergedTerrainBin));
   impact.setLandMask(findLandMask(mergedTerrainBin));
   impact.setRegions(bins.get('regions') ?? null, parsedRegionNames);
@@ -930,7 +1001,14 @@ async function loadAll(): Promise<void> {
   // bytes main just loaded feed BOTH the sim sampler and the GPU textures, so no
   // URL is fetched twice and no bin is dequantized twice (the double-load seam).
   const upperState = updateUpperWindLayerState();
-  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: envBin, upper: upperState.upper, genesis: genesisPoints, tracks: ghostTracks });
+  renderCtrl?.setResources?.({
+    terrain: mergedTerrainBin,
+    contextTerrain: contextTerrainBin,
+    env: envBin,
+    upper: upperState.upper,
+    genesis: genesisPoints,
+    tracks: ghostTracks,
+  });
 
   // First storm. A shared storm from the URL hash replays exactly; if it carries a
   // known scenario key, fetch that event bin BEFORE the first spawn so the replay
@@ -1363,7 +1441,14 @@ function applyEventEnv(
   monthSelect.value = String(scenario.monthIndex);
   monthSelect.disabled = true; // a historic event is pinned to its real month
   const upperState = updateUpperWindLayerState(scenario.monthIndex);
-  renderCtrl?.setResources?.({ terrain: mergedTerrainBin, env: bin, upper: upperState.upper, genesis: genesisPoints, tracks: ghostTracks });
+  renderCtrl?.setResources?.({
+    terrain: mergedTerrainBin,
+    contextTerrain: contextTerrainBin,
+    env: bin,
+    upper: upperState.upper,
+    genesis: genesisPoints,
+    tracks: ghostTracks,
+  });
   renderCtrl?.setMonth?.(scenario.monthIndex);
   renderCtrl?.setActiveGhost?.(scenario.ghostId);
   ui.highlightGhost(scenario.ghostId);
@@ -1403,6 +1488,7 @@ function applyClimatologyEnv(month: number): void {
   ui.setScenarioContext(null);
   renderCtrl?.setResources?.({
     terrain: mergedTerrainBin,
+    contextTerrain: contextTerrainBin,
     env: climatologyBin,
     upper: updateUpperWindLayerState(month).upper,
     genesis: genesisPoints,
@@ -1474,17 +1560,8 @@ function readPickerMonth(): number {
 // Tap to spawn. A small recognizer rejects drag, long-press, and pinch contacts
 // before screen -> clip -> lat/lon conversion. Ocean -> fresh deterministic
 // storm; land -> ripple, no storm.
-const mapTap = new TapGesture();
 let probePosition: LatLon | null = null;
 let probePinned = false;
-let probeTouch: {
-  id: number;
-  startX: number;
-  startY: number;
-  latestX: number;
-  latestY: number;
-  timer: number;
-} | null = null;
 
 function mapPointFromClient(clientX: number, clientY: number): LatLon | null {
   const rect = glCanvas.getBoundingClientRect();
@@ -1496,8 +1573,8 @@ function mapPointFromClient(clientX: number, clientY: number): LatLon | null {
     rect.width,
     rect.height,
   );
-  // Data-validity gate, applied AFTER the camera inverse: the view is clamped
-  // inside the domain, so this only trims float noise at the exact edge.
+  // Data-validity gate, applied AFTER the camera inverse: the camera may show
+  // terrain-only context, but probes and spawn gestures remain inside DOMAIN.
   return inBBox(point.lat, point.lon, DOMAIN) ? point : null;
 }
 
@@ -2007,6 +2084,11 @@ function setRainAccumulationWindow(windowId: RainAccumulationWindow): void {
 function updateWeatherLegend(): void {
   const definition = weatherLayerDefinition(activeWeatherLayer);
   weatherLegend.dataset.layer = activeWeatherLayer;
+  if (activeWeatherLayer === 'rain') {
+    weatherLegend.dataset.source = activeRadarSource;
+  } else {
+    delete weatherLegend.dataset.source;
+  }
   if (activeWeatherLayer === 'infrared') {
     const palette = satellitePaletteDefinition(activeSatellitePalette);
     weatherLegendName.textContent = palette.label;
@@ -2017,15 +2099,15 @@ function updateWeatherLegend(): void {
   } else if (activeWeatherLayer === 'rain' && activeRadarSource === 'observed') {
     weatherLegendName.textContent = 'observed radar';
     weatherLegendUnit.textContent = 'RainViewer composite · display only';
-    weatherLegendScale.textContent = 'light · moderate · heavy · intense';
+    weatherLegendScale.textContent = 'provider colours · not normalized to model dBZ';
   } else if (activeWeatherLayer === 'accum') {
     const accumulation = rainAccumulationDefinition(activeRainAccumulationWindow);
     weatherLegendName.textContent = `${accumulation.label} accumulation`;
     weatherLegendUnit.textContent = 'mm · deterministic simulated-rain ledger';
     weatherLegendScale.textContent = rainAccumulationLegend(activeRainAccumulationWindow);
   } else if (activeWeatherLayer === 'rain') {
-    weatherLegendName.textContent = 'model rain proxy';
-    weatherLegendUnit.textContent = 'simulated structure · not observed dBZ';
+    weatherLegendName.textContent = 'model reflectivity';
+    weatherLegendUnit.textContent = 'Marshall–Palmer dBZ proxy · simulated, not observed';
     weatherLegendScale.textContent = definition.legend;
   } else {
     weatherLegendName.textContent = definition.shortLabel;
@@ -2621,14 +2703,37 @@ function canvasPoint(event: PointerEvent | WheelEvent): {
   };
 }
 
-glCanvas.addEventListener(
+/** Apply one accessible camera command through the same controller as keys. */
+function applyCameraCommand(code: string): boolean {
+  const rect = glCanvas.getBoundingClientRect();
+  return (
+    cameraGestures.key(
+      currentViewTransform(),
+      code,
+      Math.max(1, rect.width),
+      Math.max(1, rect.height),
+    ) !== null
+  );
+}
+
+for (const [button, code] of [
+  [mapZoomOut, 'Minus'],
+  [mapHome, 'Home'],
+  [mapZoomIn, 'Equal'],
+] as const) {
+  button.addEventListener('click', () => {
+    applyCameraCommand(code);
+  });
+}
+
+mapFrame.addEventListener(
   'wheel',
   (event) => {
     event.preventDefault();
     const p = canvasPoint(event);
     cameraGestures.wheel(
       currentViewTransform(),
-      event.deltaY,
+      normalizeWheelDelta(event.deltaY, event.deltaMode, p.h),
       p.x,
       p.y,
       p.w,
@@ -2638,17 +2743,16 @@ glCanvas.addEventListener(
   { passive: false },
 );
 
-// A second pinch finger can land on a city-marker button (they sit above the
-// canvas and are prominent when zoomed). Adopt that pointer into the active
-// camera gesture instead of letting it click the marker mid-pinch; pointer
-// capture retargets its stream to glCanvas and cancelling the pointerdown
-// suppresses the compatibility click.
+// A second pinch finger can land on an over-map city or navigation control.
+// Adopt it into the active camera gesture instead of activating the control;
+// cancel every pending tap so the first finger cannot spawn after the camera
+// moves under it. Pointer capture retargets the rest of the stream to glCanvas.
 window.addEventListener(
   'pointerdown',
   (event) => {
     if (cameraGestures.activePointers() === 0) return;
     if (!(event.target instanceof Element)) return;
-    if (!event.target.closest('.city-marker')) return;
+    if (!event.target.closest('.city-marker, #map-navigation')) return;
     const p = canvasPoint(event);
     cameraGestures.pointerDown(event.pointerId, p.x, p.y);
     try {
@@ -2656,6 +2760,7 @@ window.addEventListener(
     } catch {
       /* capture is best-effort */
     }
+    mapTap.cancelAll();
     clearProbeTouch();
     event.preventDefault();
   },
@@ -2821,14 +2926,7 @@ window.addEventListener('keydown', (e) => {
   // Modified keys stay the browser's (Ctrl+/- page zoom is an a11y feature;
   // Alt+arrows is history navigation).
   if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-    const rect = glCanvas.getBoundingClientRect();
-    const camera = cameraGestures.key(
-      currentViewTransform(),
-      e.code,
-      Math.max(1, rect.width),
-      Math.max(1, rect.height),
-    );
-    if (camera) {
+    if (applyCameraCommand(e.code)) {
       e.preventDefault();
       return;
     }
@@ -3120,7 +3218,7 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
 
   // main owns the base clear of both canvases (guards against any render layer
   // forgetting to clear the overlay it draws the track on). Layers composite in
-  // luminance order; then the UI draws genesis glow + ripples on top.
+  // luminance order; then the UI draws interaction hints + ripples on top.
   gl!.clear(gl!.COLOR_BUFFER_BIT);
   overlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
   for (const layer of layers) {
@@ -3133,7 +3231,10 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
   flushMapCaptures();
   prevFrameStorm = storm;
 
-  ui.drawOverlay(nowMs); // genesis glow + ripples, on top of the track
+  // Historic genesis points are a spawn hint, not a data field. Keep them on
+  // the default wind workspace only so radar and the clean terrain instrument
+  // remain visually inspectable.
+  ui.drawOverlay(nowMs, activeWeatherLayer === 'wind');
   ui.update(nowMs); // expire the aftermath fade back to the rarity copy
   const impactSummary = impact.summary(storm);
   ui.updateCityMarkers(storm, impactSummary);
@@ -3240,6 +3341,7 @@ function isRenderLayer(v: unknown): v is RenderLayer {
  *  render's RenderResources so main need not import across the build boundary. */
 interface RenderResourcesLike {
   terrain: ParsedBin | null;
+  contextTerrain?: ParsedBin | null;
   env: ParsedBin | null;
   upper: ParsedBin | null;
   genesis: LatLon[];

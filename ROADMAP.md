@@ -195,7 +195,9 @@ ingestion and verification.
   spawn gesture.
 - Pass one shared view transform to each shader instead of adding layer-specific
   camera math.
-- Clamp the camera to the baked domain and define explicit minimum/maximum zoom.
+- Clamp the camera to the declared display context and define explicit
+  minimum/maximum zoom; keep unsupported weather visibly bounded to the baked
+  simulation domain.
 - Support wheel/trackpad zoom, drag pan, keyboard controls, and pinch gestures.
 - Keep line weights, particles, labels, hit targets, and storm structure
   readable across the full zoom range.
@@ -510,9 +512,11 @@ upgrade path stays gated on HF-4.
   derived-statistics references (EUMETSAT per D2) and the GPM IMERG
   rain-truth comparison (D1). Until those land, every harness number is
   sim-side only and nothing may claim R2 complete.
-- **R3 (not started):** closure waves, one gap-cluster per PR, each
-  citing its register entries and updating the register disposition in
-  the same PR.
+- **R3 (in progress):** the morphology wave (D3) and RH-conditioned
+  environmental-sky wave (D4) are accepted presentation closures with their
+  R2a references explicitly resealed. Remaining waves still proceed one
+  gap-cluster per PR, citing their register entries and updating the register
+  disposition in the same PR.
 - **Two-track rule:** only presentation-class gaps close inside this
   program. Data-side and physics-side gaps are recorded, never touched
   here — they live in `docs/hf7-realism-charter.md`, a charter and
@@ -588,9 +592,13 @@ incident record.
 7. **Complete (2026-08-07): shared camera — UX v2 phase 2.** Pan/zoom per the
    contract above: cover-fit edge-to-edge canvas, every geo↔screen conversion
    through one affine world→NDC view, wheel/drag/pinch/keyboard controls
-   clamped inside the baked domain, physics and recorded output untouched
-   (grid.ts clip space stays domain-fixed WORLD space; offscreen state passes
-   bind the identity view). One deviation from the contract text: the view
+   originally clamped inside the baked domain, physics and recorded output
+   untouched (grid.ts clip space stays domain-fixed WORLD space; offscreen
+   state passes bind the identity view). A 2026-08-07 continuation candidate
+   broadens only the presentation context to real GMRT terrain/bathymetry at
+   45–80°E, 8–30°N; the 50–70°E, 15–27°N simulation domain and all scientific
+   state remain unchanged, and weather composites are visibly bounded to it.
+   One deviation from the contract text: the view
    math lives in the sibling `src/camera.ts` rather than inside `grid.ts` —
    one concern per file; grid.ts remains the data-space owner. The rain
    accumulator moved to a domain-fixed 1000×600 grid in the same PR (it was

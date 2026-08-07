@@ -14,8 +14,10 @@
  */
 
 import {
+  computeViewTransform,
   HOME_VIEW,
   MAX_ZOOM,
+  MIN_ZOOM,
   ndcToWorld,
   panByPixels,
   zoomAboutAnchor,
@@ -24,8 +26,12 @@ import type { ViewState, ViewTransform } from './types';
 
 /** One-pointer drag distance (CSS px) at which the gesture becomes a pan. */
 export const PAN_THRESHOLD_PX = 8;
-/** exp(-deltaY * rate): ~x1.6 per notch-100 wheel step. */
+/** exp(-deltaY * rate): ~x1.16 per 100 CSS-pixel wheel step. */
 const WHEEL_ZOOM_RATE = 0.0015;
+/** A conventional browser wheel line is roughly one legacy 40 px step. */
+const WHEEL_LINE_PX = 40;
+/** Prevent one page-mode or device-spike event from jumping several zoom levels. */
+const MAX_WHEEL_DELTA_PX = 240;
 const KEY_PAN_PX = 64;
 const KEY_ZOOM_FACTOR = 1.25;
 
@@ -43,10 +49,41 @@ export interface GestureUpdate {
   becamePan: boolean;
 }
 
-function clampZoom(zoom: number): number {
-  // The cover-fit floor is aspect-dependent and enforced by
-  // computeViewTransform; 1 is its lower bound, so state never goes below it.
-  return Math.min(MAX_ZOOM, Math.max(1, zoom));
+function clampZoom(zoom: number, minimum = MIN_ZOOM): number {
+  // Extreme aspect ratios can require a cover-fit floor above MAX_ZOOM; in
+  // that case containment wins, matching camera.ts clampPass.
+  const floor = Math.max(MIN_ZOOM, minimum);
+  return Math.min(Math.max(MAX_ZOOM, floor), Math.max(floor, zoom));
+}
+
+function coverFitFloor(view: ViewState, w: number, h: number): number {
+  return computeViewTransform(
+    { center: view.center, zoom: MIN_ZOOM },
+    Math.max(1, w) / Math.max(1, h),
+  ).scaleY;
+}
+
+/**
+ * Convert WheelEvent delta units to bounded CSS pixels before applying the
+ * exponential zoom curve. Numeric modes mirror DOM_DELTA_PIXEL/LINE/PAGE so
+ * this helper remains testable without a browser DOM.
+ */
+export function normalizeWheelDelta(
+  deltaY: number,
+  deltaMode: number,
+  pageHeightPx: number,
+): number {
+  if (!Number.isFinite(deltaY)) return 0;
+  const unit =
+    deltaMode === 1
+      ? WHEEL_LINE_PX
+      : deltaMode === 2
+        ? Math.max(1, Number.isFinite(pageHeightPx) ? pageHeightPx : 1)
+        : 1;
+  return Math.max(
+    -MAX_WHEEL_DELTA_PX,
+    Math.min(MAX_WHEEL_DELTA_PX, deltaY * unit),
+  );
 }
 
 export class CameraGestureController {
@@ -84,7 +121,10 @@ export class CameraGestureController {
     const ndcX = (atX / w) * 2 - 1;
     const ndcY = 1 - (atY / h) * 2;
     const anchor = ndcToWorld(t, ndcX, ndcY);
-    const zoom = clampZoom(this.current.zoom * Math.exp(-deltaY * WHEEL_ZOOM_RATE));
+    const zoom = clampZoom(
+      this.current.zoom * Math.exp(-deltaY * WHEEL_ZOOM_RATE),
+      coverFitFloor(this.current, w, h),
+    );
     this.current = zoomAboutAnchor(this.current, anchor, zoom);
     return this.current;
   }
@@ -122,11 +162,33 @@ export class CameraGestureController {
       const prevDist = Math.hypot(prevX - other.x, prevY - other.y);
       const dist = Math.hypot(x - other.x, y - other.y);
       if (prevDist < 1e-3 || dist < 1e-3) return { view: null, becamePan: false };
+      const prevMidX = (prevX + other.x) / 2;
+      const prevMidY = (prevY + other.y) / 2;
       const midX = (x + other.x) / 2;
       const midY = (y + other.y) / 2;
-      const anchor = ndcToWorld(t, (midX / w) * 2 - 1, 1 - (midY / h) * 2);
-      const zoom = clampZoom(this.current.zoom * (dist / prevDist));
-      this.current = zoomAboutAnchor(this.current, anchor, zoom);
+      // The world point under the OLD midpoint follows the gesture to the NEW
+      // midpoint. Anchoring at the new midpoint (the old implementation) kept
+      // scale changes but discarded two-finger translation, making a drifting
+      // pinch jump and slide away from the fingers.
+      const anchor = ndcToWorld(
+        t,
+        (prevMidX / w) * 2 - 1,
+        1 - (prevMidY / h) * 2,
+      );
+      const zoom = clampZoom(
+        this.current.zoom * (dist / prevDist),
+        coverFitFloor(this.current, w, h),
+      );
+      const zoomed = zoomAboutAnchor(this.current, anchor, zoom);
+      const zoomedTransform = computeViewTransform(zoomed, w / h);
+      this.current = panByPixels(
+        zoomed,
+        zoomedTransform,
+        -(midX - prevMidX),
+        -(midY - prevMidY),
+        w,
+        h,
+      );
       return { view: this.current, becamePan: false };
     }
 
@@ -171,6 +233,14 @@ export class CameraGestureController {
     this.pointerUp(id);
   }
 
+  /** Invalidate every in-flight contact when the map geometry changes. */
+  cancelAll(): void {
+    this.pointers.clear();
+    this.panning = false;
+    this.pinching = false;
+    this.gestured = false;
+  }
+
   /**
    * Keyboard controls (event.code): arrows pan, Equal/Minus (+numpad) zoom
    * about the view centre, KeyH/Home return to the full-domain view.
@@ -200,7 +270,10 @@ export class CameraGestureController {
         this.current = zoomAboutAnchor(
           this.current,
           this.current.center,
-          clampZoom(this.current.zoom * KEY_ZOOM_FACTOR),
+          clampZoom(
+            this.current.zoom * KEY_ZOOM_FACTOR,
+            coverFitFloor(this.current, w, h),
+          ),
         );
         return this.current;
       case 'Minus':
@@ -208,7 +281,10 @@ export class CameraGestureController {
         this.current = zoomAboutAnchor(
           this.current,
           this.current.center,
-          clampZoom(this.current.zoom / KEY_ZOOM_FACTOR),
+          clampZoom(
+            this.current.zoom / KEY_ZOOM_FACTOR,
+            coverFitFloor(this.current, w, h),
+          ),
         );
         return this.current;
       case 'KeyH':

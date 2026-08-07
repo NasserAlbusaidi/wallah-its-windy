@@ -47,5 +47,9 @@ export class TapGesture {
   cancel(id: number): void {
     this.pointers.delete(id);
   }
-}
 
+  /** Invalidate all pending taps when the map geometry changes. */
+  cancelAll(): void {
+    this.pointers.clear();
+  }
+}

@@ -24,7 +24,7 @@
 import './style.css';
 import { injectCssVars, TOKENS } from './tokens';
 import { readHash, writeHash, clearHash, isEnvHashKey } from './rng';
-import { DOMAIN, cellToLatLon, inBBox } from './grid';
+import { DOMAIN, inBBox } from './grid';
 import type { RegionNamesTable } from './impact';
 import {
   HOME_VIEW,
@@ -142,6 +142,8 @@ import {
   requestEnsemble,
   requestSensitivity,
 } from './ensemble-client';
+import { buildEnsembleEnvelope } from './ensemble-envelope';
+import type { EnsembleEnvelope } from './ensemble-envelope';
 import type {
   EnsembleResult,
   EnvironmentPerturbation,
@@ -493,7 +495,6 @@ let radarPlaying = false;
 let radarPlayTimer: number | null = null;
 let activeRainAccumulationWindow: RainAccumulationWindow =
   DEFAULT_RAIN_ACCUMULATION_WINDOW;
-let activeEnsemble: EnsembleResult | null = null;
 let analysisRequestSeq = 0;
 
 // --- Sim + render construction (defensive against half-done siblings) --------
@@ -1132,7 +1133,7 @@ function doSpawn(
     return;
   }
   currentSpawn = { ...spawn };
-  activeEnsemble = null;
+  renderCtrl?.setEnsemble?.(null, null);
   analysisRequestSeq++;
   ensembleResults.hidden = true;
   ensembleStatus.value = spawn.isDemo
@@ -2397,7 +2398,7 @@ ensembleRun.addEventListener('click', () => {
   void handle.result
     .then((result) => {
       if (requestSeq !== analysisRequestSeq) return;
-      activeEnsemble = result;
+      renderCtrl?.setEnsemble?.(result, buildEnsembleEnvelope(result.members));
       ensemblePeak.textContent =
         `${result.peakKt.p10.toFixed(0)}–${result.peakKt.p90.toFixed(0)} kt ` +
         `(median ${result.peakKt.median.toFixed(0)})`;
@@ -2414,7 +2415,7 @@ ensembleRun.addEventListener('click', () => {
     .catch((error: unknown) => {
       if (error instanceof EnsembleCancelledError) return;
       if (requestSeq !== analysisRequestSeq) return;
-      activeEnsemble = null;
+      renderCtrl?.setEnsemble?.(null, null);
       ensembleStatus.value =
         error instanceof Error ? `ensemble failed · ${error.message}` : 'ensemble failed';
     })
@@ -2954,54 +2955,6 @@ function buildStorm(): { storm: StormState | null; prev: StormState | null } {
   return { storm: live, prev };
 }
 
-function drawEnsembleOverlay(
-  result: EnsembleResult | null,
-  view: ViewTransform,
-): void {
-  if (!result) return;
-  const { nx, ny, probability } = result.grid;
-  const w = overlayCanvas.width;
-  const h = overlayCanvas.height;
-  // The ensemble grid spans the DOMAIN; each cell projects through the view
-  // (geo-anchored) rather than mapping grid indices straight to the canvas.
-  const spec = { nx, ny, bbox: DOMAIN };
-  overlay.save();
-  overlay.globalCompositeOperation = 'screen';
-  const accent = TOKENS.accent.rgba01;
-  for (let index = 0; index < probability.length; index++) {
-    const chance = probability[index];
-    if (chance < 0.025) continue;
-    const col = index % nx;
-    const row = Math.floor(index / nx);
-    // Cell corners: cell centres sit at integer (col,row); corners at ±0.5.
-    const nw = cellToLatLon(spec, col - 0.5, row - 0.5);
-    const se = cellToLatLon(spec, col + 0.5, row + 0.5);
-    const a = latLonToScreen(view, nw.lat, nw.lon, w, h);
-    const b = latLonToScreen(view, se.lat, se.lon, w, h);
-    overlay.fillStyle =
-      `rgba(${Math.round(accent[0] * 255)},${Math.round(accent[1] * 255)},` +
-      `${Math.round(accent[2] * 255)},${Math.min(0.28, 0.025 + chance * 0.32)})`;
-    overlay.fillRect(a.x, a.y, b.x - a.x + 1, b.y - a.y + 1);
-  }
-  const trackColor = TOKENS.track.rgba01;
-  overlay.strokeStyle =
-    `rgba(${Math.round(trackColor[0] * 255)},${Math.round(trackColor[1] * 255)},` +
-    `${Math.round(trackColor[2] * 255)},0.13)`;
-  overlay.lineWidth = Math.max(0.6, window.devicePixelRatio * 0.45);
-  for (const member of result.members) {
-    if (member.track.length < 2) continue;
-    overlay.beginPath();
-    for (let index = 0; index < member.track.length; index++) {
-      const point = member.track[index];
-      const p = latLonToScreen(view, point.lat, point.lon, w, h);
-      if (index === 0) overlay.moveTo(p.x, p.y);
-      else overlay.lineTo(p.x, p.y);
-    }
-    overlay.stroke();
-  }
-  overlay.restore();
-}
-
 function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
   const { storm, prev } = buildStorm();
   const handoffComplete = activeSatelliteSource === 'handoff' &&
@@ -3063,7 +3016,6 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
       console.warn('[render] layer draw threw (skipping this frame):', err);
     }
   }
-  drawEnsembleOverlay(activeEnsemble, view);
   flushMapCaptures();
   prevFrameStorm = storm;
 
@@ -3194,6 +3146,10 @@ type RenderController = RenderLayer & {
   setCloudTape?(tape: CloudTape | null): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;
+  /** Ensemble overlay: result + precomputed percentile envelope; null clears. */
+  setEnsemble?(result: EnsembleResult | null, envelope: EnsembleEnvelope | null): void;
+  /** Member spaghetti on demand (the envelope is the default product). */
+  setEnsembleMembersVisible?(visible: boolean): void;
   /** Screen-registered wind-trail history is stale after any camera move. */
   clearWindTrails?(): void;
 };

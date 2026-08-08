@@ -12,7 +12,7 @@ import { TOKENS } from '../tokens';
 import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H, rainbandOuterBounds } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
 import { CLOUD_MEMORY_DT_H, CLOUD_MEMORY_MACRO_GAIN, DEBRIS_MAX_CLOUD } from './cloud-memory';
-import { AMBIENT_RH_DRIVE_HI, AMBIENT_RH_DRIVE_LO, AMBIENT_TOP_CONGESTUS_COLD_C, AMBIENT_TOP_CONGESTUS_WARM_C, AMBIENT_TOP_CUMULUS_COLD_C, AMBIENT_TOP_CUMULUS_WARM_C, AMBIENT_TOP_VEIL_C, CLOUD_BAND_REFERENCE_Q, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, cloudMetricX, cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
+import { AMBIENT_RH_DRIVE_HI, AMBIENT_RH_DRIVE_LO, AMBIENT_TOP_CONGESTUS_COLD_C, AMBIENT_TOP_CONGESTUS_WARM_C, AMBIENT_TOP_CUMULUS_COLD_C, AMBIENT_TOP_CUMULUS_WARM_C, AMBIENT_TOP_VEIL_C, CLOUD_BAND_CELL_GATE_HI, CLOUD_BAND_CELL_GATE_LO, CLOUD_BAND_CELL_LEFT_RETENTION, CLOUD_BAND_CELL_RIGHT_BONUS, CLOUD_BAND_CELL_RIGHT_GAIN, CLOUD_BAND_CELL_SCALE, CLOUD_BAND_CELL_SHEAR_ORGANIZATION_HI_MS, CLOUD_BAND_CELL_SHEAR_ORGANIZATION_LO_MS, CLOUD_BAND_REFERENCE_Q, CLOUD_BAND_REGIME_INNER_KM, CLOUD_BAND_REGIME_OUTER_KM, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, cloudMetricX, cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import {
@@ -407,14 +407,65 @@ ${CLOUD_CORE_GLSL.wobble}
   // Raw support remains in stormCloud so radar-visible rain never sits under
   // clear sky. Only embedded cells below may claim a cold cloud-top grade.
   float precipitatingCloud = max(precipEyeCloud, precipBandCloud);
-  float precipColdCloud = precipitatingCloud * convectiveCells;
-  float bandCoherence = smoothstep(0.42, 0.78, u_organization) *
-    smoothstep(0.12, 0.52, u_intensity);
-  float brokenBand = smoothstep(0.28, 0.72, macro * 0.62 + fine * 0.42) *
-    mix(0.48, 1.0, primaryBand);
-  float bandShape = mix(brokenBand, max(primaryBand, secondaryBand * 0.58), bandCoherence);
-
   vec2 canopyDir = canopyQ > 0.001 ? canopyRadial / (canopyQ * rCanopy) : shearDir;
+  // RGR-004: keep the established broad spiral coverage, but let deterministic
+  // 30-70 km cells carry its cold tops. Cell gating belongs to temperature,
+  // not cloud-cover topology: a stratiform band may be continuous while its
+  // embedded convection remains discrete. precipitatingCloud above remains
+  // unchanged and independently enforces radar-aligned physical support.
+  float bandSkeleton = max(primaryBand, secondaryBand * 0.58);
+  // The inner/outer regime is cyclone-radius physics, so measure from the
+  // surface-vortex centre rather than from the shear-displaced canopy centre.
+  float vortexRadius = length(radial);
+  float bandRadiusKm = vortexRadius * ${HALF_DOMAIN_HEIGHT_KM}.0;
+  float outerBandRegime = smoothstep(
+    ${CLOUD_BAND_REGIME_INNER_KM}.0,
+    ${CLOUD_BAND_REGIME_OUTER_KM}.0,
+    bandRadiusKm
+  );
+  float hasPhysicalShear = length(u_shearVector) > 0.05 ? 1.0 : 0.0;
+  vec2 bandDirection = vortexRadius > 0.001 ? radial / vortexRadius : shearDir;
+  float shearCellOrganization = smoothstep(
+    ${CLOUD_BAND_CELL_SHEAR_ORGANIZATION_LO_MS.toFixed(1)},
+    ${CLOUD_BAND_CELL_SHEAR_ORGANIZATION_HI_MS.toFixed(1)},
+    u_shearAtStorm
+  );
+  shearCellOrganization *= hasPhysicalShear;
+  float rightOfShear = smoothstep(
+    -0.6,
+    0.6,
+    dot(bandDirection, vec2(shearDir.y, -shearDir.x))
+  );
+  vec2 bandCellP = rotate2(thetaBand) * canopyRadial;
+  vec2 bandCellUv = bandCellP * ${CLOUD_BAND_CELL_SCALE.toFixed(1)} +
+    vec2(seed * 0.73, seed * 1.19) + drift * 0.04;
+  // cloudNoise blends eight smoothly interpolated frequency/channel terms;
+  // unlike a direct B/A tap, its sharpened contours do not expose one lattice.
+  float bandCellNoise = cloudNoise(bandCellUv);
+  float bandCellGate = smoothstep(
+    ${CLOUD_BAND_CELL_GATE_LO},
+    ${CLOUD_BAND_CELL_GATE_HI},
+    bandCellNoise + ${CLOUD_BAND_CELL_RIGHT_BONUS} * shearCellOrganization *
+      (2.0 * rightOfShear - 1.0)
+  );
+  float bandCellOrganization = mix(
+    1.0,
+    mix(
+      ${CLOUD_BAND_CELL_LEFT_RETENTION},
+      ${CLOUD_BAND_CELL_RIGHT_GAIN},
+      rightOfShear
+    ),
+    shearCellOrganization
+  );
+  float organizedBandCell = bandCellGate * bandCellOrganization;
+  float bandShape = bandSkeleton;
+  // Preserve broad raw precipitatingCloud support above while allowing only
+  // embedded band cells to claim the convective tower grade.
+  float precipColdCloud = max(
+    precipEyeCloud * convectiveCells,
+    precipBandCloud * organizedBandCell
+  );
+
   float upshear = max(0.0, dot(canopyDir, -shearDir));
   float shearErosion = 1.0 - shearN * upshear * mix(0.28, 0.62, 1.0 - moisture);
   float eyewallMaturity = smoothstep(0.30, 0.68, u_intensity) *
@@ -432,7 +483,14 @@ ${CLOUD_CORE_GLSL.wobble}
     mix(0.72, 1.0, cellularColdTops) *
     mix(0.88, 1.0, macro);
 ${CLOUD_CORE_GLSL.eyewall}
-  float rainbands = bandEnvelope *
+  // Keep the decorative band canopy out of the eyewall. The physical
+  // rain-support arm already uses this same sealed radial ramp.
+  float bandInnerGate = smoothstep(
+    ${RAINBAND_INNER_Q},
+    ${RAINBAND_INNER_FULL_Q.toFixed(1)},
+    q
+  );
+  float rainbands = bandInnerGate * bandEnvelope *
     bandShape *
     mix(0.42, 0.96, moisture) *
     mix(0.46, 1.0, convectiveCells) *

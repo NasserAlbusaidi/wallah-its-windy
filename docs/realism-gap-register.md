@@ -261,7 +261,52 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
 - candidate metric: high-spatial-frequency energy (or edge density) within
   band masks, sim vs observed.
 - rough cost: L
-- disposition: close-now
+- disposition: candidate-r3 — deterministic implementation and final-BT
+  regression evidence are complete. A matched visual A/B on this exact tuning,
+  the repository-owner presentation verdict, and an explicit R2a reseal are
+  still required. Observed closure remains blocked on R2b.
+- local candidate (2026-08-08): the broad stratiform spiral remains connected,
+  while a separate cold-top pass embeds deterministic ~35–70 km convective
+  structures. Cell occurrence and depth follow the physical shear quadrant
+  (newer cells favor right-of-shear), while a 170–230 km transition makes the
+  outer thermal band sparser and more convectively concentrated. Both radii are
+  measured from the surface-vortex center. The base cold-cell grade reuses the
+  established -45/-62 °C band-top endpoints; the existing physically plausible
+  tower-overshoot pass can still make rare cells colder. A 1.45–2.0 RMW inner
+  ramp keeps decorative bands out of the eyewall. This is a simulated-cloud
+  presentation change only: rain rates, the shared rain footprint, radar,
+  impact accounting, physics, track, intensity, and storm radii are untouched.
+- deterministic evidence: on the fixed dry 70 kt / organization 0.7 compact
+  fixture's 200–500 km band ROI, the support mask remains 3,752 cells. Final
+  BT <= -25 °C changes from 154 cells in four meaningful components (largest
+  share 0.461) to 196 cells in 11 components (largest share 0.255), while
+  92.5% of the mask remains warmer than -20 °C. With all stencil endpoints
+  constrained to that same mask, final-BT one-cell high-pass energy rises from
+  0.920 to 1.969 °C and pooled adjacent-edge gradient rises from 0.289 to
+  0.395 °C/km. Tiny components under three cells do not count. The unchanged
+  rain-aligned cloud-support arm remains exactly sum 889,779, max 528, and
+  3,264 nonzero cells in quantized 1/1024 units, with little-endian quantized
+  SHA-256 `cf8c31d5db1710f07a059b0bbbd4ab57f67255c1610978802d07348fdadbdd00`.
+- shear/regime evidence: a frozen ten-seed matrix passes in all four cardinal
+  18 m/s shear directions. Right/left final cold-cell-rate ratios are 9.591 E,
+  2.489 N, 2.399 W, and 3.023 S; 10/10, 10/10, 8/10, and 10/10 seeds favor the
+  right side. In calm inner 100–170 km versus outer 230–330 km annuli, active
+  thermal-band occupancy falls from 0.242 to 0.125 (ratio 0.514), while the
+  convective fraction rises from 0.303 to 0.336 (ratio 1.110); seven of ten
+  seeds are outer-purer.
+- visual/governance status: an earlier direct-channel prototype was rejected
+  because its cells exposed geometric value-noise plateaus. A replacement
+  multiscale-noise candidate was recaptured at the exact Biparjoy hindcast frame
+  48, 1920x1080, zoom 2, WebGL2, in matched grayscale and enhanced-IR pairs.
+  It replaces the airbrushed cloud mass with embedded convection while retaining
+  broad coverage; no blocking halo, seam, tiling, lattice, or opacity hole was
+  observed. Enhanced IR makes some thresholded scallops and repeated cell scale
+  more visible, and the circular outer canopy remains a separate open gap. The
+  expected pre-reseal `realism:check` is red with 57 descriptive aggregate
+  movements; scenario identity and every sampled-frame count remain frozen,
+  and `realism-reference.json` is still byte-identical. Do not reseal or merge
+  this candidate until the
+  repository-owner verdict is recorded.
 
 ### RGR-005 — Cold-top palette saturates too cold at moderate intensity
 - subsystem: ir-clouds

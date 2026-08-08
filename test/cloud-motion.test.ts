@@ -1,6 +1,21 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import {
+  CLOUD_BAND_CELL_GATE_HI,
+  CLOUD_BAND_CELL_GATE_LO,
+  CLOUD_BAND_CELL_LEFT_RETENTION,
+  CLOUD_BAND_CELL_PRESENCE_GAIN,
+  CLOUD_BAND_CELL_RIGHT_BONUS,
+  CLOUD_BAND_CELL_RIGHT_GAIN,
+  CLOUD_BAND_CELL_SCALE,
+  CLOUD_BAND_CELL_SHEAR_ORGANIZATION_HI_MS,
+  CLOUD_BAND_CELL_SHEAR_ORGANIZATION_LO_MS,
+  CLOUD_BAND_OUTER_CELL_GAIN,
+  CLOUD_BAND_OUTER_STRATIFORM_FLOOR,
+  CLOUD_BAND_REGIME_INNER_KM,
+  CLOUD_BAND_REGIME_OUTER_KM,
+  CLOUD_BAND_THERMAL_CONTRAST_DEVELOPING_C,
+  CLOUD_BAND_THERMAL_CONTRAST_MATURE_C,
   CLOUD_CROSSFADE_PERIOD_H,
   CLOUD_ROTATION_CAP_RAD_PER_H,
   CLOUD_TOP_BAND_DEVELOPING_C,
@@ -15,6 +30,27 @@ import {
   flowPhaseState,
   interpolatedCloudAgeH,
 } from '../src/render/cloud-motion';
+
+describe('cellular rainband presentation constants', () => {
+  test('pins the resolved cell blend and 200-km regime transition', () => {
+    expect(CLOUD_BAND_CELL_SCALE).toBe(12);
+    expect(CLOUD_BAND_CELL_GATE_LO).toBe(0.54);
+    expect(CLOUD_BAND_CELL_GATE_HI).toBe(0.66);
+    expect(CLOUD_BAND_CELL_RIGHT_BONUS).toBe(0.03);
+    expect(CLOUD_BAND_CELL_LEFT_RETENTION).toBe(0.35);
+    expect(CLOUD_BAND_CELL_RIGHT_GAIN).toBe(1.35);
+    expect(CLOUD_BAND_CELL_PRESENCE_GAIN).toBe(2.2);
+    expect(CLOUD_BAND_CELL_SHEAR_ORGANIZATION_LO_MS).toBe(7);
+    expect(CLOUD_BAND_CELL_SHEAR_ORGANIZATION_HI_MS).toBe(15);
+    expect(CLOUD_BAND_REGIME_INNER_KM).toBe(170);
+    expect(CLOUD_BAND_REGIME_OUTER_KM).toBe(230);
+    expect(CLOUD_BAND_OUTER_STRATIFORM_FLOOR).toBe(0);
+    expect(CLOUD_BAND_OUTER_CELL_GAIN).toBe(6);
+    expect(CLOUD_BAND_THERMAL_CONTRAST_MATURE_C).toBeGreaterThan(
+      CLOUD_BAND_THERMAL_CONTRAST_DEVELOPING_C,
+    );
+  });
+});
 
 describe('interpolatedCloudAgeH', () => {
   test('interpolates between fixed steps', () => {
@@ -102,13 +138,13 @@ describe('cloud-top component temperature constants', () => {
   });
 
   test('keeps the emitted CLOUD_TOPS_GLSL byte-identical (morphology R3 digest)', () => {
-    // sha256 of CLOUD_TOPS_GLSL captured on 2026-08-05 after the morphology R3
-    // thermal-topology pass (2544 chars). Any change to the emitted shader
-    // text fails here.
+    // sha256 of CLOUD_TOPS_GLSL captured on 2026-08-08 after the RGR-004
+    // cellular-band thermal-topology pass (3781 chars). Any change to the
+    // emitted shader text fails here.
     const digest = createHash('sha256').update(CLOUD_TOPS_GLSL).digest('hex');
     expect(digest).toBe(
-      '663c4fa96508a849afdc493a4cf2091623c799423c39cc371fb3717e500a0512',
+      '2df916dcda2044fa26d5b2d169eebfdd5614c75242242d7f80a0cd5b1095c927',
     );
-    expect(CLOUD_TOPS_GLSL.length).toBe(2544);
+    expect(CLOUD_TOPS_GLSL.length).toBe(3781);
   });
 });

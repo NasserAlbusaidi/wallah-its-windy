@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { FlightFrame } from '../src/flight-recorder';
 import { DOMAIN } from '../src/grid';
@@ -104,10 +105,13 @@ function stormFrame(options: {
   });
 }
 
-function contextFor(frame: FlightFrame): RealismFrameContext {
+function contextFor(
+  frame: FlightFrame,
+  genesis = { lat: 16, lon: 64 },
+): RealismFrameContext {
   return {
     frame,
-    genesis: { lat: 16, lon: 64 },
+    genesis,
     envShear: {
       u: frame.structure.shearUms,
       v: frame.structure.shearVms,
@@ -288,12 +292,382 @@ function eyewallColdSectors(field: RealismField, rmwKm: number) {
   };
 }
 
+function connectedComponentSizes(active: Uint8Array, n: number): number[] {
+  const seen = new Uint8Array(active.length);
+  const componentSizes: number[] = [];
+  for (let start = 0; start < active.length; start++) {
+    if (!active[start] || seen[start]) continue;
+    let size = 0;
+    const stack = [start];
+    seen[start] = 1;
+    while (stack.length > 0) {
+      const index = stack.pop();
+      if (index === undefined) break;
+      size++;
+      const x = index % n;
+      const y = Math.floor(index / n);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= n || ny >= n) continue;
+          const neighbour = ny * n + nx;
+          if (active[neighbour] && !seen[neighbour]) {
+            seen[neighbour] = 1;
+            stack.push(neighbour);
+          }
+        }
+      }
+    }
+    componentSizes.push(size);
+  }
+  return componentSizes.sort((a, b) => b - a);
+}
+
+interface RenderedBandTexture {
+  maskedCells: number;
+  coldCells: number;
+  warmFringeCells: number;
+  meaningfulColdComponents: number;
+  largestColdComponentShare: number;
+  meanHighPassC: number;
+}
+
+// Mechanically selected nearest integer genesis lat/lon for cloud-seed targets
+// 0.05, 0.15, ... 0.95 across the Arabian Sea search box; not hand-picked for
+// favorable morphology.
+const RGR004_SEED_DECILES = [
+  { lat: 9, lon: 72 },
+  { lat: 21, lon: 53 },
+  { lat: 24, lon: 52 },
+  { lat: 24, lon: 71 },
+  { lat: 19, lon: 51 },
+  { lat: 25, lon: 54 },
+  { lat: 23, lon: 66 },
+  { lat: 19, lon: 77 },
+  { lat: 14, lon: 75 },
+  { lat: 21, lon: 71 },
+] as const;
+
+interface ThermalCounts {
+  support: number;
+  active: number;
+  convective: number;
+}
+
+function thermalCounts(
+  field: RealismField,
+  innerRadiusKm: number,
+  outerRadiusKm: number,
+): ThermalCounts {
+  let support = 0;
+  let active = 0;
+  let convective = 0;
+  for (let j = 0; j < field.n; j++) {
+    for (let i = 0; i < field.n; i++) {
+      const index = j * field.n + i;
+      const offset = cellOffsetKm(field, i, j);
+      const radiusKm = Math.hypot(offset.east, offset.north);
+      if (radiusKm < innerRadiusKm || radiusKm >= outerRadiusKm) continue;
+      if (Math.max(field.bands[index], field.precipBandCloud[index]) < 0.1) {
+        continue;
+      }
+      support++;
+      if (field.btProxyC[index] <= -20) active++;
+      if (field.btProxyC[index] <= -30) convective++;
+    }
+  }
+  return { support, active, convective };
+}
+
+function addThermalCounts(target: ThermalCounts, source: ThermalCounts): void {
+  target.support += source.support;
+  target.active += source.active;
+  target.convective += source.convective;
+}
+
+interface SideColdCounts {
+  support: number;
+  cold: number;
+}
+
+function shearSideColdCounts(
+  field: RealismField,
+  shearUms: number,
+  shearVms: number,
+): { right: SideColdCounts; left: SideColdCounts } {
+  const shearLength = Math.hypot(shearUms, shearVms);
+  if (shearLength <= 0) throw new Error('shear direction is undefined');
+  const right = { support: 0, cold: 0 };
+  const left = { support: 0, cold: 0 };
+  for (let j = 0; j < field.n; j++) {
+    for (let i = 0; i < field.n; i++) {
+      const index = j * field.n + i;
+      const offset = cellOffsetKm(field, i, j);
+      const radiusKm = Math.hypot(offset.east, offset.north);
+      if (radiusKm < 230 || radiusKm >= 400) continue;
+      if (Math.max(field.bands[index], field.precipBandCloud[index]) < 0.1) {
+        continue;
+      }
+      const normalizedRightDot =
+        (offset.east * shearVms - offset.north * shearUms) /
+        (radiusKm * shearLength);
+      const target =
+        normalizedRightDot >= 0.5
+          ? right
+          : normalizedRightDot <= -0.5
+            ? left
+            : null;
+      if (!target) continue;
+      target.support++;
+      if (field.btProxyC[index] <= -25) target.cold++;
+    }
+  }
+  return { right, left };
+}
+
+function addSideCounts(target: SideColdCounts, source: SideColdCounts): void {
+  target.support += source.support;
+  target.cold += source.cold;
+}
+
+function coldRate(counts: SideColdCounts): number {
+  return counts.cold / counts.support;
+}
+
+function precipBandDigest(field: RealismField): string {
+  const bytes = new Uint8Array(field.precipBandCloud.length * 2);
+  field.precipBandCloud.forEach((value, index) => {
+    const quantized = Math.round(value * 1024);
+    bytes[index * 2] = quantized & 0xff;
+    bytes[index * 2 + 1] = quantized >>> 8;
+  });
+  // The repo's minimal node:crypto shim types update() as string-only, while
+  // Node accepts Uint8Array at runtime (the same pattern as hf6-contract.test).
+  return createHash('sha256')
+    .update(bytes as unknown as string)
+    .digest('hex');
+}
+
+/** Final BT-proxy topology inside the same band mask used by R2a. */
+function renderedBandTexture(
+  field: RealismField,
+  coldThresholdC = -45,
+  innerRadiusKm = 200,
+): RenderedBandTexture {
+  const cold = new Uint8Array(field.n * field.n);
+  const bandMask = new Uint8Array(field.n * field.n);
+  let maskedCells = 0;
+  let coldCells = 0;
+  let warmFringeCells = 0;
+  for (let j = 0; j < field.n; j++) {
+    for (let i = 0; i < field.n; i++) {
+      const index = j * field.n + i;
+      const offset = cellOffsetKm(field, i, j);
+      const radiusKm = Math.hypot(offset.east, offset.north);
+      if (radiusKm < innerRadiusKm || radiusKm > 500) continue;
+      if (Math.max(field.bands[index], field.precipBandCloud[index]) < 0.1) {
+        continue;
+      }
+      bandMask[index] = 1;
+      maskedCells++;
+      if (field.btProxyC[index] <= coldThresholdC) {
+        cold[index] = 1;
+        coldCells++;
+      }
+      if (field.btProxyC[index] >= -20) warmFringeCells++;
+    }
+  }
+  const componentSizes = connectedComponentSizes(cold, field.n);
+  let highPassSum = 0;
+  let textureCount = 0;
+  for (let j = 1; j < field.n - 1; j++) {
+    for (let i = 1; i < field.n - 1; i++) {
+      const index = j * field.n + i;
+      if (!bandMask[index]) continue;
+      if (
+        !bandMask[index + 1] ||
+        !bandMask[index - 1] ||
+        !bandMask[index - field.n] ||
+        !bandMask[index + field.n]
+      ) {
+        continue;
+      }
+      const east = field.btProxyC[index + 1];
+      const west = field.btProxyC[index - 1];
+      const north = field.btProxyC[index - field.n];
+      const south = field.btProxyC[index + field.n];
+      highPassSum += Math.abs(
+        field.btProxyC[index] - (east + west + north + south) / 4,
+      );
+      textureCount++;
+    }
+  }
+  if (maskedCells === 0) {
+    throw new Error('rendered band mask is undersampled');
+  }
+  return {
+    maskedCells,
+    coldCells,
+    warmFringeCells,
+    meaningfulColdComponents: componentSizes.filter((size) => size >= 3).length,
+    largestColdComponentShare:
+      coldCells > 0 && componentSizes[0] !== undefined
+        ? componentSizes[0] / coldCells
+        : 0,
+    meanHighPassC: highPassSum / textureCount,
+  };
+}
+
 describe('simulated IR morphology', () => {
   const moderate = stormFrame({
     vKt: 70,
     organization: 0.7,
     shearUms: 16,
     shearVms: 8,
+  });
+
+  it('renders discrete cold cells inside a broad warm stratiform band', () => {
+    const field = buildRealismField(contextFor(moderate), dryEnvironment());
+    const compactBandFrame = stormFrame({
+      vKt: 70,
+      organization: 0.7,
+      shearUms: 16,
+      shearVms: 8,
+      rmwKm: 50,
+      outerSizeKm: 120,
+    });
+    const compactContext = contextFor(compactBandFrame);
+    const compactBandField = buildRealismField(
+      compactContext,
+      dryEnvironment(),
+    );
+    const repeated = buildRealismField(compactContext, dryEnvironment());
+    const alternateSeed = buildRealismField(
+      { ...compactContext, genesis: { lat: 17, lon: 65 } },
+      dryEnvironment(),
+    );
+    // Keep the compact CDO inside this 4+ RMW annulus so the gate measures
+    // final rendered band BT rather than a connected cold core or an
+    // intermediate mask. On the sealed pre-RGR-004 baseline this same ROI had
+    // 154 cold cells in four components, with 46.1% in the largest component
+    // and a 0.920 °C one-cell high-pass residual.
+    const rendered = renderedBandTexture(compactBandField, -25, 200);
+    let precipSupportSum = 0;
+    let precipSupportMax = 0;
+    let precipSupportNonzero = 0;
+    for (const value of field.precipBandCloud) {
+      const quantized = Math.round(value * 1024);
+      precipSupportSum += quantized;
+      precipSupportMax = Math.max(precipSupportMax, quantized);
+      if (quantized > 0) precipSupportNonzero++;
+    }
+    expect(rendered.maskedCells).toBeGreaterThan(3_500);
+    expect(rendered.warmFringeCells / rendered.maskedCells).toBeGreaterThan(
+      0.91,
+    );
+    expect(rendered.warmFringeCells / rendered.maskedCells).toBeLessThan(0.95);
+    expect(rendered.coldCells).toBeGreaterThanOrEqual(160);
+    expect(rendered.coldCells).toBeLessThanOrEqual(230);
+    expect(rendered.meaningfulColdComponents).toBeGreaterThanOrEqual(7);
+    expect(rendered.largestColdComponentShare).toBeLessThanOrEqual(0.35);
+    expect(rendered.meanHighPassC).toBeGreaterThan(1.8);
+    expect(rendered.meanHighPassC).toBeLessThan(2.1);
+    // RGR-004 is presentation-only: the exact rain-aligned cloud-support arm
+    // stays byte-for-byte on the pre-change footprint.
+    expect(precipSupportSum).toBe(889_779);
+    expect(precipSupportMax).toBe(528);
+    expect(precipSupportNonzero).toBe(3_264);
+    expect(precipBandDigest(field)).toBe(
+      'cf8c31d5db1710f07a059b0bbbd4ab57f67255c1610978802d07348fdadbdd00',
+    );
+    expect(repeated.btProxyC).toEqual(compactBandField.btProxyC);
+    expect(alternateSeed.btProxyC).not.toEqual(compactBandField.btProxyC);
+  });
+
+  it('organizes final cold cells right of every cardinal shear direction', () => {
+    const directions = [
+      { u: 18, v: 0 },
+      { u: 0, v: 18 },
+      { u: -18, v: 0 },
+      { u: 0, v: -18 },
+    ];
+    const sources = dryEnvironment();
+    for (const direction of directions) {
+      const frame = stormFrame({
+        vKt: 70,
+        organization: 0.7,
+        shearUms: direction.u,
+        shearVms: direction.v,
+        rmwKm: 50,
+        outerSizeKm: 70,
+      });
+      const pooledRight = { support: 0, cold: 0 };
+      const pooledLeft = { support: 0, cold: 0 };
+      let positiveSeeds = 0;
+      for (const genesis of RGR004_SEED_DECILES) {
+        const field = buildRealismField(
+          contextFor(frame, genesis),
+          sources,
+        );
+        const sides = shearSideColdCounts(
+          field,
+          direction.u,
+          direction.v,
+        );
+        addSideCounts(pooledRight, sides.right);
+        addSideCounts(pooledLeft, sides.left);
+        if (coldRate(sides.right) > coldRate(sides.left)) positiveSeeds++;
+      }
+      const rightRate = coldRate(pooledRight);
+      const leftRate = coldRate(pooledLeft);
+      expect(pooledRight.support).toBeGreaterThan(500);
+      expect(pooledLeft.support).toBeGreaterThan(500);
+      expect(rightRate / leftRate).toBeGreaterThanOrEqual(1.1);
+      expect(rightRate - leftRate).toBeGreaterThanOrEqual(0.003);
+      expect(positiveSeeds).toBeGreaterThanOrEqual(7);
+    }
+  }, 60_000);
+
+  it('makes outer bands sparser and more convectively concentrated', () => {
+    const calmFrame = stormFrame({
+      vKt: 70,
+      organization: 0.7,
+      shearUms: 0,
+      shearVms: 0,
+      rmwKm: 50,
+      outerSizeKm: 70,
+    });
+    const sources = dryEnvironment();
+    const pooledInner = { support: 0, active: 0, convective: 0 };
+    const pooledOuter = { support: 0, active: 0, convective: 0 };
+    let outerPurerSeeds = 0;
+    for (const genesis of RGR004_SEED_DECILES) {
+      const field = buildRealismField(
+        contextFor(calmFrame, genesis),
+        sources,
+      );
+      const inner = thermalCounts(field, 100, 170);
+      const outer = thermalCounts(field, 230, 330);
+      addThermalCounts(pooledInner, inner);
+      addThermalCounts(pooledOuter, outer);
+      if (
+        outer.convective / outer.active >
+        inner.convective / inner.active
+      ) {
+        outerPurerSeeds++;
+      }
+    }
+    const innerOccupancy = pooledInner.active / pooledInner.support;
+    const outerOccupancy = pooledOuter.active / pooledOuter.support;
+    const innerPurity = pooledInner.convective / pooledInner.active;
+    const outerPurity = pooledOuter.convective / pooledOuter.active;
+    expect(pooledInner.active).toBeGreaterThanOrEqual(500);
+    expect(pooledOuter.active).toBeGreaterThanOrEqual(500);
+    expect(outerOccupancy / innerOccupancy).toBeLessThanOrEqual(0.7);
+    expect(outerPurity / innerPurity).toBeGreaterThanOrEqual(1.05);
+    expect(outerPurerSeeds).toBeGreaterThanOrEqual(7);
   });
 
   it('deforms a moderate sheared CDO instead of only displacing a circle', () => {

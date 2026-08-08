@@ -31,6 +31,31 @@ export const CLOUD_CROSSFADE_PERIOD_H = 0.75;
 export const CLOUD_BAND_REFERENCE_Q = 2.5;
 
 /**
+ * Cellular rainband presentation (RGR-004). A multiscale cloud-noise sample
+ * resolves roughly 35-70 km structures without exposing a single underlying
+ * value-noise lattice. The radial transition follows the observed inner/outer
+ * band regime break near 200 km.
+ * These constants change only simulated cloud presentation; rain support and
+ * the physical rain footprint remain owned by rainband-profile.ts.
+ */
+export const CLOUD_BAND_CELL_SCALE = 12;
+export const CLOUD_BAND_CELL_GATE_LO = 0.54;
+export const CLOUD_BAND_CELL_GATE_HI = 0.66;
+export const CLOUD_BAND_CELL_RIGHT_BONUS = 0.03;
+export const CLOUD_BAND_CELL_PRESENCE_GAIN = 2.2;
+export const CLOUD_BAND_CELL_LEFT_RETENTION = 0.35;
+export const CLOUD_BAND_CELL_RIGHT_GAIN = 1.35;
+export const CLOUD_BAND_CELL_SHEAR_ORGANIZATION_LO_MS = 7;
+export const CLOUD_BAND_CELL_SHEAR_ORGANIZATION_HI_MS = 15;
+export const CLOUD_BAND_REGIME_INNER_KM = 170;
+export const CLOUD_BAND_REGIME_OUTER_KM = 230;
+export const CLOUD_BAND_OUTER_STRATIFORM_FLOOR = 0;
+export const CLOUD_BAND_OUTER_CELL_GAIN = 6;
+/** Maximum cold-cell versus warm-stratiform BT separation. */
+export const CLOUD_BAND_THERMAL_CONTRAST_DEVELOPING_C = 14;
+export const CLOUD_BAND_THERMAL_CONTRAST_MATURE_C = 22;
+
+/**
  * Overshooting-top lifecycle period, sim-hours. Real tops live ~30 min, which
  * is sub-second at 3 h/s; the stretch is a display-honesty compromise covered
  * by the layer's "simulated" label.
@@ -250,6 +275,15 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
   float localCdoTopC = cdoTopC + mix(6.0, 12.0, development) *
     (1.0 - cellularColdTops);
   float bandTopC = mix(${CLOUD_TOP_BAND_DEVELOPING_C.toFixed(1)}, ${CLOUD_TOP_BAND_MATURE_C.toFixed(1)}, development);
+  // Broad stratiform band cloud stays visible, but only embedded cells claim
+  // the established cold band-top grade. The one-sided warm offset keeps the
+  // base cell grade bounded by bandTopC; the later tower pass may still add a
+  // rare, physically plausible overshoot.
+  float warmBandTopC = bandTopC + mix(
+    ${CLOUD_BAND_THERMAL_CONTRAST_DEVELOPING_C.toFixed(1)},
+    ${CLOUD_BAND_THERMAL_CONTRAST_MATURE_C.toFixed(1)},
+    development
+  );
   float cirrusTopC = mix(${CLOUD_TOP_CIRRUS_WARM_C.toFixed(1)}, ${CLOUD_TOP_CIRRUS_COLD_C.toFixed(1)}, u_organization);
 
   // Overshooting tops: deterministic per-cell pulses. Cell identity comes from
@@ -272,7 +306,30 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
   // Presence ladder (tuning constants: how strongly each component claims the
   // column before opacity compositing).
   float cirrusPresence = clamp(cirrus * 2.6, 0.0, 1.0);
-  float bandPresence = clamp(max(rainbands, precipColdCloud) * 1.45, 0.0, 1.0);
+  float bandSource = max(rainbands, precipBandCloud);
+  // Outer bands are sparser and more cell-dominant: retain a small warm cloud
+  // fringe between cells, but concentrate the thermal signature around the
+  // convective gate. Raw precipitating-cloud opacity remains unchanged.
+  float outerWarmRetention = mix(
+    1.0,
+    mix(
+      ${CLOUD_BAND_OUTER_STRATIFORM_FLOOR.toFixed(1)},
+      1.0,
+      bandCellGate * bandCellGate
+    ),
+    outerBandRegime
+  );
+  float bandPresence = clamp(
+    bandSource * outerWarmRetention * 1.45,
+    0.0,
+    1.0
+  );
+  float coldBandCellPresence = clamp(
+    bandSource * organizedBandCell * ${CLOUD_BAND_CELL_PRESENCE_GAIN.toFixed(1)} *
+      mix(1.0, ${CLOUD_BAND_OUTER_CELL_GAIN.toFixed(1)}, outerBandRegime),
+    0.0,
+    1.0
+  );
   float corePresence = clamp(coreCloud * 1.28, 0.0, 1.0);
   float towerCell = smoothstep(0.58, 0.86, fine);
   float towerPresence = clamp(max(eyewallCloud, precipColdCloud) * 1.1, 0.0, 1.0) *
@@ -284,7 +341,11 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
   float debrisPresence = clamp(memDensity * 1.3, 0.0, 1.0) * u_hasCloudMemory;
   topC = mix(topC, debrisTopC, debrisPresence);
   topC = mix(topC, cirrusTopC, cirrusPresence);
-  topC = mix(topC, bandTopC, bandPresence);
+  // Warm stratiform cloud must not warm colder cirrus already above it. A
+  // second, cell-gated pass gives optically deeper embedded towers the cold
+  // band-top floor without punching holes in the broad cloud shield.
+  topC = mix(topC, min(topC, warmBandTopC), bandPresence);
+  topC = mix(topC, min(topC, bandTopC), coldBandCellPresence);
   topC = mix(topC, localCdoTopC, corePresence);
   topC = mix(topC, min(topC, localCdoTopC) - overshootC, towerPresence);
 

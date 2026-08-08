@@ -42,7 +42,22 @@ import {
   AMBIENT_TOP_CUMULUS_COLD_C,
   AMBIENT_TOP_CUMULUS_WARM_C,
   AMBIENT_TOP_VEIL_C,
+  CLOUD_BAND_CELL_GATE_HI,
+  CLOUD_BAND_CELL_GATE_LO,
+  CLOUD_BAND_CELL_LEFT_RETENTION,
+  CLOUD_BAND_CELL_PRESENCE_GAIN,
+  CLOUD_BAND_CELL_RIGHT_BONUS,
+  CLOUD_BAND_CELL_RIGHT_GAIN,
+  CLOUD_BAND_CELL_SCALE,
+  CLOUD_BAND_CELL_SHEAR_ORGANIZATION_HI_MS,
+  CLOUD_BAND_CELL_SHEAR_ORGANIZATION_LO_MS,
+  CLOUD_BAND_OUTER_CELL_GAIN,
+  CLOUD_BAND_OUTER_STRATIFORM_FLOOR,
   CLOUD_BAND_REFERENCE_Q,
+  CLOUD_BAND_REGIME_INNER_KM,
+  CLOUD_BAND_REGIME_OUTER_KM,
+  CLOUD_BAND_THERMAL_CONTRAST_DEVELOPING_C,
+  CLOUD_BAND_THERMAL_CONTRAST_MATURE_C,
   CLOUD_CROSSFADE_PERIOD_H,
   CLOUD_PULSE_PERIOD_H,
   CLOUD_ROTATION_CAP_RAD_PER_H,
@@ -67,6 +82,7 @@ import {
 } from './render/precipitating-cloud';
 import {
   CANOPY_COEFFICIENT_DIVISOR,
+  HALF_DOMAIN_HEIGHT_KM,
   RENDER_RADIUS_FLOOR,
 } from './render/storm-radii';
 
@@ -171,7 +187,8 @@ export function sampleCloudProxy(
   const rMax = Math.max(RENDER_RADIUS_FLOOR, u.rMax);
   const rCanopy = Math.max(RENDER_RADIUS_FLOOR, u.rCanopy);
   // coreQ: eye and eyewall stay tied to the contracting inner core.
-  const q = Math.hypot(radialX, radialY) / rMax;
+  const radialLen = Math.hypot(radialX, radialY);
+  const q = radialLen / rMax;
 
   // ---- CLOUD_CORE_GLSL.wobble ----
   const coreAzimuth = Math.atan2(radialY, radialX);
@@ -441,23 +458,66 @@ export function sampleCloudProxy(
   const precipEyeCloud = precipEyewall * precipEyeSupport * precipTexture;
   const precipBandCloud = precipBandArm * precipTexture;
   const precipitatingCloud = Math.max(precipEyeCloud, precipBandCloud);
-  const precipColdCloud = precipitatingCloud * convectiveCells;
-  const bandCoherence =
-    smoothstep(0.42, 0.78, u.organization) *
-    smoothstep(0.12, 0.52, u.intensity);
-  const brokenBand =
-    smoothstep(0.28, 0.72, macro * 0.62 + fine * 0.42) *
-    mix(0.48, 1.0, primaryBand);
-  const bandShape = mix(
-    brokenBand,
-    Math.max(primaryBand, secondaryBand * 0.58),
-    bandCoherence,
-  );
-
   const canopyDirX =
     canopyQ > 0.001 ? canopyRadialX / (canopyQ * rCanopy) : shearDirX;
   const canopyDirY =
     canopyQ > 0.001 ? canopyRadialY / (canopyQ * rCanopy) : shearDirY;
+  // RGR-004 cellular-band block: exact CPU twin of env.ts.
+  const bandSkeleton = Math.max(primaryBand, secondaryBand * 0.58);
+  const bandRadiusKm = radialLen * HALF_DOMAIN_HEIGHT_KM;
+  const outerBandRegime = smoothstep(
+    CLOUD_BAND_REGIME_INNER_KM,
+    CLOUD_BAND_REGIME_OUTER_KM,
+    bandRadiusKm,
+  );
+  const hasPhysicalShear = shearLen > 0.05 ? 1 : 0;
+  const bandDirectionX = radialLen > 0.001 ? radialX / radialLen : shearDirX;
+  const bandDirectionY = radialLen > 0.001 ? radialY / radialLen : shearDirY;
+  const shearCellOrganization =
+    smoothstep(
+      CLOUD_BAND_CELL_SHEAR_ORGANIZATION_LO_MS,
+      CLOUD_BAND_CELL_SHEAR_ORGANIZATION_HI_MS,
+      u.shearAtStorm,
+    ) * hasPhysicalShear;
+  const rightOfShear = smoothstep(
+    -0.6,
+    0.6,
+    bandDirectionX * shearDirY + bandDirectionY * -shearDirX,
+  );
+  const bandCellP = glslRotate2(
+    thetaBand,
+    canopyRadialX,
+    canopyRadialY,
+  );
+  const bandCellUvX =
+    bandCellP.x * CLOUD_BAND_CELL_SCALE + seed * 0.73 + driftX * 0.04;
+  const bandCellUvY =
+    bandCellP.y * CLOUD_BAND_CELL_SCALE + seed * 1.19 + driftY * 0.04;
+  const bandCellNoise = noise.cloudNoise(bandCellUvX, bandCellUvY);
+  const bandCellGate = smoothstep(
+    CLOUD_BAND_CELL_GATE_LO,
+    CLOUD_BAND_CELL_GATE_HI,
+    bandCellNoise +
+      CLOUD_BAND_CELL_RIGHT_BONUS *
+        shearCellOrganization *
+        (2 * rightOfShear - 1),
+  );
+  const bandCellOrganization = mix(
+    1,
+    mix(
+      CLOUD_BAND_CELL_LEFT_RETENTION,
+      CLOUD_BAND_CELL_RIGHT_GAIN,
+      rightOfShear,
+    ),
+    shearCellOrganization,
+  );
+  const organizedBandCell = bandCellGate * bandCellOrganization;
+  const bandShape = bandSkeleton;
+  const precipColdCloud = Math.max(
+    precipEyeCloud * convectiveCells,
+    precipBandCloud * organizedBandCell,
+  );
+
   const upshear = Math.max(0, canopyDirX * -shearDirX + canopyDirY * -shearDirY);
   const shearErosion = 1.0 - shearN * upshear * mix(0.28, 0.62, 1.0 - moisture);
   const eyewallMaturity =
@@ -493,7 +553,15 @@ export function sampleCloudProxy(
     mix(0.28, 1.0, convectiveCells);
   // ---- end eyewall ----
 
+  // Match the physical rain-support ramp so decorative bands do not bleed
+  // into the eyewall.
+  const bandInnerGate = smoothstep(
+    RAINBAND_INNER_Q,
+    RAINBAND_INNER_FULL_Q,
+    q,
+  );
   const rainbands =
+    bandInnerGate *
     bandEnvelope *
     bandShape *
     mix(0.42, 0.96, moisture) *
@@ -588,6 +656,13 @@ export function sampleCloudProxy(
     CLOUD_TOP_BAND_MATURE_C,
     development,
   );
+  const warmBandTopC =
+    bandTopC +
+    mix(
+      CLOUD_BAND_THERMAL_CONTRAST_DEVELOPING_C,
+      CLOUD_BAND_THERMAL_CONTRAST_MATURE_C,
+      development,
+    );
   const cirrusTopC = mix(
     CLOUD_TOP_CIRRUS_WARM_C,
     CLOUD_TOP_CIRRUS_COLD_C,
@@ -615,7 +690,23 @@ export function sampleCloudProxy(
     smoothstep(0.3, 0.8, rainEnergy);
 
   const cirrusPresence = clamp01(cirrus * 2.6);
-  const bandPresence = clamp01(Math.max(rainbands, precipColdCloud) * 1.45);
+  const bandSource = Math.max(rainbands, precipBandCloud);
+  const outerWarmRetention = mix(
+    1,
+    mix(
+      CLOUD_BAND_OUTER_STRATIFORM_FLOOR,
+      1,
+      bandCellGate * bandCellGate,
+    ),
+    outerBandRegime,
+  );
+  const bandPresence = clamp01(bandSource * outerWarmRetention * 1.45);
+  const coldBandCellPresence = clamp01(
+    bandSource *
+      organizedBandCell *
+      CLOUD_BAND_CELL_PRESENCE_GAIN *
+      mix(1, CLOUD_BAND_OUTER_CELL_GAIN, outerBandRegime),
+  );
   const corePresence = clamp01(coreCloud * 1.28);
   const towerCell = smoothstep(0.58, 0.86, fine);
   const towerPresence =
@@ -628,7 +719,8 @@ export function sampleCloudProxy(
   const debrisPresence = clamp01(memDensity * 1.3) * u.hasCloudMemory;
   topC = mix(topC, debrisTopC, debrisPresence);
   topC = mix(topC, cirrusTopC, cirrusPresence);
-  topC = mix(topC, bandTopC, bandPresence);
+  topC = mix(topC, Math.min(topC, warmBandTopC), bandPresence);
+  topC = mix(topC, Math.min(topC, bandTopC), coldBandCellPresence);
   topC = mix(topC, localCdoTopC, corePresence);
   topC = mix(
     topC,

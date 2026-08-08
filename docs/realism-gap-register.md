@@ -126,6 +126,18 @@ research scope. Candidate future work, recorded in the HF-7 charter appendix.
   band-edge, and 7 weak-bin/stage paths. The CLI had displayed only its first
   20; it now reports the total and omitted count. The reference was explicitly
   resealed in the same change. R2b observed comparison remains outstanding.
+- D5 (resolved 2026-08-08): after reviewing the exact matched `final-r3`
+  Biparjoy frame-48 A/B (12 h storm age, 66 kt) at 1920x1080, zoom 2, WebGL2,
+  in both grayscale and enhanced IR, the repository owner explicitly approved
+  commit `d4c67d8` against `origin/main` at `1435cbb` for release. The accepted
+  cellular-rainband candidate keeps the broad stratiform
+  band while adding deterministic 35-70 km convective cells organized by the
+  physical shear quadrant and the documented 170-230 km radial regime break.
+  The owner verdict accepts the presentation direction of RGR-004 only; it is
+  not observed-data validation, a radiometric claim, or forecast-skill
+  evidence. Scenario identity and every sampled-frame count remain frozen, and
+  the R2a aggregate is explicitly resealed in this same change. R2b observed
+  derived-statistics comparison remains outstanding.
 
 ## Entries
 
@@ -261,11 +273,10 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
 - candidate metric: high-spatial-frequency energy (or edge density) within
   band masks, sim vs observed.
 - rough cost: L
-- disposition: candidate-r3 — deterministic implementation and final-BT
-  regression evidence are complete. A matched visual A/B on this exact tuning,
-  the repository-owner presentation verdict, and an explicit R2a reseal are
-  still required. Observed closure remains blocked on R2b.
-- local candidate (2026-08-08): the broad stratiform spiral remains connected,
+- disposition: partial-r3 — cellular-rainband presentation direction accepted
+  2026-08-08 under D5 and explicitly resealed in R2a; observed closure remains
+  blocked on R2b.
+- accepted candidate (2026-08-08): the broad stratiform spiral remains connected,
   while a separate cold-top pass embeds deterministic ~35–70 km convective
   structures. Cell occurrence and depth follow the physical shear quadrant
   (newer cells favor right-of-shear), while a 170–230 km transition makes the
@@ -302,11 +313,11 @@ in `docs/research/realism/sessions/<storm>.md`. Reference-only storms
   broad coverage; no blocking halo, seam, tiling, lattice, or opacity hole was
   observed. Enhanced IR makes some thresholded scallops and repeated cell scale
   more visible, and the circular outer canopy remains a separate open gap. The
-  expected pre-reseal `realism:check` is red with 57 descriptive aggregate
-  movements; scenario identity and every sampled-frame count remain frozen,
-  and `realism-reference.json` is still byte-identical. Do not reseal or merge
-  this candidate until the
-  repository-owner verdict is recorded.
+  repository owner approved this exact `final-r3` A/B under D5. The expected
+  pre-reseal comparison contained 57 descriptive aggregate movements; scenario
+  identity and every sampled-frame count remained frozen. The reference was
+  then explicitly resealed in this same change, and `npm run realism:check` is
+  green.
 
 ### RGR-005 — Cold-top palette saturates too cold at moderate intensity
 - subsystem: ir-clouds

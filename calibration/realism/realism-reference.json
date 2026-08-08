@@ -67,8 +67,8 @@
           },
           "coldTopAreaKm2": {
             "count": 1,
-            "median": 386.594228007,
-            "mean": 386.594228007
+            "median": 0,
+            "mean": 0
           }
         },
         "083-100": {
@@ -79,8 +79,8 @@
           },
           "coldTopAreaKm2": {
             "count": 1,
-            "median": 7354.968508676,
-            "mean": 7354.968508676
+            "median": 5264.609037789,
+            "mean": 5264.609037789
           }
         },
         "100-200": {
@@ -91,8 +91,8 @@
           },
           "coldTopAreaKm2": {
             "count": 1,
-            "median": 11153.693706527,
-            "mean": 11153.693706527
+            "median": 9372.200961734,
+            "mean": 9372.200961734
           }
         }
       },
@@ -171,43 +171,43 @@
       "unbinned": {
         "coldTopCentroidOffsetKm": {
           "count": 2,
-          "median": 30.569332833,
-          "mean": 30.569332833
+          "median": 29.15853678,
+          "mean": 29.15853678
         },
         "coldTopAbsCentroidBearingRelToShearDeg": {
           "count": 2,
-          "median": 102.916610276,
-          "mean": 102.916610276
+          "median": 91.271279049,
+          "mean": 91.271279049
         },
         "bandEdgeInnerCPerKm": {
           "count": 26,
-          "median": 0.237820038,
-          "mean": 0.261531441
+          "median": 0.236100086,
+          "mean": 0.267618019
         },
         "bandEdgeOuterCPerKm": {
           "count": 26,
-          "median": 0.202226471,
-          "mean": 0.233071808
+          "median": 0.207979698,
+          "mean": 0.255011118
         },
         "bandEdgeQuadrantDownshearLeftCPerKm": {
           "count": 26,
-          "median": 0.237064748,
-          "mean": 0.261860916
+          "median": 0.217826881,
+          "mean": 0.248737196
         },
         "bandEdgeQuadrantDownshearRightCPerKm": {
           "count": 26,
-          "median": 0.233067958,
-          "mean": 0.252989909
+          "median": 0.26804069,
+          "mean": 0.288017689
         },
         "bandEdgeQuadrantUpshearLeftCPerKm": {
           "count": 26,
-          "median": 0.194734462,
-          "mean": 0.226450781
+          "median": 0.208736254,
+          "mean": 0.239979125
         },
         "bandEdgeQuadrantUpshearRightCPerKm": {
           "count": 24,
-          "median": 0.179942054,
-          "mean": 0.213061174
+          "median": 0.220253509,
+          "mean": 0.267561399
         }
       }
     },
@@ -223,7 +223,7 @@
           "coldTopAreaKm2": {
             "count": 15,
             "median": 0,
-            "mean": 40.29851123
+            "mean": 20.149255615
           }
         },
         "035-050": {
@@ -234,8 +234,8 @@
           },
           "coldTopAreaKm2": {
             "count": 12,
-            "median": 1828.567965698,
-            "mean": 2414.852029591
+            "median": 819.726195585,
+            "mean": 1372.136918783
           }
         },
         "050-064": {
@@ -246,8 +246,8 @@
           },
           "coldTopAreaKm2": {
             "count": 6,
-            "median": 9801.924875299,
-            "mean": 9019.788713016
+            "median": 5373.594948226,
+            "mean": 5095.78302141
           }
         },
         "064-083": {
@@ -258,8 +258,8 @@
           },
           "coldTopAreaKm2": {
             "count": 12,
-            "median": 17418.397015371,
-            "mean": 17811.605888841
+            "median": 10260.91334699,
+            "mean": 11192.053382996
           }
         },
         "083-100": {
@@ -270,8 +270,8 @@
           },
           "coldTopAreaKm2": {
             "count": 2,
-            "median": 41329.739166291,
-            "mean": 41329.739166291
+            "median": 31441.033726374,
+            "mean": 31441.033726374
           }
         },
         "100-200": {
@@ -282,8 +282,8 @@
           },
           "coldTopAreaKm2": {
             "count": 2,
-            "median": 61725.04224183,
-            "mean": 61725.04224183
+            "median": 58774.630055737,
+            "mean": 58774.630055737
           }
         }
       },
@@ -291,17 +291,17 @@
         "m05": {
           "count": 27,
           "median": 0.225362164,
-          "mean": 0.208353192
+          "mean": 0.208391048
         },
         "m08": {
           "count": 11,
-          "median": 0.210112936,
-          "mean": 0.174025496
+          "median": 0.2067564,
+          "mean": 0.175107557
         },
         "m09": {
           "count": 11,
           "median": 0.048959503,
-          "mean": 0.07539526
+          "mean": 0.075422467
         }
       },
       "weakBinByStage": {
@@ -309,12 +309,12 @@
           "coldTopAreaKm2": {
             "count": 15,
             "median": 0,
-            "mean": 40.29851123
+            "mean": 20.149255615
           },
           "coldTopCentroidOffsetKm": {
-            "count": 1,
-            "median": 30.78509404,
-            "mean": 30.78509404
+            "count": 0,
+            "median": null,
+            "mean": null
           }
         },
         "020-035|pre-peak": {
@@ -332,68 +332,68 @@
         "035-050|post-peak": {
           "coldTopAreaKm2": {
             "count": 4,
-            "median": 3573.718446409,
-            "mean": 4921.152447189
+            "median": 1495.190691366,
+            "mean": 2946.204377498
           },
           "coldTopCentroidOffsetKm": {
             "count": 4,
-            "median": 28.715587161,
-            "mean": 25.663629287
+            "median": 35.121167463,
+            "mean": 31.635015662
           }
         },
         "035-050|pre-peak": {
           "coldTopAreaKm2": {
             "count": 8,
-            "median": 622.597352699,
-            "mean": 1161.701820792
+            "median": 182.912454561,
+            "mean": 585.103189426
           },
           "coldTopCentroidOffsetKm": {
-            "count": 4,
-            "median": 37.286527988,
-            "mean": 37.831869782
+            "count": 3,
+            "median": 34.426821814,
+            "mean": 34.356935473
           }
         }
       },
       "unbinned": {
         "coldTopCentroidOffsetKm": {
-          "count": 31,
-          "median": 28.03846589,
-          "mean": 27.023858959
+          "count": 29,
+          "median": 24.447644938,
+          "mean": 24.782605675
         },
         "coldTopAbsCentroidBearingRelToShearDeg": {
-          "count": 31,
-          "median": 37.561187727,
-          "mean": 40.833244461
+          "count": 29,
+          "median": 30.053608801,
+          "mean": 46.071155683
         },
         "bandEdgeInnerCPerKm": {
           "count": 49,
-          "median": 0.497795465,
-          "mean": 0.510863387
+          "median": 0.57278385,
+          "mean": 0.580513113
         },
         "bandEdgeOuterCPerKm": {
           "count": 45,
-          "median": 0.431879795,
-          "mean": 0.439122824
+          "median": 0.521046772,
+          "mean": 0.523019307
         },
         "bandEdgeQuadrantDownshearLeftCPerKm": {
           "count": 49,
-          "median": 0.472251053,
-          "mean": 0.488227389
+          "median": 0.519891441,
+          "mean": 0.537584696
         },
         "bandEdgeQuadrantDownshearRightCPerKm": {
           "count": 49,
-          "median": 0.441070717,
-          "mean": 0.455853247
+          "median": 0.54601626,
+          "mean": 0.55884186
         },
         "bandEdgeQuadrantUpshearLeftCPerKm": {
           "count": 49,
-          "median": 0.465403307,
-          "mean": 0.459866576
+          "median": 0.526577637,
+          "mean": 0.51971296
         },
         "bandEdgeQuadrantUpshearRightCPerKm": {
           "count": 49,
-          "median": 0.464672506,
-          "mean": 0.465172849
+          "median": 0.559210598,
+          "mean": 0.570662587
         }
       }
     }

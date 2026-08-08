@@ -12,7 +12,7 @@ import { TOKENS } from '../tokens';
 import { EYEWALL_WIDTH_Q, RAINBAND_AZIMUTHAL_MEAN, RAINBAND_INNER_FULL_Q, RAINBAND_INNER_Q, RAINBAND_SPIRAL_AMPLITUDE, RAINBAND_SPIRAL_ARMS, RAINBAND_SPIRAL_PITCH, RAINBAND_SPIRAL_ROTATION_PER_H, rainbandOuterBounds } from '../rainband-profile';
 import type { SatellitePaletteId, WeatherLayerId } from '../weather-layers';
 import { CLOUD_MEMORY_DT_H, CLOUD_MEMORY_MACRO_GAIN, DEBRIS_MAX_CLOUD } from './cloud-memory';
-import { AMBIENT_RH_DRIVE_HI, AMBIENT_RH_DRIVE_LO, AMBIENT_TOP_CONGESTUS_COLD_C, AMBIENT_TOP_CONGESTUS_WARM_C, AMBIENT_TOP_CUMULUS_COLD_C, AMBIENT_TOP_CUMULUS_WARM_C, AMBIENT_TOP_VEIL_C, CLOUD_BAND_CELL_GATE_HI, CLOUD_BAND_CELL_GATE_LO, CLOUD_BAND_CELL_LEFT_RETENTION, CLOUD_BAND_CELL_RIGHT_BONUS, CLOUD_BAND_CELL_RIGHT_GAIN, CLOUD_BAND_CELL_SCALE, CLOUD_BAND_CELL_SHEAR_ORGANIZATION_HI_MS, CLOUD_BAND_CELL_SHEAR_ORGANIZATION_LO_MS, CLOUD_BAND_REFERENCE_Q, CLOUD_BAND_REGIME_INNER_KM, CLOUD_BAND_REGIME_OUTER_KM, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, LEGACY_CLOUD_ROTATION_RAD_PER_H, cloudMetricX, cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
+import { AMBIENT_RH_DRIVE_HI, AMBIENT_RH_DRIVE_LO, AMBIENT_TOP_CONGESTUS_COLD_C, AMBIENT_TOP_CONGESTUS_WARM_C, AMBIENT_TOP_CUMULUS_COLD_C, AMBIENT_TOP_CUMULUS_WARM_C, AMBIENT_TOP_VEIL_C, CLOUD_BAND_CELL_GATE_HI, CLOUD_BAND_CELL_GATE_LO, CLOUD_BAND_CELL_LEFT_RETENTION, CLOUD_BAND_CELL_RIGHT_BONUS, CLOUD_BAND_CELL_RIGHT_GAIN, CLOUD_BAND_CELL_SCALE, CLOUD_BAND_CELL_SHEAR_ORGANIZATION_HI_MS, CLOUD_BAND_CELL_SHEAR_ORGANIZATION_LO_MS, CLOUD_BAND_REFERENCE_Q, CLOUD_BAND_REGIME_INNER_KM, CLOUD_BAND_REGIME_OUTER_KM, CLOUD_CORE_GLSL, CLOUD_CROSSFADE_PERIOD_H, CLOUD_MOTION_GLSL, CLOUD_RELIEF_GLSL, CLOUD_TOPS_GLSL, CLOUD_WEAK_BURST_ACTIVITY_HI, CLOUD_WEAK_BURST_ACTIVITY_LO, CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_HI, CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_LO, CLOUD_WEAK_BURST_INTENSITY_GATE_HI, CLOUD_WEAK_BURST_INTENSITY_GATE_LO, CLOUD_WEAK_BURST_ORGANIZATION_GATE_HI, CLOUD_WEAK_BURST_ORGANIZATION_GATE_LO, CLOUD_WEAK_RAINBAND_RETENTION, LEGACY_CLOUD_ROTATION_RAD_PER_H, cloudMetricX, cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
 import { cloudNoiseBytes } from './cloud-noise';
 import type { DrawCtx, GpuTextures, RenderModule } from './context';
 import {
@@ -287,6 +287,41 @@ ${CLOUD_CORE_GLSL.wobble}
   float moisture = clamp((u_midlevelRh - 0.25) / 0.62, 0.0, 1.0);
   float rainEnergy = clamp((u_eyewallRain + 0.7 * u_rainbandRain) / 28.0, 0.0, 1.0);
   float development = clamp(0.56 * u_organization + 0.44 * u_intensity, 0.0, 1.0);
+  // RGR-006: weak disturbances are convective burst complexes, not miniature
+  // mature vortices. Wind alone forces the weak regime through 40 kt; a
+  // disorganized storm fades out of it more slowly. Both branches are exactly
+  // zero in the accepted moderate/mature regime.
+  float weakWind = 1.0 - smoothstep(
+    ${CLOUD_WEAK_BURST_INTENSITY_GATE_LO.toFixed(2)},
+    ${CLOUD_WEAK_BURST_INTENSITY_GATE_HI.toFixed(2)},
+    u_intensity
+  );
+  float weakDisorganization = 1.0 - smoothstep(
+      ${CLOUD_WEAK_BURST_ORGANIZATION_GATE_LO.toFixed(2)},
+      ${CLOUD_WEAK_BURST_ORGANIZATION_GATE_HI.toFixed(2)},
+      u_organization
+    );
+  float disorganizationIntensityCeiling = 1.0 - smoothstep(
+      ${CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_LO.toFixed(2)},
+      ${CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_HI.toFixed(2)},
+      u_intensity
+    );
+  float weakMorphology = max(
+    weakWind,
+    weakDisorganization * disorganizationIntensityCeiling
+  );
+  float weakBurstLifecycle = smoothstep(
+    ${CLOUD_WEAK_BURST_ACTIVITY_LO.toFixed(2)},
+    ${CLOUD_WEAK_BURST_ACTIVITY_HI.toFixed(2)},
+    development
+  );
+  float weakBurstActivity = weakBurstLifecycle *
+    mix(0.18, 1.0, smoothstep(0.06, 0.28, rainEnergy));
+  float weakBurstCarrierActivity = smoothstep(
+    0.18,
+    0.62,
+    max(weakBurstActivity, weakBurstLifecycle * 0.35)
+  );
   float coreRadius = mix(
     ${2.25 / CANOPY_COEFFICIENT_DIVISOR},
     ${3.55 / CANOPY_COEFFICIENT_DIVISOR},
@@ -303,6 +338,93 @@ ${CLOUD_CORE_GLSL.wobble}
   // A fallback axis keeps legacy texture/displacement math finite, but only a
   // real vector may create a physical-looking elongated outflow signature.
   float anisotropyShearN = shearN * (length(u_shearVector) > 0.05 ? 1.0 : 0.0);
+  // Three unequal, overlapping convective lobes. Their identity comes only
+  // from the genesis seed, so the complex persists through replay instead of
+  // reseeding per frame. Real shear biases (but does not dictate) the complex;
+  // in calm flow the seed supplies the orientation.
+  // Arithmetic seed fractions, not sine hashes: whole-lobe geometry must not
+  // diverge between JS doubles and vendor-specific shader float precision.
+  float burstJitterA = fract(seed * 7.13 + 0.17) - 0.5;
+  float burstJitterB = fract(seed * 11.71 + 0.53) - 0.5;
+  float burstJitterC = fract(seed * 17.31 + 0.89) - 0.5;
+  float burstSeedAngle = 6.2831853 * fract(seed * 0.61803398875 + 0.137);
+  vec2 burstSeedDir = vec2(cos(burstSeedAngle), sin(burstSeedAngle));
+  float burstShearBias = 0.42 * smoothstep(6.0, 16.0, u_shearAtStorm) *
+    (length(u_shearVector) > 0.05 ? 1.0 : 0.0);
+  vec2 burstAxis = normalize(mix(burstSeedDir, shearDir, burstShearBias));
+  vec2 burstCrossAxis = vec2(-burstAxis.y, burstAxis.x);
+  float burstAlong = dot(canopyNorm, burstAxis);
+  float burstCross = dot(canopyNorm, burstCrossAxis);
+  vec2 burstLobe1P = vec2(
+    (burstAlong - (0.68 + 0.22 * burstJitterA)) / (0.58 + 0.10 * burstJitterB),
+    (burstCross - (-0.08 + 0.18 * burstJitterB)) / (0.27 + 0.05 * burstJitterC)
+  );
+  vec2 burstLobe2P = vec2(
+    (burstAlong - (0.18 + 0.20 * burstJitterC)) / (0.38 + 0.06 * burstJitterA),
+    (burstCross - (0.43 + 0.18 * burstJitterA)) / (0.23 + 0.04 * burstJitterB)
+  );
+  vec2 burstLobe3P = vec2(
+    (burstAlong - (-0.08 + 0.18 * burstJitterB)) / (0.32 + 0.05 * burstJitterC),
+    (burstCross - (-0.36 + 0.22 * burstJitterC)) / (0.20 + 0.04 * burstJitterA)
+  );
+  // Distort each ellipse with a different blend of the existing advected
+  // textures. This keeps the macro components persistent while preventing
+  // smooth, equal Gaussian petals from reading as a schematic icon.
+  float burstTextureA = clamp(
+    macro * 0.56 + fine * 0.52 + 0.18 * burstJitterA,
+    0.0,
+    1.0
+  );
+  float burstTextureB = clamp(
+    macro * 0.25 + fine * 0.78 + 0.18 * burstJitterB,
+    0.0,
+    1.0
+  );
+  float burstTextureC = clamp(
+    macro * 0.82 + fine * 0.22 + 0.18 * burstJitterC,
+    0.0,
+    1.0
+  );
+  float burstLobe1 = exp(
+    -dot(burstLobe1P, burstLobe1P) * mix(1.42, 0.66, burstTextureA)
+  ) * (0.98 + 0.10 * burstJitterA) * mix(0.58, 1.12, burstTextureA);
+  float burstLobe2 = exp(
+    -dot(burstLobe2P, burstLobe2P) * mix(1.50, 0.70, burstTextureB)
+  ) * (0.90 + 0.16 * burstJitterB) * mix(0.54, 1.10, burstTextureB);
+  float burstLobe3 = exp(
+    -dot(burstLobe3P, burstLobe3P) * mix(1.58, 0.74, burstTextureC)
+  ) * (0.72 + 0.16 * burstJitterC) * mix(0.50, 1.08, burstTextureC);
+  float weakBurstField = max(burstLobe1, max(burstLobe2, burstLobe3));
+  float weakBurstEnvelope = smoothstep(
+    0.10,
+    0.62,
+    weakBurstField * mix(0.70, 1.20, macro * 0.68 + fine * 0.32)
+  );
+  float weakBurstMidEnvelope = smoothstep(
+    0.24,
+    0.62,
+    weakBurstField * mix(0.70, 1.20, macro * 0.68 + fine * 0.32)
+  );
+  // A weak-system anvil is one frayed carrier around the burst complex, not
+  // three enlarged copies of its cells. Keeping this envelope unified removes
+  // the telltale clover silhouette while the colder field above stays lobed.
+  vec2 burstCarrierP = vec2(
+    (burstAlong - (0.48 + 0.10 * burstJitterA)) / (1.36 + 0.10 * burstJitterB),
+    (burstCross - (0.01 + 0.08 * burstJitterC)) / (0.80 + 0.08 * burstJitterA)
+  );
+  float burstCarrierSide = smoothstep(
+    -0.16,
+    0.30,
+    burstAlong + 0.04 * burstJitterB
+  );
+  float weakBurstAnvilField = exp(
+    -dot(burstCarrierP, burstCarrierP) * mix(1.22, 0.72, burstTextureA)
+  ) * (0.90 + 0.12 * burstJitterB) * mix(0.08, 1.0, burstCarrierSide);
+  float weakBurstAnvil = smoothstep(
+    0.10,
+    0.72,
+    weakBurstAnvilField * mix(0.76, 1.16, macro)
+  );
   float downshearSide = smoothstep(-0.35, 0.55, canopyAlong);
   float coreAlongScale = mix(
     1.0 - 0.26 * anisotropyShearN,
@@ -442,6 +564,19 @@ ${CLOUD_CORE_GLSL.wobble}
   // cloudNoise blends eight smoothly interpolated frequency/channel terms;
   // unlike a direct B/A tap, its sharpened contours do not expose one lattice.
   float bandCellNoise = cloudNoise(bandCellUv);
+  // Reuse the accepted high-frequency band-cell texture inside weak burst
+  // lobes. The broad geometry stays seed-persistent, while cold towers occupy
+  // irregular sub-cells instead of filling each Gaussian into a round petal.
+  float weakBurstCellTexture = smoothstep(
+    0.38,
+    0.68,
+    bandCellNoise * 0.72 + fine * 0.34
+  );
+  float weakBurstCarrierTexture = smoothstep(
+    0.28,
+    0.70,
+    bandCellNoise * 0.60 + macro * 0.44
+  );
   float bandCellGate = smoothstep(
     ${CLOUD_BAND_CELL_GATE_LO},
     ${CLOUD_BAND_CELL_GATE_HI},
@@ -478,10 +613,39 @@ ${CLOUD_CORE_GLSL.wobble}
     0.78,
     fine * 0.70 + macro * 0.36
   );
-  float coreCloud = centralOvercast *
+  float organizedCoreCloud = centralOvercast *
     mix(0.66, 0.94, development) *
     mix(0.72, 1.0, cellularColdTops) *
     mix(0.88, 1.0, macro);
+  float weakBurstCloud = weakBurstEnvelope *
+    mix(0.10, 0.84, weakBurstActivity) *
+    mix(0.08, 1.0, weakBurstCellTexture) *
+    mix(0.28, 1.0, cellularColdTops) *
+    mix(0.84, 1.0, macro);
+  float weakBurstColdEnvelope = smoothstep(
+    0.40,
+    0.72,
+    weakBurstField * mix(0.72, 1.15, cellularColdTops)
+  );
+  float weakBurstCellMidThermal = weakBurstMidEnvelope *
+    mix(0.06, 1.0, weakBurstCarrierActivity) *
+    mix(0.08, 1.0, weakBurstCellTexture) *
+    mix(0.28, 1.0, cellularColdTops);
+  // The mid-cold carrier follows the single frayed anvil envelope, so broad
+  // cloud remains around the cells without resurrecting three enlarged lobes.
+  float weakBurstCarrierMidThermal = weakBurstAnvil *
+    mix(0.04, 0.74, weakBurstCarrierActivity) *
+    mix(0.34, 1.0, macro) *
+    mix(0.20, 1.0, weakBurstCarrierTexture);
+  float weakBurstMidThermal = max(
+    weakBurstCellMidThermal,
+    weakBurstCarrierMidThermal
+  );
+  float weakBurstThermalCore = weakBurstColdEnvelope *
+    mix(0.08, 1.0, weakBurstActivity) *
+    mix(0.06, 1.12, weakBurstCellTexture) *
+    mix(0.16, 1.0, cellularColdTops);
+  float coreCloud = mix(organizedCoreCloud, weakBurstCloud, weakMorphology);
 ${CLOUD_CORE_GLSL.eyewall}
   // Keep the decorative band canopy out of the eyewall. The physical
   // rain-support arm already uses this same sealed radial ramp.
@@ -494,7 +658,12 @@ ${CLOUD_CORE_GLSL.eyewall}
     bandShape *
     mix(0.42, 0.96, moisture) *
     mix(0.46, 1.0, convectiveCells) *
-    mix(0.62, 1.0, development);
+    mix(0.62, 1.0, development) *
+    mix(
+      ${CLOUD_WEAK_RAINBAND_RETENTION.toFixed(2)},
+      1.0,
+      1.0 - weakMorphology
+    );
 
   // Cirrus streams along the shear axis (outflow proxy -- pure translation of
   // REPEAT noise: zero distortion, zero extra lookups; see plan note).
@@ -523,8 +692,14 @@ ${CLOUD_CORE_GLSL.eyewall}
     (macro - 0.5) * 0.28) * smoothstep(0.22, 1.40, anisotropicCirrusQ);
   float warpedCirrusQ = max(0.0, anisotropicCirrusQ - cirrusEdgeWarp);
   float cirrusEnvelope = 1.0 - smoothstep(0.34, 2.65, warpedCirrusQ);
-  float cirrus = cirrusEnvelope * mix(0.18, 1.0, cirrusTexture) *
+  float organizedCirrus = cirrusEnvelope * mix(0.18, 1.0, cirrusTexture) *
     mix(0.20, 0.44, u_organization) * mix(0.82, 1.16, shearN);
+  float weakBurstCirrus = weakBurstAnvil *
+    mix(0.30, 0.98, cirrusTexture) *
+    mix(0.24, 1.0, weakBurstCarrierTexture) *
+    mix(0.28, 1.0, weakBurstCarrierActivity) *
+    mix(0.90, 1.05, shearN);
+  float cirrus = mix(organizedCirrus, weakBurstCirrus, weakMorphology);
 
   float eyeStrength = smoothstep(0.70, 0.90, u_intensity) *
     smoothstep(0.74, 0.88, u_organization) *
@@ -538,7 +713,12 @@ ${CLOUD_CORE_GLSL.eyewall}
   );
   stormCloud *= 1.0 - eye * eyeStrength * 0.97;
   stormCloud *= u_stormPresence;
-  float cloud = max(ambientCloud * (1.0 - centralOvercast * u_stormPresence), stormCloud);
+  // Suppress the environmental deck only where the stage-scaled storm carrier
+  // actually exists. Raw geometry here would carve a dark ghost after decay.
+  float weakStormOcclusion = max(weakBurstCloud, weakBurstCirrus) *
+    weakBurstCarrierActivity;
+  float stormOcclusion = mix(centralOvercast, weakStormOcclusion, weakMorphology);
+  float cloud = max(ambientCloud * (1.0 - stormOcclusion * u_stormPresence), stormCloud);
   // Debris: decaying stratiform deck the storm leaves behind. Deliberately
   // outside stormCloud so shear erosion and storm presence cannot erase the
   // wake the storm already shed.

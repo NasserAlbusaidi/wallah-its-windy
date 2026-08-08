@@ -234,6 +234,45 @@ Findings:
 > conditioning the cloudy-area-fraction metric on month/season rather
 > than testing against one constant target. Informs RGR-001.
 
+## 6. Pre-genesis convective organization
+
+- Wang, Z., 2018: What Is the Key Feature of Convection Leading up to
+  Tropical Cyclone Formation? J. Atmos. Sci., 75, 1609-1629.
+  doi:`10.1175/JAS-D-17-0131.1`
+- Chang, M., et al., 2017: Multiday Evolution of Convective Bursts during
+  Western North Pacific Tropical Cyclone Development and Nondevelopment
+  Using Geostationary Satellite Measurements. J. Geophys. Res. Atmos.,
+  122, 1635-1649. doi:`10.1002/2016JD025535`
+
+Findings:
+
+- Weak-stage convection is not one recurrent miniature cyclone pattern.
+  Cluster analysis of more than 150 Atlantic genesis cases found three
+  distinct IR spatial regimes: a large convective system displaced roughly
+  4-5 degrees from the pouch center, a smaller and weaker system that was
+  more centered, and a large system with a smaller displacement. Convective
+  intensity, area, and duration varied substantially between storms; the
+  composite is an occurrence probability, not a shape every storm repeats
+  (Wang 2018).
+- Organization changes toward genesis: the occurrence of deep convection
+  increases in the inner pouch, and convection becomes more effective at
+  strengthening the protovortex as its maximum approaches the circulation
+  center. A displaced burst complex is therefore a weak-stage possibility,
+  not a shape that should remain fixed through maturation (Wang 2018).
+- Repeated bursts are common before formation: 67.5% of 80 developing
+  disturbances, versus 13.8% of 383 nondeveloping disturbances, exhibited
+  multiday convective bursts in the satellite analysis (Chang et al. 2017).
+  This supports episodic clustered texture instead of one continuously
+  organized spiral, while the basin-specific frequency remains unverified.
+
+> **Anchor:** RGR-006 should replace the deterministic centered mini-vortex
+> at weak intensity with a seed-varying distribution of multi-lobed burst
+> complexes, including both displaced and relatively centered realizations,
+> and blend back toward an organized core as development rises. Metrics should
+> test the distribution of centroid offsets and component topology across a
+> frozen seed matrix rather than require every weak storm to have the same
+> displacement. Informs RGR-006 and RGR-009.
+
 ## Verification summary
 
 | Topic | Verified this session | Needs verification |
@@ -243,6 +282,7 @@ Findings:
 | Canopy/outflow | edge-formation mechanism, weak size-intensity correlation | shield-radius percentile (attribution unresolved — see §3); Arabian Sea-specific size climatology |
 | Rainband geometry | 200 km regime break, shear-quadrant organization | band spacing (km); crossing angle (degrees) |
 | Arabian Sea cloud | seasonal cycle shape, N/S regional asymmetry | single monsoon/post-monsoon cloud-fraction number |
+| Pre-genesis convection | spatial-pattern variability, inward organization, multiday-burst frequency | North Indian Ocean-specific pattern and frequency |
 
 Papers were located via search-engine indexing of AMS, AGU/Wiley, and
 NOAA/NASA repository listings; several primary PDFs (AMS journals: 403,

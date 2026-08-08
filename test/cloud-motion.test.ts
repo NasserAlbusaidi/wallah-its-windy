@@ -25,10 +25,14 @@ import {
   CLOUD_TOP_CIRRUS_COLD_C,
   CLOUD_TOP_CIRRUS_WARM_C,
   CLOUD_TOPS_GLSL,
+  CLOUD_WEAK_COLD_BAND_THERMAL_RETENTION,
+  CLOUD_WEAK_RAINBAND_RETENTION,
+  CLOUD_WEAK_WARM_BAND_THERMAL_RETENTION,
   cloudAngularRateAtClipRadius,
   cloudAngularRateRadPerH,
   flowPhaseState,
   interpolatedCloudAgeH,
+  weakBurstMorphologyWeight,
 } from '../src/render/cloud-motion';
 
 describe('cellular rainband presentation constants', () => {
@@ -69,6 +73,31 @@ describe('interpolatedCloudAgeH', () => {
   test('never runs backwards across a storm respawn', () => {
     // prev frame belonged to the old storm (age 87 h), new storm is 0.25 h old
     expect(interpolatedCloudAgeH(87, 0.25, 0.5)).toBe(0.25);
+  });
+});
+
+describe('weak-stage burst-complex gate', () => {
+  test('is full through 40 kt and exactly off at 55 kt', () => {
+    expect(weakBurstMorphologyWeight(0.15, 0.9)).toBe(1);
+    expect(weakBurstMorphologyWeight(0.2, 0.9)).toBe(1);
+    expect(weakBurstMorphologyWeight(0.25, 0.7)).toBeCloseTo(0.5, 12);
+    expect(weakBurstMorphologyWeight(0.35, 0.2)).toBe(0);
+    expect(weakBurstMorphologyWeight(0.35, 0.55)).toBe(0);
+    expect(weakBurstMorphologyWeight(0.5, 0.7)).toBe(0);
+  });
+
+  test('fades continuously and pins presentation-only retention', () => {
+    let largestStep = 0;
+    let previous = weakBurstMorphologyWeight(0.18, 0.3);
+    for (let intensity = 0.181; intensity <= 0.43; intensity += 0.001) {
+      const current = weakBurstMorphologyWeight(intensity, 0.3);
+      largestStep = Math.max(largestStep, Math.abs(current - previous));
+      previous = current;
+    }
+    expect(largestStep).toBeLessThan(0.04);
+    expect(CLOUD_WEAK_RAINBAND_RETENTION).toBe(0.12);
+    expect(CLOUD_WEAK_WARM_BAND_THERMAL_RETENTION).toBe(0.2);
+    expect(CLOUD_WEAK_COLD_BAND_THERMAL_RETENTION).toBe(0.06);
   });
 });
 
@@ -137,14 +166,14 @@ describe('cloud-top component temperature constants', () => {
     expect(CLOUD_TOP_CIRRUS_COLD_C).toBe(-48);
   });
 
-  test('keeps the emitted CLOUD_TOPS_GLSL byte-identical (morphology R3 digest)', () => {
-    // sha256 of CLOUD_TOPS_GLSL captured on 2026-08-08 after the RGR-004
-    // cellular-band thermal-topology pass (3781 chars). Any change to the
-    // emitted shader text fails here.
+  test('keeps the emitted CLOUD_TOPS_GLSL byte-identical (morphology R4 digest)', () => {
+    // sha256 of CLOUD_TOPS_GLSL captured on 2026-08-08 after the accepted
+    // RGR-006/RGR-009 weak-burst and decay pass (4886 chars). Any change to
+    // the emitted shader text fails here.
     const digest = createHash('sha256').update(CLOUD_TOPS_GLSL).digest('hex');
     expect(digest).toBe(
-      '2df916dcda2044fa26d5b2d169eebfdd5614c75242242d7f80a0cd5b1095c927',
+      '8e4762288f4205d977c9836ba1bb77407e06bfd602e8c554d8a13539c6c48aa7',
     );
-    expect(CLOUD_TOPS_GLSL.length).toBe(3781);
+    expect(CLOUD_TOPS_GLSL.length).toBe(4886);
   });
 });

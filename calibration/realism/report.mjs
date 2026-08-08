@@ -250,7 +250,7 @@ ${scenarioTable(result.scenarios)}
 | Eye contrast by intensity bin | RGR-002 | Dvorak (1984) / Velden et al. (2006) / Olander & Velden (2007) eye-onset climatology — order-of-relationship only (T4.5 ≈ 77 kt and T5.0 ≈ 90 kt need verification) |
 | Cold-top centroid offset and bearing rel. shear | RGR-003 | Hence & Houze (2012) shear-quadrant convective organization |
 | Band edge energy, inner/outer split and shear quadrants | RGR-004 | Hence & Houze (2012) 200 km regime break plus shear-quadrant organization |
-| Cold-top area and centroid offset, weak bins × stage | RGR-006 | No literature anchor recovered; captures-only comparison |
+| Cold-top area and centroid offset, weak bins × stage | RGR-006 | Wang (2018) displaced/centered pre-genesis regimes and Chang et al. (2017) multiday convective bursts — qualitative distribution only (North Indian Ocean-specific frequency unverified) |
 | Cold-top area by intensity bin | RGR-013 | Merrill (1984) weak size–intensity correlation — order-of-relationship only (the ~550–600 km shield-radius figure needs verification) |
 
 ## Observed references

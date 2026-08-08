@@ -47,7 +47,7 @@ function openOcean() {
  * openOcean while silencing ambient cloud — for pins that must measure the
  * storm's own morphology, not storm-plus-environment.
  */
-function dryEnvironment() {
+function uniformEnvironment(rhPct: number) {
   const layer = (name: string, value: number): BinLayer => ({
     name,
     dtype: DType.float32,
@@ -60,7 +60,7 @@ function dryEnvironment() {
     offset: 0,
     data: new Float32Array([value, value]),
   });
-  const layers = [layer('rh_05', 20), layer('sst_05', 28)];
+  const layers = [layer('rh_05', rhPct), layer('sst_05', 28)];
   return {
     envBin: {
       version: 1,
@@ -70,6 +70,14 @@ function dryEnvironment() {
     noise: new RealismNoise(),
     debris: null,
   };
+}
+
+function dryEnvironment() {
+  return uniformEnvironment(20);
+}
+
+function moistEnvironment() {
+  return uniformEnvironment(65);
 }
 
 function stormFrame(options: {
@@ -325,6 +333,115 @@ function connectedComponentSizes(active: Uint8Array, n: number): number[] {
   return componentSizes.sort((a, b) => b - a);
 }
 
+interface WeakColdTopology {
+  cells: number;
+  meaningfulCells: number;
+  centroidOffsetKm: number;
+  meaningfulComponents: number;
+  largestComponentShare: number;
+  maxAnnularClosure: number;
+}
+
+const MIN_WEAK_COMPONENT_CELLS = 8;
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
+function weakColdTopology(
+  field: RealismField,
+  thresholdC: number,
+): WeakColdTopology {
+  const active = new Uint8Array(field.n * field.n);
+  const sectorCold = Array.from({ length: 15 }, () => new Uint16Array(24));
+  const sectorTotal = Array.from({ length: 15 }, () => new Uint16Array(24));
+  let cells = 0;
+  let eastSum = 0;
+  let northSum = 0;
+  for (let j = 0; j < field.n; j++) {
+    for (let i = 0; i < field.n; i++) {
+      const index = j * field.n + i;
+      const offset = cellOffsetKm(field, i, j);
+      const radiusKm = Math.hypot(offset.east, offset.north);
+      if (radiusKm > 360) continue;
+      const annulus = Math.floor(radiusKm / 25);
+      const angle = Math.atan2(offset.north, offset.east);
+      const sector = Math.floor(((angle + Math.PI) / (2 * Math.PI)) * 24) % 24;
+      sectorTotal[annulus][sector]++;
+      const brightnessC = field.btProxyC[index];
+      if (!Number.isFinite(brightnessC)) {
+        throw new Error('weak cold-top field contains a non-finite value');
+      }
+      if (brightnessC > thresholdC) continue;
+      sectorCold[annulus][sector]++;
+      active[index] = 1;
+      cells++;
+      eastSum += offset.east;
+      northSum += offset.north;
+    }
+  }
+  if (cells === 0) {
+    return {
+      cells: 0,
+      meaningfulCells: 0,
+      centroidOffsetKm: 0,
+      meaningfulComponents: 0,
+      largestComponentShare: 1,
+      maxAnnularClosure: 0,
+    };
+  }
+  const componentSizes = connectedComponentSizes(active, field.n);
+  const meaningfulComponentSizes = componentSizes.filter(
+    (size) => size >= MIN_WEAK_COMPONENT_CELLS,
+  );
+  const meaningfulCells = meaningfulComponentSizes.reduce(
+    (sum, size) => sum + size,
+    0,
+  );
+  let maxAnnularClosure = 0;
+  for (let annulus = 1; annulus < sectorTotal.length; annulus++) {
+    let covered = 0;
+    let sampled = 0;
+    for (let sector = 0; sector < 24; sector++) {
+      if (sectorTotal[annulus][sector] === 0) continue;
+      sampled++;
+      if (
+        sectorCold[annulus][sector] / sectorTotal[annulus][sector] >= 0.25
+      ) {
+        covered++;
+      }
+    }
+    if (sampled >= 12) {
+      maxAnnularClosure = Math.max(maxAnnularClosure, covered / sampled);
+    }
+  }
+  return {
+    cells,
+    meaningfulCells,
+    centroidOffsetKm: Math.hypot(eastSum / cells, northSum / cells),
+    meaningfulComponents: meaningfulComponentSizes.length,
+    largestComponentShare:
+      meaningfulCells > 0 ? meaningfulComponentSizes[0] / meaningfulCells : 1,
+    maxAnnularClosure,
+  };
+}
+
+function fieldDigest(values: Float32Array): string {
+  return createHash('sha256')
+    .update(
+      new Uint8Array(
+        values.buffer,
+        values.byteOffset,
+        values.byteLength,
+      ) as unknown as string,
+    )
+    .digest('hex');
+}
+
 interface RenderedBandTexture {
   maskedCells: number;
   coldCells: number;
@@ -526,6 +643,163 @@ describe('simulated IR morphology', () => {
     organization: 0.7,
     shearUms: 16,
     shearVms: 8,
+  });
+
+  it('renders weak systems as displaced multi-lobe burst complexes', () => {
+    const baseWeak = stormFrame({
+      vKt: 35,
+      organization: 0.3,
+      shearUms: 12,
+      shearVms: 6,
+      rmwKm: 60,
+      outerSizeKm: 180,
+    });
+    const weak: FlightFrame = {
+      ...baseWeak,
+      diagnostics: {
+        ...baseWeak.diagnostics,
+        eyewallRainMmH: 6,
+        rainbandRainMmH: 3,
+        totalRainMmH: 9,
+      },
+      structure: {
+        ...baseWeak.structure,
+        centralPressureHpa: 1000,
+        hollandB: 1.2,
+      },
+    };
+    const sources = dryEnvironment();
+    const fields = RGR004_SEED_DECILES.map((genesis) =>
+      buildRealismField(contextFor(weak, genesis), sources),
+    );
+    const midCold = fields.map((field) => weakColdTopology(field, -40));
+    const deepLobes = fields.map((field) => weakColdTopology(field, -50));
+    const repeated = buildRealismField(
+      contextFor(weak, RGR004_SEED_DECILES[0]),
+      sources,
+    );
+
+    const nonemptyDeepLobes = deepLobes.filter((value) => value.cells > 0);
+
+    // The -40 C field must remain displaced and open without demanding the
+    // broad, smooth cold shield that produced the rejected Gaussian bridge.
+    // The -50 C mask resolves embedded towers. Seed-dependent dominance is
+    // expected, so fragmentation is guarded by prevalence across the decile
+    // sample instead of forcing every case into equal-sized clover lobes.
+    expect(median(midCold.map((value) => value.cells))).toBeGreaterThanOrEqual(
+      75,
+    );
+    expect(median(midCold.map((value) => value.cells))).toBeLessThanOrEqual(
+      300,
+    );
+    expect(
+      median(midCold.map((value) => value.centroidOffsetKm)),
+    ).toBeGreaterThanOrEqual(70);
+    expect(
+      median(midCold.map((value) => value.maxAnnularClosure)),
+    ).toBeLessThanOrEqual(0.5);
+    expect(
+      midCold.filter((value) => value.maxAnnularClosure < 0.7).length,
+    ).toBeGreaterThanOrEqual(9);
+    expect(nonemptyDeepLobes.length).toBeGreaterThanOrEqual(9);
+    expect(
+      deepLobes.filter(
+        (value) =>
+          value.meaningfulComponents >= 2 &&
+          value.largestComponentShare <= 0.85,
+      ).length,
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      deepLobes.filter((value) => value.meaningfulCells > 0).length,
+    ).toBeGreaterThanOrEqual(7);
+    expect(
+      median(nonemptyDeepLobes.map((value) => value.centroidOffsetKm)),
+    ).toBeGreaterThanOrEqual(70);
+    expect(
+      median(deepLobes.map((value) => value.meaningfulCells)),
+    ).toBeGreaterThanOrEqual(35);
+    expect(
+      median(deepLobes.map((value) => value.meaningfulCells)),
+    ).toBeLessThanOrEqual(200);
+
+    // Rain support is owned by the physical precipitation branch and remains
+    // byte-identical while only presentation morphology changes.
+    expect(precipBandDigest(fields[0])).toBe(
+      'a4fd804aa3d5e53973f8d6950e298173f34a3504871303a78e1a2d52b5269b06',
+    );
+    expect(repeated.btProxyC).toEqual(fields[0].btProxyC);
+    expect(fields[1].btProxyC).not.toEqual(fields[0].btProxyC);
+  }, 30_000);
+
+  it('keeps the accepted moderate and mature fields byte-identical', () => {
+    const mature = stormFrame({
+      vKt: 100,
+      organization: 0.93,
+      shearUms: 14,
+      shearVms: 7,
+      rmwKm: 26,
+      outerSizeKm: 180,
+    });
+    const moderateField = buildRealismField(contextFor(moderate), openOcean());
+    const matureField = buildRealismField(contextFor(mature), openOcean());
+
+    expect(fieldDigest(moderateField.btProxyC)).toBe(
+      'a7fe758147bcf9aae4616cf245a552af6159b5ef97598f3d96465e4644c81264',
+    );
+    expect(fieldDigest(moderateField.stormCloud)).toBe(
+      'b2735085fd1b765566ec3e8786365598c053a4f983abb46c61683ab6af76ac61',
+    );
+    expect(fieldDigest(matureField.btProxyC)).toBe(
+      'a278bebe0b2fd219a12075444665f71655586a4d01910794903954139c1cf8ce',
+    );
+    expect(fieldDigest(matureField.stormCloud)).toBe(
+      '8812994758fcbeeffb5377a222e73bbdf9c5be5ffc1a2577b4980466f7eb7c5f',
+    );
+  });
+
+  it('does not carve a dark burst-shaped hole after moist zero-rain decay', () => {
+    const baseDecay = stormFrame({
+      vKt: 19,
+      organization: 0.1,
+      shearUms: 24,
+      shearVms: 10,
+      rmwKm: 80,
+      outerSizeKm: 180,
+    });
+    const decay: FlightFrame = {
+      ...baseDecay,
+      diagnostics: {
+        ...baseDecay.diagnostics,
+        eyewallRainMmH: 0,
+        rainbandRainMmH: 0,
+        totalRainMmH: 0,
+      },
+      structure: {
+        ...baseDecay.structure,
+        centralPressureHpa: 1007,
+        hollandB: 1.1,
+      },
+    };
+    const field = buildRealismField(contextFor(decay), moistEnvironment());
+    let maxStormCloud = 0;
+    let maxAmbientDeficit = 0;
+    let ambientDeficitSum = 0;
+    let coldCells = 0;
+    for (let index = 0; index < field.cloud.length; index++) {
+      maxStormCloud = Math.max(maxStormCloud, field.stormCloud[index]);
+      const deficit = Math.max(
+        0,
+        field.ambientCloud[index] - field.cloud[index],
+      );
+      maxAmbientDeficit = Math.max(maxAmbientDeficit, deficit);
+      ambientDeficitSum += deficit;
+      if (field.btProxyC[index] <= -40) coldCells++;
+    }
+
+    expect(coldCells).toBe(0);
+    expect(maxStormCloud).toBeLessThan(0.35);
+    expect(maxAmbientDeficit).toBeLessThan(0.12);
+    expect(ambientDeficitSum / field.cloud.length).toBeLessThan(0.005);
   });
 
   it('renders discrete cold cells inside a broad warm stratiform band', () => {

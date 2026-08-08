@@ -374,11 +374,13 @@ describe('buildRealismField', () => {
     expect(centre).toBeGreaterThan(eyewallMinC(field, frame.structure.rmwKm) + 20);
   });
 
-  it('weak eyeless storm: centre is cold (no eye clearing)', () => {
+  it('weak storm: deepest convection is displaced from the centre', () => {
     const frame = weakFrame();
     const field = buildRealismField(contextFor(frame), openOcean);
     const centre = field.btProxyC[centreCellIndex(field)];
-    expect(centre).toBeLessThan(-20);
+    const coldest = Math.min(...field.btProxyC);
+    expect(coldest).toBeLessThan(-40);
+    expect(centre).toBeGreaterThan(coldest + 20);
   });
 
   it('stormCloud is zero everywhere when the frame is not alive', () => {

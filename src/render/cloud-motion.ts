@@ -56,6 +56,67 @@ export const CLOUD_BAND_THERMAL_CONTRAST_DEVELOPING_C = 14;
 export const CLOUD_BAND_THERMAL_CONTRAST_MATURE_C = 22;
 
 /**
+ * Weak-stage convective-burst morphology (RGR-006).
+ *
+ * The developing CDO used to be the mature radial shield scaled down, which
+ * produced a centred bullseye before a storm had organized one. The gates
+ * below combine an unconditional weak-wind gate with an organization gate
+ * that is capped by intensity. The complex is therefore fully active through
+ * 40 kt and exactly off at 55 kt, preserving the accepted R3 moderate/mature
+ * field bit-for-bit. The activity gate is separate so a dissipated low-rain
+ * vortex keeps only a faint remnant carrier rather than being redrawn as fresh
+ * genesis convection.
+ */
+export const CLOUD_WEAK_BURST_ORGANIZATION_GATE_LO = 0.32;
+export const CLOUD_WEAK_BURST_ORGANIZATION_GATE_HI = 0.55;
+export const CLOUD_WEAK_BURST_INTENSITY_GATE_LO = 0.2;
+export const CLOUD_WEAK_BURST_INTENSITY_GATE_HI = 0.3;
+export const CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_LO = 0.3;
+export const CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_HI = 0.35;
+export const CLOUD_WEAK_BURST_ACTIVITY_LO = 0.1;
+export const CLOUD_WEAK_BURST_ACTIVITY_HI = 0.23;
+export const CLOUD_WEAK_RAINBAND_RETENTION = 0.12;
+export const CLOUD_WEAK_WARM_BAND_THERMAL_RETENTION = 0.2;
+export const CLOUD_WEAK_COLD_BAND_THERMAL_RETENTION = 0.06;
+
+function smoothUnit(lo: number, hi: number, value: number): number {
+  const t = Math.min(1, Math.max(0, (value - lo) / (hi - lo)));
+  return t * t * (3 - 2 * t);
+}
+
+/** CPU pin for the exact weakMorphology expression emitted in env.ts. */
+export function weakBurstMorphologyWeight(
+  intensity: number,
+  organization: number,
+): number {
+  const weakWind =
+    1 -
+    smoothUnit(
+      CLOUD_WEAK_BURST_INTENSITY_GATE_LO,
+      CLOUD_WEAK_BURST_INTENSITY_GATE_HI,
+      intensity,
+    );
+  const weakDisorganization =
+    1 -
+    smoothUnit(
+      CLOUD_WEAK_BURST_ORGANIZATION_GATE_LO,
+      CLOUD_WEAK_BURST_ORGANIZATION_GATE_HI,
+      organization,
+    );
+  const disorganizationIntensityCeiling =
+    1 -
+    smoothUnit(
+      CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_LO,
+      CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_HI,
+      intensity,
+    );
+  return Math.max(
+    weakWind,
+    weakDisorganization * disorganizationIntensityCeiling,
+  );
+}
+
+/**
  * Overshooting-top lifecycle period, sim-hours. Real tops live ~30 min, which
  * is sub-second at 3 h/s; the stretch is a display-honesty compromise covered
  * by the layer's "simulated" label.
@@ -284,7 +345,17 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
     ${CLOUD_BAND_THERMAL_CONTRAST_MATURE_C.toFixed(1)},
     development
   );
-  float cirrusTopC = mix(${CLOUD_TOP_CIRRUS_WARM_C.toFixed(1)}, ${CLOUD_TOP_CIRRUS_COLD_C.toFixed(1)}, u_organization);
+  float organizedCirrusTopC = mix(${CLOUD_TOP_CIRRUS_WARM_C.toFixed(1)}, ${CLOUD_TOP_CIRRUS_COLD_C.toFixed(1)}, u_organization);
+  // Weak broad anvils carry a mid-cold top around the embedded deeper bursts.
+  // The carrier follows lifecycle/rain activity and never claims the CDO's
+  // mature -65..-82 C grade.
+  float weakBurstAnvilTopC = mix(-34.0, -39.0, weakBurstCarrierActivity);
+  float weakBurstMidTopC = mix(-44.0, -49.0, weakBurstCarrierActivity);
+  float cirrusTopC = mix(
+    organizedCirrusTopC,
+    weakBurstAnvilTopC,
+    weakMorphology
+  );
 
   // Overshooting tops: deterministic per-cell pulses. Cell identity comes from
   // the advected storm-relative coordinate + seed; the lifecycle reads the
@@ -306,6 +377,11 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
   // Presence ladder (tuning constants: how strongly each component claims the
   // column before opacity compositing).
   float cirrusPresence = clamp(cirrus * 2.6, 0.0, 1.0);
+  float weakBurstMidPresence = clamp(
+    weakBurstMidThermal * 1.34 * weakMorphology,
+    0.0,
+    1.0
+  );
   float bandSource = max(rainbands, precipBandCloud);
   // Outer bands are sparser and more cell-dominant: retain a small warm cloud
   // fringe between cells, but concentrate the thermal signature around the
@@ -319,20 +395,41 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
     ),
     outerBandRegime
   );
+  float weakWarmBandThermalGate = mix(
+    1.0,
+    ${CLOUD_WEAK_WARM_BAND_THERMAL_RETENTION.toFixed(2)},
+    weakMorphology
+  );
+  float weakColdBandThermalGate = mix(
+    1.0,
+    ${CLOUD_WEAK_COLD_BAND_THERMAL_RETENTION.toFixed(2)},
+    weakMorphology
+  );
   float bandPresence = clamp(
-    bandSource * outerWarmRetention * 1.45,
+    bandSource * outerWarmRetention * 1.45 * weakWarmBandThermalGate,
     0.0,
     1.0
   );
   float coldBandCellPresence = clamp(
     bandSource * organizedBandCell * ${CLOUD_BAND_CELL_PRESENCE_GAIN.toFixed(1)} *
-      mix(1.0, ${CLOUD_BAND_OUTER_CELL_GAIN.toFixed(1)}, outerBandRegime),
+      mix(1.0, ${CLOUD_BAND_OUTER_CELL_GAIN.toFixed(1)}, outerBandRegime) *
+      weakColdBandThermalGate,
     0.0,
     1.0
   );
-  float corePresence = clamp(coreCloud * 1.28, 0.0, 1.0);
+  float corePresence = clamp(mix(
+    organizedCoreCloud * 1.28,
+    weakBurstThermalCore * 1.36,
+    weakMorphology
+  ), 0.0, 1.0);
   float towerCell = smoothstep(0.58, 0.86, fine);
-  float towerPresence = clamp(max(eyewallCloud, precipColdCloud) * 1.1, 0.0, 1.0) *
+  float organizedTowerSource = max(eyewallCloud, precipColdCloud);
+  float weakTowerSource = weakBurstThermalCore * convectiveCells;
+  float towerPresence = clamp(mix(
+    organizedTowerSource,
+    weakTowerSource,
+    weakMorphology
+  ) * 1.1, 0.0, 1.0) *
     towerCell * towerCell;
 
   float topC = ambientTopC;
@@ -341,6 +438,11 @@ export const CLOUD_TOPS_GLSL = /* glsl */ `
   float debrisPresence = clamp(memDensity * 1.3, 0.0, 1.0) * u_hasCloudMemory;
   topC = mix(topC, debrisTopC, debrisPresence);
   topC = mix(topC, cirrusTopC, cirrusPresence);
+  topC = mix(
+    topC,
+    min(topC, weakBurstMidTopC),
+    weakBurstMidPresence
+  );
   // Warm stratiform cloud must not warm colder cirrus already above it. A
   // second, cell-gated pass gives optically deeper embedded towers the cold
   // band-top floor without punching holes in the broad cloud shield.
@@ -383,7 +485,7 @@ export const CLOUD_RELIEF_GLSL = /* glsl */ `
       1.0
     );
     float envSlope = -6.0 * coreEnvelopeT * (1.0 - coreEnvelopeT) /
-      max(coreEdge1 - coreEdge0, 0.001);
+      max(coreEdge1 - coreEdge0, 0.001) * (1.0 - weakMorphology);
     vec2 anisotropicCoreGrad = anisotropicCoreQ > 0.001
       ? shearDir * (canopyAlong /
           (coreAlongScale * coreAlongScale * anisotropicCoreQ)) +

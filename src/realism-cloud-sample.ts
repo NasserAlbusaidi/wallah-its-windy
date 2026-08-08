@@ -67,6 +67,17 @@ import {
   CLOUD_TOP_CDO_MATURE_C,
   CLOUD_TOP_CIRRUS_COLD_C,
   CLOUD_TOP_CIRRUS_WARM_C,
+  CLOUD_WEAK_BURST_ACTIVITY_HI,
+  CLOUD_WEAK_BURST_ACTIVITY_LO,
+  CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_HI,
+  CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_LO,
+  CLOUD_WEAK_BURST_INTENSITY_GATE_HI,
+  CLOUD_WEAK_BURST_INTENSITY_GATE_LO,
+  CLOUD_WEAK_BURST_ORGANIZATION_GATE_HI,
+  CLOUD_WEAK_BURST_ORGANIZATION_GATE_LO,
+  CLOUD_WEAK_COLD_BAND_THERMAL_RETENTION,
+  CLOUD_WEAK_RAINBAND_RETENTION,
+  CLOUD_WEAK_WARM_BAND_THERMAL_RETENTION,
   DEBRIS_TOP_COLD_C,
   DEBRIS_TOP_WARM_C,
   LEGACY_CLOUD_ROTATION_RAD_PER_H,
@@ -349,6 +360,43 @@ export function sampleCloudProxy(
   const moisture = clamp01((u.midlevelRh - 0.25) / 0.62);
   const rainEnergy = clamp01((u.eyewallRain + 0.7 * u.rainbandRain) / 28.0);
   const development = clamp01(0.56 * u.organization + 0.44 * u.intensity);
+  const weakWind =
+    1.0 -
+    smoothstep(
+      CLOUD_WEAK_BURST_INTENSITY_GATE_LO,
+      CLOUD_WEAK_BURST_INTENSITY_GATE_HI,
+      u.intensity,
+    );
+  const weakDisorganization =
+    1.0 -
+    smoothstep(
+      CLOUD_WEAK_BURST_ORGANIZATION_GATE_LO,
+      CLOUD_WEAK_BURST_ORGANIZATION_GATE_HI,
+      u.organization,
+    );
+  const disorganizationIntensityCeiling =
+    1.0 -
+    smoothstep(
+      CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_LO,
+      CLOUD_WEAK_BURST_DISORGANIZED_INTENSITY_GATE_HI,
+      u.intensity,
+    );
+  const weakMorphology = Math.max(
+    weakWind,
+    weakDisorganization * disorganizationIntensityCeiling,
+  );
+  const weakBurstLifecycle = smoothstep(
+    CLOUD_WEAK_BURST_ACTIVITY_LO,
+    CLOUD_WEAK_BURST_ACTIVITY_HI,
+    development,
+  );
+  const weakBurstActivity =
+    weakBurstLifecycle * mix(0.18, 1.0, smoothstep(0.06, 0.28, rainEnergy));
+  const weakBurstCarrierActivity = smoothstep(
+    0.18,
+    0.62,
+    Math.max(weakBurstActivity, weakBurstLifecycle * 0.35),
+  );
   const coreRadius =
     mix(
       2.25 / CANOPY_COEFFICIENT_DIVISOR,
@@ -365,6 +413,90 @@ export function sampleCloudProxy(
   // Mirrors the shader's strict real-vector gate; the fallback axis must not
   // create a physical-looking anisotropy at or below the direction threshold.
   const anisotropyShearN = shearN * (shearLen <= 0.05 ? 0 : 1);
+  const burstJitterA = glslFract(seed * 7.13 + 0.17) - 0.5;
+  const burstJitterB = glslFract(seed * 11.71 + 0.53) - 0.5;
+  const burstJitterC = glslFract(seed * 17.31 + 0.89) - 0.5;
+  const burstSeedAngle = 6.2831853 * glslFract(seed * 0.61803398875 + 0.137);
+  const burstSeedDirX = Math.cos(burstSeedAngle);
+  const burstSeedDirY = Math.sin(burstSeedAngle);
+  const burstShearBias =
+    0.42 * smoothstep(6.0, 16.0, u.shearAtStorm) * (shearLen <= 0.05 ? 0 : 1);
+  const burstAxisRawX = mix(burstSeedDirX, shearDirX, burstShearBias);
+  const burstAxisRawY = mix(burstSeedDirY, shearDirY, burstShearBias);
+  const burstAxisLength = Math.hypot(burstAxisRawX, burstAxisRawY);
+  const burstAxisX = burstAxisRawX / burstAxisLength;
+  const burstAxisY = burstAxisRawY / burstAxisLength;
+  const burstCrossAxisX = -burstAxisY;
+  const burstCrossAxisY = burstAxisX;
+  const burstAlong = canopyNormX * burstAxisX + canopyNormY * burstAxisY;
+  const burstCross =
+    canopyNormX * burstCrossAxisX + canopyNormY * burstCrossAxisY;
+  const burstLobe1X =
+    (burstAlong - (0.68 + 0.22 * burstJitterA)) / (0.58 + 0.1 * burstJitterB);
+  const burstLobe1Y =
+    (burstCross - (-0.08 + 0.18 * burstJitterB)) / (0.27 + 0.05 * burstJitterC);
+  const burstLobe2X =
+    (burstAlong - (0.18 + 0.2 * burstJitterC)) / (0.38 + 0.06 * burstJitterA);
+  const burstLobe2Y =
+    (burstCross - (0.43 + 0.18 * burstJitterA)) / (0.23 + 0.04 * burstJitterB);
+  const burstLobe3X =
+    (burstAlong - (-0.08 + 0.18 * burstJitterB)) / (0.32 + 0.05 * burstJitterC);
+  const burstLobe3Y =
+    (burstCross - (-0.36 + 0.22 * burstJitterC)) / (0.2 + 0.04 * burstJitterA);
+  const burstLobe1Q = burstLobe1X ** 2 + burstLobe1Y ** 2;
+  const burstLobe2Q = burstLobe2X ** 2 + burstLobe2Y ** 2;
+  const burstLobe3Q = burstLobe3X ** 2 + burstLobe3Y ** 2;
+  const burstTextureA = clamp01(
+    macro * 0.56 + fine * 0.52 + 0.18 * burstJitterA,
+  );
+  const burstTextureB = clamp01(
+    macro * 0.25 + fine * 0.78 + 0.18 * burstJitterB,
+  );
+  const burstTextureC = clamp01(
+    macro * 0.82 + fine * 0.22 + 0.18 * burstJitterC,
+  );
+  const burstLobe1 =
+    Math.exp(-burstLobe1Q * mix(1.42, 0.66, burstTextureA)) *
+    (0.98 + 0.1 * burstJitterA) *
+    mix(0.58, 1.12, burstTextureA);
+  const burstLobe2 =
+    Math.exp(-burstLobe2Q * mix(1.5, 0.7, burstTextureB)) *
+    (0.9 + 0.16 * burstJitterB) *
+    mix(0.54, 1.1, burstTextureB);
+  const burstLobe3 =
+    Math.exp(-burstLobe3Q * mix(1.58, 0.74, burstTextureC)) *
+    (0.72 + 0.16 * burstJitterC) *
+    mix(0.5, 1.08, burstTextureC);
+  const weakBurstField = Math.max(burstLobe1, burstLobe2, burstLobe3);
+  const weakBurstEnvelope = smoothstep(
+    0.1,
+    0.62,
+    weakBurstField * mix(0.7, 1.2, macro * 0.68 + fine * 0.32),
+  );
+  const weakBurstMidEnvelope = smoothstep(
+    0.24,
+    0.62,
+    weakBurstField * mix(0.7, 1.2, macro * 0.68 + fine * 0.32),
+  );
+  const burstCarrierX =
+    (burstAlong - (0.48 + 0.1 * burstJitterA)) / (1.36 + 0.1 * burstJitterB);
+  const burstCarrierY =
+    (burstCross - (0.01 + 0.08 * burstJitterC)) / (0.8 + 0.08 * burstJitterA);
+  const burstCarrierQ = burstCarrierX ** 2 + burstCarrierY ** 2;
+  const burstCarrierSide = smoothstep(
+    -0.16,
+    0.3,
+    burstAlong + 0.04 * burstJitterB,
+  );
+  const weakBurstAnvilField =
+    Math.exp(-burstCarrierQ * mix(1.22, 0.72, burstTextureA)) *
+    (0.9 + 0.12 * burstJitterB) *
+    mix(0.08, 1, burstCarrierSide);
+  const weakBurstAnvil = smoothstep(
+    0.1,
+    0.72,
+    weakBurstAnvilField * mix(0.76, 1.16, macro),
+  );
   const downshearSide = smoothstep(-0.35, 0.55, canopyAlong);
   const coreAlongScale = mix(
     1.0 - 0.26 * anisotropyShearN,
@@ -494,6 +626,16 @@ export function sampleCloudProxy(
   const bandCellUvY =
     bandCellP.y * CLOUD_BAND_CELL_SCALE + seed * 1.19 + driftY * 0.04;
   const bandCellNoise = noise.cloudNoise(bandCellUvX, bandCellUvY);
+  const weakBurstCellTexture = smoothstep(
+    0.38,
+    0.68,
+    bandCellNoise * 0.72 + fine * 0.34,
+  );
+  const weakBurstCarrierTexture = smoothstep(
+    0.28,
+    0.7,
+    bandCellNoise * 0.6 + macro * 0.44,
+  );
   const bandCellGate = smoothstep(
     CLOUD_BAND_CELL_GATE_LO,
     CLOUD_BAND_CELL_GATE_HI,
@@ -527,11 +669,42 @@ export function sampleCloudProxy(
     0.78,
     fine * 0.7 + macro * 0.36,
   );
-  const coreCloud =
+  const organizedCoreCloud =
     centralOvercast *
     mix(0.66, 0.94, development) *
     mix(0.72, 1.0, cellularColdTops) *
     mix(0.88, 1.0, macro);
+  const weakBurstCloud =
+    weakBurstEnvelope *
+    mix(0.1, 0.84, weakBurstActivity) *
+    mix(0.08, 1.0, weakBurstCellTexture) *
+    mix(0.28, 1.0, cellularColdTops) *
+    mix(0.84, 1.0, macro);
+  const weakBurstColdEnvelope = smoothstep(
+    0.4,
+    0.72,
+    weakBurstField * mix(0.72, 1.15, cellularColdTops),
+  );
+  const weakBurstCellMidThermal =
+    weakBurstMidEnvelope *
+    mix(0.06, 1.0, weakBurstCarrierActivity) *
+    mix(0.08, 1.0, weakBurstCellTexture) *
+    mix(0.28, 1.0, cellularColdTops);
+  const weakBurstCarrierMidThermal =
+    weakBurstAnvil *
+    mix(0.04, 0.74, weakBurstCarrierActivity) *
+    mix(0.34, 1.0, macro) *
+    mix(0.2, 1.0, weakBurstCarrierTexture);
+  const weakBurstMidThermal = Math.max(
+    weakBurstCellMidThermal,
+    weakBurstCarrierMidThermal,
+  );
+  const weakBurstThermalCore =
+    weakBurstColdEnvelope *
+    mix(0.08, 1.0, weakBurstActivity) *
+    mix(0.06, 1.12, weakBurstCellTexture) *
+    mix(0.16, 1.0, cellularColdTops);
+  const coreCloud = mix(organizedCoreCloud, weakBurstCloud, weakMorphology);
 
   // ---- CLOUD_CORE_GLSL.eyewall ----
   const mesoTheta = animGate * CLOUD_ROTATION_CAP_RAD_PER_H * u.cloudAgeH;
@@ -566,7 +739,8 @@ export function sampleCloudProxy(
     bandShape *
     mix(0.42, 0.96, moisture) *
     mix(0.46, 1.0, convectiveCells) *
-    mix(0.62, 1.0, development);
+    mix(0.62, 1.0, development) *
+    mix(CLOUD_WEAK_RAINBAND_RETENTION, 1.0, 1.0 - weakMorphology);
 
   const cirrusStream = animGate * u.cloudAgeH * 0.06;
   const cirrusTexture = smoothstep(
@@ -596,11 +770,18 @@ export function sampleCloudProxy(
     smoothstep(0.22, 1.4, anisotropicCirrusQ);
   const warpedCirrusQ = Math.max(0, anisotropicCirrusQ - cirrusEdgeWarp);
   const cirrusEnvelope = 1.0 - smoothstep(0.34, 2.65, warpedCirrusQ);
-  const cirrus =
+  const organizedCirrus =
     cirrusEnvelope *
     mix(0.18, 1.0, cirrusTexture) *
     mix(0.2, 0.44, u.organization) *
     mix(0.82, 1.16, shearN);
+  const weakBurstCirrus =
+    weakBurstAnvil *
+    mix(0.3, 0.98, cirrusTexture) *
+    mix(0.24, 1.0, weakBurstCarrierTexture) *
+    mix(0.28, 1.0, weakBurstCarrierActivity) *
+    mix(0.9, 1.05, shearN);
+  const cirrus = mix(organizedCirrus, weakBurstCirrus, weakMorphology);
 
   const eyeStrength =
     smoothstep(0.7, 0.9, u.intensity) *
@@ -613,8 +794,15 @@ export function sampleCloudProxy(
   );
   stormCloud *= 1.0 - eye * eyeStrength * 0.97;
   stormCloud *= u.stormPresence;
+  const weakStormOcclusion =
+    Math.max(weakBurstCloud, weakBurstCirrus) * weakBurstCarrierActivity;
+  const stormOcclusion = mix(
+    centralOvercast,
+    weakStormOcclusion,
+    weakMorphology,
+  );
   let cloud = Math.max(
-    ambientCloud * (1.0 - centralOvercast * u.stormPresence),
+    ambientCloud * (1.0 - stormOcclusion * u.stormPresence),
     stormCloud,
   );
   const debris = memDensity * (1.0 - 0.55 * memAge) * DEBRIS_MAX_CLOUD;
@@ -663,10 +851,17 @@ export function sampleCloudProxy(
       CLOUD_BAND_THERMAL_CONTRAST_MATURE_C,
       development,
     );
-  const cirrusTopC = mix(
+  const organizedCirrusTopC = mix(
     CLOUD_TOP_CIRRUS_WARM_C,
     CLOUD_TOP_CIRRUS_COLD_C,
     u.organization,
+  );
+  const weakBurstAnvilTopC = mix(-34, -39, weakBurstCarrierActivity);
+  const weakBurstMidTopC = mix(-44, -49, weakBurstCarrierActivity);
+  const cirrusTopC = mix(
+    organizedCirrusTopC,
+    weakBurstAnvilTopC,
+    weakMorphology,
   );
 
   const otCellX = Math.floor(pA.x * 6.0);
@@ -690,6 +885,9 @@ export function sampleCloudProxy(
     smoothstep(0.3, 0.8, rainEnergy);
 
   const cirrusPresence = clamp01(cirrus * 2.6);
+  const weakBurstMidPresence = clamp01(
+    weakBurstMidThermal * 1.34 * weakMorphology,
+  );
   const bandSource = Math.max(rainbands, precipBandCloud);
   const outerWarmRetention = mix(
     1,
@@ -700,17 +898,34 @@ export function sampleCloudProxy(
     ),
     outerBandRegime,
   );
-  const bandPresence = clamp01(bandSource * outerWarmRetention * 1.45);
+  const weakWarmBandThermalGate = mix(
+    1,
+    CLOUD_WEAK_WARM_BAND_THERMAL_RETENTION,
+    weakMorphology,
+  );
+  const weakColdBandThermalGate = mix(
+    1,
+    CLOUD_WEAK_COLD_BAND_THERMAL_RETENTION,
+    weakMorphology,
+  );
+  const bandPresence = clamp01(
+    bandSource * outerWarmRetention * 1.45 * weakWarmBandThermalGate,
+  );
   const coldBandCellPresence = clamp01(
     bandSource *
       organizedBandCell *
       CLOUD_BAND_CELL_PRESENCE_GAIN *
-      mix(1, CLOUD_BAND_OUTER_CELL_GAIN, outerBandRegime),
+      mix(1, CLOUD_BAND_OUTER_CELL_GAIN, outerBandRegime) *
+      weakColdBandThermalGate,
   );
-  const corePresence = clamp01(coreCloud * 1.28);
+  const corePresence = clamp01(
+    mix(organizedCoreCloud * 1.28, weakBurstThermalCore * 1.36, weakMorphology),
+  );
   const towerCell = smoothstep(0.58, 0.86, fine);
+  const organizedTowerSource = Math.max(eyewallCloud, precipColdCloud);
+  const weakTowerSource = weakBurstThermalCore * convectiveCells;
   const towerPresence =
-    clamp01(Math.max(eyewallCloud, precipColdCloud) * 1.1) *
+    clamp01(mix(organizedTowerSource, weakTowerSource, weakMorphology) * 1.1) *
     towerCell *
     towerCell;
 
@@ -719,6 +934,7 @@ export function sampleCloudProxy(
   const debrisPresence = clamp01(memDensity * 1.3) * u.hasCloudMemory;
   topC = mix(topC, debrisTopC, debrisPresence);
   topC = mix(topC, cirrusTopC, cirrusPresence);
+  topC = mix(topC, Math.min(topC, weakBurstMidTopC), weakBurstMidPresence);
   topC = mix(topC, Math.min(topC, warmBandTopC), bandPresence);
   topC = mix(topC, Math.min(topC, bandTopC), coldBandCellPresence);
   topC = mix(topC, localCdoTopC, corePresence);

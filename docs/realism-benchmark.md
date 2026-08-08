@@ -68,9 +68,9 @@ No sampled frame in this seal produced an eye-contrast value: the shader draws n
 
 | Intensity bin (kt) | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| 20–35 | 15 | 0.0 | 20.1 |
-| 35–50 | 12 | 819.7 | 1372.1 |
-| 50–64 | 6 | 5373.6 | 5095.8 |
+| 20–35 | 15 | 0.0 | 0.0 |
+| 35–50 | 12 | 438.9 | 505.5 |
+| 50–64 | 6 | 5373.6 | 4925.3 |
 | 64–83 | 12 | 10260.9 | 11192.1 |
 | 83–100 | 2 | 31441.0 | 31441.0 |
 | 100–200 | 2 | 58774.6 | 58774.6 |
@@ -92,8 +92,8 @@ No sampled frame in this seal produced an eye-contrast value: the shader draws n
 
 | Month key | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| m05 | 27 | 0.2254 | 0.2084 |
-| m08 | 11 | 0.2068 | 0.1751 |
+| m05 | 27 | 0.2254 | 0.2038 |
+| m08 | 11 | 0.1945 | 0.1708 |
 | m09 | 11 | 0.0490 | 0.0754 |
 
 **Climatology runs**
@@ -111,10 +111,10 @@ No sampled frame in this seal produced an eye-contrast value: the shader draws n
 
 | Bin (kt) | Stage | n | Median area km² | Mean area km² | n | Median offset km | Mean offset km |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 20–35 | post-peak | 15 | 0.0 | 20.1 | 0 | — | — |
+| 20–35 | post-peak | 15 | 0.0 | 0.0 | 0 | — | — |
 | 20–35 | pre-peak | 0 | — | — | 0 | — | — |
-| 35–50 | post-peak | 4 | 1495.2 | 2946.2 | 4 | 35.12 | 31.64 |
-| 35–50 | pre-peak | 8 | 182.9 | 585.1 | 3 | 34.43 | 34.36 |
+| 35–50 | post-peak | 4 | 334.8 | 473.2 | 2 | 67.87 | 67.87 |
+| 35–50 | pre-peak | 8 | 438.9 | 521.7 | 3 | 54.30 | 54.22 |
 
 **Climatology runs**
 
@@ -134,14 +134,14 @@ run's maximum wind, and `ageH <= peakAgeH` is pre-peak.
 
 | Metric | n | Median | Mean |
 | --- | ---: | ---: | ---: |
-| Cold-top centroid offset (km) | 29 | 24.45 | 24.78 |
-| \|Centroid bearing rel. shear\| (deg) | 29 | 30.05 | 46.07 |
-| Band edge energy, inner ≤200 km (°C/km) | 49 | 0.5728 | 0.5805 |
-| Band edge energy, outer 200–600 km (°C/km) | 45 | 0.5210 | 0.5230 |
-| Band edge energy, downshear-left (°C/km) | 49 | 0.5199 | 0.5376 |
-| Band edge energy, downshear-right (°C/km) | 49 | 0.5460 | 0.5588 |
-| Band edge energy, upshear-left (°C/km) | 49 | 0.5266 | 0.5197 |
-| Band edge energy, upshear-right (°C/km) | 49 | 0.5592 | 0.5707 |
+| Cold-top centroid offset (km) | 27 | 25.68 | 29.44 |
+| \|Centroid bearing rel. shear\| (deg) | 27 | 31.28 | 49.73 |
+| Band edge energy, inner ≤200 km (°C/km) | 49 | 0.4687 | 0.4662 |
+| Band edge energy, outer 200–600 km (°C/km) | 45 | 0.4121 | 0.4347 |
+| Band edge energy, downshear-left (°C/km) | 49 | 0.4421 | 0.4346 |
+| Band edge energy, downshear-right (°C/km) | 49 | 0.4947 | 0.4809 |
+| Band edge energy, upshear-left (°C/km) | 49 | 0.4306 | 0.4314 |
+| Band edge energy, upshear-right (°C/km) | 49 | 0.4838 | 0.4726 |
 
 **Climatology runs**
 
@@ -149,12 +149,12 @@ run's maximum wind, and `ageH <= peakAgeH` is pre-peak.
 | --- | ---: | ---: | ---: |
 | Cold-top centroid offset (km) | 2 | 29.16 | 29.16 |
 | \|Centroid bearing rel. shear\| (deg) | 2 | 91.27 | 91.27 |
-| Band edge energy, inner ≤200 km (°C/km) | 26 | 0.2361 | 0.2676 |
-| Band edge energy, outer 200–600 km (°C/km) | 26 | 0.2080 | 0.2550 |
-| Band edge energy, downshear-left (°C/km) | 26 | 0.2178 | 0.2487 |
-| Band edge energy, downshear-right (°C/km) | 26 | 0.2680 | 0.2880 |
-| Band edge energy, upshear-left (°C/km) | 26 | 0.2087 | 0.2400 |
-| Band edge energy, upshear-right (°C/km) | 24 | 0.2203 | 0.2676 |
+| Band edge energy, inner ≤200 km (°C/km) | 5 | 0.4882 | 0.3357 |
+| Band edge energy, outer 200–600 km (°C/km) | 5 | 0.5329 | 0.3878 |
+| Band edge energy, downshear-left (°C/km) | 5 | 0.5256 | 0.3662 |
+| Band edge energy, downshear-right (°C/km) | 5 | 0.5154 | 0.3418 |
+| Band edge energy, upshear-left (°C/km) | 5 | 0.5142 | 0.3671 |
+| Band edge energy, upshear-right (°C/km) | 3 | 0.1076 | 0.4450 |
 
 ## Per-scenario
 
@@ -181,7 +181,7 @@ run's maximum wind, and `ageH <= peakAgeH` is pre-peak.
 | Eye contrast by intensity bin | RGR-002 | Dvorak (1984) / Velden et al. (2006) / Olander & Velden (2007) eye-onset climatology — order-of-relationship only (T4.5 ≈ 77 kt and T5.0 ≈ 90 kt need verification) |
 | Cold-top centroid offset and bearing rel. shear | RGR-003 | Hence & Houze (2012) shear-quadrant convective organization |
 | Band edge energy, inner/outer split and shear quadrants | RGR-004 | Hence & Houze (2012) 200 km regime break plus shear-quadrant organization |
-| Cold-top area and centroid offset, weak bins × stage | RGR-006 | No literature anchor recovered; captures-only comparison |
+| Cold-top area and centroid offset, weak bins × stage | RGR-006 | Wang (2018) displaced/centered pre-genesis regimes and Chang et al. (2017) multiday convective bursts — qualitative distribution only (North Indian Ocean-specific frequency unverified) |
 | Cold-top area by intensity bin | RGR-013 | Merrill (1984) weak size–intensity correlation — order-of-relationship only (the ~550–600 km shield-radius figure needs verification) |
 
 ## Observed references

@@ -51,6 +51,15 @@ describe('validateBinDomain', () => {
     const message = validateBinDomain(bin(40, 24, DOMAIN), 'env_gonu', NEW_DOMAIN);
     expect(message).toMatch(/env_gonu/);
     expect(message).toMatch(/50,70,15,27/);
+    expect(message).toMatch(/45,100,0,30/);
+    // Both boxes appearing is not enough — pin which is the ACTUAL bin bbox
+    // (50,70,15,27, the shipped grid) and which is the EXPECTED domain
+    // (45,100,0,30, the passed-in override): a reversed actual/expected in
+    // the message construction would still contain both substrings but fail
+    // this ordered match.
+    expect(message).toMatch(
+      /bbox \(50,70,15,27\) disagrees with the simulation domain \(45,100,0,30\)/,
+    );
   });
 
   it('rejects a bin whose layers disagree with each other on nx/ny', () => {

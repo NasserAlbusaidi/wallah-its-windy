@@ -269,32 +269,140 @@ Declared before measuring, anchored to the repository's own hindcast gate
 - CONDITIONAL — max track deviation ≤ 10 km AND max wind deviation ≤ 3.0 kt.
 - FAIL — anything larger, a changed landfall/death outcome, or a throw.
 
+Both `vayu` and `hikaa` are `benchmarkPartition: "calibration"` (confirmed
+from `public/data/scenarios.json`), satisfying the brief's constraint against
+substituting a `validation`-partition scenario. Both crops moved the bbox
+origin on both axes (`originMoved.lon` and `.lat` both `true` for both
+storms), so neither run needed a substitute scenario.
+
 | Field | vayu | hikaa |
 | --- | --- | --- |
-| Scenario bin | `UNMEASURED` | `UNMEASURED` |
-| Full-extent header (nx, ny, bbox) | `UNMEASURED` | `UNMEASURED` |
-| Simulated frame bbox | `UNMEASURED` | `UNMEASURED` |
-| Crop window applied | `UNMEASURED` | `UNMEASURED` |
-| Cropped header (nx, ny, bbox) | `UNMEASURED` | `UNMEASURED` |
-| Origin moved (lonMin and/or latMax) | `UNMEASURED` | `UNMEASURED` |
-| Cropped bin size, bytes | `UNMEASURED` | `UNMEASURED` |
-| `validateEventBinForScenario` return | `UNMEASURED` | `UNMEASURED` |
-| Frame count, full vs cropped | `UNMEASURED` | `UNMEASURED` |
-| Tapes byte-identical | `UNMEASURED` | `UNMEASURED` |
-| Max track deviation, km | `UNMEASURED` | `UNMEASURED` |
-| Max wind deviation, kt | `UNMEASURED` | `UNMEASURED` |
-| Max central-pressure deviation, hPa | `UNMEASURED` | `UNMEASURED` |
-| Max RMW deviation, km | `UNMEASURED` | `UNMEASURED` |
-| Landfall identical | `UNMEASURED` | `UNMEASURED` |
-| Death identical | `UNMEASURED` | `UNMEASURED` |
-| Pure-sampling max |Δ| over the interior lattice | `UNMEASURED` | `UNMEASURED` |
-| Pure-sampling points differing at all, of 10201 | `UNMEASURED` | `UNMEASURED` |
-| Negative control (zero-margin crop) track deviation, km | `UNMEASURED` | `UNMEASURED` |
-| Negative control raised an error | `UNMEASURED` | `UNMEASURED` |
+| Scenario bin | `data/env_vayu.bin` | `data/env_hikaa.bin` |
+| Full-extent header (nx, ny, bbox) | 40×24, bbox=(50,70,15,27) | 40×24, bbox=(50,70,15,27) |
+| Simulated frame bbox | lon [65.07165243085765, 68.79471271825024], lat [20.279774922096035, 21.70066212585945] | lon [56.52468583857511, 66.1], lat [20.05712133883342, 20.4] |
+| Crop window applied | lon [60.5, 70], lat [15.5, 26.5] | lon [52, 70], lat [15.5, 25] |
+| Cropped header (nx, ny, bbox) | 19×22, bbox=(60.5,70,15.5,26.5) | 36×19, bbox=(52,70,15.5,25) |
+| Origin moved (lonMin and/or latMax) | lon=true, lat=true | lon=true, lat=true |
+| Cropped bin size, bytes | 482,248 (full 1,106,632; ratio 0.435780) | 526,024 (full 737,992; ratio 0.712777) |
+| `validateEventBinForScenario` return | `null` | `null` |
+| Frame count, full vs cropped | 360 vs 360 | 177 vs 177 |
+| Tapes byte-identical | **true** (sha256 match) | **true** (sha256 match) |
+| Max track deviation, km | 0 | 0 |
+| Max wind deviation, kt | 0 | 0 |
+| Max central-pressure deviation, hPa | 0 | 0 |
+| Max RMW deviation, km | 0 | 0 |
+| Landfall identical | true | true |
+| Death identical | true | true |
+| Pure-sampling max &#124;Δ&#124; over the interior lattice | 0 | 0 |
+| Pure-sampling points differing at all, of 10201 | 0 | 0 |
+| Negative control (zero-margin crop) track deviation, km | 108.00362262918549 | 140.327957185087 |
+| Negative control raised an error | No (`controlError: null`) | No (`controlError: null`) |
 
-Steering-bin sampling comparison (no sim, `steering_vayu.bin`): `UNMEASURED`
-Projected `calibration/data` size with track-following subwindows: `UNMEASURED`
-Verdict: `UNMEASURED`
+Both runs died naturally inside the window (not a spike artifact — confirmed
+by rerunning `runDetailedHindcastCase` against the full-extent bin alone and
+inspecting `result.death`): `vayu` died to shear at `durationH` 89.75
+(`{"reason":"shear","closestApproachKm":756.8855814927925,"peakKt":127.93698798852252}`),
+`hikaa` died to land at `durationH` 44, after a landfall at `ageH` 34.25
+(`{"reason":"land","closestApproachKm":370.9224546036663,"peakKt":73.57013979928252}`).
+This is why the observed frame counts (360, 177) are shorter than a
+naive full-duration estimate (windowH − envOffsetH at 15-min ticks: 481 for
+vayu, 373 for hikaa) — the early `died` event breaks
+`runDetailedHindcastCase`'s tick loop
+(`src/hindcast-benchmark.ts:183-194`). What matters for M5 is that the full
+and cropped runs died at the identical tick with the identical cause, which
+they did (`deathEqual: true`, identical frame counts).
+
+Contrary to the brief's own pre-measurement hypothesis (`src/grid.ts:86`
+producing ~1e-14 rounding drift between `(lon − 50)` and `(lon − 60.5)`
+arithmetic), the measured result is **exact, not approximate**:
+`identicalTape` is `true` for both storms, and the pure-sampling probe found
+zero differing points, not a small nonzero count with sub-1e-13 magnitude.
+Extending the brief's sampling probe (which checks only the first shared
+layer, by design — see the `break` in `samplingDiff`) to all eight shared
+env layers for both storms confirms this is not a first-layer coincidence:
+81,608 total sample points (10,201 × 8 layers) across both scenarios, 0
+differing, worst-case |Δ| 0. No mechanism is asserted for why the predicted
+ULP drift did not manifest here — this was not investigated beyond the
+measurement itself, per the instruction to report only what was observed.
+
+Two findings independent of the pass/fail verdict:
+
+- `validateEventBinForScenario` (`src/scenarios.ts:184-202`) returned `null`
+  — ACCEPTED — for both wrong-extent (subwindow) bins. Reading the function
+  confirms why: it checks only layer names and `nt` per layer
+  (`bin.layers.get(name)`, `layer.nt !== expectedNt`), never `bbox`, `nx`, or
+  `ny`. This is the concrete case spec §5 invariant 1 ("No layer header bbox
+  may disagree with `grid.ts DOMAIN`... `validateEventBinForScenario` must
+  assert `nx`, `ny` and bbox") must close.
+- `src/env-sampler.ts:163-164` (`sample()`) clamps every query lat/lon to
+  `grid.ts DOMAIN` before calling `sampleEnvBin` → `sampleLayer` →
+  `sampleLayerBilinear`; `src/raster-sampler.ts:15-16` then clamps the
+  resulting cell coordinate a second time, to the layer's own `nx`/`ny`
+  edge — confirmed by reading both call sites, not inferred. For a subwindow
+  bin, a point inside `DOMAIN` but outside the subwindow's own bbox passes
+  the first clamp unchanged and is then silently pinned to the subwindow's
+  edge cell by the second clamp — reading stale/wrong edge data with no
+  error. The negative control (zero-margin crop) is the empirical
+  demonstration of exactly this: `vayu` deviated by 108.0 km track / 30.5 kt
+  wind / 25.9 hPa pressure and changed its death outcome; `hikaa` deviated by
+  140.3 km track / 15.6 kt wind and changed both its landfall and death
+  outcome. Neither crop threw (`controlError: null` both times) — the run
+  silently produced different, wrong physics. This is the evidence for spec
+  §5 invariant 1's motivating case and for kill criterion §11 #4's concern
+  about a too-tight subwindow.
+
+Steering-bin sampling comparison (no sim, `steering_vayu.bin`, `u850`, crop
+window lon [62.5,70] lat [15.5,27], same window used in the Step 3
+round-trip check): `{"points":10201,"differing":0,"worst":0}` — exact match,
+far inside the brief's 1e-6 m/s investigate-threshold. The
+steering path is not exercised by `runDetailedHindcastCase`'s default
+arguments (no `pressureWindSampler` passed — `calibrate:check` never drives
+it), so this sampling-only check is the only M5 evidence for a cropped
+STEERING bin specifically; no full sim run through a cropped steering bin
+was measured.
+
+Projected `calibration/data` size with track-following subwindows: spec
+§4.3 states "a basin-wide cohort at full extent would be about 10 MB of
+forcing per storm" — a figure for the *future*, much larger basin-wide
+domain, not measured in this spike. This spike measured the crop ratio only
+on the *current*, small 40×24 (20°×12°) domain: 0.435780 (vayu) and
+0.712777 (hikaa), mean 0.574279. Applying that ratio directly to the spec's
+stated 10 MB/storm figure gives an implied per-storm subwindow size of
+4.36–7.13 MB (mean ≈5.74 MB). `calibration/data` today holds 30 HF-3
+steering bins (`calibration/data/hf3/`, 20 MiB on disk) + 16 HF-6 forcing
+bins (`calibration/data/hf6/forcing/`, 12 MiB on disk) = 46 storms —
+independently counted with `ls`, matching the brief's figures exactly; whole
+`calibration/data` is 54 MiB on disk today. At the measured ratio, 46
+storms at the *future* full-extent size project to 46 × [4.36, 7.13] MB ≈
+200.6–328.0 MB (mean ≈264.2 MB) — **above** the 150 MB target. This projection is
+almost certainly pessimistic: the ratio measured here is "how much of a
+20°×12° domain a track-following window occupies," and the future
+basin-wide domain (55°×30° per M2) is far larger while a storm's physical
+travel distance is not, so the true future-domain ratio should be smaller
+than what was measured here. That reduction was not measured — it would
+require repeating this spike against a new-domain-sized env bin, which does
+not exist yet. The 150 MB target is therefore **CONTINGENT**, not
+SUPPORTED: the offset-bbox mechanism itself is proven (see verdict below),
+but this measurement's own ratio, taken at face value, projects over
+budget, and the domain-size argument for why it should come in under budget
+is reasoning, not measurement.
+
+Verdict: **PASS.** Both scenarios hit the strongest pre-declared bar —
+tapes byte-identical (`identicalTape: true`), not merely within the ≤1.0 km
+track / ≤0.5 kt wind tolerance — with landfall and death identical in both
+cases. Kill criterion §11 #4 does not fire: offset-bbox forcing is usable
+for non-sealed calibration data. The 150 MB numeric budget target is
+separately CONTINGENT (see above) — a distinct question from whether the
+mechanism reproduces physics.
+
+Separately, one arithmetic note on the brief's own Step 3 worked example,
+which does not affect the verdict above: its "Expected" byte count
+(`704 + 8*15*23*72*2 = 745,664`) does not match its own stated formula, which
+evaluates to 398,144 (704+397,440), and the correct total including the
+8-byte format-magic prefix omitted from that formula is 398,152
+(8+704+397,440) — the value this measurement actually produced and which
+`src/loader.ts` parsed without error, confirming the byte layout is correct
+even though the brief's arithmetic was not.
 
 ## Verdicts
 

@@ -56,6 +56,7 @@ const METRIC_X =
   ((DOMAIN.lonMax - DOMAIN.lonMin) *
     Math.cos((((DOMAIN.latMin + DOMAIN.latMax) / 2) * Math.PI) / 180)) /
   (DOMAIN.latMax - DOMAIN.latMin);
+
 /**
  * Vortex RMW floor for the wind-line field, in KILOMETRES (7.992 / 666 is
  * bit-exactly the old 0.012 clip literal). In km it cannot rescale with the

@@ -10,6 +10,7 @@ import {
   HALF_DOMAIN_HEIGHT_KM,
   RENDER_KM_PER_LAT_DEG,
 } from '../src/grid';
+import { DEFAULT_STRUCTURE_PARAMETERS } from '../src/structure';
 
 describe('stormRenderRadii', () => {
   it('derives the canopy from outer size alone, never from RMW', () => {
@@ -98,5 +99,19 @@ describe('render radius floors are denominated in km', () => {
     // clip units it would become 13.3 km at 0-30 N and start overriding the
     // 12 km RMW floor -- the re-coupling CLAUDE.md's rCanopy note warns about.
     expect(RENDER_RADIUS_FLOOR_KM).toBeLessThan(12);
+  });
+
+  it('keeps rmwMinKm above the one-ULP-inexact 9.99 km floor used by render/rain.ts and render/particles.ts', () => {
+    // render/rain.ts and render/particles.ts each hoist Math.max(9.99,
+    // Math.min(106.56, rmwKm)) / HALF_DOMAIN_HEIGHT_KM out of the old
+    // Math.max(0.015, Math.min(0.16, rmwKm / HALF_DOMAIN_HEIGHT_KM)) because
+    // 9.99 / 666 is 0.015000000000000001, one ULP above the old 0.015
+    // literal -- the hoisted and un-hoisted forms are bit-identical ONLY
+    // because structure.ts clamps rmwKm to >= rmwMinKm = 12, which keeps the
+    // floored branch permanently unreachable. If rmwMinKm ever drops to or
+    // below 9.99, that branch becomes reachable and the two forms diverge by
+    // one ULP. This assertion is the guard: it fails loudly instead of
+    // requiring a human to re-derive the reachability proof by hand.
+    expect(DEFAULT_STRUCTURE_PARAMETERS.rmwMinKm).toBeGreaterThan(9.99);
   });
 });

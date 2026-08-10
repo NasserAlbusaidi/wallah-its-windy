@@ -62,10 +62,12 @@ import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
 
 /**
- * Rain-shader core radius bounds, in KILOMETRES. 9.99 / 666 and 106.56 / 666
- * are the old 0.015 and 0.16 clip literals. Denominated in km so a domain
- * change cannot rescale them; structure.ts clamps rmwKm to [12, 95], so both
- * bounds sit outside the reachable range and neither binds today.
+ * Rain-shader core radius bounds, in KILOMETRES. Denominated in km so a
+ * domain change cannot rescale them. 106.56 / 666 is bit-exactly the old
+ * 0.16 clip literal; 9.99 / 666 is 0.015000000000000001, one ULP above the
+ * old 0.015 literal, so hoisting the division out of the Math.max/Math.min
+ * below is required, not stylistic. structure.ts clamps rmwKm to [12, 95],
+ * so both bounds sit outside the reachable range and neither binds today.
  */
 const RAIN_RMAX_FLOOR_KM = 9.99;
 const RAIN_RMAX_CAP_KM = 106.56;

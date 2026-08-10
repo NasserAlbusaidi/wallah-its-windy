@@ -29,9 +29,12 @@ import type { Rng } from '../rng';
 import type { DrawCtx, RenderModule } from './context';
 
 /**
- * Particle-field radius bounds, in KILOMETRES. 9.99 / 666, 106.56 / 666 and
- * 306.36 / 666 are bit-exactly the old 0.015, 0.16 and 0.46 clip literals.
- * Denominated in km so a domain change cannot rescale them.
+ * Particle-field radius bounds, in KILOMETRES. Denominated in km so a domain
+ * change cannot rescale them. 106.56 / 666 and 306.36 / 666 are bit-exactly
+ * the old 0.16 and 0.46 clip literals; 9.99 / 666 is 0.015000000000000001,
+ * one ULP above the old 0.015 literal, so hoisting the division out of the
+ * Math.max/Math.min below is required, not stylistic. structure.ts clamps
+ * rmwKm to [12, 95], which is why the one inexact branch is unreachable.
  */
 const PARTICLE_RMAX_FLOOR_KM = 9.99;
 const PARTICLE_RMAX_CAP_KM = 106.56;

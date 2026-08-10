@@ -27,20 +27,70 @@ Spec risk 2 and kill criterion 3. Today's largest deployed `.bin` is
 ever been measured on the wire. The projected new assets are 14,328,784
 (`terrain.bin`) and 19,105,072 (`flowacc.bin`).
 
-Probe host: `UNMEASURED`
+Probe host: `https://nasseralbusaidi.github.io/pages-compression-probe/` (throwaway
+public repo `NasserAlbusaidi/pages-compression-probe`, created, measured, and
+deleted in this session — see teardown confirmation below).
+
+Probe content: `public/data/terrain.bin` (2,084,344 B) repeated 10× and
+truncated with `head -c`, per `tmp/phase0/pages-probe/site/`. Step-3
+compressibility check (`gzip -9 -c "$f" | wc -c`), reference ratio being
+terrain.bin's own 2,084,344/905,869 = 2.30×:
+
+```
+probe_10485760.bin raw=10485760 gz9=4577132 ratio=2.2909
+probe_14328784.bin raw=14328784 gz9=6348964 ratio=2.2569
+probe_19105072.bin raw=19105072 gz9=8377378 ratio=2.2806
+probe_4168680.bin raw=4168680 gz9=1813433 ratio=2.2988
+probe_9437184.bin raw=9437184 gz9=4326347 ratio=2.1813
+```
+
+Four of five ratios fall in the expected 2.2–2.5 band; `probe_9437184.bin`
+measured 2.1813, marginally below 2.2 (not above 3, so the brief's
+regenerate-if-exceeds-3 condition was not triggered). Recorded as measured,
+not adjusted.
+
+Wire measurements, second pass (identical to the first pass; both showed
+`x-proxy-cache: MISS`, recording pass 2 per the brief):
 
 | Probe size (raw B) | Stands for | `Content-Encoding` | Wire `Content-Length` | Ratio |
 | --- | --- | --- | --- | --- |
-| 4,168,680 | today's `flowacc.bin` (control) | `UNMEASURED` | `UNMEASURED` | `UNMEASURED` |
-| 9,437,184 | 9 MiB, below the suspected cut | `UNMEASURED` | `UNMEASURED` | `UNMEASURED` |
-| 10,485,760 | 10 MiB, at the suspected cut | `UNMEASURED` | `UNMEASURED` | `UNMEASURED` |
-| 14,328,784 | projected new `terrain.bin` | `UNMEASURED` | `UNMEASURED` | `UNMEASURED` |
-| 19,105,072 | projected new `flowacc.bin` | `UNMEASURED` | `UNMEASURED` | `UNMEASURED` |
+| 4,168,680 | today's `flowacc.bin` (control) | `gzip` | `1823980` | 4168680/1823980 = 2.2855 |
+| 9,437,184 | 9 MiB, below the suspected cut | `gzip` | `4348008` | 9437184/4348008 = 2.1705 |
+| 10,485,760 | 10 MiB, at the suspected cut | `gzip` | `4603132` | 10485760/4603132 = 2.2780 |
+| 14,328,784 | projected new `terrain.bin` | `gzip` | `6383366` | 14328784/6383366 = 2.2447 |
+| 19,105,072 | projected new `flowacc.bin` | `gzip` | `8423586` | 19105072/8423586 = 2.2680 |
 
-Live control (the real deployed file, same day): `UNMEASURED`
-Compression threshold bracket: `UNMEASURED`
-First paint implied by this result, gz bytes on the wire: `UNMEASURED`
-Verdict: `UNMEASURED`
+Live control (the real deployed site, same day):
+
+```
+HTTP/1.1 200 OK
+Content-Length: 685250
+ETag: W/"6a793f20-3f9be8"
+Content-Encoding: gzip
+```
+
+`0x3f9be8` = 4,168,680 (raw size); 4168680/685250 = 6.0834×.
+
+Compression threshold bracket: no threshold up to 19,105,072 B — every probe,
+including both projected new assets (14,328,784 and 19,105,072 B), returned
+`Content-Encoding: gzip` on both passes. Step 6 (bisection) did not apply:
+there was no identity-encoded probe to bracket against.
+
+First paint implied by this result, gz bytes on the wire: 19,283,792 B =
+18.39 MiB — the spec's "both large bins served gzip" branch, since both
+`probe_14328784.bin` and `probe_19105072.bin` measured `Content-Encoding: gzip`.
+
+Verdict: **PASS.** Falsification condition ("the response for
+`probe_14328784.bin` or `probe_19105072.bin` carries no `Content-Encoding:
+gzip` header") did not occur — both carried `Content-Encoding: gzip` on both
+measurement passes. Kill criterion §11 #3 did not fire.
+
+Teardown: `gh repo delete NasserAlbusaidi/pages-compression-probe --yes`
+exited 0. Post-delete check: `curl -sS -o /dev/null -w "%{http_code}\n"
+https://nasseralbusaidi.github.io/pages-compression-probe/probe_14328784.bin`
+printed `404`; `gh repo view NasserAlbusaidi/pages-compression-probe` returned
+`GraphQL: Could not resolve to a Repository with the name
+'NasserAlbusaidi/pages-compression-probe'.` — the probe repository is deleted.
 
 ## M2 — GMRT over the new box
 

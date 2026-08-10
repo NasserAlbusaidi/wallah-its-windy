@@ -16,9 +16,9 @@ below is reproducible from the command printed beside it. A field still reading
 | --- | --- |
 | OS | Windows 11 Pro |
 | `node --version` | v22.23.1 |
-| `bake/.venv` python version | `UNMEASURED` |
+| `bake/.venv` python version | missing bake/.venv/Scripts/python.exe (created by Task 3) |
 | `curl --version` (first line) | curl 8.4.0 (x86_64-w64-mingw32) libcurl/8.4.0 Schannel zlib/1.3 brotli/1.1.0 zstd/1.5.5 libidn2/2.3.4 libpsl/0.21.2 (+libidn2/2.3.3) libssh2/1.11.0 |
-| Operator | `UNMEASURED` |
+| Operator | Claude Code subagent, dispatched by NasserAlbusaidi |
 
 ## M1 — GitHub Pages compression above 10 MB
 

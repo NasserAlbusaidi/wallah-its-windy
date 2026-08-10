@@ -198,12 +198,13 @@ describe('metricsForField', () => {
   });
 
   it('the km mapping tracks the field builder\'s half-domain height', () => {
-    // Drift guard for the two independent USES of the half-domain height:
-    // realism-metrics.ts maps clip offsets to km in fieldGeometry, and
-    // buildRealismField maps cell size to km in cellKm. The duplicated 666
-    // literal is gone, but the two mappings are still written separately and
-    // can still be rewritten apart. The cold centroid sits at clip (0.5, 0),
-    // so its offset must be exactly half the domain height.
+    // Guards fieldGeometry's clip->km mapping (realism-metrics.ts):
+    // centroidOffsetKm comes from clip offset * metricX * HALF_DOMAIN_HEIGHT_KM
+    // computed inside fieldGeometry, which never reads field.cellKm — so this
+    // is NOT a cross-check against buildRealismField's cellKm mapping. What it
+    // does catch: wrong cell selection, a dropped metricX factor, or a
+    // wrong-axis bug in fieldGeometry. The cold centroid sits at clip
+    // (0.5, 0), so its offset must be exactly half the domain height.
     const m = metricsForField(eastLobeField(), ctxFor());
     expect(m.coldTop.centroidOffsetKm).toBeCloseTo(0.5 * HALF_DOMAIN_HEIGHT_KM, 6);
   });

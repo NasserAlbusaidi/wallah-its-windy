@@ -128,4 +128,14 @@ describe('grid: world east-west metric', () => {
         (DOMAIN.latMax - DOMAIN.latMin),
     );
   });
+
+  it('pins the reference anisotropy so the render is unchanged', () => {
+    // DELIBERATE bare literals (20, 12, 18), not DOMAIN-derived. Every test
+    // above restates worldMetricX's own arithmetic against the live DOMAIN,
+    // so all three stay green through a domain change — none of them is an
+    // absolute pin. This is the ONE absolute pin of today's east-west
+    // anisotropy. A domain change MUST fail here and be decided, not
+    // absorbed.
+    expect(worldMetricX(18)).toBeCloseTo((20 * Math.cos((18 * Math.PI) / 180)) / 12, 12);
+  });
 });

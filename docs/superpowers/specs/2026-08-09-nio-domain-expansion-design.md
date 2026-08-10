@@ -722,6 +722,53 @@ candidate selection, and **`fidelity-reference.json`**. A post-expansion HF-1
 validation drift is a measured result to publish in `docs/fidelity-benchmark.md`
 and the ROADMAP break entry — not a baseline to move.
 
+### 7.1 Provenance hashes are not baselines **[amended 2026-08-10]**
+
+The two lists above conflate a **scientific baseline** with a **provenance
+hash**, and Phase 1B proved the distinction is load-bearing.
+
+`calibration/hf6-verify.mjs:17-24` hashes the raw bytes of eight files —
+`src/sim.ts`, `src/steering.ts`, `src/upper-ocean.ts`, `src/ventilation.ts`,
+`src/structure.ts`, `src/coastal-exposure.ts`, `src/hindcast-benchmark.ts`, and
+the verifier itself. **A comment change to any of them fails
+`hf6:verify:check`**, because the hash covers bytes, not behaviour. That hash
+lives in `hf6-sealed-verification.json`, whose own digest is in turn recorded as
+`verificationSha256` inside `hf6-acceptance.json` — so one source edit cascades
+into two files the list above marks unresealable.
+
+Read literally, that made every Phase 1B hardening task impossible: the phase
+exists to harden `sim.ts` and `upper-ocean.ts` *before* the rebake, and it may
+not touch them. The rule, not the phase, was wrong.
+
+**The distinction:** an acceptance file's *thresholds and rules* stay frozen —
+that is what "frozen before scoring, never retuned after" protects. Its
+*provenance hash fields* record which artifact was scored, and must track the
+artifact or the chain stops being evidence of anything. Precedent agrees:
+commits `9bb57d6` and `f85cfb9` each moved `runtimeSimSha256` and
+`verificationSha256` and nothing else in those files.
+
+**Therefore a provenance reseal is permitted, under proof.** A commit that
+regenerates `hf6-sealed-verification.json` and `hf6-acceptance.json` alongside a
+runtime source edit must demonstrate, in its report:
+
+1. the sealed-file diff contains **only** `*Sha256` fields — no `metrics`, no
+   `cases`, no `aggregate`, no `outcomes` entry moved by a single byte;
+2. the acceptance-file diff contains **only** `verificationSha256`; no
+   threshold, tolerance, or rule changed;
+3. `hf6:gate:check` and `hf6:prospective:check` pass after the regeneration.
+
+Failing any of the three, it is not a provenance reseal — it is a result change,
+and the frozen-gate rules apply in full.
+
+**This does not reopen the HF-6 verdict.** HF-6's sealed first look is REJECTED
+and stays rejected. Updating a byte-hash so the chain still points at the file it
+scored is the opposite of re-running a gate to flip a verdict.
+
+**Consequence for Phase 1B's gate.** The phase acceptance test is no longer
+"`git status --porcelain calibration docs public/data` prints nothing". It is:
+**no scientific number moves.** Only `*Sha256` provenance fields may differ, and
+each must be justified by a named source edit in the same commit.
+
 **Untouched:** `calibrate:structure`, `hf5:gate:check` and
 `hf6:prospective:check` are domain-independent and must not appear in any reseal
 PR.

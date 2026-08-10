@@ -5,8 +5,9 @@
  * RGR-002 eye contrast, RGR-003/006/013 cold-top area + centroid, RGR-004 band
  * edge energy), each reducing a `RealismField` to plain numbers. Everything
  * here is a pure function of (field, context): no clock, no device trait, no
- * global state, and no import from a render path — the only dependency is
- * `realism-proxy`, the harness's single import surface.
+ * global state, and no import from a render path — the dependencies are
+ * `realism-proxy` (the harness's single import surface) and `grid`, which owns
+ * the km<->clip mapping and sits below the render layer.
  *
  * Conditioning that the register defines per BIN rather than per FRAME lives
  * with the aggregator, not here: RGR-001's month grouping and RGR-006's
@@ -21,6 +22,11 @@
 
 import type { RealismField, RealismFrameContext } from './realism-proxy';
 import { clamp01, smoothstep } from './realism-proxy';
+// grid.ts, NOT render/storm-radii.ts: this module still must not import a
+// render path, and grid.ts is a coordinate-convention module below it. The
+// duplicated 666 that used to live here is gone; the mapping is now shared
+// with buildRealismField by construction rather than by comment.
+import { HALF_DOMAIN_HEIGHT_KM } from './grid';
 
 /** RGR-001: a cell is cloudy when `btProxyC <= 0 C`. */
 // Proxy threshold, sealed sim-side; the observed-side BT mapping is an R2b
@@ -58,14 +64,6 @@ export const REALISM_MIN_SHEAR_DIR_MS = 0.05;
  * core-minus-ring difference would measure eyewall noise against itself.
  */
 const EYE_STRENGTH_MIN = 0.05;
-
-/**
- * Half the domain height in km — the clip→km factor. Mirrors
- * `HALF_DOMAIN_HEIGHT_KM` in `src/render/storm-radii.ts`, restated here because
- * this module must not import a render path; `buildRealismField` derives its
- * `cellKm` from the same 666, so the two mappings agree by construction.
- */
-const HALF_DOMAIN_HEIGHT_KM = 666;
 
 const DEG_PER_RAD = 180 / Math.PI;
 

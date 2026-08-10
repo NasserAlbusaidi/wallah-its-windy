@@ -40,6 +40,35 @@ export const EARTH_RADIUS_KM = 6371;
 export const METERS_PER_DEG_LAT = 111_320;
 const DEG2RAD = Math.PI / 180;
 
+/**
+ * Kilometres per degree of latitude used by the RENDER km<->clip mapping, and
+ * by nothing else.
+ *
+ * This deliberately disagrees with the two other km-per-degree numbers in the
+ * tree, and the disagreement is load-bearing:
+ *   - METERS_PER_DEG_LAT = 111_320 above (the physics wind conversion) would
+ *     make the half-domain height 667.92 km;
+ *   - KM_PER_LAT_DEGREE = 111.195 in src/render/terrain.ts:23 (and the same
+ *     number in src/fidelity-verification.ts:14 and src/steering.ts:221) would
+ *     make it 667.17 km.
+ * Neither is 666. The render layer has always used a flat 111, and every
+ * shipped shader constant, R2a realism metric and human-accepted R3/R4
+ * presentation baseline is denominated in that mapping. Reconciling the <=
+ * 0.29 % difference would move every cloud, rainband and radar radius those
+ * verdicts accepted. It is a RENDERING unit, never a physical one: do not use
+ * it in sim.ts, structure.ts, steering.ts or any calibration path.
+ */
+export const RENDER_KM_PER_LAT_DEG = 111;
+
+/**
+ * Half the domain height in km — THE km -> clip-y factor for every render and
+ * measurement path. Derived, not written out, so a domain change cannot leave
+ * a stale literal behind. Exactly 666 at the current 15..27 N domain
+ * (12 / 2 * 111, all three operations exact in IEEE754 double).
+ */
+export const HALF_DOMAIN_HEIGHT_KM =
+  ((DOMAIN.latMax - DOMAIN.latMin) / 2) * RENDER_KM_PER_LAT_DEG;
+
 // ---------------------------------------------------------------------------
 // Domain membership
 // ---------------------------------------------------------------------------

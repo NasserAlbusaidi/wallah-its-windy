@@ -11,9 +11,12 @@
  */
 
 import type { StormStructure } from '../types';
+import { HALF_DOMAIN_HEIGHT_KM, RENDER_KM_PER_LAT_DEG } from '../grid';
 
-/** Half the domain height in km — converts km to clip-y units. */
-export const HALF_DOMAIN_HEIGHT_KM = 666;
+// grid.ts owns the km<->clip mapping (it owns clip space). Re-exported here so
+// the twelve render and realism modules that already import it from this file
+// keep working, and so docs/architecture.md's export list stays true.
+export { HALF_DOMAIN_HEIGHT_KM, RENDER_KM_PER_LAT_DEG };
 
 /** Shared numerical floor; matches the existing guards in env.ts and radar.ts. */
 export const RENDER_RADIUS_FLOOR = 0.008;

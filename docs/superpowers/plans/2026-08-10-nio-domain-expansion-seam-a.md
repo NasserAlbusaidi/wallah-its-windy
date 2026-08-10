@@ -7821,7 +7821,7 @@ node -e "const c=require('./calibration/fidelity-catalog.json'); const r=require
 ```
 
 ```powershell
-node -e "const h=require('./calibration/data/hf6-case-catalog.json'); const r=require('./calibration/results.json'); const cal=r.dataset.split.calibration, val=r.dataset.split.validation; const s=h.cases.filter(c=>c.partition==='sealed-confirmation'); console.log('sealed n=', s.length); console.log('in calibration:', s.filter(c=>cal.includes(c.sid)).map(c=>c.sid).join(',')||'(none)'); console.log('in validation:', s.filter(c=>val.includes(c.sid)).map(c=>c.sid).join(',')||'(none)')"</br>```
+node -e "const h=require('./calibration/data/hf6-case-catalog.json'); const r=require('./calibration/results.json'); const cal=r.dataset.split.calibration, val=r.dataset.split.validation; const s=h.cases.filter(c=>c.partition==='sealed-confirmation'); console.log('sealed n=', s.length); console.log('in calibration:', s.filter(c=>cal.includes(c.sid)).map(c=>c.sid).join(',')||'(none)'); console.log('in validation:', s.filter(c=>val.includes(c.sid)).map(c=>c.sid).join(',')||'(none)')"```
 
 *Expected:* First command prints:
 ```

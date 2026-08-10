@@ -126,6 +126,15 @@ describe('probeCaps reports the texture-size cap', () => {
     } as unknown as WebGL2RenderingContext;
     expect(probeCaps(fake).maxTextureSize).toBe(2048);
   });
+
+  it('falls back to the floor when a lost context reports 0, the realistic failure', () => {
+    const fake = {
+      MAX_TEXTURE_SIZE: 0x0d33,
+      getParameter: () => 0,
+      getExtension: () => null,
+    } as unknown as WebGL2RenderingContext;
+    expect(probeCaps(fake).maxTextureSize).toBe(2048);
+  });
 });
 
 describe('determinism guard: no land predicate can observe the texture cap', () => {
@@ -177,11 +186,20 @@ describe('determinism guard: no land predicate can observe the texture cap', () 
     const workerSide = points.map((p) => sampleLayerBilinear(land, 0, p.lat, p.lon) > 0.5);
     expect(uiSide).toEqual(workerSide);
 
-    // Now stub a floor device. fitFactor(1040, 668, 512) === 3, so a reduction
-    // genuinely happens — and neither predicate may notice, because neither
-    // reads the reduced plane.
+    // Snapshot the source plane before reducing it. Length staying put or the
+    // predicates still agreeing would NOT catch an in-place write here: binarizing
+    // at 0.5 preserves the > 0.5 predicate everywhere, so uiAfter/workerAfter are
+    // blind to it. Only a full byte-for-byte compare proves no mutation.
+    const beforeReduction = Float32Array.from(land.data);
+
+    // Now stub a floor device that forces a real reduction — neither predicate
+    // may notice, because neither reads the reduced plane. The fit arithmetic
+    // itself is already pinned with bare literals in the `fitFactor` describe
+    // block above; this only needs "a reduction genuinely happens" and must
+    // stay true across the domain-expansion grid growth, so it asserts a
+    // relation, not a value that changes with land.nx/land.ny.
     const f = fitFactor(land.nx, land.ny, 512);
-    expect(f).toBe(3);
+    expect(f).toBeGreaterThan(1);
     const dims = reducedDims(land.nx, land.ny, f);
     const reduced = majorityReduce(binarize(land.data, 0.5), land.nx, land.ny, f);
     expect(reduced.length).toBe(dims.nx * dims.ny);
@@ -190,12 +208,20 @@ describe('determinism guard: no land predicate can observe the texture cap', () 
     const workerAfter = points.map((p) => sampleLayerBilinear(land, 0, p.lat, p.lon) > 0.5);
     expect(uiAfter).toEqual(uiSide);
     expect(workerAfter).toEqual(workerSide);
-    // The source plane was not mutated by the reduction.
-    expect(land.data.length).toBe(land.nx * land.ny);
+    // The source plane was not mutated by the reduction: compare byte-for-byte.
+    expect(land.data).toEqual(beforeReduction);
   });
 
-  it('texture-fit is not reachable from the binary reader or the worker', () => {
-    for (const file of ['src/loader.ts', 'src/ensemble.worker.ts', 'src/raster-sampler.ts']) {
+  it('texture-fit is not reachable from either land predicate or the binary reader', () => {
+    for (const file of [
+      'src/loader.ts',
+      'src/ensemble.worker.ts',
+      'src/raster-sampler.ts',
+      'src/ui.ts',
+      'src/main.ts',
+      'src/sim.ts',
+      'src/ensemble.ts',
+    ]) {
       expect(readFileSync(file, 'utf8'), file).not.toMatch(/texture-fit/);
     }
     // And texture-fit itself never learns what a BinLayer is.

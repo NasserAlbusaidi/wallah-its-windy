@@ -1,10 +1,11 @@
 /**
- * node-fs.d.ts — minimal ambient typing for the one Node builtin the integration
- * tests use. The project deliberately does NOT depend on
+ * node-fs.d.ts — minimal ambient typing for the one Node builtin the file-reading
+ * tests use (e.g. test/integration-bins.test.ts, test/texture-fit.test.ts, and
+ * others). The project deliberately does NOT depend on
  * @types/node (dev deps are capped at vite/typescript/vitest), so this declares
- * only the `node:fs` surface used by test/integration-bins.test.ts. `readFileSync`
+ * only the `node:fs` surface those tests need. `readFileSync`
  * returns a Uint8Array (Node's Buffer is a Uint8Array subclass), which exposes the
- * `.buffer/.byteOffset/.byteLength` the test needs to hand parseBin an ArrayBuffer.
+ * `.buffer/.byteOffset/.byteLength` a test needs to hand parseBin an ArrayBuffer.
  */
 declare module 'node:fs' {
   export function readFileSync(path: string): Uint8Array;

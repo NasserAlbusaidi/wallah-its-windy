@@ -1689,7 +1689,8 @@ export class UiController {
 
   /**
    * Is (lat,lon) over land? Prefers the baked land mask (terrain.bin `landmask`
-   * layer, >0.5 = land) sampled through grid.ts; falls back to an analytic
+   * layer, >0.5 = land) sampled through raster-sampler.ts (sampleLayerNearest,
+   * which itself resolves cells via grid.ts); falls back to an analytic
    * coastline polygon until the mask is baked. The fallback is deliberately
    * coarse — good enough to route obvious Oman/Iran/Pakistan clicks to a ripple
    * and open-sea clicks to a spawn; the real mask supersedes it.

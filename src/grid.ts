@@ -137,6 +137,50 @@ export function latLonToCell(spec: GridSpec, lat: number, lon: number): CellCoor
   };
 }
 
+/**
+ * Snap tolerance that makes a 0.1-degree walk produce a strictly one-per-step
+ * cell index. NOT the default: enabling it moves 38 of the 81 shipped spawn
+ * points in scenarios.json + genesis.json by one 0.1-degree ocean cell
+ * (measured 2026-08-10), which changes tracks and breaks calibrate:check. It
+ * is turned on with the domain flip, where a value change is attributable.
+ */
+export const STABLE_CELL_SNAP_EPSILON = 1e-9;
+
+/**
+ * Containing-cell index on a regular axis that starts at `origin` and advances
+ * by `delta`, clamped to [0, count-1].
+ *
+ * This replaces `Math.round(latLonToCell(...).col)`. That expression is an
+ * exact half-integer for any coordinate sitting on a cell boundary, so the
+ * rounding direction was decided by last-bit float error rather than by a
+ * stated rule. Flooring the origin-relative offset states the rule — the cell
+ * whose west (or north) edge is at or before the point — and is bit-identical
+ * to the old expression at `snapEpsilon = 0`, because `t - 0.5` is exact in
+ * IEEE754 for every `t` in [0.5, 2^52) so `Math.round(t - 0.5) === Math.floor(t)`.
+ */
+export function cellIndexFromOrigin(
+  value: number,
+  origin: number,
+  delta: number,
+  count: number,
+  snapEpsilon = 0,
+): number {
+  const index = Math.floor((value - origin) / delta + snapEpsilon);
+  return Math.max(0, Math.min(count - 1, index));
+}
+
+/** Column index of `lon` on `spec`, indexed off the bbox west edge. */
+export function columnIndex(spec: GridSpec, lon: number, snapEpsilon = 0): number {
+  const dLon = (spec.bbox.lonMax - spec.bbox.lonMin) / spec.nx;
+  return cellIndexFromOrigin(lon, spec.bbox.lonMin, dLon, spec.nx, snapEpsilon);
+}
+
+/** Row index of `lat` on `spec`, indexed off the bbox NORTH edge (row 0 = latMax). */
+export function rowIndex(spec: GridSpec, lat: number, snapEpsilon = 0): number {
+  const dLat = (spec.bbox.latMax - spec.bbox.latMin) / spec.ny;
+  return cellIndexFromOrigin(spec.bbox.latMax - lat, 0, dLat, spec.ny, snapEpsilon);
+}
+
 // ---------------------------------------------------------------------------
 // latlon <-> clip space
 // ---------------------------------------------------------------------------

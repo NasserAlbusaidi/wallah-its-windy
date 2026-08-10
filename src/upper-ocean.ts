@@ -12,7 +12,7 @@
  * horizontal currents, waves, spray, rain freshening or ocean eddies.
  */
 
-import { cellToLatLon, DOMAIN, latLonToCell } from './grid';
+import { cellToLatLon, columnIndex, DOMAIN, rowIndex } from './grid';
 import { cloneStormStructure, hollandWindSpeedKt } from './structure';
 import type { GridSpec, StormStructure } from './types';
 
@@ -141,6 +141,16 @@ const OCEAN_GRID: GridSpec = {
   ny: Math.round((DOMAIN.latMax - DOMAIN.latMin) / OCEAN.GRID_DEGREES),
   bbox: DOMAIN,
 };
+
+/**
+ * Zero here on purpose: at zero the containing-cell rule is bit-identical to
+ * the Math.round expression it replaced, so this file's change is a refactor.
+ * Raising it to grid.ts's STABLE_CELL_SNAP_EPSILON makes a 0.1-degree walk
+ * advance one cell per step, but moves 38 of the 81 shipped spawn points by a
+ * cell (measured 2026-08-10) and therefore changes every sealed calibration
+ * number. It is raised in the phase that flips DOMAIN, never before.
+ */
+const OCEAN_CELL_SNAP_EPSILON = 0;
 
 const LAYER_COUNT = OCEAN_DEPTH_INTERFACES_M.length - 1;
 const LAYER_THICKNESS_M = Float64Array.from(
@@ -562,10 +572,9 @@ export class SparseUpperOcean {
   }
 
   private cell(lat: number, lon: number): { col: number; row: number } {
-    const at = latLonToCell(OCEAN_GRID, lat, lon);
     return {
-      col: clamp(Math.round(at.col), 0, OCEAN_GRID.nx - 1),
-      row: clamp(Math.round(at.row), 0, OCEAN_GRID.ny - 1),
+      col: columnIndex(OCEAN_GRID, lon, OCEAN_CELL_SNAP_EPSILON),
+      row: rowIndex(OCEAN_GRID, lat, OCEAN_CELL_SNAP_EPSILON),
     };
   }
 

@@ -18,7 +18,7 @@
  */
 
 import type { ViewState, ViewTransform } from './types';
-import { DOMAIN, clipToLatLon, latLonToClip } from './grid';
+import { clipToLatLon, latLonToClip, worldMetricX } from './grid';
 import { DISPLAY_CONTEXT_DOMAIN } from './display-domain';
 
 export type { ViewState, ViewTransform } from './types';
@@ -54,16 +54,6 @@ export const HOME_VIEW: ViewState = {
 /** View half-height at max zoom = (latMax-latMin)/(2*MAX_ZOOM) = 0.75 deg. */
 export const MAX_ZOOM = 8;
 
-const DEG2RAD = Math.PI / 180;
-
-/** East-west world anisotropy at a latitude — same formula as cloudMetricX. */
-function metricX(lat: number): number {
-  return (
-    ((DOMAIN.lonMax - DOMAIN.lonMin) * Math.cos(lat * DEG2RAD)) /
-    (DOMAIN.latMax - DOMAIN.latMin)
-  );
-}
-
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
@@ -83,7 +73,7 @@ function clampPass(
   cy: number,
 ): ClampedView {
   const centreLat = clipToLatLon(0, cy).lat;
-  const m = metricX(centreLat);
+  const m = worldMetricX(centreLat);
   const displayHalfW = (DISPLAY_WORLD.maxX - DISPLAY_WORLD.minX) / 2;
   const displayHalfH = (DISPLAY_WORLD.maxY - DISPLAY_WORLD.minY) / 2;
   // Context containment outranks MAX_ZOOM: on an extreme-aspect canvas the
@@ -222,7 +212,7 @@ export function panByPixels(
 /**
  * Change zoom while keeping a world-space anchor at the same screen point.
  * scaleY is proportional to zoom, so the y relation is exact and gives the
- * new centre latitude; scaleX additionally carries metricX(centre lat), so
+ * new centre latitude; scaleX additionally carries worldMetricX(centre lat), so
  * the x relation uses the metric factors of the old AND new centres. The
  * next computeViewTransform absorbs clamping (anchor drift at the domain
  * edge is the clamp doing its job).
@@ -235,8 +225,8 @@ export function zoomAboutAnchor(
   const z = clamp(newZoom, MIN_ZOOM, MAX_ZOOM);
   const r = view.zoom / z;
   const cy = anchorWorld.y - (anchorWorld.y - view.center.y) * r;
-  const m0 = metricX(clipToLatLon(0, view.center.y).lat);
-  const m1 = metricX(clipToLatLon(0, cy).lat);
+  const m0 = worldMetricX(clipToLatLon(0, view.center.y).lat);
+  const m1 = worldMetricX(clipToLatLon(0, cy).lat);
   return {
     center: {
       x:

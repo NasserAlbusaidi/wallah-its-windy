@@ -179,10 +179,13 @@ export function interpolatedCloudAgeH(
   return prevAgeH + (ageH - prevAgeH) * clamped;
 }
 
-/** East-west metric correction shared by env and cloud-memory uploads. */
-export function cloudMetricX(latitude: number): number {
-  return (20 * Math.cos((latitude * Math.PI) / 180)) / 12;
-}
+/**
+ * East-west metric correction shared by env and cloud-memory uploads.
+ * The formula is grid.ts's `worldMetricX` — one owner, so the shader uploads
+ * and the camera clamp cannot drift apart. Re-exported (not wrapped) so the
+ * two names are the SAME function object.
+ */
+export { worldMetricX as cloudMetricX } from '../grid';
 
 /** Deterministic genesis-point seed shared by env and cloud-memory uploads. */
 export function cloudSeedFromGenesis(

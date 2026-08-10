@@ -9,6 +9,7 @@ import {
   msToDegPerHourMeridional,
   greatCircleKm,
   inBBox,
+  worldMetricX,
 } from '../src/grid';
 import type { GridSpec } from '../src/types';
 
@@ -103,5 +104,28 @@ describe('grid: great-circle distance + domain membership', () => {
     expect(inBBox(15, 50)).toBe(true); // inclusive corner
     expect(inBBox(28, 60)).toBe(false); // north of domain
     expect(inBBox(21, 49.9)).toBe(false); // west of domain
+  });
+});
+
+describe('grid: world east-west metric', () => {
+  it('is the domain aspect ratio at the equator', () => {
+    expect(worldMetricX(0)).toBe(
+      (DOMAIN.lonMax - DOMAIN.lonMin) / (DOMAIN.latMax - DOMAIN.latMin),
+    );
+  });
+
+  it('scales by cos(lat) and is symmetric about the equator', () => {
+    expect(worldMetricX(60)).toBeCloseTo(worldMetricX(0) * Math.cos(Math.PI / 3), 12);
+    expect(worldMetricX(-21)).toBeCloseTo(worldMetricX(21), 15);
+  });
+
+  it('keeps the radian conversion the sealed realism reference was measured with', () => {
+    // (lat * Math.PI) / 180, NOT lat * (Math.PI / 180). The two forms differ by
+    // up to ~1.4 ULP on about 2 % of latitudes in 0..30 N, and the first form
+    // is the one calibration/realism/realism-reference.json was produced with.
+    expect(worldMetricX(21)).toBe(
+      ((DOMAIN.lonMax - DOMAIN.lonMin) * Math.cos((21 * Math.PI) / 180)) /
+        (DOMAIN.latMax - DOMAIN.latMin),
+    );
   });
 });

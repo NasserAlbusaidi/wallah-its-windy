@@ -69,6 +69,26 @@ export const RENDER_KM_PER_LAT_DEG = 111;
 export const HALF_DOMAIN_HEIGHT_KM =
   ((DOMAIN.latMax - DOMAIN.latMin) / 2) * RENDER_KM_PER_LAT_DEG;
 
+/**
+ * East-west world anisotropy at a latitude: the factor that makes a circle on
+ * the ground render as a circle in the domain-normalized clip space. Owned
+ * here because clip space is grid.ts's contract, and because both consumers
+ * sit in different layers — `src/camera.ts` (presentation clamp) may not
+ * import a render module, and `src/render/cloud-motion.ts` re-exports this as
+ * `cloudMetricX` for the shader uploads.
+ *
+ * The radian conversion is written `(latitude * Math.PI) / 180`, NOT
+ * `latitude * DEG2RAD`. The two forms differ by up to about 1.4 ULP on roughly
+ * 2 % of latitudes in 0..30 N, and this one is the form the sealed R2a realism
+ * reference was measured with. Do not "simplify" it to reuse DEG2RAD.
+ */
+export function worldMetricX(latitude: number): number {
+  return (
+    ((DOMAIN.lonMax - DOMAIN.lonMin) * Math.cos((latitude * Math.PI) / 180)) /
+    (DOMAIN.latMax - DOMAIN.latMin)
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Domain membership
 // ---------------------------------------------------------------------------

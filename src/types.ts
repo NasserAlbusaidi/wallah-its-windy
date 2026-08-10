@@ -402,6 +402,8 @@ export enum DeathReason {
   Land = 'land',
   DryAir = 'dry-air',
   ExitedDomain = 'exited-domain',
+  /** Reached SIM.MAX_AGE_H. Unreachable inside the 50-70E/15-27N domain. */
+  MaxAge = 'max-age',
 }
 
 /** Muscat, for closest-approach reporting in the epitaph. */

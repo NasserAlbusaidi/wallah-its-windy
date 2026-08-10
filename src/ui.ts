@@ -1762,6 +1762,7 @@ const REASON_PHRASE: Record<DeathReason, string> = {
   [DeathReason.Land]: 'wrung out over land',
   [DeathReason.DryAir]: 'choked on dry desert air',
   [DeathReason.ExitedDomain]: 'drifted off the map',
+  [DeathReason.MaxAge]: 'ran out the simulated clock',
 };
 
 export function deathReasonPhrase(reason: DeathReason): string {

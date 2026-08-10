@@ -77,6 +77,25 @@ export const SIM = {
   SPAWN_VKT: 30,
   /** Storm dies below this sustained wind, knots (design lifecycle rule). */
   DESPAWN_VKT: 20,
+  /**
+   * Hard lifetime bound, simulated hours. A CALIBRATED MODEL PARAMETER, not a
+   * guard rail — read this before touching it.
+   *
+   * Provenance is `ensemble.ts:183`'s existing `maxHours = 360`, and that
+   * provenance is weak. Today the value is inert: inside the 50-70E/15-27N box
+   * the exit-domain test at the bottom of tick() ends every storm first, and
+   * the comparison below is STRICTLY greater so a run stopped at exactly 360 h
+   * (which is what `ensemble.runStorm` does by default) never reaches it. That
+   * is what keeps this addition zero-diff.
+   *
+   * THE ZERO-DIFF PROPERTY EXPIRES AT THE DOMAIN FLIP. Over 45-100E/0-30N a
+   * probe ran nine spawn latitudes over constant 29.5 C water for the full
+   * 240 h with `reason = null`, so after the flip this cap becomes the dominant
+   * death mechanism for a large share of storms — a first-order physics
+   * parameter. It belongs in the HF-7 charter's frozen-input set and in the
+   * model card; HF-7 scores dissipation timing and cannot treat it as free.
+   */
+  MAX_AGE_H: 360,
 
   // -- Intensity ODE: dV/dt = k*(MPI(SST) - V) - shear - land - dryair --------
   /**
@@ -1375,11 +1394,17 @@ export function createSimEngine(deps: SimDeps): SimEngine {
     recordTrackPoint();
     current = snapshot();
 
-    // 6) Lifecycle: exit-domain wins over intensity; then the <20 kt floor.
+    // 6) Lifecycle: exit-domain wins over intensity; then the <20 kt floor;
+    // then the age cap LAST, so it can never pre-empt an existing outcome.
+    // The comparison is strictly greater on purpose: `ensemble.runStorm` stops
+    // at exactly SIM.MAX_AGE_H, and `>=` would emit a death event on that final
+    // tick, changing every recorded ensemble result. See SIM.MAX_AGE_H.
     if (!inBBox(lat, lon, DOMAIN)) {
       die(DeathReason.ExitedDomain, events);
     } else if (vKt < SIM.DESPAWN_VKT) {
       die(reasonFromRecent(), events);
+    } else if (ageH > SIM.MAX_AGE_H) {
+      die(DeathReason.MaxAge, events);
     }
 
     return events;

@@ -3,7 +3,7 @@
 Date: 2026-08-10.
 Repository commit at measurement time: `7914d7f0da70a93839dcbd5d049435661b518e10`.
 Spec under test: `docs/superpowers/specs/2026-08-09-nio-domain-expansion-design.md` §6 Phase 0.
-Status: in progress.
+Status: complete except M4 (blocked on CDS credentials).
 
 This note records measurements only. Phase 0 changes no code, no baked data and
 no calibration artifact; this file is the only thing it commits. Every number
@@ -632,11 +632,46 @@ even though the brief's arithmetic was not.
 
 | # | Measurement | Verdict | Kill criterion | Fired |
 | --- | --- | --- | --- | --- |
-| M1 | Pages compression above 10 MB | `UNMEASURED` | §11 #3 | `UNMEASURED` |
+| M1 | Pages compression above 10 MB | PASS | §11 #3 | No |
 | M2 | GMRT over the new box | PASS | §11 #1 | No |
-| M3 | HydroSHEDS bytes | `UNMEASURED` | none | n/a |
+| M3 | HydroSHEDS bytes | FAIL — immaterial (see note below) | none | n/a |
 | M4 | CDS queue time | `BLOCKED` | none | n/a |
 | M5 | Offset-bbox forcing | PASS | §11 #4 | No |
+
+**Notes on the verdicts above.** These four points were adjudicated after the
+five measurement tasks ran (`.superpowers/sdd/2026-08-10-nio-domain-expansion-seam-a/progress.md`);
+they clarify what the bare table cells above cannot show on their own.
+
+- **M2 overturns a spec assumption, not just a pass.** §3.6's claim that
+  `resolution=med` is a hard 1140-column cap, requiring a 15-tile mosaic,
+  does not generalize: an 11° tile returned 1252/1254 columns (not 1140),
+  and a single `resolution=high` request over the full 45–100 °E / 0–30 °N
+  box returned `[3129,1791]` in 94.243613 s / 22,416,884 B — clearing the
+  2860×1670 target on both axes in one request (`## M2` above). The planned
+  15-tile mosaic may be unnecessary; spec §3.6 needs rewriting before Phase 5
+  builds against it.
+- **M3's FAIL is correct and immaterial.** By the letter of the stated
+  criterion, the union of `af`/`as`/`eu` HydroSHEDS bounds leaves a gap at
+  lon [55,57] × lat [0,12] (`## M3` above) — a true result from a
+  bounding-box test that cannot distinguish land from water. Measured
+  against `tmp/phase0/gmrt/full_high.nc`, that gap window has max elevation
+  −102.29 m, 0 of 81,624 cells above sea level, and the nearest land is at
+  lon ≤ 54.65 °E. HydroSHEDS is a land-only drainage dataset, so no fourth
+  region covers open ocean, and none is needed to close the gap. The FAIL
+  stands as recorded above; it does not block Phase 5.
+- **M5's PASS holds only on today's domain.** Both `vayu` and `hikaa`
+  produced SHA-256-identical flight-recorder tapes (`## M5` above), but the
+  underlying `latLonToCell` subtraction is exact only where the Sterbenz
+  bound holds (`lat ≥ latMax/2`): the current domain's `latMin = 15 ≥
+  27/2 = 13.5` guarantees it; the proposed domain's `latMax = 30` does not,
+  for `lat < 15`. The effect is resolution-dependent, not domain-uniform: at
+  `dLat = 0.5°` (the shipped env grid) it is 0.000% inexact; at `dLat =
+  30/1670°` (M2's terrain target) it is 64.671% inexact; at `dLat = 0.1°` it
+  is 56.000% inexact. Env-forcing subwindows on the proposed domain stay
+  exact; terrain and 0.1° grids do not. Seam B must budget a per-grid
+  tolerance, not assume byte-identity from this result.
+- **M4 is the project's long pole**, not one blocked measurement among five
+  — see `## What Phase 0 did not measure` below.
 
 ## What Phase 0 did not measure
 
@@ -655,5 +690,19 @@ even though the brief's arithmetic was not.
   regardless of the CDS question, `data/raw/` does not exist at all on this
   machine, so every other bake input (GMRT, HydroSHEDS, OISST, IBTrACS) needs
   re-downloading before any of those later tasks can run either.
-- (M1, M3 entries pending Task 7's verdict roll-up. M2 and M5 now show
-  resolved verdicts in the table above.)
+- A full simulation through a cropped STEERING bin. M5 drives
+  `runDetailedHindcastCase` with its default arguments — the
+  `runHindcastCase` path used by `npm run calibrate:check` — which passes no
+  `pressureWindSampler`, so only the raster sampler was exercised on steering
+  layers, not the sim.
+- A cropped `terrain.bin` or `ocean.bin`. M5 held both at full extent
+  deliberately; spec §4.3 concerns forcing bins only.
+- CDS queue behaviour beyond one sample. Queue depth varies by hour and by
+  dataset; M4 bounds nothing.
+- Whether the GMRT mosaic is seamless after resampling. M2 measured returned
+  extents and spacings, not the resampled 2860 x 1670 output;
+  `bake/sources.py:90-130` still assumes exactly one netCDF.
+- Whether the HydroSHEDS `acc` rasters cover the box. M3 read bounds from the
+  already-downloaded `dir` zips only.
+- The size of the clean IBTrACS pool (spec §10 risk 8). `data/raw/ibtracs.NI.csv`
+  is gitignored and absent from this checkout.

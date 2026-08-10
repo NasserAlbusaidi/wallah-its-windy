@@ -633,10 +633,10 @@ even though the brief's arithmetic was not.
 | # | Measurement | Verdict | Kill criterion | Fired |
 | --- | --- | --- | --- | --- |
 | M1 | Pages compression above 10 MB | PASS | §11 #3 | No |
-| M2 | GMRT over the new box | PASS | §11 #1 | No |
+| M2 | GMRT over the new box | PASS (see note below) | §11 #1 | No |
 | M3 | HydroSHEDS bytes | FAIL — immaterial (see note below) | none | n/a |
 | M4 | CDS queue time | `BLOCKED` | none | n/a |
-| M5 | Offset-bbox forcing | PASS | §11 #4 | No |
+| M5 | Offset-bbox forcing | PASS (see note below) | §11 #4 | No |
 
 **Notes on the verdicts above.** These four points were adjudicated after the
 five measurement tasks ran (`.superpowers/sdd/2026-08-10-nio-domain-expansion-seam-a/progress.md`);
@@ -670,6 +670,18 @@ they clarify what the bare table cells above cannot show on their own.
   is 56.000% inexact. Env-forcing subwindows on the proposed domain stay
   exact; terrain and 0.1° grids do not. Seam B must budget a per-grid
   tolerance, not assume byte-identity from this result.
+- **M5's storage budget projects over target.** The measured crop ratio
+  (0.435780 vayu / 0.712777 hikaa, mean 0.574279) applied to the future
+  46-storm cohort (30 HF-3 steering + 16 HF-6 forcing bins) at full-extent
+  forcing size projects **200.6–328.0 MB (mean ≈264.2 MB)** of
+  `calibration/data` — **above** the spec's 150 MB target (`## M5` above).
+  The offset-bbox mechanism itself is proven (tapes byte-identical on both
+  scenarios); the storage budget is a separate, unmet number. M5 argues the
+  true future-domain ratio should come in lower, because the domain grows
+  while a storm's physical travel distance does not, but that reduction is
+  reasoning, not measurement — it would require repeating this spike against
+  a new-domain-sized env bin, which does not exist yet. The 150 MB target is
+  therefore **CONTINGENT, not SUPPORTED**.
 - **M4 is the project's long pole**, not one blocked measurement among five
   — see `## What Phase 0 did not measure` below.
 

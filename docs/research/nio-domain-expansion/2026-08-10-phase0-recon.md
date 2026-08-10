@@ -303,7 +303,12 @@ by rerunning `runDetailedHindcastCase` against the full-extent bin alone and
 inspecting `result.death`): `vayu` died to shear at `durationH` 89.75
 (`{"reason":"shear","closestApproachKm":756.8855814927925,"peakKt":127.93698798852252}`),
 `hikaa` died to land at `durationH` 44, after a landfall at `ageH` 34.25
-(`{"reason":"land","closestApproachKm":370.9224546036663,"peakKt":73.57013979928252}`).
+(`{"reason":"land","closestApproachKm":370.9224546036663,"peakKt":73.57013979928263}`,
+re-confirmed by re-running the same command a second time in this fix pass —
+an earlier draft of this note had `…928252`, which is `vayu`'s `peakKt` tail
+transposed onto `hikaa` by a copy/paste error, not a re-measurement; caught
+in code review. The magnitude of the correction is 1.1e-13, no effect on
+any verdict).
 This is why the observed frame counts (360, 177) are shorter than a
 naive full-duration estimate (windowH − envOffsetH at 15-min ticks: 481 for
 vayu, 373 for hikaa) — the early `died` event breaks
@@ -320,10 +325,90 @@ zero differing points, not a small nonzero count with sub-1e-13 magnitude.
 Extending the brief's sampling probe (which checks only the first shared
 layer, by design — see the `break` in `samplingDiff`) to all eight shared
 env layers for both storms confirms this is not a first-layer coincidence:
-81,608 total sample points (10,201 × 8 layers) across both scenarios, 0
-differing, worst-case |Δ| 0. No mechanism is asserted for why the predicted
-ULP drift did not manifest here — this was not investigated beyond the
-measurement itself, per the instruction to report only what was observed.
+81,608 sample points (10,201 × 8 layers) **per scenario** — 163,216 total
+across both `vayu` and `hikaa` — 0 differing, worst-case |Δ| 0 in every
+case. (An earlier draft of this note said "81,608 total... across both
+scenarios"; that undercounted by half — corrected in code review.)
+
+**Why the byte-identity result does not generalise (code review finding).**
+Independent review identified the specific arithmetic mechanism and showed
+it is domain-dependent, not a general property of offset-bbox crops.
+`latLonToCell` (`src/grid.ts:87`) computes `(bbox.latMax − lat) / dLat`.
+Sterbenz's Lemma guarantees a float64 subtraction `a − b` is exact whenever
+`a/2 ≤ b ≤ a` (same sign, magnitudes within a factor of 2). For the CURRENT
+domain, `latMax = 27` and every in-domain query has `lat ≥ DOMAIN.latMin =
+15`, and `15 ≥ 27/2 = 13.5` — the bound holds for every possible query
+point with 1.5° to spare, so the subtraction is *guaranteed* exact, not
+merely observed to be exact. The review brute-forced this over every
+cell-aligned crop of the current domain: 252,000,000 probes, 0 inexact. For
+the PROPOSED 45–100°E / 0–30°N domain, `latMax = 30` moves the Sterbenz
+threshold to `lat ≥ 15`, and the domain now extends to `lat = 0`; for every
+`lat < 15`, `30 − lat > lat`, the bound is violated and exactness is no
+longer guaranteed. The review found 40,320,000 probes in that zone,
+5,097,600 inexact (12.6%), and traced the effect through the real
+`sampleLayerBilinear` to interior value shifts of up to 7.8e-14 at 0.5°
+grid spacing and 6.1e-13 at 0.1°. (Those two magnitude figures and the
+252,000,000 / 40,320,000 / 5,097,600 probe counts are cited from the review
+as given; this fix pass did not re-run the review's own brute-force
+crop-enumeration methodology.)
+
+Independently reproduced in this fix pass with a *different* methodology —
+a float64 two-sum/Dekker error-decomposition exactness test
+(`err = (a − s) − b` where `s = fl(a − b)`; `err === 0` iff the
+subtraction was exact), swept over a uniform 2,000,000-point lattice, not
+the review's crop enumeration, so the exact counts and percentages are not
+expected to match:
+
+```
+node -e "
+function subExact(a, b) {
+  const s = a - b;
+  const bVirtual = a - s;
+  const err = bVirtual - b;
+  return err === 0;
+}
+function sweep(latMax, latMin, n) {
+  let total = 0, inexact = 0;
+  for (let i = 0; i < n; i++) {
+    const lat = latMin + (latMax - latMin) * (i / (n - 1));
+    total++;
+    if (!subExact(latMax, lat)) inexact++;
+  }
+  return { total, inexact, pct: (100*inexact/total).toFixed(3) };
+}
+console.log('current domain latMax=27 lat in [15,27], n=2,000,000:', JSON.stringify(sweep(27, 15, 2000000)));
+console.log('proposed domain latMax=30 lat in [0,30], n=2,000,000:', JSON.stringify(sweep(30, 0, 2000000)));
+"
+```
+
+Output:
+
+```
+current domain latMax=27 lat in [15,27], n=2,000,000: {"total":2000000,"inexact":0,"pct":"0.000"}
+proposed domain latMax=30 lat in [0,30], n=2,000,000: {"total":2000000,"inexact":625670,"pct":"31.284"}
+```
+
+0/2,000,000 inexact for the current domain — consistent with the review's
+0/252,000,000 and with the Sterbenz guarantee being unconditional here.
+625,670/2,000,000 (31.284%) inexact for the proposed domain — nonzero,
+confirming the mechanism is real. This session's 31.3% (a uniform sweep
+over the *entire* 0–30° range) does not numerically match the review's
+12.6% (probed specifically within the `lat < 15` danger zone using crop
+enumeration) and should not be read as replicating it — different
+methodology, same qualitative conclusion, and the boundary point (`lat =
+15 = latMax/2`) matches Sterbenz's Lemma exactly in both.
+
+**Conclusion, stated plainly: the M5 byte-identity PASS is a property of
+the CURRENT domain's specific numbers (`DOMAIN.latMax = 27`,
+`DOMAIN.latMin = 15`, comfortably inside the Sterbenz bound relative to
+`latMax`), not a general property of the offset-bbox crop mechanism. It is
+structural, not lucky — but it is structural to numbers that change when
+the domain expands. Seam B must NOT carry "byte-identical" forward as an
+expectation for the new 45–100°E / 0–30°N domain. It must budget a
+tolerance (the review's measured order of magnitude, ~1e-13 at 0.5° grid
+spacing, is a starting point, not a validated bound for the new domain)
+and re-run an M5-equivalent spike against real new-domain bins before
+assuming any pass/fail bar for Seam B.**
 
 Two findings independent of the pass/fail verdict:
 
@@ -350,6 +435,71 @@ Two findings independent of the pass/fail verdict:
   silently produced different, wrong physics. This is the evidence for spec
   §5 invariant 1's motivating case and for kill criterion §11 #4's concern
   about a too-tight subwindow.
+
+**Validator rule needs two tiers, not one (code review finding).** Spec §5
+invariant 1 says `validateEventBinForScenario` "must assert nx, ny and
+bbox" — read as written, that means asserting `bbox === DOMAIN`. But
+`test/fidelity-scenarios.test.ts:101-124` builds the 30 fidelity scenarios
+and asserts exactly 20 of them (`offlineBins`) point at
+`calibration/data/fidelity/env_${scenario.id}.bin`; `:129` then runs
+`expect(validateEventBinForScenario(bin, scenario)).toBeNull()` against
+every one of all 30 scenarios, offline and public alike — both confirmed
+by reading the test file directly. Checked in this fix pass:
+`calibration/data/fidelity/*.bin` holds exactly 20 files today (`ls
+calibration/data/fidelity/*.bin | wc -l` → `20`), and a sample
+(`env_as1980.bin`, `env_as1981.bin`) still carries the full-extent bbox
+`(50,70,15,27)` — so today a naive `bbox === DOMAIN` rule would happen to
+pass. It would stop passing the day spec §4.3's subwindow conversion
+lands, because those 20 offline bins are exactly its target. **The
+validator needs two tiers: runtime bins (anything the browser or
+`ensemble.worker.ts` loads for live play) must require `bbox === DOMAIN`;
+offline calibration bins (`calibration/data/hf3`,
+`calibration/data/hf6/forcing`, `calibration/data/fidelity`) must instead
+require `bbox ⊆ DOMAIN`, cell-aligned, with a declared minimum margin (see
+below) — not bit-for-bit equality.** A single `bbox === DOMAIN` rule
+applied uniformly would break `test/fidelity-scenarios.test.ts:129` on the
+day subwindows land.
+
+Two further constraints Seam B depends on, both checked directly in this
+fix pass rather than assumed:
+
+- **(a) The crop must be cell-aligned by construction; `cropBin` does not
+  enforce it.** The brief's Step 3 text claims "If `cropBin` throws, the
+  window is not cell-aligned." That is not what the code does — `cropBin`
+  computes `c0/c1/r0/r1` via `Math.round`, which silently *snaps* a
+  non-cell-aligned window to the nearest cell boundary instead of
+  throwing. Verified directly: `m.cropBin('public/data/env_vayu.bin',
+  ..., { lonMin: 60.7, lonMax: 70, latMin: 15.6, latMax: 26.4 })` — a
+  window with none of its four edges on a 0.5° cell boundary — produced
+  header `sst_05 19x22 bbox=60.5,70,15.5,26.5`, silently substituting the
+  nearest cell-aligned window for the requested one, no error, no
+  warning. A production track-following-window generator must snap
+  OUTWARD (round crop edges away from the track, never toward it) itself,
+  before calling a cropper like this one — it cannot rely on the cropper
+  to reject misalignment. Non-cell-aligned identity was not tested by this
+  spike and is not obtainable with this tool as written.
+- **(b) The margin must exceed max(half a cell, the 375 km steering
+  annulus).** Measured directly: cropped `env_vayu.bin` moving only the
+  west edge (`lonMin` 50→55, all other edges left at full extent — a
+  single moved edge in isolation, to attribute divergence unambiguously)
+  and sampled `sst_05` along a lon transect crossing the moved edge at
+  fixed `lat=20`. Divergence between the full-extent and cropped sample is
+  nonzero at the moved edge itself (`lon=55.00`, diff `−0.030`), shrinks
+  linearly (`lon=55.05` diff `−0.024`; `55.10` diff `−0.018`; `55.15` diff
+  `−0.012`; `55.20` diff `−0.006`), and becomes **exactly 0 starting at
+  `lon=55.25`** — precisely one half-cell (0.25° on this bin's 0.5° grid)
+  inward from the moved edge — and stays exactly 0 for every point tested
+  further inward, out to 1.0° (20 half-cells). This matches
+  `sampleLayerBilinear`'s bilinear neighbourhood, which reaches exactly
+  one half-cell past the nominal query point; any margin smaller than half
+  a cell still touches the edge-clamp discrepancy zone regardless of storm
+  physics. M5's own margin (4.5°, driven by the 375 km steering annulus
+  ceiling — `src/steering.ts:98` — not by this half-cell floor)
+  comfortably clears both floors, which is why `sampling.differing` was 0
+  in the main spike. A production subwindow generator must use `margin ≥
+  max(0.5 × cellSizeDeg, annulusMarginDeg)` — either term can be the
+  binding constraint depending on grid resolution, so neither can be
+  dropped.
 
 Steering-bin sampling comparison (no sim, `steering_vayu.bin`, `u850`, crop
 window lon [62.5,70] lat [15.5,27], same window used in the Step 3
@@ -412,7 +562,7 @@ even though the brief's arithmetic was not.
 | M2 | GMRT over the new box | PASS | §11 #1 | No |
 | M3 | HydroSHEDS bytes | `UNMEASURED` | none | n/a |
 | M4 | CDS queue time | `BLOCKED` | none | n/a |
-| M5 | Offset-bbox forcing | `UNMEASURED` | §11 #4 | `UNMEASURED` |
+| M5 | Offset-bbox forcing | PASS | §11 #4 | No |
 
 ## What Phase 0 did not measure
 

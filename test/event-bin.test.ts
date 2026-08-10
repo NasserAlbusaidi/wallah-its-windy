@@ -172,3 +172,31 @@ describe('event bin: the sim runs on it and terminates finitely', () => {
     if (final) expect(Number.isFinite(final.vKt)).toBe(true);
   });
 });
+
+describe('event-bin scenario compatibility: extent, not just names and nt', () => {
+  const NEW_DOMAIN = { lonMin: 45, lonMax: 100, latMin: 0, latMax: 30 };
+
+  function buildWrongExtentBin(): ParsedBin {
+    const buf = buildWiwbBin(
+      ['sst', 'u', 'v', 'shr', 'shu', 'shv', 'rh', 'ohc'].map((field) => ({
+        name: `${field}_${MM}`,
+        nx: NX,
+        ny: NY,
+        nt: 3,
+        bbox: NEW_DOMAIN,
+        data: constantPlanes(NX, NY, [1, 1, 1]),
+      })),
+    );
+    return parseBin(buf);
+  }
+
+  it('rejects a bin with every correct layer name and the correct nt but the wrong bbox', () => {
+    const message = validateEventBinForScenario(buildWrongExtentBin(), SCENARIO);
+    expect(message).not.toBeNull();
+    expect(message).toMatch(/45,100,0,30/);
+  });
+
+  it('still accepts the matching bin', () => {
+    expect(validateEventBinForScenario(buildEventBin(), SCENARIO)).toBeNull();
+  });
+});

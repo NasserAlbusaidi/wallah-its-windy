@@ -16,6 +16,7 @@
  * when the catalogue is empty.
  */
 
+import { validateBinDomain } from './bin-domain-guard';
 import { eventMonthSuffix } from './env-sampler';
 import type { EnvSamplingMode, ParsedBin } from './types';
 
@@ -180,11 +181,19 @@ export function findScenario(scenarios: readonly Scenario[], id: string | null |
   return scenarios.find((s) => s.id === id) ?? null;
 }
 
-/** Return a human-readable incompatibility, or null when the bin matches. */
+/**
+ * Return a human-readable incompatibility, or null when the bin matches.
+ *
+ * Extent comes FIRST: `nt` is exactly what does not change when only the grid
+ * changes, so a bin rebaked over the wrong box passes every name and timeline
+ * check and then samples clamped edge values for the whole run.
+ */
 export function validateEventBinForScenario(
   bin: ParsedBin,
   scenario: Scenario,
 ): string | null {
+  const domainMismatch = validateBinDomain(bin, scenario.id);
+  if (domainMismatch !== null) return domainMismatch;
   const mm = eventMonthSuffix(scenario.monthIndex);
   const expectedNt = scenario.windowH / scenario.stepH + 1;
   if (!Number.isInteger(expectedNt)) {

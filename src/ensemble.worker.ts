@@ -11,6 +11,7 @@ import { parseBin } from './loader';
 import { sampleLayerBilinear } from './raster-sampler';
 import { pressureWindSamplerFromBin } from './steering';
 import { sampleOceanProfileBin } from './ocean-profile-sampler';
+import { assertBinDomain } from './bin-domain-guard';
 import type {
   AnalysisWorkerRequest,
   AnalysisWorkerResponse,
@@ -69,6 +70,13 @@ async function handle(
     request.steeringUrl ? loadBin(request.steeringUrl) : Promise.resolve(null),
     request.oceanUrl ? loadBin(request.oceanUrl) : Promise.resolve(null),
   ]);
+  // The worker validated nothing at all before this. Every bin here feeds
+  // physics, so a wrong-extent bin must be a thrown error, not clamped edge
+  // samples. The throw surfaces through the worker's existing error path.
+  assertBinDomain(envBin, request.envUrl);
+  assertBinDomain(terrainBin, request.terrainUrl);
+  if (steeringBin) assertBinDomain(steeringBin, request.steeringUrl ?? 'steering');
+  if (oceanBin) assertBinDomain(oceanBin, request.oceanUrl ?? 'ocean');
   const land = terrainBin.layers.get('landmask');
   if (!land) throw new Error('terrain.bin is missing landmask');
   const isLand = (lat: number, lon: number): boolean =>

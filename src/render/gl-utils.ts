@@ -102,16 +102,32 @@ export function makeQuadVao(gl: WebGL2RenderingContext, program: WebGLProgram): 
   return vao;
 }
 
+/** The GLES 3.0 guaranteed minimum, used when the driver reports nothing usable. */
+export const MIN_GUARANTEED_TEXTURE_SIZE = 2048;
+
 /** Feature flags for float textures/targets, probed once. */
 export interface GlCaps {
   colorBufferFloat: boolean;
   floatLinear: boolean;
+  /**
+   * gl.MAX_TEXTURE_SIZE. Presentation only: a device below the baked grid width
+   * draws a coarser coastline and NOTHING else changes. The land predicates the
+   * physics uses (ui.ts isLand, ensemble.worker.ts) read the decoded BinLayer at
+   * full baked resolution, and a worker has no GL context, so tracks, landfall
+   * and recorded output are identical on every tier.
+   */
+  maxTextureSize: number;
 }
 
 export function probeCaps(gl: WebGL2RenderingContext): GlCaps {
+  const reported = gl.getParameter(gl.MAX_TEXTURE_SIZE);
   return {
     colorBufferFloat: !!gl.getExtension('EXT_color_buffer_float'),
     floatLinear: !!gl.getExtension('OES_texture_float_linear'),
+    maxTextureSize:
+      typeof reported === 'number' && Number.isFinite(reported) && reported > 0
+        ? reported
+        : MIN_GUARANTEED_TEXTURE_SIZE,
   };
 }
 

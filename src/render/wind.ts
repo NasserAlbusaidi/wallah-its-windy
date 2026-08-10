@@ -33,6 +33,7 @@ import {
   setViewUniform,
 } from './gl-utils';
 import type { GlCaps, RenderTarget } from './gl-utils';
+import { MIN_GUARANTEED_TEXTURE_SIZE } from './gl-utils';
 import type { DrawCtx, RenderModule } from './context';
 import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 
@@ -141,7 +142,11 @@ void main() {
 
 export class WindLayer implements RenderModule {
   private gl!: WebGL2RenderingContext;
-  private caps: GlCaps = { colorBufferFloat: false, floatLinear: false };
+  private caps: GlCaps = {
+    colorBufferFloat: false,
+    floatLinear: false,
+    maxTextureSize: MIN_GUARANTEED_TEXTURE_SIZE,
+  };
   private lineProg: WebGLProgram | null = null;
   private fadeProg: WebGLProgram | null = null;
   private compProg: WebGLProgram | null = null;

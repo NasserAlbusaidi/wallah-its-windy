@@ -53,7 +53,7 @@ import {
   matchesDisplayContextGrid,
 } from '../display-domain';
 import { parseBin } from '../loader';
-import { probeCaps } from './gl-utils';
+import { MIN_GUARANTEED_TEXTURE_SIZE, probeCaps } from './gl-utils';
 import type { GlCaps } from './gl-utils';
 import {
   buildBasinRG8Tex,
@@ -232,7 +232,11 @@ function mergeBins(a: ParsedBin | null, b: ParsedBin | null): ParsedBin | null {
 export class RenderPipeline implements RenderLayer {
   private gl: WebGL2RenderingContext | null = null;
   private overlay: CanvasRenderingContext2D | null = null;
-  private caps: GlCaps = { colorBufferFloat: false, floatLinear: false };
+  private caps: GlCaps = {
+    colorBufferFloat: false,
+    floatLinear: false,
+    maxTextureSize: MIN_GUARANTEED_TEXTURE_SIZE,
+  };
   private res: RenderResources = { terrain: null, env: null, upper: null, genesis: [], tracks: [] };
   private gpu: GpuTextures = emptyGpu();
   private monthIndex = 5;

@@ -28,9 +28,10 @@ import type {
 } from './types';
 import { DeathReason, AFTERMATH_FADE_MS } from './types';
 import { randomSeed, type HashState } from './rng';
-import { DOMAIN, latLonToCell, latLonToClip } from './grid';
+import { DOMAIN, latLonToClip } from './grid';
 import { latLonToScreen, viewKey } from './camera';
 import { domainCanvasRect } from './domain-clip';
+import { sampleLayerNearest } from './raster-sampler';
 import { TOKENS } from './tokens';
 import { categoryRgba, intensityFraction, stormCategory } from './category';
 import { IMPACT_CITIES, windAtPointKt } from './impact';
@@ -1695,12 +1696,7 @@ export class UiController {
    */
   isLand(lat: number, lon: number): boolean {
     const m = this.landMask;
-    if (m) {
-      const { col, row } = latLonToCell({ nx: m.nx, ny: m.ny, bbox: m.bbox }, lat, lon);
-      const c = Math.max(0, Math.min(m.nx - 1, Math.round(col)));
-      const rr = Math.max(0, Math.min(m.ny - 1, Math.round(row)));
-      return m.data[rr * m.nx + c] > 0.5;
-    }
+    if (m) return sampleLayerNearest(m, 0, lat, lon) > 0.5;
     return !pointInSea(lon, lat);
   }
 

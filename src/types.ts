@@ -402,7 +402,12 @@ export enum DeathReason {
   Land = 'land',
   DryAir = 'dry-air',
   ExitedDomain = 'exited-domain',
-  /** Reached SIM.MAX_AGE_H. Unreachable inside the 50-70E/15-27N domain. */
+  /**
+   * Reached SIM.MAX_AGE_H. Unreachable with the shipped BAKED ENVIRONMENT over
+   * 50-70E/15-27N (every real storm exits or despawns first) — NOT unreachable
+   * inside the domain box structurally. A synthetic constant-steer environment
+   * can reach it; see `test/max-age.test.ts`.
+   */
   MaxAge = 'max-age',
 }
 

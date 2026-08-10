@@ -1,7 +1,7 @@
 /**
  * max-age.test.ts — SIM.MAX_AGE_H, the lifetime bound (nio-v1 Phase 1).
  *
- * Today the exit-domain test at sim.ts:1379 ends every real storm long before
+ * Today the exit-domain test at sim.ts:1407 ends every real storm long before
  * any age cap, so the cap must be provably inert. This file proves BOTH halves:
  * (a) the cap never pre-empts an existing outcome, and it is strictly outside
  *     the 360-hour horizon `ensemble.runStorm` already stops at — so no recorded
@@ -21,7 +21,7 @@ import { DOMAIN, inBBox } from '../src/grid';
 const DT = 15; // the fixed accumulator step, sim-minutes
 /** sim.ts:72's module-local MS_PER_KT, duplicated because it is not exported. */
 const MS_PER_KT = 0.514444;
-/** sim.ts:808-812's shipped-profile beta drift is {u:-B, v:+B} with this B. */
+/** sim.ts:832-836's shipped-profile beta drift is {u:-B, v:+B} with this B. */
 const BETA_SPEED_MS = SIM.BETA_DRIFT_KT * MS_PER_KT * Math.SQRT1_2;
 /** Slow enough to stay in the box for 360 h, fast enough to avoid wake saturation. */
 const DRIFT_EAST_MS = 1;
@@ -46,6 +46,20 @@ const NO_LAND = () => false;
 /** Net motion: +1 m/s east, 0 north. Beta drift is cancelled exactly in v. */
 const IMMORTAL_ENV = env({
   steerU: BETA_SPEED_MS + DRIFT_EAST_MS,
+  steerV: -BETA_SPEED_MS,
+});
+
+/**
+ * Same immortal fixture, drift raised so the storm crosses the east domain
+ * edge on the SAME tick (1441, ageH 360.25) the age cap first becomes
+ * eligible -- a genuine tie, not just an earlier or later death. Found
+ * empirically against the production engine: at 1.361 m/s the storm is still
+ * at lon 69.98 on tick 1441 and the age cap fires; at 1.363 m/s it is already
+ * past lon 70 on that same tick and exit-domain fires instead.
+ */
+const DRIFT_EAST_AT_CAP_MS = 1.363;
+const EXIT_AT_CAP_ENV = env({
+  steerU: BETA_SPEED_MS + DRIFT_EAST_AT_CAP_MS,
   steerV: -BETA_SPEED_MS,
 });
 
@@ -102,6 +116,23 @@ describe('SIM.MAX_AGE_H: the declared lifetime bound', () => {
     expect(death!.reason).toBe(DeathReason.MaxAge);
     expect(death!.durationH).toBe(360.25);
     expect(engine.getState()!.alive).toBe(false);
+  });
+
+  it('exit-domain still wins when it becomes true on the same tick as the age cap', () => {
+    // All six cases in the next describe block die well under 360 h, so none
+    // of them is ever alive past the cap -- they would pass identically with
+    // the age branch moved to the FRONT of sim.ts's lifecycle chain. This
+    // case is built so both conditions are true on the same tick, which is
+    // the only kind of case that can actually distinguish the two orderings.
+    const engine = createSimEngine({ env: EXIT_AT_CAP_ENV, isLand: NO_LAND });
+    engine.spawn(immortalSpawn());
+    let death: StormDeath | null = null;
+    for (let i = 0; i < 1500 && death === null; i++) death = firstDeath(engine.tick(DT));
+    expect(death).not.toBeNull();
+    expect(death!.reason).toBe(DeathReason.ExitedDomain);
+    // Past the cap when it dies -- the moment this isn't true, this case has
+    // stopped testing precedence and is just another pre-emption case.
+    expect(death!.durationH).toBe(360.25);
   });
 });
 

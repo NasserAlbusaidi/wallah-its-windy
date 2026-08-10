@@ -82,11 +82,16 @@ export const SIM = {
    * guard rail — read this before touching it.
    *
    * Provenance is `ensemble.ts:183`'s existing `maxHours = 360`, and that
-   * provenance is weak. Today the value is inert: inside the 50-70E/15-27N box
-   * the exit-domain test at the bottom of tick() ends every storm first, and
-   * the comparison below is STRICTLY greater so a run stopped at exactly 360 h
-   * (which is what `ensemble.runStorm` does by default) never reaches it. That
-   * is what keeps this addition zero-diff.
+   * provenance is weak. Today the value is inert WITH THE SHIPPED BAKED
+   * ENVIRONMENT over 50-70E/15-27N: the exit-domain test at the bottom of
+   * tick() ends every real storm first, and the comparison below is STRICTLY
+   * greater so a run stopped at exactly 360 h (which is what
+   * `ensemble.runStorm` does by default) never reaches it. That is what keeps
+   * this addition zero-diff. This is NOT unreachable inside the box
+   * structurally — `test/max-age.test.ts` cancels beta drift against a
+   * constant synthetic steer and stays in box past 360 h, hitting this branch
+   * directly; only the shipped env.bin data keeps every real storm moving
+   * enough to exit or despawn first.
    *
    * THE ZERO-DIFF PROPERTY EXPIRES AT THE DOMAIN FLIP. Over 45-100E/0-30N a
    * probe ran nine spawn latitudes over constant 29.5 C water for the full

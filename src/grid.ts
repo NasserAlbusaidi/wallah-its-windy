@@ -157,6 +157,9 @@ export const STABLE_CELL_SNAP_EPSILON = 1e-9;
  * whose west (or north) edge is at or before the point — and is bit-identical
  * to the old expression at `snapEpsilon = 0`, because `t - 0.5` is exact in
  * IEEE754 for every `t` in [0.5, 2^52) so `Math.round(t - 0.5) === Math.floor(t)`.
+ *
+ * Precondition, unchecked: `delta > 0` and `count >= 1`, true for every real
+ * `GridSpec`.
  */
 export function cellIndexFromOrigin(
   value: number,

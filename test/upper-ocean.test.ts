@@ -121,6 +121,29 @@ describe('upper-ocean fixed physics contract', () => {
   });
 });
 
+describe('upper-ocean cell snap stays off (nio-v1 Phase 1)', () => {
+  it('samples the no-snap cell through the public sample() entry point', () => {
+    // lon 67.1 is column 170 under today's shipped OCEAN_CELL_SNAP_EPSILON = 0
+    // and column 171 if that constant were ever raised to grid.ts's
+    // STABLE_CELL_SNAP_EPSILON (measured 2026-08-10 in src/grid.ts and
+    // src/upper-ocean.ts). Column centers on the 0.1-degree ocean grid are
+    // 67.05 (col 170) and 67.15 (col 171), so the background sampler's lon
+    // argument — reachable only through sample(), the shipped ocean path —
+    // reveals which cell SparseUpperOcean actually picked. This is the guard
+    // OCEAN_CELL_SNAP_EPSILON itself cannot provide: it is module-private, so
+    // flipping it silently passed every other test in this file and would
+    // have surfaced only as unattributed drift in calibrate:check.
+    let observedLon: number | null = null;
+    const ocean = new SparseUpperOcean();
+    ocean.reset((_lat, lon) => {
+      observedLon = lon;
+      return { sstC: 29.5, ohcKjCm2: 65, initializationTier: 'climatological-subsurface' };
+    });
+    ocean.sample(20, 67.1, 0);
+    expect(observedLon).toBeCloseTo(67.05, 9);
+  });
+});
+
 describe('upper-ocean conservation and retained state', () => {
   it('conserves heat, salt and both momentum components through homogenization', () => {
     const length = OCEAN_DEPTH_INTERFACES_M.length - 1;

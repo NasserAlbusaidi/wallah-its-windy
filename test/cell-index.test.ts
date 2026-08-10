@@ -16,7 +16,6 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  DOMAIN,
   STABLE_CELL_SNAP_EPSILON,
   cellIndexFromOrigin,
   columnIndex,
@@ -25,8 +24,18 @@ import {
 } from '../src/grid';
 import type { GridSpec } from '../src/types';
 
-/** The runtime ocean grid: 0.1 degrees over DOMAIN (upper-ocean.ts:139-143). */
-const OCEAN_GRID: GridSpec = { nx: 200, ny: 120, bbox: DOMAIN };
+/**
+ * The runtime ocean grid: 0.1 degrees over today's DOMAIN (upper-ocean.ts:139-143).
+ * Bare literals, not `bbox: DOMAIN` — this fixture pins today's grid shape as
+ * one frozen unit. Deriving bbox from DOMAIN would silently follow the Phase 8
+ * domain change and stop pinning anything; nx/ny would then disagree with the
+ * new bbox instead of failing loudly.
+ */
+const OCEAN_GRID: GridSpec = {
+  nx: 200,
+  ny: 120,
+  bbox: { lonMin: 50, lonMax: 70, latMin: 15, latMax: 27 },
+};
 
 /** Verbatim reproduction of the pre-fix upper-ocean.ts:564-570 expression. */
 function legacyCell(lat: number, lon: number): { col: number; row: number } {

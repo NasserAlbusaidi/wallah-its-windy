@@ -5,8 +5,9 @@ import {
   metricsForField,
 } from '../src/realism-metrics';
 import { syntheticFrame, weakFrame } from './helpers/realism';
-// The MODULE may not import a render path, so it restates HALF_DOMAIN_HEIGHT_KM.
-// This TEST is under no such rule, and imports the original to bind the two.
+// The MODULE takes HALF_DOMAIN_HEIGHT_KM from grid.ts (below the render layer);
+// this TEST imports it through the render re-export, which is the path every
+// render consumer uses. Same value, both routes — that is the point.
 import { HALF_DOMAIN_HEIGHT_KM } from '../src/render/storm-radii';
 
 function blankField(): RealismField {
@@ -14,7 +15,12 @@ function blankField(): RealismField {
   const fill = (value: number) => new Float32Array(n * n).fill(value);
   return {
     n, metricX: 1, center: { x: 0, y: 0 },
-    cellKm: { x: (2 / n) * 666, y: (2 / n) * 666 },
+    // Fixture construction, not a drift guard: cellKm must track what
+    // buildRealismField produces or the fixture stops being a real field.
+    cellKm: {
+      x: (2 / n) * HALF_DOMAIN_HEIGHT_KM,
+      y: (2 / n) * HALF_DOMAIN_HEIGHT_KM,
+    },
     btProxyC: fill(20), cloud: fill(0), stormCloud: fill(0),
     ambientCloud: fill(0), bands: fill(0), precipBandCloud: fill(0),
     debris: fill(0), oceanMask: fill(1),
@@ -192,10 +198,12 @@ describe('metricsForField', () => {
   });
 
   it('the km mapping tracks the field builder\'s half-domain height', () => {
-    // Drift guard for the duplicated 666. The cold centroid sits at clip
-    // (0.5, 0), so its offset must be exactly half the domain height. Changing
-    // EITHER copy — the render path's constant or the metrics module's local
-    // restatement — breaks this equality, so a divergence cannot go quiet.
+    // Drift guard for the two independent USES of the half-domain height:
+    // realism-metrics.ts maps clip offsets to km in fieldGeometry, and
+    // buildRealismField maps cell size to km in cellKm. The duplicated 666
+    // literal is gone, but the two mappings are still written separately and
+    // can still be rewritten apart. The cold centroid sits at clip (0.5, 0),
+    // so its offset must be exactly half the domain height.
     const m = metricsForField(eastLobeField(), ctxFor());
     expect(m.coldTop.centroidOffsetKm).toBeCloseTo(0.5 * HALF_DOMAIN_HEIGHT_KM, 6);
   });

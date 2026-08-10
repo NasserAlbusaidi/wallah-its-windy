@@ -39,6 +39,12 @@ describe('stormRenderRadii', () => {
       rmwKm: 40,
       outerSizeKm: 180,
     });
+    // DELIBERATE bare 666, kept after the constant was derived from DOMAIN.
+    // This is the ONE absolute pin of today's rendered geometry. Importing
+    // HALF_DOMAIN_HEIGHT_KM here would make both lines restate
+    // stormRenderRadii's own arithmetic, and a domain change would rescale
+    // every cloud, rainband and radar radius with a green suite. A domain
+    // change MUST fail here and be decided, not absorbed.
     expect(rMax).toBeCloseTo(40 / 666, 12);
     expect(rCanopy).toBeCloseTo(180 / 666, 12);
     // Canopy coefficients are the old rMax multiples divided by this ratio.

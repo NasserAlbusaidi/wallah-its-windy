@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
+import { HALF_DOMAIN_HEIGHT_KM } from '../src/render/storm-radii';
 import {
   CLOUD_BAND_CELL_GATE_HI,
   CLOUD_BAND_CELL_GATE_LO,
@@ -125,9 +126,18 @@ describe('cloudAngularRateRadPerH', () => {
     expect(rate).toBe(CLOUD_ROTATION_CAP_RAD_PER_H);
   });
 
-  test('clip-radius form applies the shared 666-km conversion', () => {
-    // rUnits 0.3 at the 666-km half-domain height = 199.8 km; rmw 30 km
-    const viaKm = cloudAngularRateRadPerH(0.3 * 666, 0.045045045 * 666, 40, 1.35);
+  test('clip-radius form applies the shared half-domain conversion', () => {
+    // The 666 literal is gone on purpose: HALF_DOMAIN_HEIGHT_KM is now derived
+    // from DOMAIN in grid.ts, so a literal here would be a second number to
+    // hand-edit at a domain change. What this still guards is that the clip
+    // form scales BOTH radii by that constant and nothing else.
+    // rUnits 0.3 at today's 666-km half-domain height = 199.8 km; rmw 30 km.
+    const viaKm = cloudAngularRateRadPerH(
+      0.3 * HALF_DOMAIN_HEIGHT_KM,
+      0.045045045 * HALF_DOMAIN_HEIGHT_KM,
+      40,
+      1.35,
+    );
     const viaClip = cloudAngularRateAtClipRadius(0.3, 0.045045045, 40, 1.35);
     expect(viaClip).toBeCloseTo(viaKm, 12);
   });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DOMAIN } from '../src/grid';
 import { cloudNoiseBytes } from '../src/render/cloud-noise';
+import { HALF_DOMAIN_HEIGHT_KM } from '../src/render/storm-radii';
+import { cloudMetricX } from '../src/render/cloud-motion';
 import {
   REALISM_GRID_N,
   RealismNoise,
@@ -331,8 +333,12 @@ function eyewallMinC(field: RealismField, rmwKm: number): number {
     for (let i = 0; i < field.n; i++) {
       const u = (i + 0.5) / field.n;
       const v = (j + 0.5) / field.n;
-      const east = ((u * 2 - 1) - field.center.x) * field.metricX * 666;
-      const north = ((1 - v * 2) - field.center.y) * 666;
+      // Imported, not restated: a disagreement here would pick the wrong
+      // annulus and still pass. The mapping's real drift guard lives in
+      // test/realism-metrics.test.ts.
+      const east =
+        ((u * 2 - 1) - field.center.x) * field.metricX * HALF_DOMAIN_HEIGHT_KM;
+      const north = ((1 - v * 2) - field.center.y) * HALF_DOMAIN_HEIGHT_KM;
       const q = Math.hypot(east, north) / rmwKm;
       if (q >= 0.8 && q <= 1.3) coldest = Math.min(coldest, field.btProxyC[j * field.n + i]);
     }
@@ -357,7 +363,10 @@ describe('buildRealismField', () => {
     const field = buildRealismField(contextFor(syntheticFrame()), openOcean);
     expect(field.n).toBe(REALISM_GRID_N);
     expect(field.btProxyC.length).toBe(REALISM_GRID_N * REALISM_GRID_N);
-    expect(field.metricX).toBeCloseTo((20 * Math.cos((18 * Math.PI) / 180)) / 12, 9);
+    // The discriminating part is the ARGUMENT — 18, the synthetic frame's
+    // latitude, not a default and not the domain centre. The formula itself is
+    // pinned domain-agnostically in test/grid.test.ts now that grid.ts owns it.
+    expect(field.metricX).toBeCloseTo(cloudMetricX(18), 9);
   });
 
   it('mature storm: eyewall annulus is far colder than the ambient far field', () => {

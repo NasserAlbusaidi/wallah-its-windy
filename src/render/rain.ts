@@ -61,6 +61,15 @@ import { cloudMetricX } from './cloud-motion';
 import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 import { INFLOW_RAD, VORTEX_GLSL } from './vortex';
 
+/**
+ * Rain-shader core radius bounds, in KILOMETRES. 9.99 / 666 and 106.56 / 666
+ * are the old 0.015 and 0.16 clip literals. Denominated in km so a domain
+ * change cannot rescale them; structure.ts clamps rmwKm to [12, 95], so both
+ * bounds sit outside the reachable range and neither binds today.
+ */
+const RAIN_RMAX_FLOOR_KM = 9.99;
+const RAIN_RMAX_CAP_KM = 106.56;
+
 /** Per-frame decay multiply — THE knob (eng task T5, valid 0.90–1.00). */
 const RAIN_DECAY_PER_H = 0.72;
 const RAIN_GAIN = 0.0025; // metres of local relief -> bounded upslope multiplier
@@ -340,9 +349,9 @@ export class RainLayer {
     );
     const rMax = structure
       ? Math.max(
-          0.015,
-          Math.min(0.16, structure.rmwKm / HALF_DOMAIN_HEIGHT_KM),
-        )
+          RAIN_RMAX_FLOOR_KM,
+          Math.min(RAIN_RMAX_CAP_KM, structure.rmwKm),
+        ) / HALF_DOMAIN_HEIGHT_KM
       : RMAX_BASE * (0.7 + 0.6 * ctx.intensity01);
     const maximumWind = Math.max(1, structure?.maximumWindKt ?? ctx.vKt);
     gl.uniform1f(u('u_rMax'), rMax);

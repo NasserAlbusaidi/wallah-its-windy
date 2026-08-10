@@ -18,8 +18,21 @@ import { HALF_DOMAIN_HEIGHT_KM, RENDER_KM_PER_LAT_DEG } from '../grid';
 // keep working, and so docs/architecture.md's export list stays true.
 export { HALF_DOMAIN_HEIGHT_KM, RENDER_KM_PER_LAT_DEG };
 
-/** Shared numerical floor; matches the existing guards in env.ts and radar.ts. */
-export const RENDER_RADIUS_FLOOR = 0.008;
+/**
+ * Shared numerical floor, in KILOMETRES. Denominated in km, not clip units, so
+ * it cannot rescale with the domain: as a clip literal 0.008 is 5.33 km today
+ * and would be 13.3 km over a 0-30 N domain, overriding structure.ts's 12 km
+ * rmwKm floor and re-coupling the canopy to the core.
+ */
+export const RENDER_RADIUS_FLOOR_KM = 5.328;
+
+/**
+ * The same floor in clip units — 5.328 / 666 is bit-exactly 0.008, so the GLSL
+ * template literals in env.ts, cloud-motion.ts and cloud-memory.ts still emit
+ * "0.008" and their digest pins are unaffected. Kept exported: six modules
+ * consume it as a clip value.
+ */
+export const RENDER_RADIUS_FLOOR = RENDER_RADIUS_FLOOR_KM / HALF_DOMAIN_HEIGHT_KM;
 
 /**
  * Reference outerSizeKm / rmwKm (180 / 40). Canopy coefficients are the former
@@ -38,14 +51,15 @@ export interface StormRenderRadii {
 export function stormRenderRadii(
   structure: Pick<StormStructure, 'rmwKm' | 'outerSizeKm'>,
 ): StormRenderRadii {
+  // Clamp in km, convert once. Because RENDER_RADIUS_FLOOR_KM /
+  // HALF_DOMAIN_HEIGHT_KM is bit-exactly RENDER_RADIUS_FLOOR and the division
+  // is monotone, this returns the identical double as the old clip-space form
+  // for every input, including the floored branch.
   return {
-    rMax: Math.max(
-      RENDER_RADIUS_FLOOR,
-      structure.rmwKm / HALF_DOMAIN_HEIGHT_KM,
-    ),
-    rCanopy: Math.max(
-      RENDER_RADIUS_FLOOR,
-      structure.outerSizeKm / HALF_DOMAIN_HEIGHT_KM,
-    ),
+    rMax:
+      Math.max(RENDER_RADIUS_FLOOR_KM, structure.rmwKm) / HALF_DOMAIN_HEIGHT_KM,
+    rCanopy:
+      Math.max(RENDER_RADIUS_FLOOR_KM, structure.outerSizeKm) /
+      HALF_DOMAIN_HEIGHT_KM,
   };
 }

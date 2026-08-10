@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CANOPY_COEFFICIENT_DIVISOR,
   RENDER_RADIUS_FLOOR,
+  RENDER_RADIUS_FLOOR_KM,
   stormRenderRadii,
 } from '../src/render/storm-radii';
 import {
@@ -77,5 +78,25 @@ describe('HALF_DOMAIN_HEIGHT_KM', () => {
     // moves DOMAIN, so the rescale cannot happen by accident.
     expect(HALF_DOMAIN_HEIGHT_KM).toBe(666);
     expect(RENDER_KM_PER_LAT_DEG).toBe(111);
+  });
+});
+
+describe('render radius floors are denominated in km', () => {
+  it('RENDER_RADIUS_FLOOR is exactly the km floor over the half-domain height', () => {
+    expect(RENDER_RADIUS_FLOOR_KM).toBe(5.328);
+    expect(RENDER_RADIUS_FLOOR).toBe(RENDER_RADIUS_FLOOR_KM / HALF_DOMAIN_HEIGHT_KM);
+    // Bit-exact round trip: the derived double IS the old 0.008 literal, so
+    // the GLSL template literals in env.ts, cloud-motion.ts and cloud-memory.ts
+    // still emit the string "0.008" and their digest pins are untouched.
+    expect(RENDER_RADIUS_FLOOR).toBe(0.008);
+    expect(String(RENDER_RADIUS_FLOOR)).toBe('0.008');
+  });
+
+  it('the floor stays below the RMW clamp, which is why it never binds', () => {
+    // structure.ts clamps rmwKm to [12, 95]. Expressed in km the floor is
+    // domain-invariant, so this stays true after a domain change; expressed in
+    // clip units it would become 13.3 km at 0-30 N and start overriding the
+    // 12 km RMW floor -- the re-coupling CLAUDE.md's rCanopy note warns about.
+    expect(RENDER_RADIUS_FLOOR_KM).toBeLessThan(12);
   });
 });

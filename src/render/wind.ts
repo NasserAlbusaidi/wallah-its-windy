@@ -56,6 +56,12 @@ const METRIC_X =
   ((DOMAIN.lonMax - DOMAIN.lonMin) *
     Math.cos((((DOMAIN.latMin + DOMAIN.latMax) / 2) * Math.PI) / 180)) /
   (DOMAIN.latMax - DOMAIN.latMin);
+/**
+ * Vortex RMW floor for the wind-line field, in KILOMETRES (7.992 / 666 is
+ * bit-exactly the old 0.012 clip literal). In km it cannot rescale with the
+ * domain; structure.ts clamps rmwKm to >= 12, so it never binds in practice.
+ */
+const VORTEX_RMAX_FLOOR_KM = 7.992;
 
 // a_pos is WORLD clip; u_view projects it to the screen-registered trail
 // target (camera moves clear the trail history rather than re-projecting it).
@@ -265,7 +271,8 @@ export class WindLayer implements RenderModule {
       const w = vortexWind((x - c.x) * METRIC_X, y - c.y, {
         cx: 0,
         cy: 0,
-        rMax: Math.max(0.012, s.rmwKm / HALF_DOMAIN_HEIGHT_KM),
+        rMax:
+          Math.max(VORTEX_RMAX_FLOOR_KM, s.rmwKm) / HALF_DOMAIN_HEIGHT_KM,
         vMax: s.maximumWindKt * MS_PER_KT,
         hollandB: s.hollandB,
         motionX: s.motionUms,

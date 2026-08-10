@@ -28,6 +28,15 @@ import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 import type { Rng } from '../rng';
 import type { DrawCtx, RenderModule } from './context';
 
+/**
+ * Particle-field radius bounds, in KILOMETRES. 9.99 / 666, 106.56 / 666 and
+ * 306.36 / 666 are bit-exactly the old 0.015, 0.16 and 0.46 clip literals.
+ * Denominated in km so a domain change cannot rescale them.
+ */
+const PARTICLE_RMAX_FLOOR_KM = 9.99;
+const PARTICLE_RMAX_CAP_KM = 106.56;
+const PARTICLE_SPAWN_RADIUS_CAP_KM = 306.36;
+
 const DEFAULT_COUNT = 8000;
 const RMAX_BASE = 0.11; // radius of max wind, iso units (fraction of half-height)
 const VMAX_BASE = 0.32; // peak tangential speed, iso units / sec
@@ -71,15 +80,16 @@ function geometry(ctx: DrawCtx): ParticleGeometry {
       shearAsymmetryFraction: 0,
     };
   }
-  const rMax = Math.max(
-    0.015,
-    Math.min(0.16, structure.rmwKm / HALF_DOMAIN_HEIGHT_KM),
-  );
+  const rMax =
+    Math.max(
+      PARTICLE_RMAX_FLOOR_KM,
+      Math.min(PARTICLE_RMAX_CAP_KM, structure.rmwKm),
+    ) / HALF_DOMAIN_HEIGHT_KM;
   const r34 = maxWindRadiusKm(structure.r34Km);
   const outerKm = Math.max(structure.rmwKm * 4, r34 * 1.08);
   const spawnR = Math.max(
     rMax * 2.5,
-    Math.min(0.46, outerKm / HALF_DOMAIN_HEIGHT_KM),
+    Math.min(PARTICLE_SPAWN_RADIUS_CAP_KM, outerKm) / HALF_DOMAIN_HEIGHT_KM,
   );
   const maximum = Math.max(1, structure.maximumWindKt);
   return {

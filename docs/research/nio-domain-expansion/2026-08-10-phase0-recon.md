@@ -212,19 +212,40 @@ counting whatever region is eventually found to close the gap.
 One minimal request. This is a sample of one; CDS queue depth varies by hour and
 by dataset, so the number below is an order of magnitude, not a service level.
 
+Credential-existence check (brief Step 1 — existence only, contents never read,
+copied, or edited):
+
+```bash
+test -f "$USERPROFILE/.cdsapirc" && echo "cdsapirc: present" || echo "cdsapirc: ABSENT"
+```
+
+```
+cdsapirc: ABSENT
+```
+
+Per the repository owner's pre-flight ruling
+(`.superpowers/sdd/2026-08-10-nio-domain-expansion-seam-a/progress.md`, "Task 5 /
+M4"), `~/.cdsapirc` will not be created in this session: it needs a Copernicus
+account, a licence acceptance on the CDS website, and a personal access token —
+a human step that must not be automated. With credentials absent, the probe was
+not attempted: no CDS request was issued. The brief's Step 2 (`pip install
+cdsapi` into `bake/.venv`) was skipped too — it exists only to enable a probe
+that will not run, so installing it here would buy nothing.
+
 | Field | Value |
 | --- | --- |
-| Credentials present before the probe | `UNMEASURED` |
-| Dataset | `UNMEASURED` |
-| Request dict | `UNMEASURED` |
-| Submit time (UTC) | `UNMEASURED` |
-| Completion time (UTC) | `UNMEASURED` |
-| Elapsed seconds | `UNMEASURED` |
-| Downloaded bytes | `UNMEASURED` |
+| Credentials present before the probe | `ABSENT` |
+| Dataset | `BLOCKED` |
+| Request dict | `BLOCKED` |
+| Submit time (UTC) | `BLOCKED` |
+| Completion time (UTC) | `BLOCKED` |
+| Elapsed seconds | `BLOCKED` |
+| Downloaded bytes | `BLOCKED` |
 
-Projection to Phase 10's 45 event requests: `UNMEASURED`
-Projection to the two 12-month × 30-year climatology requests: `UNMEASURED`
-Verdict: `UNMEASURED`
+Projection to Phase 10's 45 event requests: `BLOCKED`
+Projection to the two 12-month × 30-year climatology requests: `BLOCKED`
+Verdict: `BLOCKED` — no CDS credentials at measurement time, by the repository
+owner's decision.
 
 ## M5 — Offset-bbox forcing spike
 
@@ -282,9 +303,24 @@ Verdict: `UNMEASURED`
 | M1 | Pages compression above 10 MB | `UNMEASURED` | §11 #3 | `UNMEASURED` |
 | M2 | GMRT over the new box | PASS | §11 #1 | No |
 | M3 | HydroSHEDS bytes | `UNMEASURED` | none | n/a |
-| M4 | CDS queue time | `UNMEASURED` | none | n/a |
+| M4 | CDS queue time | `BLOCKED` | none | n/a |
 | M5 | Offset-bbox forcing | `UNMEASURED` | §11 #4 | `UNMEASURED` |
 
 ## What Phase 0 did not measure
 
-- `UNMEASURED`
+- **M4, CDS request timing.** No CDS request was issued: `~/.cdsapirc` is
+  absent on this machine and, by the repository owner's decision, was not
+  created for this measurement. This is not a narrow M4 gap — the same
+  missing credential is the project's long pole for the whole domain
+  expansion. It gates all of Seam B Phase 10's ERA5 refetch (45 CDS requests,
+  spec §6 Phase 10). It also reaches into this very plan: Task 34's
+  old-domain rebake, byte-clean gate cannot populate `data/raw/`'s two ERA5
+  climatology files via `bake/fetch_era5.py` and therefore cannot bake, and
+  Task 36's ERA5-at-new-extent reproduction probe cannot run — which means
+  the combined reproduction-probe gate (Tasks 35-37, consumed by task P5-D)
+  cannot complete either, even though Task 35's GMRT probe and Task 37's
+  HydroSHEDS probe do not themselves need CDS credentials. Separately, and
+  regardless of the CDS question, `data/raw/` does not exist at all on this
+  machine, so every other bake input (GMRT, HydroSHEDS, OISST, IBTrACS) needs
+  re-downloading before any of those later tasks can run either.
+- (M1, M2, M3, M5 entries pending Task 7's verdict roll-up.)

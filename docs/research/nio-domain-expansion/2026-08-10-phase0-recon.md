@@ -83,20 +83,79 @@ Verdict: **PASS.** Both pass paths hold: the med tiles A (`[1252,1144]`) and B (
 Spec §6 Phase 0 item 3 claims 127,828,199 B total. `bake/hydrosheds.py:25-34`
 fetches only the `eu` region today; the new box needs `af` and `as` as well.
 
+Prior evidence: Task 1 parked `hyd_af_dir_30s.zip`, `hyd_as_dir_30s.zip`,
+`hyd_au_dir_30s.zip`, `hyd_eu_dir_30s.zip` in `tmp/phase0/prior-probes/hs/`.
+`ls -la` on that directory measured (from disk, no network) `af dir`
+14,601,343 B, `as dir` 12,215,300 B, `au dir` 7,179,698 B, `eu dir`
+12,603,455 B. No `acc` zip was on disk for any region.
+
+Measured 2026-08-10 with
+`curl -sSIL "https://data.hydrosheds.org/file/hydrosheds-v1-$k/hyd_${r}_${k}_30s.zip"`
+(network HEAD request only — the three `dir` zips already on disk were not
+re-downloaded, only their headers were fetched to get `Content-Length` and
+`last-modified`; the two `acc` zips have never been downloaded, so their
+`Content-Length` here is the only measurement of them):
+
 | Region | Kind | URL | HTTP | `Content-Length` | `last-modified` |
 | --- | --- | --- | --- | --- | --- |
-| af | dir | `UNMEASURED` | | | |
-| af | acc | `UNMEASURED` | | | |
-| as | dir | `UNMEASURED` | | | |
-| as | acc | `UNMEASURED` | | | |
-| eu | dir | `UNMEASURED` | | | |
-| eu | acc | `UNMEASURED` | | | |
+| af | dir | `https://data.hydrosheds.org/file/hydrosheds-v1-dir/hyd_af_dir_30s.zip` | 200 | 14,601,343 | Sun, 09 Aug 2026 16:22:35 GMT |
+| af | acc | `https://data.hydrosheds.org/file/hydrosheds-v1-acc/hyd_af_acc_30s.zip` | 200 | 32,036,819 | Sun, 09 Aug 2026 16:22:32 GMT |
+| as | dir | `https://data.hydrosheds.org/file/hydrosheds-v1-dir/hyd_as_dir_30s.zip` | 200 | 12,215,300 | Sun, 09 Aug 2026 16:22:40 GMT |
+| as | acc | `https://data.hydrosheds.org/file/hydrosheds-v1-acc/hyd_as_acc_30s.zip` | 200 | 26,953,393 | Sun, 09 Aug 2026 16:22:38 GMT |
+| eu | dir | `https://data.hydrosheds.org/file/hydrosheds-v1-dir/hyd_eu_dir_30s.zip` | 200 | 12,603,455 | Sun, 09 Aug 2026 16:22:51 GMT |
+| eu | acc | `https://data.hydrosheds.org/file/hydrosheds-v1-acc/hyd_eu_acc_30s.zip` | 200 | 29,417,889 | Sun, 09 Aug 2026 16:22:49 GMT |
 
-Sum of the six: `UNMEASURED`
-Agrees with the spec's 127,828,199 B? `UNMEASURED`
-Raster bounds per region (from the already-downloaded dir zips): `UNMEASURED`
-Does the union cover 45–100 °E / 0–30 °N with no gap? `UNMEASURED`
-Verdict: `UNMEASURED`
+For `af dir`, `as dir`, and `eu dir` the network `Content-Length` matches the
+on-disk file size exactly (byte-for-byte), confirming the brief's `eu dir`
+anchor (12,603,455) and extending the same check to `af dir` and `as dir`.
+
+Sub-sum, three `dir` zips: 14,601,343 + 12,215,300 + 12,603,455 = 39,420,098.
+Sub-sum, three `acc` zips: 32,036,819 + 26,953,393 + 29,417,889 = 88,408,101.
+Sum of the six: 39,420,098 + 88,408,101 = 127,828,199.
+Agrees with the spec's 127,828,199 B? **Yes, exact match (diff 0 B).** The
+spec's figure is the six-file (three regions × dir+acc) sum, not a three-file
+sum — `au` is not part of it and was never claimed to be.
+
+Raster bounds per region (read from the dir zips already on disk via
+`node bake/run-python.mjs -c "import rasterio; ..."`, no new download; `au`
+included only because Task 1 already had it on disk):
+
+```
+af BoundingBox(left=-19.0, bottom=-35.0, right=54.99999999999997, top=37.99999999999997) 8880 8760
+as BoundingBox(left=57.0, bottom=1.4210854715202004e-14, right=151.99999999999994, top=56.99999999999999) 11400 6840
+au BoundingBox(left=94.0, bottom=-55.999999999999545, right=179.99999999999994, top=25.000000000000426) 10320 9720
+eu BoundingBox(left=-25.0, bottom=12.0, right=69.99999999999996, top=83.99999999999997) 11400 8640
+```
+
+Does the union cover 45–100 °E / 0–30 °N with no gap? **No.** By hand: `af`
+covers lon [-19, 54.99999999999997] × lat [-35, 37.99999999999997], so it
+fills lon 45–~55 for the full 0–30 lat range. `as` covers lon
+[57, 151.99999999999994] × lat [~0, 56.99999999999999], so it fills lon
+57–100 for the full 0–30 lat range on its own (`au`, lon [94, 180], is not
+needed anywhere in the box — `as` already reaches 151.99999999999994). `eu`
+covers lon [-25, 69.99999999999996] × lat [12, 83.99999999999997], so it
+fills lon ~55–57 for lat 12–30 only. That leaves an uncovered rectangle at
+approximately **lon [54.99999999999997, 57.0] × lat [0, 12.0]** — roughly 2°
+of longitude by 12° of latitude, between `af`'s right edge and `as`'s left
+edge, below `eu`'s bottom edge. Which additional HydroSHEDS region code (if
+any) covers that rectangle was not determined in this measurement — no
+region raster other than `af`, `as`, `au`, `eu` was probed for bounds, so
+naming a fifth region code here would be a guess, not a measurement. This is
+an open question for Phase 5.
+
+Verdict: **FAIL** by the letter of the stated criterion ("all six URLs return
+200 with a Content-Length and the union of bounds covers the box"). All six
+URLs did return 200 with a `Content-Length`, but the union of `af`/`as`/`eu`
+bounds does not fully cover 45–100 °E / 0–30 °N — it has the gap named above
+at lon [~55, 57] × lat [0, 12]. The missing piece is that gap; the region
+code needed to close it is unidentified and is Phase 5 work. Separately:
+`bake/hydrosheds.py:49-73` (`_read_domain`) currently hardcodes the `eu`
+region and a single `hyd_eu_{kind}_30s.tif` name per kind (see `tif =
+f'hyd_eu_{kind}_30s.tif'` at line 64) and would need to learn to fetch and
+mosaic `af`, `as`, and `eu` (and whatever region fills the gap) before this
+domain can bake. The download cost the recorded sum implies for Phase 5 is
+127,828,199 B (~121.9 MiB) of raw zip downloads for `af`+`as`+`eu` alone, not
+counting whatever region is eventually found to close the gap.
 
 ## M4 — CDS request timing
 

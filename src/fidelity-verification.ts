@@ -1,7 +1,8 @@
 /** Lead-time verification and deterministic storm-level uncertainty intervals. */
 
 import type { FlightFrame } from './flight-recorder';
-import { DOMAIN, greatCircleKm, inBBox } from './grid';
+import { greatCircleKm, inBBox } from './grid';
+import { SCORING_DOMAIN } from './scoring-domain';
 import { mulberry32 } from './rng';
 import type { StormTrack, TrackFix } from './tracks';
 
@@ -397,20 +398,20 @@ export function verifyLeadTimes(
     const verifyingMs = startMs + leadH * 3_600_000;
     const observed = interpolateTrack(points, verifyingMs);
     const model = interpolateFrames(frames, leadH);
-    // The runtime has no forcing outside its declared product domain and dies
-    // on exit. Never score a model that lingered inside against truth that has
-    // already left that physical domain.
+    // The sealed cohorts were truncated against the FROZEN scoring box, not
+    // the live DOMAIN. Truncating against a wider box would admit fixes the
+    // catalogues never contained and move every sealed lead-time score.
     const observedExited = points.some(
       ({ time, fix }) =>
         time > startMs &&
         time <= verifyingMs &&
-        !inBBox(fix.lat, fix.lon, DOMAIN),
+        !inBBox(fix.lat, fix.lon, SCORING_DOMAIN),
     );
     if (
       !observed ||
       !model ||
       observedExited ||
-      !inBBox(observed.lat, observed.lon, DOMAIN)
+      !inBBox(observed.lat, observed.lon, SCORING_DOMAIN)
     ) {
       continue;
     }

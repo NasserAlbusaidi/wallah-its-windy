@@ -79,10 +79,11 @@ const [
   { parseScenarios },
   { DEFAULT_INTENSITY_PARAMETERS, DEFAULT_TRACK_PARAMETERS },
   { parseTracks },
-  { DOMAIN, inBBox },
+  { inBBox },
   { scoreHindcast },
   { sampleOceanProfileBin, sampleEventOceanProfileBin },
   { observedInitialMotionMs, pressureWindSamplerFromBin },
+  { SCORING_DOMAIN },
 ] = await Promise.all([
   vite.ssrLoadModule('/src/hindcast-benchmark.ts'),
   vite.ssrLoadModule('/src/fidelity-verification.ts'),
@@ -94,6 +95,7 @@ const [
   vite.ssrLoadModule('/src/hindcast.ts'),
   vite.ssrLoadModule('/src/ocean-profile-sampler.ts'),
   vite.ssrLoadModule('/src/steering.ts'),
+  vite.ssrLoadModule('/src/scoring-domain.ts'),
 ]);
 const RUNTIME_INTENSITY_PARAMETERS = Object.freeze({
   ...DEFAULT_INTENSITY_PARAMETERS,
@@ -146,7 +148,7 @@ function contiguousInDomainTrack(track, startIso) {
   for (const point of track.points) {
     const time = Date.parse(point.iso);
     if (!Number.isFinite(time) || time < startMs) continue;
-    if (!inBBox(point.lat, point.lon, DOMAIN)) break;
+    if (!inBBox(point.lat, point.lon, SCORING_DOMAIN)) break;
     points.push(point);
   }
   return { ...track, points };
@@ -673,7 +675,7 @@ const outputBase = {
   runtimeTrackParameters: RUNTIME_TRACK_PARAMETERS,
   verificationProtocol: {
     leadHours: [...FIDELITY_LEAD_HOURS],
-    domain: DOMAIN,
+    domain: SCORING_DOMAIN,
     initializationFixScored: false,
     requiresContinuousObservedDomain: true,
     persistence: {

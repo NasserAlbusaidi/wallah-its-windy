@@ -65,10 +65,11 @@ const [
   { sampleEnvBin },
   { sampleLayerBilinear },
   { deriveStormStructure },
-  { greatCircleKm, inBBox, DOMAIN },
+  { greatCircleKm, inBBox },
   { SIM },
   { SparseUpperOcean, DEFAULT_UPPER_OCEAN_PARAMETERS },
   { sampleOceanProfileBin, sampleEventOceanProfileBin },
+  { SCORING_DOMAIN },
 ] = await Promise.all([
   vite.ssrLoadModule('/src/loader.ts'),
   vite.ssrLoadModule('/src/env-sampler.ts'),
@@ -78,6 +79,7 @@ const [
   vite.ssrLoadModule('/src/sim.ts'),
   vite.ssrLoadModule('/src/upper-ocean.ts'),
   vite.ssrLoadModule('/src/ocean-profile-sampler.ts'),
+  vite.ssrLoadModule('/src/scoring-domain.ts'),
 ]);
 
 function numberArgument(name, fallback) {
@@ -155,7 +157,7 @@ function contiguousTrack(track, startIso) {
   for (const point of track.points) {
     const timeMs = Date.parse(point.iso);
     if (!Number.isFinite(timeMs) || timeMs < startMs) continue;
-    if (!inBBox(point.lat, point.lon, DOMAIN)) {
+    if (!inBBox(point.lat, point.lon, SCORING_DOMAIN)) {
       if (started) break;
       continue;
     }

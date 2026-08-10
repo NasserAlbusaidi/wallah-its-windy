@@ -31,6 +31,7 @@ const [
   { makeEnvSampler },
   { pressureWindSamplerFromBin, sampleEnvironmentalSteering },
   { betaDriftMs },
+  { SCORING_DOMAIN },
 ] = await Promise.all([
   vite.ssrLoadModule('/src/loader.ts'),
   vite.ssrLoadModule('/src/scenarios.ts'),
@@ -38,6 +39,7 @@ const [
   vite.ssrLoadModule('/src/env-sampler.ts'),
   vite.ssrLoadModule('/src/steering.ts'),
   vite.ssrLoadModule('/src/sim.ts'),
+  vite.ssrLoadModule('/src/scoring-domain.ts'),
 ]);
 
 const [scenarioText, trackText, steeringText] = await Promise.all([
@@ -85,7 +87,14 @@ for (const scenario of scenarios.filter((item) => item.benchmarkPartition === 'd
     if (!(intervalHours > 0) || ageH < 36) continue;
     const lat = (previous.lat + current.lat) / 2;
     const lon = (previous.lon + current.lon) / 2;
-    if (lon < 50 || lon > 70 || lat < 15 || lat > 27) break;
+    if (
+      lon < SCORING_DOMAIN.lonMin ||
+      lon > SCORING_DOMAIN.lonMax ||
+      lat < SCORING_DOMAIN.latMin ||
+      lat > SCORING_DOMAIN.latMax
+    ) {
+      break;
+    }
     const meanLatitudeRad = (lat * Math.PI) / 180;
     const observedU =
       ((current.lon - previous.lon) * 111.195 * Math.cos(meanLatitudeRad) * 1000) /

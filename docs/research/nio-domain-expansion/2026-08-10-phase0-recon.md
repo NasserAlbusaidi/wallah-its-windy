@@ -317,7 +317,7 @@ vayu, 373 for hikaa) — the early `died` event breaks
 and cropped runs died at the identical tick with the identical cause, which
 they did (`deathEqual: true`, identical frame counts).
 
-Contrary to the brief's own pre-measurement hypothesis (`src/grid.ts:86`
+Contrary to the brief's own pre-measurement hypothesis (`src/grid.ts:87`
 producing ~1e-14 rounding drift between `(lon − 50)` and `(lon − 60.5)`
 arithmetic), the measured result is **exact, not approximate**:
 `identicalTape` is `true` for both storms, and the pure-sampling probe found
@@ -355,9 +355,9 @@ crop-enumeration methodology.)
 Independently reproduced in this fix pass with a *different* methodology —
 a float64 two-sum/Dekker error-decomposition exactness test
 (`err = (a − s) − b` where `s = fl(a − b)`; `err === 0` iff the
-subtraction was exact), swept over a uniform 2,000,000-point lattice, not
-the review's crop enumeration, so the exact counts and percentages are not
-expected to match:
+subtraction was exact), swept over the SAME two zones the review used
+(`lat < 15` and `lat ≥ 15`, apples-to-apples denominators, not a whole-domain
+sweep diluted by the always-exact upper half):
 
 ```
 node -e "
@@ -367,36 +367,107 @@ function subExact(a, b) {
   const err = bVirtual - b;
   return err === 0;
 }
-function sweep(latMax, latMin, n) {
+function sweepZone(latMax, zoneMin, zoneMax, n) {
   let total = 0, inexact = 0;
   for (let i = 0; i < n; i++) {
-    const lat = latMin + (latMax - latMin) * (i / (n - 1));
+    const lat = zoneMin + (zoneMax - zoneMin) * (i / (n - 1));
     total++;
     if (!subExact(latMax, lat)) inexact++;
   }
   return { total, inexact, pct: (100*inexact/total).toFixed(3) };
 }
-console.log('current domain latMax=27 lat in [15,27], n=2,000,000:', JSON.stringify(sweep(27, 15, 2000000)));
-console.log('proposed domain latMax=30 lat in [0,30], n=2,000,000:', JSON.stringify(sweep(30, 0, 2000000)));
+console.log('lat<15 zone, n=1,000,000:', JSON.stringify(sweepZone(30, 0, 15, 1000000)));
+console.log('lat>=15 zone, n=1,000,000:', JSON.stringify(sweepZone(30, 15, 30, 1000000)));
 "
 ```
 
 Output:
 
 ```
-current domain latMax=27 lat in [15,27], n=2,000,000: {"total":2000000,"inexact":0,"pct":"0.000"}
-proposed domain latMax=30 lat in [0,30], n=2,000,000: {"total":2000000,"inexact":625670,"pct":"31.284"}
+lat<15 zone, n=1,000,000: {"total":1000000,"inexact":625702,"pct":"62.570"}
+lat>=15 zone, n=1,000,000: {"total":1000000,"inexact":0,"pct":"0.000"}
 ```
 
-0/2,000,000 inexact for the current domain — consistent with the review's
-0/252,000,000 and with the Sterbenz guarantee being unconditional here.
-625,670/2,000,000 (31.284%) inexact for the proposed domain — nonzero,
-confirming the mechanism is real. This session's 31.3% (a uniform sweep
-over the *entire* 0–30° range) does not numerically match the review's
-12.6% (probed specifically within the `lat < 15` danger zone using crop
-enumeration) and should not be read as replicating it — different
-methodology, same qualitative conclusion, and the boundary point (`lat =
-15 = latMax/2`) matches Sterbenz's Lemma exactly in both.
+**Like-for-like, this session's sweep vs the review's crop-enumeration
+sweep, same two zones:**
+
+| Zone | This session (continuous mantissa) | Review (crop enumeration) |
+| --- | --- | --- |
+| `lat < 15` (danger zone) | 625,702 / 1,000,000 = **62.570%** | 5,097,600 / 40,320,000 = **12.6%** |
+| `lat ≥ 15` (guaranteed zone) | 0 / 1,000,000 = **0.000%** | 0 / 252,000,000 (whole-domain sweep) = **0.000%** |
+
+An earlier draft of this note compared this session's 31.284%
+(a whole-domain `[0,30]` sweep, which dilutes the danger-zone rate by
+mixing in the always-exact upper half) against the review's 12.6%
+(already restricted to `lat < 15`) and called the ~2.5× gap "different
+methodology" without separating what agreed from what did not. Corrected:
+comparing the same zone to the same zone, the gap is **62.6% vs 12.6% —
+roughly 5×, not 2.5×**.
+
+**What agrees between the two independent methods:** the mechanism (a
+Sterbenz-boundary float64 subtraction effect, not noise), the exact
+boundary location (`lat = 15 = latMax/2`), and the confinement of every
+single inexact result to the `lat < 15` side — 0% inexact in `lat ≥ 15` in
+both methods, exactly. **What does not agree:** the magnitude — this
+session's continuous-mantissa sweep is roughly 5× more rounding-prone
+within the danger zone than the review's crop-enumeration sweep.
+
+Tested, not merely asserted, one candidate explanation for that gap: that
+cell-aligned values (multiples of a grid's `dLat`) need fewer mantissa
+bits and round exactly more often than a continuous mantissa lattice, even
+outside the Sterbenz-guaranteed band. Swept three plausible grid
+resolutions over the same `lat < 15` zone:
+
+```
+node -e "
+function subExact(a, b) {
+  const s = a - b;
+  const bVirtual = a - s;
+  const err = bVirtual - b;
+  return err === 0;
+}
+function sweepCellAligned(latMax, zoneMin, zoneMax, dLat) {
+  let total = 0, inexact = 0;
+  const steps = Math.round((zoneMax - zoneMin) / dLat);
+  for (let k = 0; k <= steps; k++) {
+    const lat = zoneMin + k * dLat;
+    if (lat < zoneMin || lat > zoneMax) continue;
+    total++;
+    if (!subExact(latMax, lat)) inexact++;
+  }
+  return { total, inexact, pct: total ? (100*inexact/total).toFixed(3) : 'n/a' };
+}
+console.log('cell-aligned dLat=0.5 (current env grid), lat<15:', JSON.stringify(sweepCellAligned(30, 0, 15 - 0.5, 0.5)));
+console.log('cell-aligned dLat=30/1670 (M2 terrain target), lat<15:', JSON.stringify(sweepCellAligned(30, 0, 15 - 30/1670, 30/1670)));
+console.log('cell-aligned dLat=0.1, lat<15:', JSON.stringify(sweepCellAligned(30, 0, 15 - 0.1, 0.1)));
+"
+```
+
+Output:
+
+```
+cell-aligned dLat=0.5 (current env grid), lat<15: {"total":30,"inexact":0,"pct":"0.000"}
+cell-aligned dLat=30/1670 (M2 terrain target), lat<15: {"total":835,"inexact":540,"pct":"64.671"}
+cell-aligned dLat=0.1, lat<15: {"total":150,"inexact":84,"pct":"56.000"}
+```
+
+**This hypothesis, as tested, is NOT confirmed.** At `dLat=0.5°` (an exact
+power-of-two-friendly fraction, matching the current shipped env grid),
+every subtraction is exact — 0.000%, not near 12.6%. At the two irregular
+(non-power-of-two) resolutions — `dLat=30/1670°`, the actual M2 terrain
+target spacing, and `dLat=0.1°`, mentioned in the review's own magnitude
+figures — the inexact rate is 64.671% and 56.000% respectively, both
+*higher* than this session's own continuous-mantissa rate (62.570%), not
+lower toward 12.6%. Cell-alignment at a "nice" binary fraction (0.5°)
+eliminates the effect entirely rather than reducing it partway; a "messy"
+decimal fraction (30/1670°, 0.1°) does not reduce it either. Neither
+outcome lands near the review's reported 12.6%, so this specific
+hypothesis does not explain the gap. **Left honest: unexplained — two
+independent methods confirm the same mechanism (the Sterbenz boundary at
+`lat=15`, 0% inexact above it in both), but the magnitudes differ by
+roughly 5× (62.6% vs 12.6%) and the candidate cell-alignment explanation,
+tested directly in this fix pass at three resolutions, does not account
+for it.**
 
 **Conclusion, stated plainly: the M5 byte-identity PASS is a property of
 the CURRENT domain's specific numbers (`DOMAIN.latMax = 27`,
@@ -406,9 +477,12 @@ structural, not lucky — but it is structural to numbers that change when
 the domain expands. Seam B must NOT carry "byte-identical" forward as an
 expectation for the new 45–100°E / 0–30°N domain. It must budget a
 tolerance (the review's measured order of magnitude, ~1e-13 at 0.5° grid
-spacing, is a starting point, not a validated bound for the new domain)
-and re-run an M5-equivalent spike against real new-domain bins before
-assuming any pass/fail bar for Seam B.**
+spacing, is a starting point, not a validated bound for the new domain —
+and the confirmed ~5× gap between this session's and the review's
+inexactness rate in the same danger zone, both nonzero, is a reason for
+MORE caution on that starting point, not less) and re-run an
+M5-equivalent spike against real new-domain bins before assuming any
+pass/fail bar for Seam B.**
 
 Two findings independent of the pass/fail verdict:
 
@@ -581,4 +655,5 @@ even though the brief's arithmetic was not.
   regardless of the CDS question, `data/raw/` does not exist at all on this
   machine, so every other bake input (GMRT, HydroSHEDS, OISST, IBTrACS) needs
   re-downloading before any of those later tasks can run either.
-- (M1, M2, M3, M5 entries pending Task 7's verdict roll-up.)
+- (M1, M3 entries pending Task 7's verdict roll-up. M2 and M5 now show
+  resolved verdicts in the table above.)

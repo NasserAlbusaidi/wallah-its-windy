@@ -775,6 +775,16 @@ async function loadSatelliteManifest(): Promise<void> {
   }
 }
 
+/**
+ * MANIFEST key for the presentation-only display-context bin
+ * (DISPLAY_CONTEXT_ASSET_PATH / context-terrain.bin). Named once so
+ * routeLoaded's domain-guard exclusion and the downstream `bins.get` lookup
+ * can never silently desync from a MANIFEST key rename here — `LoadItem.key`
+ * is a plain `string`, so a typo'd literal would fail neither the type
+ * checker nor a test that also hardcodes the string.
+ */
+const CONTEXT_TERRAIN_KEY = 'contextTerrain';
+
 // terrain/env/flowacc are listed now even though bake.py may not emit them yet:
 // loadWithProgress swallows a 404 and returns null, so a missing artifact cannot
 // brick the boot — the map simply assembles with whatever landed.
@@ -783,7 +793,7 @@ const MANIFEST: LoadItem[] = [
     url: asset(DISPLAY_CONTEXT_ASSET_PATH),
     label: 'regional terrain context',
     kind: 'bin',
-    key: 'contextTerrain',
+    key: CONTEXT_TERRAIN_KEY,
     weight: 2,
   },
   { url: asset('data/terrain.bin'), label: 'terrain', kind: 'bin', key: 'terrain', weight: 3 },
@@ -862,12 +872,12 @@ function routeLoaded(item: LoadItem, buf: ArrayBuffer, bins: Map<string, ParsedB
   try {
     if (item.kind === 'bin') {
       const parsed = parseBin(buf);
-      // MANIFEST's 'contextTerrain' item (DISPLAY_CONTEXT_ASSET_PATH) is the
+      // MANIFEST's contextTerrain item (DISPLAY_CONTEXT_ASSET_PATH) is the
       // presentation-only display context: deliberately a different extent
       // from the simulation DOMAIN (display-domain.ts), already validated
       // downstream against DISPLAY_CONTEXT_GRID via matchesDisplayContextGrid.
       // Only the bins that actually feed the sim are checked against DOMAIN.
-      if (item.key !== 'contextTerrain') assertBinDomain(parsed, item.label);
+      if (item.key !== CONTEXT_TERRAIN_KEY) assertBinDomain(parsed, item.label);
       bins.set(item.key, parsed);
     } else {
       const json = JSON.parse(new TextDecoder().decode(buf)) as unknown;
@@ -972,7 +982,7 @@ async function loadAll(): Promise<void> {
   // genesis points drive the faint glow the UI draws on the overlay. Uploading
   // the same parsed resources drive the render GPU textures and storm track.
   mergedTerrainBin = mergedTerrain(bins);
-  const contextCandidate = bins.get('contextTerrain') ?? null;
+  const contextCandidate = bins.get(CONTEXT_TERRAIN_KEY) ?? null;
   const contextElev = contextCandidate?.layers.get('elev');
   const contextLand = contextCandidate?.layers.get('landmask');
   contextTerrainBin =

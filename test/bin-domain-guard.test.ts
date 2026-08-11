@@ -134,18 +134,41 @@ describe('the main-thread physics load path actually calls the guard (task 16B)'
     expect(routeLoadedBody).toMatch(/assertBinDomain\(/);
   });
 
-  it("routeLoaded's guard excludes the contextTerrain item", () => {
-    // routeLoaded is ALSO the parse path for MANIFEST's 'contextTerrain' item
-    // (DISPLAY_CONTEXT_ASSET_PATH / context-terrain.bin) — the same
-    // presentation-only, deliberately-different-extent bin the loader.ts
-    // exclusion above protects. A guard added to routeLoaded without this
-    // exclusion would reject context-terrain.bin on every load, which is the
-    // exact regression this task must not introduce.
+  it('routeLoaded asserts before storing, gated by the contextTerrain exclusion', () => {
+    // A prior version of this test matched the bare identifier
+    // /contextTerrain/, which ALSO appears in the explanatory comment right
+    // above the guard (src/main.ts ~:875) -- so mutation testing showed it
+    // stayed green even after deleting the exclusion entirely (making the
+    // assert unconditional, which would reject context-terrain.bin on every
+    // load) and even for a hypothetical second unexcluded presentation-only
+    // bin. Pin the actual conditional shape instead: the exclusion check
+    // immediately gating assertBinDomain, itself immediately preceding
+    // bins.set (assert-before-store, not merely assert-present-somewhere).
     const routeLoadedBody = source.slice(
       source.indexOf('function routeLoaded('),
       source.indexOf('\n}', source.indexOf('function routeLoaded(')),
     );
-    expect(routeLoadedBody).toMatch(/contextTerrain/);
+    expect(routeLoadedBody).toMatch(
+      /if \(item\.key !== CONTEXT_TERRAIN_KEY\) assertBinDomain\(parsed, item\.label\);\s*\n\s*bins\.set\(/,
+    );
+  });
+
+  it("every kind: 'bin' MANIFEST entry is a known guarded-or-excluded key", () => {
+    // Nothing else catches a NEW unexcluded presentation-only (or physics)
+    // bin added to MANIFEST later: extract every kind:'bin' entry's key from
+    // the MANIFEST literal itself and pin the full set, so adding one forces
+    // a deliberate guarded-or-excluded decision here at review time instead
+    // of silently inheriting whatever routeLoaded happens to already do.
+    const manifestBody = source.slice(
+      source.indexOf('const MANIFEST: LoadItem[] = ['),
+      source.indexOf('\n];', source.indexOf('const MANIFEST: LoadItem[] = [')),
+    );
+    const binKeys = [...manifestBody.matchAll(/kind:\s*'bin',\s*key:\s*([^,]+),/g)].map((m) =>
+      m[1].trim().replace(/^'|'$/g, ''),
+    );
+    expect(binKeys.sort()).toEqual(
+      ['CONTEXT_TERRAIN_KEY', 'env', 'flowacc', 'ocean', 'regions', 'terrain', 'upper'],
+    );
   });
 
   it('the event steering fetch checks the bin it parses', () => {
@@ -154,6 +177,21 @@ describe('the main-thread physics load path actually calls the guard (task 16B)'
       source.indexOf('\n}', source.indexOf('async function loadEventSteeringBin(')),
     );
     expect(steeringBody).toMatch(/assertBinDomain\(|validateBinDomain\(/);
+  });
+
+  it('the steering fetch checks extent BEFORE the layer-name check (Step 5 ordering)', () => {
+    // nt and layer names are invariant under a grid move, so if the
+    // layer-name check ran first, a wrong-extent bin would pass it and
+    // produce the misleading "missing u850" diagnosis instead of "wrong
+    // extent". A silent reorder would restore that misdiagnosis with every
+    // other test in this file still green; this pins the order directly.
+    const steeringBody = source.slice(
+      source.indexOf('async function loadEventSteeringBin('),
+      source.indexOf('\n}', source.indexOf('async function loadEventSteeringBin(')),
+    );
+    expect(steeringBody.indexOf('validateBinDomain(')).toBeLessThan(
+      steeringBody.indexOf('required.every('),
+    );
   });
 
   it('loader.ts stays domain-agnostic — context-terrain.bin must stay loadable', () => {

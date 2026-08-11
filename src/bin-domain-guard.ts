@@ -18,6 +18,12 @@
  * deliberately excludes the 'contextTerrain' MANIFEST item (see below) —
  * that item shares routeLoaded's parse path but is not a physics bin.
  *
+ * One parse site remains genuinely uncovered: src/render/index.ts's
+ * fetchBin (:640-648) parses terrain.bin, flowacc.bin, and env.bin with no
+ * extent check, reached only from mode-B selfLoad (:303-306) when the
+ * render facade was not given injected resources — a render-only path,
+ * out of scope for this round.
+ *
  * The worker's four assertions only run when an ensemble request actually
  * executes: src/performance.ts sets autoEnsemble false on the phone and mid
  * device tiers (:52, :60), so the automatic post-spawn run — and this

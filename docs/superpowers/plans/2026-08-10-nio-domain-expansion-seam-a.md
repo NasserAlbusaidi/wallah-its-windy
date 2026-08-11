@@ -4964,7 +4964,9 @@ node -e "const fs=require('fs');fs.copyFileSync('public/data/terrain.bin','calib
 node -e "const{createHash}=require('crypto'),fs=require('fs');const rec=JSON.parse(fs.readFileSync('calibration/hf6-sealed-verification.json','utf8')).manifests;for(const [p,k] of [['calibration/data/hf6/forcing/terrain.bin','terrainSha256'],['calibration/data/hf6/forcing/ocean.bin','oceanSha256']]){const b=fs.readFileSync(p);const h=createHash('sha256').update(b).digest('hex');console.log((h===rec[k]?'MATCH':'MISMATCH'),p,b.length,h);}"
 ```
 
-*Expected:* ```
+*Expected:*
+
+```
 MATCH calibration/data/hf6/forcing/terrain.bin 2084344 a350399d3ce4960313f92e58f4f08d04b9c76ca6a7c35319d27443f3344ae262
 MATCH calibration/data/hf6/forcing/ocean.bin 700120 0811050864a24374e1cc7ed0e1d8519a85ec9e72505d1f9af28a6abca3498434
 ```
@@ -5212,7 +5214,9 @@ If it instead throws `... no longer matches the sealed record (record ..., live 
 node -e "const s=require('./calibration/hf6-seal.json');console.log('sealId',s.sealId);console.log('record',s.record.path,s.record.bytes,s.record.sha256);console.log('frozenInputs',s.frozenInputs.length,'roles',[...new Set(s.frozenInputs.map(i=>i.role))].join(','));console.log('forcing entries',s.frozenInputs.filter(i=>i.role==='forcing').length);for(const m of s.runtimeReproducibility)console.log('runtime',m.status,m.path,m.attestedSha256===m.recordSha256);console.log('verdict',s.verdict.sealedRetrospectiveStatus,s.verdict.prospectiveStatus);"
 ```
 
-*Expected:* ```
+*Expected:*
+
+```
 sealId hf6-arabian-v1-2026-07-21
 record calibration/hf6-sealed-verification.json 76746 f2728914428bcf8a35c853e8ac428d2390f2868bab5173c89ff6fcd8665f474d
 frozenInputs 24 roles catalog,tracks,sealed-scenarios,steering-manifest,terrain,ocean,hf2-candidate-selection,hf3-candidate-selection,forcing
@@ -6002,7 +6006,9 @@ Regenerate: calibration/hf6-acceptance.json, docs/hf6-scorecard.md (via `npm run
 node -e "const j=require('./calibration/hf6-acceptance.json');console.log('modelCard',j.manifests.modelCardSha256);console.log('verdict',j.implementationStatus,j.sealedRetrospectiveStatus,j.prospectiveStatus);"
 ```
 
-*Expected:* ```
+*Expected:*
+
+```
 modelCard ff395ab7d961db8d095ee879bb062255aece71490b90e0c8c6607b89e245225c
 verdict complete rejected awaiting-future-storms
 ```
@@ -7821,7 +7827,9 @@ node -e "const c=require('./calibration/fidelity-catalog.json'); const r=require
 ```
 
 ```powershell
-node -e "const h=require('./calibration/data/hf6-case-catalog.json'); const r=require('./calibration/results.json'); const cal=r.dataset.split.calibration, val=r.dataset.split.validation; const s=h.cases.filter(c=>c.partition==='sealed-confirmation'); console.log('sealed n=', s.length); console.log('in calibration:', s.filter(c=>cal.includes(c.sid)).map(c=>c.sid).join(',')||'(none)'); console.log('in validation:', s.filter(c=>val.includes(c.sid)).map(c=>c.sid).join(',')||'(none)')"```
+node -e "const h=require('./calibration/data/hf6-case-catalog.json'); const r=require('./calibration/results.json'); const cal=r.dataset.split.calibration, val=r.dataset.split.validation; const s=h.cases.filter(c=>c.partition==='sealed-confirmation'); console.log('sealed n=', s.length); console.log('in calibration:', s.filter(c=>cal.includes(c.sid)).map(c=>c.sid).join(',')||'(none)'); console.log('in validation:', s.filter(c=>val.includes(c.sid)).map(c=>c.sid).join(',')||'(none)')"
+
+```
 
 *Expected:* First command prints:
 ```

@@ -58,4 +58,8 @@ def valid_cached_netcdf(
             lon = [float(v) for v in handle["longitude"][...]]
     except (OSError, KeyError, ValueError):
         return False
-    return lat == expected_lat and lon == expected_lon
+    # Latitude order is NOT guaranteed: era5_event.py's own reader tolerates
+    # either native order (`flip = lat_native[0] > lat_native[-1]`). Comparing
+    # sorted axes accepts either order without weakening the check - the
+    # VALUES must still match exactly, just not a specific direction.
+    return sorted(lat) == sorted(expected_lat) and lon == expected_lon

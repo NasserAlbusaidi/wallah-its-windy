@@ -213,8 +213,8 @@ def main(names: list[str]) -> int:
             print(f"[skip] {filename} already present ({target.stat().st_size / 1e6:.1f} MB)")
             continue
         if target.exists():
-            print(f"[refetch] {filename} does not cover {AREA} at {GRID} - replacing")
-            target.unlink()
+            print(f"[refetch] {filename} does not cover {AREA} at {GRID} - "
+                  "will replace once the redownload succeeds")
         if filename in {
             "era5_shaheen_2021.nc",
             "era5_rh_shaheen_2021.nc",
@@ -230,24 +230,38 @@ def main(names: list[str]) -> int:
                     print(f"[skip] {part.name} already present")
                     continue
                 if part.exists():
-                    print(f"[refetch] {part.name} does not cover {AREA} at {GRID} - replacing")
-                    part.unlink()
+                    print(f"[refetch] {part.name} does not cover {AREA} at {GRID} - "
+                          "will replace once the redownload succeeds")
                 s = dict(spec, month=mon, day=days)
                 print(f"[submit] {dataset} -> {part.name} (queue may take a while)")
+                # Download to a temp path and only replace `part` once the
+                # download has actually landed: a stale/invalid cache is a
+                # possibly-wrong verdict (see netcdf_extent.py), and CDS
+                # queues can take hours, so an existing file - valid or not -
+                # must never be destroyed before its replacement exists.
+                tmp = part.with_name(part.name + ".tmp")
                 try:
-                    client.retrieve(dataset, s, str(part))
+                    client.retrieve(dataset, s, str(tmp))
+                    tmp.replace(part)
                     print(f"[done] {part.name} ({part.stat().st_size / 1e6:.1f} MB)")
                 except Exception as err:  # noqa: BLE001 — report and continue to next request
                     failures += 1
                     print(f"[FAIL] {part.name}: {err}", file=sys.stderr)
+                    if tmp.exists():
+                        tmp.unlink()
             continue
         print(f"[submit] {dataset} -> {filename} (queue may take a while)")
+        # See the Shaheen-loop comment above: replace only on success.
+        tmp = target.with_name(target.name + ".tmp")
         try:
-            client.retrieve(dataset, spec, str(target))
+            client.retrieve(dataset, spec, str(tmp))
+            tmp.replace(target)
             print(f"[done] {filename} ({target.stat().st_size / 1e6:.1f} MB)")
         except Exception as err:  # noqa: BLE001
             failures += 1
             print(f"[FAIL] {filename}: {err}", file=sys.stderr)
+            if tmp.exists():
+                tmp.unlink()
     if failures:
         print(f"\n{failures} request(s) failed — commonest causes: licence not yet "
               "accepted on the CDS site, or a stale token in ~/.cdsapirc.", file=sys.stderr)

@@ -155,8 +155,17 @@ def quantize_u16(a: np.ndarray, scale: float, label: str) -> np.ndarray:
     this raise is byte-identical on current data. Over the expanded basin the
     Ganges-Brahmaputra-Meghna reaches about log10(1+acc) = 6.345 against a
     6.5535 ceiling - a 3.2 percent margin, which is exactly why it must raise.
+
+    Also raises on NaN/inf. np.round propagates NaN, and NaN compares False
+    against both the low and high bounds below, so a range check alone lets a
+    NaN cell through as 0 with only a RuntimeWarning on the final cast - the
+    exact silent-plausible-file failure this function exists to close. The
+    isfinite check below subsumes +-inf too (min()/max() already flags those
+    via the range check, but a single early check is simpler to reason about).
     """
     scaled = np.round(np.asarray(a, dtype="float64") / scale)
+    if not np.isfinite(scaled).all():
+        raise ValueError(f"{label}: non-finite values before uint16 quantization")
     low = float(scaled.min())
     high = float(scaled.max())
     if low < 0 or high > 65535:

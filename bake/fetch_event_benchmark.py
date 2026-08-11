@@ -70,8 +70,8 @@ def main() -> int:
                     )
                     continue
                 if target.exists():
-                    print(f"[refetch] {filename} does not cover {AREA} at {GRID} - replacing")
-                    target.unlink()
+                    print(f"[refetch] {filename} does not cover {AREA} at {GRID} - "
+                          "will replace once the redownload succeeds")
                 request = {
                     **base,
                     "year": str(year),
@@ -87,14 +87,23 @@ def main() -> int:
                     f"[submit] {event['label']} {kind} -> {filename} "
                     "(CDS may queue)"
                 )
+                # Download to a temp path and only replace `target` once the
+                # download has actually landed: a stale/invalid cache is a
+                # possibly-wrong verdict (see netcdf_extent.py), and CDS
+                # queues can take hours, so an existing file - valid or not -
+                # must never be destroyed before its replacement exists.
+                tmp = target.with_name(target.name + ".tmp")
                 try:
-                    client.retrieve(dataset, request, str(target))
+                    client.retrieve(dataset, request, str(tmp))
+                    tmp.replace(target)
                     print(
                         f"[done] {filename} ({target.stat().st_size / 1e6:.1f} MB)"
                     )
                 except Exception as err:  # noqa: BLE001
                     failures += 1
                     print(f"[FAIL] {filename}: {err}", file=sys.stderr)
+                    if tmp.exists():
+                        tmp.unlink()
     if failures:
         print(f"{failures} ERA5 request(s) failed", file=sys.stderr)
     return 1 if failures else 0

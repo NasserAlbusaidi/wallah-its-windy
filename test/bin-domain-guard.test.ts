@@ -119,3 +119,49 @@ describe('the ensemble worker actually calls the guard', () => {
     expect(source.match(/assertBinDomain\(/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe('the main-thread physics load path actually calls the guard (task 16B)', () => {
+  // main.ts is a browser entry module (it opens a WebGL2 context at import
+  // time) and cannot be imported in a node test, so pin both call sites by
+  // source text, the same way the worker's are pinned above.
+  const source = readFileSync('src/main.ts', 'utf8');
+
+  it('routeLoaded asserts the bulk climatology bins it parses', () => {
+    const routeLoadedBody = source.slice(
+      source.indexOf('function routeLoaded('),
+      source.indexOf('\n}', source.indexOf('function routeLoaded(')),
+    );
+    expect(routeLoadedBody).toMatch(/assertBinDomain\(/);
+  });
+
+  it("routeLoaded's guard excludes the contextTerrain item", () => {
+    // routeLoaded is ALSO the parse path for MANIFEST's 'contextTerrain' item
+    // (DISPLAY_CONTEXT_ASSET_PATH / context-terrain.bin) — the same
+    // presentation-only, deliberately-different-extent bin the loader.ts
+    // exclusion above protects. A guard added to routeLoaded without this
+    // exclusion would reject context-terrain.bin on every load, which is the
+    // exact regression this task must not introduce.
+    const routeLoadedBody = source.slice(
+      source.indexOf('function routeLoaded('),
+      source.indexOf('\n}', source.indexOf('function routeLoaded(')),
+    );
+    expect(routeLoadedBody).toMatch(/contextTerrain/);
+  });
+
+  it('the event steering fetch checks the bin it parses', () => {
+    const steeringBody = source.slice(
+      source.indexOf('async function loadEventSteeringBin('),
+      source.indexOf('\n}', source.indexOf('async function loadEventSteeringBin(')),
+    );
+    expect(steeringBody).toMatch(/assertBinDomain\(|validateBinDomain\(/);
+  });
+
+  it('loader.ts stays domain-agnostic — context-terrain.bin must stay loadable', () => {
+    // The load-bearing negative assertion: a loader-level guard would reject
+    // public/data/context-terrain.bin (875x550 on bbox (45,80,8,30) by
+    // design, presentation-only) alongside every wrong-extent physics bin.
+    const loaderSource = readFileSync('src/loader.ts', 'utf8');
+    expect(loaderSource).not.toMatch(/assertBinDomain\(/);
+    expect(loaderSource).not.toMatch(/validateBinDomain\(/);
+  });
+});

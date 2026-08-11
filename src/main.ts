@@ -44,6 +44,7 @@ import {
   normalizeWheelDelta,
 } from './camera-gestures';
 import { parseBin } from './loader';
+import { assertBinDomain, validateBinDomain } from './bin-domain-guard';
 import type {
   BinLayer,
   EnvTextures,
@@ -860,7 +861,14 @@ async function loadWithProgress(item: LoadItem, onProgress: (frac: number) => vo
 function routeLoaded(item: LoadItem, buf: ArrayBuffer, bins: Map<string, ParsedBin>): void {
   try {
     if (item.kind === 'bin') {
-      bins.set(item.key, parseBin(buf));
+      const parsed = parseBin(buf);
+      // MANIFEST's 'contextTerrain' item (DISPLAY_CONTEXT_ASSET_PATH) is the
+      // presentation-only display context: deliberately a different extent
+      // from the simulation DOMAIN (display-domain.ts), already validated
+      // downstream against DISPLAY_CONTEXT_GRID via matchesDisplayContextGrid.
+      // Only the bins that actually feed the sim are checked against DOMAIN.
+      if (item.key !== 'contextTerrain') assertBinDomain(parsed, item.label);
+      bins.set(item.key, parsed);
     } else {
       const json = JSON.parse(new TextDecoder().decode(buf)) as unknown;
       if (item.key === 'genesis') genesisPoints = parseGenesis(json);
@@ -1402,6 +1410,11 @@ async function loadEventSteeringBin(
     const response = await fetch(asset(relative));
     if (!response.ok) return null;
     const parsed = parseBin(await response.arrayBuffer());
+    const domainMismatch = validateBinDomain(parsed, `${scenario.label} steering`);
+    if (domainMismatch !== null) {
+      console.warn(`[scenario] ${scenario.label} pressure steering wrong extent:`, domainMismatch);
+      return null;
+    }
     const required = ['u850', 'v850', 'u500', 'v500', 'u250', 'v250'];
     if (!required.every((name) => parsed.layers.has(name))) return null;
     eventSteeringBinCache.set(scenario.id, parsed);

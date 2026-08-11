@@ -7,22 +7,22 @@
  * layer's own header bbox and clamps to that layer's edges, so a bin baked over
  * the wrong box simulates and renders without one diagnostic.
  *
- * This module closes that at exactly two call sites, not "every physics bin":
- * the four bins src/ensemble.worker.ts loads per request (env, terrain,
- * steering, ocean), and the scenario event-bin path
- * (src/scenarios.ts's validateEventBinForScenario, reached from
- * src/main.ts:1377's loadEventBin). It does NOT cover the PRIMARY
- * single-storm simulation's bulk climatology load (src/main.ts:863, the
- * env/terrain/ocean/upper/regions/flowacc bins map) or the main-thread
- * scenario steering-bin fetch (src/main.ts:1404) — a wrong-extent bin at
- * either of those two sites still fails silently today. Extending the guard
- * there is a scope decision for a later round, not done here.
+ * This module closes that at four call sites: the four bins
+ * src/ensemble.worker.ts loads per request (env, terrain, steering, ocean);
+ * the scenario event-bin path (src/scenarios.ts's validateEventBinForScenario,
+ * reached from src/main.ts:1385's loadEventBin); the PRIMARY single-storm
+ * simulation's bulk climatology load (src/main.ts's routeLoaded, the
+ * env/terrain/ocean/upper/regions/flowacc bins map — task 16B); and the
+ * main-thread scenario steering-bin fetch (src/main.ts's
+ * loadEventSteeringBin — task 16B). routeLoaded's assertBinDomain call
+ * deliberately excludes the 'contextTerrain' MANIFEST item (see below) —
+ * that item shares routeLoaded's parse path but is not a physics bin.
  *
  * The worker's four assertions only run when an ensemble request actually
  * executes: src/performance.ts sets autoEnsemble false on the phone and mid
  * device tiers (:52, :60), so the automatic post-spawn run — and this
  * guard — never fires there on its own; the manual "Run" button
- * (src/main.ts:2609) still reaches the worker, and the guard, on every tier.
+ * (src/main.ts:2622) still reaches the worker, and the guard, on every tier.
  *
  * It is deliberately NOT applied to context-terrain.bin, which is
  * presentation-only and carries 875x550 / (45,80,8,30) by design.

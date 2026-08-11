@@ -327,9 +327,21 @@ def _to_env_grid(field: np.ndarray, elat: np.ndarray, elon: np.ndarray) -> np.nd
     if np.isnan(field).any():
         raise ValueError("ERA5 field contains NaN inside the domain — bad download?")
     lat, lon = _axes
-    interp = RegularGridInterpolator((lat, lon), field, bounds_error=False, fill_value=None)
+    # bounds_error=True, NOT fill_value=None. fill_value=None means EXTRAPOLATE:
+    # fed a raw file that does not cover the domain, this fabricated a basin
+    # with no diagnostic at all. Interior evaluation is unchanged, so a correct
+    # cache produces bit-identical output.
+    interp = RegularGridInterpolator((lat, lon), field, bounds_error=True)
     pts = np.stack([elat.ravel(), elon.ravel()], axis=-1)
-    return interp(pts).reshape(elat.shape).astype(np.float64)
+    try:
+        values = interp(pts)
+    except ValueError as error:
+        raise ValueError(
+            f"ERA5 native grid lat[{lat.min()},{lat.max()}] lon[{lon.min()},{lon.max()}] "
+            f"does not cover the env grid lat[{elat.min()},{elat.max()}] "
+            f"lon[{elon.min()},{elon.max()}] - stale download in data/raw?"
+        ) from error
+    return values.reshape(elat.shape).astype(np.float64)
 
 
 def _month_pick_indices(month: int) -> list[int]:

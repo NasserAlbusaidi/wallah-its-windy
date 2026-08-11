@@ -28,6 +28,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from netcdf_extent import valid_cached_netcdf
+
 RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
 AREA = [27, 50, 15, 70]  # N, W, S, E
 GRID = [0.5, 0.5]
@@ -205,9 +207,14 @@ def main(names: list[str]) -> int:
     failures = 0
     for filename, dataset, spec in selected:
         target = RAW / filename
-        if target.exists() and target.stat().st_size > 0:
+        # Existence is NOT enough: no filename encodes the extent, so a stale
+        # file from a previous AREA silently poisons the whole bake.
+        if valid_cached_netcdf(target, AREA, GRID):
             print(f"[skip] {filename} already present ({target.stat().st_size / 1e6:.1f} MB)")
             continue
+        if target.exists():
+            print(f"[refetch] {filename} does not cover {AREA} at {GRID} - replacing")
+            target.unlink()
         if filename in {
             "era5_shaheen_2021.nc",
             "era5_rh_shaheen_2021.nc",
@@ -218,9 +225,13 @@ def main(names: list[str]) -> int:
             for mon, days in SHAHEEN_DAYS.items():
                 stem = filename.removesuffix(".nc")
                 part = RAW / f"{stem}_{mon}.nc"
-                if part.exists() and part.stat().st_size > 0:
+                # Existence is NOT enough - see netcdf_extent.py.
+                if valid_cached_netcdf(part, AREA, GRID):
                     print(f"[skip] {part.name} already present")
                     continue
+                if part.exists():
+                    print(f"[refetch] {part.name} does not cover {AREA} at {GRID} - replacing")
+                    part.unlink()
                 s = dict(spec, month=mon, day=days)
                 print(f"[submit] {dataset} -> {part.name} (queue may take a while)")
                 try:

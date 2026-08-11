@@ -10,6 +10,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from netcdf_extent import valid_cached_netcdf
+
 import cdsapi
 
 from event_catalog import EVENTS, event_files
@@ -61,11 +63,15 @@ def main() -> int:
             for part, filename in zip(event["parts"], filenames, strict=True):
                 year, month, days, _ = part
                 target = RAW / filename
-                if target.exists() and target.stat().st_size > 0:
+                # Existence is NOT enough - see netcdf_extent.py.
+                if valid_cached_netcdf(target, AREA, GRID):
                     print(
                         f"[skip] {filename} ({target.stat().st_size / 1e6:.1f} MB)"
                     )
                     continue
+                if target.exists():
+                    print(f"[refetch] {filename} does not cover {AREA} at {GRID} - replacing")
+                    target.unlink()
                 request = {
                     **base,
                     "year": str(year),

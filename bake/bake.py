@@ -145,6 +145,29 @@ def build_env() -> str:
     return path
 
 
+def quantize_u16(a: np.ndarray, scale: float, label: str) -> np.ndarray:
+    """Quantize to uint16, RAISING on saturation instead of clipping silently.
+
+    This used to be np.clip(...). Clipping is invisible: the file still parses,
+    the map still draws, and the largest river in the basin is quietly pegged at
+    the ceiling. Headroom today (measured from the committed flowacc.bin,
+    2026-08-10): flowacc peaks at raw 53,749 of 65,535 and basin at 40,828, so
+    this raise is byte-identical on current data. Over the expanded basin the
+    Ganges-Brahmaputra-Meghna reaches about log10(1+acc) = 6.345 against a
+    6.5535 ceiling - a 3.2 percent margin, which is exactly why it must raise.
+    """
+    scaled = np.round(np.asarray(a, dtype="float64") / scale)
+    low = float(scaled.min())
+    high = float(scaled.max())
+    if low < 0 or high > 65535:
+        raise ValueError(
+            f"{label}: uint16 quantization range [{low:.0f},{high:.0f}] escapes "
+            f"[0,65535] at scale {scale}; raise the scale or widen the dtype - "
+            "do not clip"
+        )
+    return scaled.astype(np.uint16).ravel(order="C")
+
+
 def build_flowacc(terrain_path: str) -> tuple[str, str]:
     print("[3/5] flowacc.bin  (HydroSHEDS ACC + DIR + timed downstream routing)")
     parsed = binfmt.parse_bin(open(terrain_path, "rb").read())
@@ -166,16 +189,13 @@ def build_flowacc(terrain_path: str) -> tuple[str, str]:
         )
     passed, msg = hydro.connectivity_check(flowacc_log, landmask)
 
-    def q_u16(a: np.ndarray, scale: float) -> np.ndarray:
-        return np.clip(np.round(a / scale), 0, 65535).astype(np.uint16).ravel(order="C")
-
     acc_scale = 1e-4  # stores log10(1+acc) to 4 decimals; max ~5.4 -> ~54000 < 65535
-    basin_clip = np.clip(basin, 0, 65535).astype(np.uint16)
+    basin_clip = quantize_u16(basin, 1.0, "basin")
     layers = [
-        Layer("flowacc", "uint16", True, nx, ny, 1, DOMAIN, acc_scale, 0.0, q_u16(flowacc_log, acc_scale)),
+        Layer("flowacc", "uint16", True, nx, ny, 1, DOMAIN, acc_scale, 0.0, quantize_u16(flowacc_log, acc_scale, "flowacc")),
         Layer("flowdir", "uint8", False, nx, ny, 1, DOMAIN, 1.0, 0.0, flowdir.ravel(order="C")),
         Layer("travmin", "uint8", False, nx, ny, 1, DOMAIN, 1.0, 0.0, travmin.ravel(order="C")),
-        Layer("basin", "uint16", False, nx, ny, 1, DOMAIN, 1.0, 0.0, basin_clip.ravel(order="C")),
+        Layer("basin", "uint16", False, nx, ny, 1, DOMAIN, 1.0, 0.0, basin_clip),
     ]
     path = os.path.join(OUT_DIR, "flowacc.bin")
     binfmt.write_bin(path, layers)

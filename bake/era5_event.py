@@ -173,9 +173,18 @@ def _regrid_series(field3d: np.ndarray, lat_native: np.ndarray, lon_native: np.n
         plane = field3d[p, ::-1, :] if flip else field3d[p]
         if np.isnan(plane).any():
             raise ValueError("event field contains NaN inside the domain — bad download?")
+        # See era5._to_env_grid: fill_value=None extrapolates silently.
         interp = RegularGridInterpolator((lat_asc, lon_native), plane,
-                                         bounds_error=False, fill_value=None)
-        out[p] = interp(pts).reshape(elat.shape)
+                                         bounds_error=True)
+        try:
+            out[p] = interp(pts).reshape(elat.shape)
+        except ValueError as error:
+            raise ValueError(
+                f"event native grid lat[{lat_asc.min()},{lat_asc.max()}] "
+                f"lon[{lon_native.min()},{lon_native.max()}] does not cover the env grid "
+                f"lat[{elat.min()},{elat.max()}] lon[{elon.min()},{elon.max()}] "
+                f"- stale download in data/raw?"
+            ) from error
     return out
 
 

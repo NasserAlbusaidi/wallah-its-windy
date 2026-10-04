@@ -15,6 +15,7 @@ describe('chooseRenderProfile', () => {
       particleBudget: 8_000,
       compact: false,
       autoEnsemble: true,
+      postFx: true,
     });
   });
 
@@ -31,6 +32,7 @@ describe('chooseRenderProfile', () => {
       particleBudget: 2_600,
       compact: true,
       autoEnsemble: false,
+      postFx: false,
     });
   });
 
@@ -47,6 +49,7 @@ describe('chooseRenderProfile', () => {
       particleBudget: 4_200,
       compact: true,
       autoEnsemble: false,
+      postFx: true,
     });
   });
 

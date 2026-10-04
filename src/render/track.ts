@@ -1,8 +1,9 @@
 /**
  * track.ts — the storm track + intensity halo, drawn on the 2D overlay canvas.
  *
- * This is crisp vector chrome above the WebGL map: a dotted, age-faded polyline
- * of the storm's path (track token) plus a soft intensity halo at the centre.
+ * This is crisp vector chrome above the WebGL map: a glowing, age-faded,
+ * category-coloured polyline of the storm's path with six-hourly fix beads,
+ * a soft intensity halo, and the tropical-cyclone glyph at the centre.
  * It is ALSO the prefers-reduced-motion representation of the storm — when the
  * particle swarm is skipped, the track + a stronger halo stand in for it
  * (design a11y floor). During aftermath the whole overlay multiplies its alpha
@@ -14,7 +15,7 @@
  */
 
 import { TOKENS } from '../tokens';
-import { categoryRgba } from '../category';
+import { categoryRgba, stormCategory } from '../category';
 import { clipToLatLon, latLonToClip, offsetKm } from '../grid';
 import {
   maxWindRadiusKm,
@@ -45,6 +46,19 @@ function coreRgba(a: number): string {
 function accentRgba(a: number): string {
   return `rgba(${AR},${AG},${AB},${a})`;
 }
+const k = TOKENS.oceanDeep.rgba01;
+const KR = Math.round(k[0] * 255);
+const KG = Math.round(k[1] * 255);
+const KB = Math.round(k[2] * 255);
+/** Dark keyline under opaque marks, so they separate from bright weather. */
+function keylineRgba(a: number): string {
+  return `rgba(${KR},${KG},${KB},${a})`;
+}
+
+/** Alpha steps along the age-faded track (stroke batching granularity). */
+const AGE_BUCKETS = 16;
+/** Decorative eye-glyph spin, radians per wall-clock second (display only). */
+const GLYPH_TURN_RAD_PER_S = 0.9;
 
 export class TrackLayer {
   private ov: CanvasRenderingContext2D | null = null;
@@ -176,33 +190,68 @@ export class TrackLayer {
       );
     }
 
-    // Dotted, age-faded track polyline, coloured by Saffir–Simpson class of
-    // each segment (the standard tracker convention) so the storm's history —
-    // TD spin-up, peak category, decay — reads directly off the map.
+    // Age-faded track, coloured by the Saffir–Simpson class of each segment
+    // (the standard tracker convention) so TD spin-up, peak and decay read
+    // straight off the map: a wide additive glow under a crisp core line.
     const track = ctx.track;
     if (track && track.length > 1) {
-      g.lineWidth = Math.max(1, unit * 0.0018);
-      g.setLineDash([unit * 0.004, unit * 0.008]);
+      const pts = track.map((p) => {
+        const clip = latLonToClip(p.lat, p.lon);
+        return this.px(clip.x, clip.y);
+      });
       g.lineCap = 'round';
-      for (let i = 1; i < track.length; i++) {
-        const a = latLonToClip(track[i - 1].lat, track[i - 1].lon);
-        const b = latLonToClip(track[i].lat, track[i].lon);
-        const [ax, ay] = this.px(a.x, a.y);
-        const [bx, by] = this.px(b.x, b.y);
-        // Older segments (earlier in the array) dimmer. The whole line (base +
-        // age term) multiplies by `fade` so it drains smoothly to 0 during the
-        // ~10 s aftermath instead of flooring at 0.12 then popping to nothing.
+      g.lineJoin = 'round';
+      // Older segments (earlier in the array) dimmer; the whole line
+      // multiplies by `fade` so it drains smoothly over the aftermath. Runs of
+      // segments sharing a category and one of AGE_BUCKETS alpha steps stroke
+      // as one path, so a long track costs dozens of strokes, not hundreds.
+      const strokePass = (width: number, alpha: (ageFrac: number) => number): void => {
+        g.lineWidth = width;
+        let runKey = '';
+        let runStart = 0;
+        const flush = (end: number): void => {
+          if (end <= runStart) return;
+          const ageFrac = end / (pts.length - 1);
+          g.strokeStyle = categoryRgba(track[end].vKt, alpha(ageFrac) * fade);
+          g.beginPath();
+          g.moveTo(pts[runStart][0], pts[runStart][1]);
+          for (let j = runStart + 1; j <= end; j++) g.lineTo(pts[j][0], pts[j][1]);
+          g.stroke();
+        };
+        for (let i = 1; i < pts.length; i++) {
+          const bucket = Math.round((i / (pts.length - 1)) * AGE_BUCKETS);
+          const key = `${stormCategory(track[i].vKt).id}:${bucket}`;
+          if (key !== runKey) {
+            flush(i - 1);
+            runKey = key;
+            runStart = i - 1;
+          }
+        }
+        flush(pts.length - 1);
+      };
+      strokePass(Math.max(3, unit * 0.009), (a) => 0.03 + 0.07 * a);
+      strokePass(Math.max(1, unit * 0.0022), (a) => 0.22 + 0.6 * a);
+
+      // Six-hourly fixes, best-track style: category-filled beads with a dark
+      // keyline, the daily ones larger. Drawn opaque (source-over) so the
+      // keyline separates them from bright weather beneath.
+      g.save();
+      g.globalCompositeOperation = 'source-over';
+      g.lineWidth = Math.max(1, unit * 0.0011);
+      g.strokeStyle = keylineRgba(0.7 * fade);
+      for (let i = 1; i < track.length - 1; i++) {
+        const hours = track[i].ageH;
+        const sixHourly = Math.abs(hours / 6 - Math.round(hours / 6)) < 0.02;
+        if (!sixHourly) continue;
+        const daily = Math.abs(hours / 24 - Math.round(hours / 24)) < 0.005;
         const ageFrac = i / (track.length - 1);
-        g.strokeStyle = categoryRgba(
-          track[i].vKt,
-          (0.18 + 0.5 * ageFrac) * fade,
-        );
+        g.fillStyle = categoryRgba(track[i].vKt, (0.35 + 0.6 * ageFrac) * fade);
         g.beginPath();
-        g.moveTo(ax, ay);
-        g.lineTo(bx, by);
+        g.arc(pts[i][0], pts[i][1], Math.max(1.5, unit * (daily ? 0.0042 : 0.0026)), 0, Math.PI * 2);
+        g.fill();
         g.stroke();
       }
-      g.setLineDash([]);
+      g.restore();
     }
 
     // Intensity halo at the centre. Stronger in reduced-motion (it IS the storm).
@@ -210,7 +259,7 @@ export class TrackLayer {
     if (c) {
       const [cx, cy] = this.px(c.x, c.y);
       const radius = unit * (0.02 + 0.05 * ctx.intensity01);
-      const peak = (ctx.reduced ? 0.9 : 0.5) * (ctx.demo ? 0.5 : 1) * fade;
+      const peak = (ctx.reduced ? 0.9 : 0.36) * (ctx.demo ? 0.5 : 1) * fade;
       const grad = g.createRadialGradient(cx, cy, 0, cx, cy, radius);
       grad.addColorStop(0, coreRgba(peak));
       grad.addColorStop(0.4, trackRgba(peak * 0.5));
@@ -220,12 +269,76 @@ export class TrackLayer {
       g.arc(cx, cy, radius, 0, Math.PI * 2);
       g.fill();
 
-      // A crisp eye dot so the exact centre reads even at low intensity.
-      g.fillStyle = coreRgba(0.8 * peak + 0.15 * fade);
+      const vKt = ctx.frame.storm?.vKt ?? track?.[track.length - 1]?.vKt ?? 0;
+      this.drawCycloneGlyph(g, cx, cy, unit, vKt, ctx, fade);
+    }
+    g.restore();
+  }
+
+  /**
+   * The meteorological tropical-cyclone symbol at the eye: a centre disc with
+   * two curled arms, category-coloured, turning counter-clockwise (northern
+   * hemisphere) at a fixed decorative rate. Hollow below hurricane force,
+   * filled at and above it. Reduced motion freezes the spin; the wall-clock
+   * angle never reaches physics or recorded output.
+   */
+  private drawCycloneGlyph(
+    g: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    unit: number,
+    vKt: number,
+    ctx: DrawCtx,
+    fade: number,
+  ): void {
+    const core = Math.max(2.5, unit * 0.0042);
+    const arm = core * 3.1;
+    const spin = ctx.reduced ? 0 : -(ctx.nowMs / 1000) * GLYPH_TURN_RAD_PER_S;
+    const filled = vKt >= 64;
+    g.save();
+    g.globalCompositeOperation = 'source-over';
+    g.translate(cx, cy);
+    g.rotate(spin);
+    const traceArms = (): void => {
       g.beginPath();
-      g.arc(cx, cy, Math.max(1, unit * 0.0015), 0, Math.PI * 2);
+      for (const sign of [1, -1]) {
+        // Northern-hemisphere form (an S): the top arm leaves the disc
+        // westward and hooks south, the bottom arm mirrors it — each arm
+        // points along the counter-clockwise surface flow on its side.
+        g.moveTo(0, -sign * core);
+        g.bezierCurveTo(
+          -sign * arm * 0.55, -sign * core * 1.15,
+          -sign * arm * 1.0, -sign * core * 0.25,
+          -sign * arm * 0.82, sign * arm * 0.38,
+        );
+      }
+    };
+    // Dark keyline first so the glyph reads over white cloud and bright fill.
+    g.lineCap = 'round';
+    g.strokeStyle = keylineRgba(0.55 * fade);
+    g.lineWidth = Math.max(2.5, unit * 0.0042);
+    traceArms();
+    g.stroke();
+    g.beginPath();
+    g.arc(0, 0, core + g.lineWidth * 0.3, 0, Math.PI * 2);
+    g.stroke();
+
+    g.strokeStyle = categoryRgba(vKt, 0.95 * fade);
+    g.lineWidth = Math.max(1.5, unit * 0.0022);
+    traceArms();
+    g.stroke();
+    g.beginPath();
+    g.arc(0, 0, core, 0, Math.PI * 2);
+    if (filled) {
+      g.fillStyle = categoryRgba(vKt, 0.95 * fade);
       g.fill();
     }
+    g.stroke();
+    // The exact centre stays readable at any intensity.
+    g.fillStyle = coreRgba((filled ? 0.25 : 0.9) * fade);
+    g.beginPath();
+    g.arc(0, 0, Math.max(1, unit * 0.0012), 0, Math.PI * 2);
+    g.fill();
     g.restore();
   }
 

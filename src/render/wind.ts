@@ -8,9 +8,10 @@
  * so the swarm and the flow field never disagree. Speed colours each trail
  * through the shared wind-palette tokens.
  *
- * Trails are the classic technique: an offscreen half-res target is faded a
- * little each frame (dst *= fadeKeep), new segments draw additively on top,
- * and the target composites to screen with additive blending. Everything here
+ * Trails are the classic technique: an offscreen target (full-res, halved on
+ * large HiDPI canvases) is faded a little each frame (dst *= fadeKeep), new
+ * segments draw additively on top, and the target composites to screen with
+ * additive blending. Everything here
  * is decorative — no physics reads it; the RNG is a fixed private seed.
  *
  * prefers-reduced-motion is gated here in the module; the wind-speed fill in
@@ -39,11 +40,17 @@ import { HALF_DOMAIN_HEIGHT_KM } from './storm-radii';
 const DEFAULT_COUNT = 3000;
 const MS_PER_KT = 0.514444;
 /** Visual advection gain: clip units per second per m/s of wind. */
-const SPEED_TO_CLIP = 0.0032;
+const SPEED_TO_CLIP = 0.0042;
 /** Trail persistence per second (higher = longer trails). */
-const TRAIL_KEEP_PER_S = 0.045; // keep^dt: ~0.95 per frame at 60 fps
-const LIFE_MIN_S = 2.0;
-const LIFE_MAX_S = 5.0;
+const TRAIL_KEEP_PER_S = 0.11; // keep^dt: ~0.964 per frame at 60 fps
+const LIFE_MIN_S = 3.0;
+const LIFE_MAX_S = 7.0;
+/**
+ * Trail targets up to this many pixels run at full resolution (crisp 1px
+ * streaks); larger (HiDPI) canvases halve each axis, which is still at least
+ * one CSS pixel per trail texel.
+ */
+const FULL_RES_TRAIL_MAX_PX = 2_600_000;
 /** Palette span, m/s (matches the wind layer legend + fill shader). */
 const SPEED_SPAN_MS = 50;
 /**
@@ -171,7 +178,7 @@ export class WindLayer implements RenderModule {
 
   setBudget(stormParticleBudget: number): void {
     // Scale with the device profile's storm-swarm budget, bounded sanely.
-    const next = Math.max(600, Math.min(4200, Math.round(stormParticleBudget * 0.4)));
+    const next = Math.max(600, Math.min(6000, Math.round(stormParticleBudget * 0.6)));
     if (next === this.count) return;
     this.count = next;
     this.pos = new Float32Array(next * 2);
@@ -214,8 +221,9 @@ export class WindLayer implements RenderModule {
     this.height = Math.max(1, h);
     const gl = this.gl;
     if (!gl) return;
-    this.rtW = Math.max(1, Math.floor(this.width / 2));
-    this.rtH = Math.max(1, Math.floor(this.height / 2));
+    const divisor = this.width * this.height <= FULL_RES_TRAIL_MAX_PX ? 1 : 2;
+    this.rtW = Math.max(1, Math.floor(this.width / divisor));
+    this.rtH = Math.max(1, Math.floor(this.height / divisor));
     disposeRenderTarget(gl, this.trails);
     this.trails = makeRenderTarget(gl, this.rtW, this.rtH, this.caps);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.trails.fbo);

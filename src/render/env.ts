@@ -33,7 +33,16 @@ import {
   RENDER_RADIUS_FLOOR,
   stormRenderRadii,
 } from './storm-radii';
-import { SST_MAX_C, SST_MIN_C } from './textures';
+import { OHC_TEXTURE_MAX_KJ_CM2, SHEAR_TEXTURE_MAX_MS, SST_MAX_C, SST_MIN_C } from './textures';
+import { CLOUD_RELIEF_PACK, CLOUD_TOP_PACK_KM, CloudLightPass } from './cloud-light';
+
+/** Visible-palette uniforms (unlit fallback), each fed from one token. */
+const VISIBLE_UNIFORMS = [
+  ['u_visSea', 'visSea'],
+  ['u_visLand', 'visLand'],
+  ['u_visCloudShade', 'visCloudShade'],
+  ['u_visCloudLit', 'visCloudLit'],
+] as const satisfies readonly (readonly [string, keyof typeof TOKENS])[];
 
 const VS = VIEW_QUAD_VS;
 
@@ -113,6 +122,14 @@ uniform vec3 u_palette2;
 uniform vec3 u_palette3;
 uniform vec3 u_palette4;
 uniform vec3 u_rainPlate;
+uniform vec3 u_visSea;
+uniform vec3 u_visLand;
+uniform vec3 u_visCloudShade;
+uniform vec3 u_visCloudLit;
+uniform float u_packVisible;
+uniform vec3 u_contourHighlight;
+uniform vec3 u_cloudContextThin;
+uniform vec3 u_cloudContextThick;
 
 vec3 fiveStop(float value, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e) {
   float x = clamp(value, 0.0, 1.0) * 4.0;
@@ -747,10 +764,38 @@ ${CLOUD_RELIEF_GLSL}
   return CloudField(cloud, stormCloud, ambientCloud, brightnessC, convectiveCells, relief, debris);
 }
 
+// Anti-aliased isolines of a scalar field: a ~1 px line every stepSize
+// units, widthed in screen pixels through fwidth so it stays crisp under any
+// camera zoom. Contours only re-draw the plotted value; they add no data.
+// Flat plateaus (8-bit texture steps sitting exactly on a contour value)
+// have no defined crossing, so the line fades out where the gradient vanishes
+// instead of filling the whole plateau.
+float isoline(float value, float stepSize, float widthPx) {
+  float coord = value / stepSize;
+  float gradient = fwidth(coord);
+  float distPx = abs(fract(coord + 0.5) - 0.5) / max(gradient, 1e-5);
+  return (1.0 - smoothstep(widthPx * 0.5, widthPx * 0.5 + 1.0, distPx)) *
+    smoothstep(0.0015, 0.006, gradient);
+}
+
+// Minor contours darken the fill; the optional highlight value draws bold
+// and light (e.g. the 26 C isotherm the ocean-heat product is defined on).
+vec3 withContours(vec3 color, float value, float stepSize, float majorEvery, float highlight) {
+  float minor = isoline(value, stepSize, 0.9);
+  float major = isoline(value, stepSize * majorEvery, 1.2);
+  color = mix(color, color * 0.58, max(minor * 0.42, major * 0.62));
+  if (highlight > -1e4) {
+    // A period far beyond the field's range leaves exactly one line.
+    float bold = isoline(value - highlight, 1e3, 2.2);
+    color = mix(color, u_contourHighlight, bold * 0.85);
+  }
+  return color;
+}
+
 vec4 addCloudContext(vec3 baseColor, float baseAlpha, CloudField field, float strength) {
   float textureLift = mix(0.68, 1.0, field.convectiveCells);
   float cloudAlpha = pow(field.cloud, 0.76) * strength * textureLift;
-  vec3 cloudColor = mix(vec3(0.61, 0.66, 0.68), vec3(0.93, 0.95, 0.94), field.stormCloud);
+  vec3 cloudColor = mix(u_cloudContextThin, u_cloudContextThick, field.stormCloud);
   return vec4(mix(baseColor, cloudColor, cloudAlpha), max(baseAlpha, cloudAlpha * 0.86));
 }
 
@@ -784,10 +829,24 @@ void main() {
     if (u_satellitePalette == 1) {
       color = vec3(pow(enhanced, 0.82));
     } else if (u_satellitePalette == 2) {
-      vec3 surface = mix(vec3(0.025, 0.075, 0.105), vec3(0.22, 0.19, 0.14), land);
-      vec3 litCloud = mix(vec3(0.64, 0.67, 0.67), vec3(0.98), field.convectiveCells) *
+      float cloudA = pow(field.cloud, 0.70);
+      if (u_packVisible > 0.5) {
+        // Pack the field for cloud-light.ts, which lights and shadows it.
+        // Height proxy: lapse-rate km of the top above the sea surface.
+        float topKm = clamp((sstC - field.brightnessC) / 6.5, 0.0, ${CLOUD_TOP_PACK_KM.toFixed(1)}) *
+          smoothstep(0.02, 0.45, field.cloud);
+        o = vec4(
+          cloudA,
+          topKm / ${CLOUD_TOP_PACK_KM.toFixed(1)},
+          field.convectiveCells,
+          clamp(field.relief * ${CLOUD_RELIEF_PACK.toFixed(2)}, 0.0, 1.0)
+        );
+        return;
+      }
+      vec3 surface = mix(u_visSea, u_visLand, land);
+      vec3 litCloud = mix(u_visCloudShade, u_visCloudLit, field.convectiveCells) *
         field.relief;
-      color = mix(surface, litCloud, pow(field.cloud, 0.70));
+      color = mix(surface, litCloud, cloudA);
     } else {
       color = fiveStop(
         enhanced,
@@ -804,6 +863,7 @@ void main() {
       value,
       u_palette0, u_palette1, u_palette2, u_palette3, u_palette4
     );
+    color = withContours(color, sstC, 1.0, 2.0, 26.0);
     o = vec4(color, (1.0 - step(0.5, land)) * 0.84 * u_fade);
     return;
   }
@@ -818,6 +878,7 @@ void main() {
       value,
       u_palette0, u_palette1, u_palette2, u_palette3, u_palette4
     );
+    color = withContours(color, value * 100.0, 10.0, 5.0, -1e5);
     o = vec4(color, 0.82 * u_fade);
     return;
   }
@@ -828,6 +889,7 @@ void main() {
       value,
       u_palette0, u_palette1, u_palette2, u_palette3, u_palette4
     );
+    color = withContours(color, value * ${OHC_TEXTURE_MAX_KJ_CM2.toFixed(1)}, 20.0, 3.0, -1e5);
     o = vec4(color, (1.0 - step(0.5, land)) * 0.84 * u_fade);
     return;
   }
@@ -842,6 +904,7 @@ void main() {
       value,
       u_palette0, u_palette1, u_palette2, u_palette3, u_palette4
     );
+    color = withContours(color, value * ${SHEAR_TEXTURE_MAX_MS.toFixed(1)}, 5.0, 2.0, -1e5);
     o = vec4(color, 0.80 * u_fade);
     return;
   }
@@ -960,6 +1023,7 @@ export class EnvLayer implements RenderModule {
   private prog: WebGLProgram | null = null;
   private ohcBlendProg: WebGLProgram | null = null;
   private ohcBlendTarget: RenderTarget | null = null;
+  private light = new CloudLightPass();
   private ohcBlendWidth = 0;
   private ohcBlendHeight = 0;
   private vao: WebGLVertexArrayObject | null = null;
@@ -981,6 +1045,7 @@ export class EnvLayer implements RenderModule {
     this.ohcBlendProg = makeProgram(gl, VS, OHC_BLEND_FS);
     this.vao = makeQuadVao(gl, this.prog);
     this.cloudNoise = this.createCloudNoiseTexture();
+    this.light.init(gl, this.caps);
   }
 
   private ensureOhcBlendTarget(width: number, height: number): RenderTarget {
@@ -1077,11 +1142,20 @@ export class EnvLayer implements RenderModule {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, ctx.width, ctx.height);
     }
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    // The simulated visible palette renders in two steps: the field packs
+    // into cloud-light's target, which then lights and shadows it on screen.
+    const packing =
+      ctx.weatherLayer === 'infrared' &&
+      this.satellitePalette === 'visible' &&
+      this.light.begin(ctx.width, ctx.height);
+    if (!packing) {
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
     gl.useProgram(this.prog);
     gl.bindVertexArray(this.vao);
     const u = (name: string) => gl.getUniformLocation(this.prog!, name);
+    gl.uniform1f(u('u_packVisible'), packing ? 1 : 0);
     setViewUniform(gl, u('u_view'), ctx.view);
     const bind = (unit: number, texture: WebGLTexture, name: string): void => {
       gl.activeTexture(gl.TEXTURE0 + unit);
@@ -1221,9 +1295,18 @@ export class EnvLayer implements RenderModule {
       u('u_rainPlate'),
       TOKENS.rainPlate.rgba01.subarray(0, 3),
     );
+    for (const [name, key] of VISIBLE_UNIFORMS) {
+      gl.uniform3fv(u(name), TOKENS[key].rgba01.subarray(0, 3));
+    }
+    gl.uniform3fv(u('u_contourHighlight'), TOKENS.textHi.rgba01.subarray(0, 3));
+    gl.uniform3fv(u('u_cloudContextThin'), TOKENS.cloudContextThin.rgba01.subarray(0, 3));
+    gl.uniform3fv(u('u_cloudContextThick'), TOKENS.cloudContextThick.rgba01.subarray(0, 3));
     gl.uniform1f(u('u_metricX'), cloudMetricX(ctx.frame.storm?.lat ?? 21));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
+    if (packing) {
+      this.light.composite(ctx.view, gpu.land, fade, !ctx.reduced && ctx.width >= 720);
+    }
   }
 
   dispose(): void {
@@ -1233,6 +1316,7 @@ export class EnvLayer implements RenderModule {
     if (this.vao) gl.deleteVertexArray(this.vao);
     if (this.cloudNoise) gl.deleteTexture(this.cloudNoise);
     disposeRenderTarget(gl, this.ohcBlendTarget);
+    this.light.dispose();
     this.prog = null;
     this.ohcBlendProg = null;
     this.ohcBlendTarget = null;

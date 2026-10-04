@@ -14,6 +14,10 @@ import type { BinLayer, EnvSamplingMode, ParsedBin } from '../types';
 /** SST normalisation window, °C. Shader reverses: sstC = v*(MAX-MIN)+MIN. */
 export const SST_MIN_C = 10;
 export const SST_MAX_C = 35;
+/** Ocean heat content mapped onto the R8 texture's [0,1], kJ/cm². */
+export const OHC_TEXTURE_MAX_KJ_CM2 = 140;
+/** Deep-layer shear magnitude mapped onto the R8 texture's [0,1], m/s. */
+export const SHEAR_TEXTURE_MAX_MS = 40;
 
 export interface PlaneInterpolation {
   current: number;

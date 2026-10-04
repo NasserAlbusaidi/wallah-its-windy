@@ -31,6 +31,16 @@ const RAW: readonly RawToken[] = [
   { key: 'oceanShallow', cssVar: '--ocean-shallow', rgb: [10, 21, 34], a: 1 },
   { key: 'terrain', cssVar: '--terrain', rgb: [26, 31, 36], a: 1 },
   { key: 'ridgeHi', cssVar: '--ridge-hi', rgb: [44, 52, 60], a: 1 },
+  // Shaded-relief base map (terrain.ts). Sea: near-black abyss, a blue
+  // continental slope, a luminous shelf. Land: dark-sand lowland, weathered
+  // rock, pale summits. The coast token draws the one-pixel coastline.
+  { key: 'abyss', cssVar: '--abyss', rgb: [6, 14, 28], a: 1 },
+  { key: 'basin', cssVar: '--basin', rgb: [11, 30, 52], a: 1 },
+  { key: 'shelf', cssVar: '--shelf', rgb: [18, 56, 80], a: 1 },
+  { key: 'landLow', cssVar: '--land-low', rgb: [40, 38, 35], a: 1 },
+  { key: 'landHigh', cssVar: '--land-high', rgb: [74, 68, 60], a: 1 },
+  { key: 'landPeak', cssVar: '--land-peak', rgb: [128, 122, 112], a: 1 },
+  { key: 'coast', cssVar: '--coast', rgb: [134, 214, 236], a: 1 },
   { key: 'wadiDry', cssVar: '--wadi-dry', rgb: [80, 200, 255], a: 0.18 },
   { key: 'wadiFlood', cssVar: '--wadi-flood', rgb: [77, 216, 255], a: 1 },
   { key: 'sstWarm', cssVar: '--sst-warm', rgb: [255, 140, 40], a: 0.1 },
@@ -82,6 +92,17 @@ const RAW: readonly RawToken[] = [
   { key: 'radar4', cssVar: '--radar-4', rgb: [250, 82, 20], a: 1 },
   { key: 'radar5', cssVar: '--radar-5', rgb: [204, 15, 122], a: 1 },
   { key: 'rainPlate', cssVar: '--rain-plate', rgb: [3, 6, 14], a: 1 },
+  // Simulated visible palette: translucent surface tints, cloud-top shade and
+  // lit whites, and the cool multiplier on walls facing away from the sun.
+  { key: 'visSea', cssVar: '--vis-sea', rgb: [6, 19, 31], a: 1 },
+  { key: 'visLand', cssVar: '--vis-land', rgb: [66, 56, 42], a: 1 },
+  { key: 'visCloudShade', cssVar: '--vis-cloud-shade', rgb: [163, 171, 176], a: 1 },
+  { key: 'visCloudLit', cssVar: '--vis-cloud-lit', rgb: [250, 251, 248], a: 1 },
+  { key: 'visShadowTint', cssVar: '--vis-shadow-tint', rgb: [128, 144, 170], a: 1 },
+  // Faint cloud context laid under the wind, radar and rain-total products:
+  // ambient deck grey and storm-canopy white.
+  { key: 'cloudContextThin', cssVar: '--cloud-context-thin', rgb: [156, 168, 173], a: 1 },
+  { key: 'cloudContextThick', cssVar: '--cloud-context-thick', rgb: [237, 242, 240], a: 1 },
   // Wind-speed palette (Windy-style flow map): calm indigo -> teal -> green ->
   // amber -> magenta across 0..50 m/s. Consumed by the wind fill shader, the
   // particle-trail colouring, and the rail legend gradient.

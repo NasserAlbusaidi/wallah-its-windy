@@ -65,6 +65,8 @@ import {
   pickLayer,
   planeMax,
   normalizeLoggedFlowAccumulation,
+  OHC_TEXTURE_MAX_KJ_CM2,
+  SHEAR_TEXTURE_MAX_MS,
   SST_MAX_C,
   SST_MIN_C,
   upperWindTexturePlane,
@@ -103,6 +105,7 @@ import { ObservedRadarLayer } from './observed-radar';
 import { CloudMemoryPass } from './cloud-memory';
 import type { CloudTape } from './cloud-memory';
 import { cloudSeedFromGenesis, interpolatedCloudAgeH } from './cloud-motion';
+import { POSTFX_LOOK, PostFx } from './postfx';
 
 /** Baked data handed to the renderer (mode A); any field may arrive progressively. */
 export interface RenderResources {
@@ -264,6 +267,7 @@ export class RenderPipeline implements RenderLayer {
   private ghosts = new GhostLayer();
   private ensemble = new EnsembleLayer();
   private track = new TrackLayer();
+  private postFx = new PostFx();
   /** Version of the impact rain grid currently uploaded (-1 = none). */
   private accumVersion = -1;
 
@@ -427,6 +431,7 @@ export class RenderPipeline implements RenderLayer {
       this.upperWind.draw(ctx);
     }
     gl.disable(gl.SCISSOR_TEST);
+    this.postFx.apply(POSTFX_LOOK[ctx.weatherLayer], this.width, this.height);
 
     if (this.overlay) {
       this.overlay.clearRect(0, 0, this.width, this.height);
@@ -471,6 +476,7 @@ export class RenderPipeline implements RenderLayer {
     this.ghosts.dispose();
     this.ensemble.dispose();
     this.track.dispose();
+    this.postFx.dispose();
     this.gl = null;
     this.overlay = null;
   }
@@ -573,6 +579,11 @@ export class RenderPipeline implements RenderLayer {
   }
 
   /** Decorative workload only; deterministic physics and flight tapes are untouched. */
+  /** Device tier switch for the bloom/vignette pass (RenderProfile.postFx). */
+  setPostFx(enabled: boolean): void {
+    this.postFx.setEnabled(enabled);
+  }
+
   setParticleBudget(count: number): void {
     this.wind.setBudget(count);
     this.upperWind.setBudget(count);
@@ -731,6 +742,7 @@ export class RenderPipeline implements RenderLayer {
     this.upperWind.init(gl, this.caps);
     this.rain.init(gl, this.caps);
     this.radar.init(gl);
+    this.postFx.init(gl, this.caps);
     if (this.overlay) {
       this.ghosts.init(this.overlay);
       this.ensemble.init(this.overlay);
@@ -986,14 +998,14 @@ export class RenderPipeline implements RenderLayer {
         gl,
         ohcL,
         Math.min(plane, ohcL.nt - 1),
-        (value) => value / 140,
+        (value) => value / OHC_TEXTURE_MAX_KJ_CM2,
         gl.LINEAR,
       );
       this.gpu.ohcNext = buildR8Tex(
         gl,
         ohcL,
         Math.min(nextPlane, ohcL.nt - 1),
-        (value) => value / 140,
+        (value) => value / OHC_TEXTURE_MAX_KJ_CM2,
         gl.LINEAR,
       );
     }
@@ -1002,14 +1014,14 @@ export class RenderPipeline implements RenderLayer {
         gl,
         shearL,
         Math.min(plane, shearL.nt - 1),
-        (value) => value / 40,
+        (value) => value / SHEAR_TEXTURE_MAX_MS,
         gl.LINEAR,
       );
       this.gpu.shearNext = buildR8Tex(
         gl,
         shearL,
         Math.min(nextPlane, shearL.nt - 1),
-        (value) => value / 40,
+        (value) => value / SHEAR_TEXTURE_MAX_MS,
         gl.LINEAR,
       );
     }

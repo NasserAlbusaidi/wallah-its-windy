@@ -15,7 +15,7 @@
  */
 
 import { TOKENS } from '../tokens';
-import { categoryRgba } from '../category';
+import { categoryRgba, stormCategory } from '../category';
 import { clipToLatLon, latLonToClip, offsetKm } from '../grid';
 import {
   maxWindRadiusKm,
@@ -55,6 +55,8 @@ function keylineRgba(a: number): string {
   return `rgba(${KR},${KG},${KB},${a})`;
 }
 
+/** Alpha steps along the age-faded track (stroke batching granularity). */
+const AGE_BUCKETS = 16;
 /** Decorative eye-glyph spin, radians per wall-clock second (display only). */
 const GLYPH_TURN_RAD_PER_S = 0.9;
 
@@ -199,18 +201,33 @@ export class TrackLayer {
       });
       g.lineCap = 'round';
       g.lineJoin = 'round';
+      // Older segments (earlier in the array) dimmer; the whole line
+      // multiplies by `fade` so it drains smoothly over the aftermath. Runs of
+      // segments sharing a category and one of AGE_BUCKETS alpha steps stroke
+      // as one path, so a long track costs dozens of strokes, not hundreds.
       const strokePass = (width: number, alpha: (ageFrac: number) => number): void => {
         g.lineWidth = width;
-        for (let i = 1; i < pts.length; i++) {
-          // Older segments (earlier in the array) dimmer. The whole line
-          // multiplies by `fade` so it drains smoothly over the aftermath.
-          const ageFrac = i / (pts.length - 1);
-          g.strokeStyle = categoryRgba(track[i].vKt, alpha(ageFrac) * fade);
+        let runKey = '';
+        let runStart = 0;
+        const flush = (end: number): void => {
+          if (end <= runStart) return;
+          const ageFrac = end / (pts.length - 1);
+          g.strokeStyle = categoryRgba(track[end].vKt, alpha(ageFrac) * fade);
           g.beginPath();
-          g.moveTo(pts[i - 1][0], pts[i - 1][1]);
-          g.lineTo(pts[i][0], pts[i][1]);
+          g.moveTo(pts[runStart][0], pts[runStart][1]);
+          for (let j = runStart + 1; j <= end; j++) g.lineTo(pts[j][0], pts[j][1]);
           g.stroke();
+        };
+        for (let i = 1; i < pts.length; i++) {
+          const bucket = Math.round((i / (pts.length - 1)) * AGE_BUCKETS);
+          const key = `${stormCategory(track[i].vKt).id}:${bucket}`;
+          if (key !== runKey) {
+            flush(i - 1);
+            runKey = key;
+            runStart = i - 1;
+          }
         }
+        flush(pts.length - 1);
       };
       strokePass(Math.max(3, unit * 0.009), (a) => 0.03 + 0.07 * a);
       strokePass(Math.max(1, unit * 0.0022), (a) => 0.22 + 0.6 * a);

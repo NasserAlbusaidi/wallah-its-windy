@@ -291,6 +291,9 @@ export class UiController {
   private ghostAnchors: GhostLabelAnchor[] = [];
   /** DOM label elements keyed by storm id, inside {@link ghostContainer}. */
   private ghostLabels = new Map<string, HTMLElement>();
+  /** CSS-pixel label anchors and chart size from the last layoutGhostLabels. */
+  private ghostLabelPx = new Map<string, { x: number; y: number }>();
+  private ghostLayoutSize = { w: 0, h: 0 };
   /** Lazily-created wrapper that holds the ghost label elements. */
   private ghostContainer: HTMLElement | null = null;
   /** Which ghost is the active scenario (brighter label); null = none. */
@@ -1419,6 +1422,7 @@ export class UiController {
     // Rebuild the element set (labels are few + static, so a full rebuild is fine).
     this.ghostContainer.replaceChildren();
     this.ghostLabels.clear();
+    this.ghostLabelPx.clear();
     for (const a of anchors) {
       const el = document.createElement('span');
       el.className = 'chrome ghost-label';
@@ -1441,11 +1445,15 @@ export class UiController {
     const cv = this.host.overlayCanvas;
     const w = cv.clientWidth;
     const h = cv.clientHeight;
+    this.ghostLayoutSize = { w, h };
     for (const a of this.ghostAnchors) {
       const el = this.ghostLabels.get(a.id);
       if (!el) continue;
-      el.style.left = `${this.pxX(a.lon, w)}px`;
-      el.style.top = `${this.pxY(a.lat, h)}px`;
+      const x = this.pxX(a.lon, w);
+      const y = this.pxY(a.lat, h);
+      this.ghostLabelPx.set(a.id, { x, y });
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
     }
   }
 
@@ -1459,9 +1467,10 @@ export class UiController {
     storm: { lat: number; lon: number; structure: Pick<StormStructure, 'r34Km'> } | null,
   ): void {
     if (this.ghostAnchors.length === 0) return;
-    const cv = this.host.overlayCanvas;
-    const w = cv.clientWidth;
-    const h = cv.clientHeight;
+    // Per-frame path: reuse the size and label positions cached by
+    // layoutGhostLabels — reading clientWidth after this frame's DOM writes
+    // would force a synchronous layout every frame.
+    const { w, h } = this.ghostLayoutSize;
     let eyeX = 0;
     let eyeY = 0;
     let radiusPx = 0;
@@ -1473,14 +1482,16 @@ export class UiController {
     }
     for (const a of this.ghostAnchors) {
       const el = this.ghostLabels.get(a.id);
-      if (!el) continue;
+      const at = this.ghostLabelPx.get(a.id);
+      if (!el || !at) continue;
       let near = 1;
       if (radiusPx > 0) {
-        const d = Math.hypot(this.pxX(a.lon, w) - eyeX, this.pxY(a.lat, h) - eyeY);
+        const d = Math.hypot(at.x - eyeX, at.y - eyeY);
         const t = Math.min(1, Math.max(0, (d - 0.6 * radiusPx) / (0.8 * radiusPx)));
         near = t * t * (3 - 2 * t);
       }
-      const value = near.toFixed(2);
+      // 5 % steps: the CSS transition smooths them, and most frames write nothing.
+      const value = (Math.round(near * 20) / 20).toFixed(2);
       if (el.style.getPropertyValue('--ghost-near') !== value) {
         el.style.setProperty('--ghost-near', value);
       }

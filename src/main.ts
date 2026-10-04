@@ -687,6 +687,7 @@ function resize(): void {
   const h = Math.floor(glCanvas.clientHeight * dpr);
   document.documentElement.dataset.compact = String(profile.compact);
   renderCtrl?.setParticleBudget?.(profile.particleBudget);
+  renderCtrl?.setPostFx?.(profile.postFx);
   for (const c of [glCanvas, overlayCanvas]) {
     if (c.width !== w || c.height !== h) {
       c.width = w;
@@ -3361,6 +3362,7 @@ type RenderController = RenderLayer & {
   setObservedRadarFrame?(image: TexImageSource | null): void;
   setObservedRadarCoverage?(image: TexImageSource | null): void;
   setParticleBudget?(count: number): void;
+  setPostFx?(enabled: boolean): void;
   setCloudTape?(tape: CloudTape | null): void;
   /** Highlight the active-scenario ghost polyline (C7/C8); null clears. */
   setActiveGhost?(id: string | null): void;

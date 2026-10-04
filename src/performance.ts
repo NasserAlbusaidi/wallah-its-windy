@@ -1,8 +1,9 @@
 /**
  * performance.ts — deterministic render budgets from observable device traits.
  *
- * Physics and recorded output never change. Only backing resolution and the
- * decorative particle count adapt, keeping phone interaction responsive.
+ * Physics and recorded output never change. Only backing resolution, the
+ * decorative particle count, and screen post-effects adapt, keeping phone
+ * interaction responsive.
  */
 
 export interface RenderProfileInput {
@@ -22,6 +23,12 @@ export interface RenderProfile {
    * payload, so a manual run computes identical results on every tier.
    */
   autoEnsemble: boolean;
+  /**
+   * Whether the screen-space bloom/vignette pass runs (render/postfx.ts).
+   * Presentation-only: off on phones, where the extra full-screen passes
+   * cost more battery than the glow is worth.
+   */
+  postFx: boolean;
 }
 
 /**
@@ -50,6 +57,7 @@ export function chooseRenderProfile(input: RenderProfileInput): RenderProfile {
       particleBudget: 2_600,
       compact: true,
       autoEnsemble: false,
+      postFx: false,
     };
   }
   if (input.width <= 820 || input.coarsePointer) {
@@ -58,6 +66,7 @@ export function chooseRenderProfile(input: RenderProfileInput): RenderProfile {
       particleBudget: 4_200,
       compact: true,
       autoEnsemble: false,
+      postFx: true,
     };
   }
   return {
@@ -65,6 +74,7 @@ export function chooseRenderProfile(input: RenderProfileInput): RenderProfile {
     particleBudget: 8_000,
     compact: false,
     autoEnsemble: true,
+    postFx: true,
   };
 }
 

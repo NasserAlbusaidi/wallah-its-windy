@@ -15,6 +15,13 @@ describe('post-effects look', () => {
     }
   });
 
+  it('vignettes only the legend-free terrain instrument', () => {
+    for (const layer of WEATHER_LAYERS) {
+      if (layer.id === 'terrain') continue;
+      expect(POSTFX_LOOK[layer.id].vignette).toBe(0);
+    }
+  });
+
   it('keeps every look inside a sane range', () => {
     for (const look of Object.values(POSTFX_LOOK)) {
       expect(look.bloom).toBeGreaterThanOrEqual(0);

@@ -7,9 +7,9 @@
  * dual-filter (Kawase) down/up chain, and one composite pass writes
  * `(scene + bloom) * vignette` back to the screen.
  *
- * Presentation-only and layer-aware: products whose colour IS the value
- * (scalar fields, rain totals) get no bloom and no vignette, so a legend
- * reading is never shifted. If the driver rejects the resolve blit the pass
+ * Presentation-only and layer-aware: no layer with a colour legend is
+ * vignetted, and smooth value fields (scalars, rain totals) get no bloom, so
+ * a legend reading is never shifted. If the driver rejects the resolve blit the pass
  * disables itself for the session and the map renders exactly as before.
  */
 
@@ -25,14 +25,17 @@ export interface PostFxLook {
 }
 
 /**
- * Per-layer look. Value-coded products stay at zero: their colour maps to a
- * legend reading, and any glow or edge darkening would misreport it.
+ * Per-layer look. Vignette darkens every pixel near the corners, so only the
+ * terrain instrument (no colour legend) carries it. Bloom only adds glow
+ * around already-saturated pixels, so the flow, IR and radar products keep a
+ * low amount; smooth scalar fields and rain totals, where a halo would read
+ * as a value, get none.
  */
 export const POSTFX_LOOK: Record<WeatherLayerId, PostFxLook> = {
-  wind: { bloom: 0.75, vignette: 0.22 },
-  upper: { bloom: 0.4, vignette: 0.22 },
-  infrared: { bloom: 0.28, vignette: 0.2 },
-  rain: { bloom: 0.35, vignette: 0.2 },
+  wind: { bloom: 0.75, vignette: 0 },
+  upper: { bloom: 0.4, vignette: 0 },
+  infrared: { bloom: 0.28, vignette: 0 },
+  rain: { bloom: 0.35, vignette: 0 },
   terrain: { bloom: 0.5, vignette: 0.24 },
   accum: { bloom: 0, vignette: 0 },
   sst: { bloom: 0, vignette: 0 },

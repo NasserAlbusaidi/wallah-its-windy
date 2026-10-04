@@ -128,6 +128,8 @@ uniform vec3 u_visCloudShade;
 uniform vec3 u_visCloudLit;
 uniform float u_packVisible;
 uniform vec3 u_contourHighlight;
+uniform vec3 u_cloudContextThin;
+uniform vec3 u_cloudContextThick;
 
 vec3 fiveStop(float value, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e) {
   float x = clamp(value, 0.0, 1.0) * 4.0;
@@ -793,7 +795,7 @@ vec3 withContours(vec3 color, float value, float stepSize, float majorEvery, flo
 vec4 addCloudContext(vec3 baseColor, float baseAlpha, CloudField field, float strength) {
   float textureLift = mix(0.68, 1.0, field.convectiveCells);
   float cloudAlpha = pow(field.cloud, 0.76) * strength * textureLift;
-  vec3 cloudColor = mix(vec3(0.61, 0.66, 0.68), vec3(0.93, 0.95, 0.94), field.stormCloud);
+  vec3 cloudColor = mix(u_cloudContextThin, u_cloudContextThick, field.stormCloud);
   return vec4(mix(baseColor, cloudColor, cloudAlpha), max(baseAlpha, cloudAlpha * 0.86));
 }
 
@@ -1297,6 +1299,8 @@ export class EnvLayer implements RenderModule {
       gl.uniform3fv(u(name), TOKENS[key].rgba01.subarray(0, 3));
     }
     gl.uniform3fv(u('u_contourHighlight'), TOKENS.textHi.rgba01.subarray(0, 3));
+    gl.uniform3fv(u('u_cloudContextThin'), TOKENS.cloudContextThin.rgba01.subarray(0, 3));
+    gl.uniform3fv(u('u_cloudContextThick'), TOKENS.cloudContextThick.rgba01.subarray(0, 3));
     gl.uniform1f(u('u_metricX'), cloudMetricX(ctx.frame.storm?.lat ?? 21));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);

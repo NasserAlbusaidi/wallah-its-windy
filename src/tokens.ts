@@ -99,6 +99,10 @@ const RAW: readonly RawToken[] = [
   { key: 'visCloudShade', cssVar: '--vis-cloud-shade', rgb: [163, 171, 176], a: 1 },
   { key: 'visCloudLit', cssVar: '--vis-cloud-lit', rgb: [250, 251, 248], a: 1 },
   { key: 'visShadowTint', cssVar: '--vis-shadow-tint', rgb: [128, 144, 170], a: 1 },
+  // Faint cloud context laid under the wind, radar and rain-total products:
+  // ambient deck grey and storm-canopy white.
+  { key: 'cloudContextThin', cssVar: '--cloud-context-thin', rgb: [156, 168, 173], a: 1 },
+  { key: 'cloudContextThick', cssVar: '--cloud-context-thick', rgb: [237, 242, 240], a: 1 },
   // Wind-speed palette (Windy-style flow map): calm indigo -> teal -> green ->
   // amber -> magenta across 0..50 m/s. Consumed by the wind fill shader, the
   // particle-trail colouring, and the rail legend gradient.

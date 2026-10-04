@@ -65,6 +65,8 @@ import {
   pickLayer,
   planeMax,
   normalizeLoggedFlowAccumulation,
+  OHC_TEXTURE_MAX_KJ_CM2,
+  SHEAR_TEXTURE_MAX_MS,
   SST_MAX_C,
   SST_MIN_C,
   upperWindTexturePlane,
@@ -996,14 +998,14 @@ export class RenderPipeline implements RenderLayer {
         gl,
         ohcL,
         Math.min(plane, ohcL.nt - 1),
-        (value) => value / 140,
+        (value) => value / OHC_TEXTURE_MAX_KJ_CM2,
         gl.LINEAR,
       );
       this.gpu.ohcNext = buildR8Tex(
         gl,
         ohcL,
         Math.min(nextPlane, ohcL.nt - 1),
-        (value) => value / 140,
+        (value) => value / OHC_TEXTURE_MAX_KJ_CM2,
         gl.LINEAR,
       );
     }
@@ -1012,14 +1014,14 @@ export class RenderPipeline implements RenderLayer {
         gl,
         shearL,
         Math.min(plane, shearL.nt - 1),
-        (value) => value / 40,
+        (value) => value / SHEAR_TEXTURE_MAX_MS,
         gl.LINEAR,
       );
       this.gpu.shearNext = buildR8Tex(
         gl,
         shearL,
         Math.min(nextPlane, shearL.nt - 1),
-        (value) => value / 40,
+        (value) => value / SHEAR_TEXTURE_MAX_MS,
         gl.LINEAR,
       );
     }

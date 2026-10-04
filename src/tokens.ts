@@ -92,6 +92,13 @@ const RAW: readonly RawToken[] = [
   { key: 'radar4', cssVar: '--radar-4', rgb: [250, 82, 20], a: 1 },
   { key: 'radar5', cssVar: '--radar-5', rgb: [204, 15, 122], a: 1 },
   { key: 'rainPlate', cssVar: '--rain-plate', rgb: [3, 6, 14], a: 1 },
+  // Simulated visible palette: translucent surface tints, cloud-top shade and
+  // lit whites, and the cool multiplier on walls facing away from the sun.
+  { key: 'visSea', cssVar: '--vis-sea', rgb: [6, 19, 31], a: 1 },
+  { key: 'visLand', cssVar: '--vis-land', rgb: [66, 56, 42], a: 1 },
+  { key: 'visCloudShade', cssVar: '--vis-cloud-shade', rgb: [163, 171, 176], a: 1 },
+  { key: 'visCloudLit', cssVar: '--vis-cloud-lit', rgb: [250, 251, 248], a: 1 },
+  { key: 'visShadowTint', cssVar: '--vis-shadow-tint', rgb: [128, 144, 170], a: 1 },
   // Wind-speed palette (Windy-style flow map): calm indigo -> teal -> green ->
   // amber -> magenta across 0..50 m/s. Consumed by the wind fill shader, the
   // particle-trail colouring, and the rail legend gradient.

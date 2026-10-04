@@ -31,6 +31,16 @@ const RAW: readonly RawToken[] = [
   { key: 'oceanShallow', cssVar: '--ocean-shallow', rgb: [10, 21, 34], a: 1 },
   { key: 'terrain', cssVar: '--terrain', rgb: [26, 31, 36], a: 1 },
   { key: 'ridgeHi', cssVar: '--ridge-hi', rgb: [44, 52, 60], a: 1 },
+  // Shaded-relief base map (terrain.ts). Sea: near-black abyss, a blue
+  // continental slope, a luminous shelf. Land: dark-sand lowland, weathered
+  // rock, pale summits. The coast token draws the one-pixel coastline.
+  { key: 'abyss', cssVar: '--abyss', rgb: [6, 14, 28], a: 1 },
+  { key: 'basin', cssVar: '--basin', rgb: [11, 30, 52], a: 1 },
+  { key: 'shelf', cssVar: '--shelf', rgb: [18, 56, 80], a: 1 },
+  { key: 'landLow', cssVar: '--land-low', rgb: [40, 38, 35], a: 1 },
+  { key: 'landHigh', cssVar: '--land-high', rgb: [74, 68, 60], a: 1 },
+  { key: 'landPeak', cssVar: '--land-peak', rgb: [128, 122, 112], a: 1 },
+  { key: 'coast', cssVar: '--coast', rgb: [134, 214, 236], a: 1 },
   { key: 'wadiDry', cssVar: '--wadi-dry', rgb: [80, 200, 255], a: 0.18 },
   { key: 'wadiFlood', cssVar: '--wadi-flood', rgb: [77, 216, 255], a: 1 },
   { key: 'sstWarm', cssVar: '--sst-warm', rgb: [255, 140, 40], a: 0.1 },

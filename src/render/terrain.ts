@@ -7,6 +7,11 @@
  * coordinates are explicitly remapped into context-terrain.bin; they are never
  * clamped back onto the simulation edge. Inside the simulation box the original
  * higher-resolution terrain remains authoritative.
+ *
+ * The elevation and land textures are uploaded NEAREST because other passes
+ * read them as exact values; this pass binds its own LINEAR sampler object so
+ * relief and the coastline stay smooth under camera zoom without changing what
+ * any other consumer of those textures sees.
  */
 
 import { TOKENS } from '../tokens';
@@ -22,6 +27,8 @@ import type { DrawCtx, GpuTextures, RenderModule } from './context';
 const RELIEF_EXAGGERATION = 10;
 const KM_PER_LAT_DEGREE = 111.195;
 const SIM_TO_CONTEXT_UV = rasterUvTransform(DOMAIN, DISPLAY_CONTEXT_DOMAIN);
+/** Texture units this pass samples; its LINEAR sampler binds to each. */
+const TERRAIN_UNITS = [0, 1, 2, 3] as const;
 
 const VS = VIEW_QUAD_VS;
 
@@ -46,9 +53,13 @@ uniform float u_contextFade;
 uniform float u_hasDetail;
 uniform float u_hasContext;
 uniform vec4 u_oceanDeep;
-uniform vec4 u_oceanShallow;
-uniform vec4 u_terrain;
-uniform vec4 u_ridgeHi;
+uniform vec4 u_abyss;
+uniform vec4 u_basin;
+uniform vec4 u_shelf;
+uniform vec4 u_landLow;
+uniform vec4 u_landHigh;
+uniform vec4 u_landPeak;
+uniform vec4 u_coast;
 uniform vec4 u_simBoundary;
 
 float insideUnit(vec2 uv) {
@@ -83,43 +94,73 @@ vec3 surfaceColour(
     (eE4 - eW4) / max(1.0, 8.0 * cellKm.x * 1000.0),
     (eN4 - eS4) / max(1.0, 8.0 * cellKm.y * 1000.0)
   );
-  vec3 nFine = normalize(vec3(-slopeFine * relief, 1.0));
-  vec3 nBroad = normalize(vec3(
-    -slopeBroad.x * relief,
-    -slopeBroad.y * relief,
-    1.0
-  ));
-  vec3 L = normalize(vec3(-0.6, 0.6, 0.8));
-  float shade = mix(
-    clamp(dot(nBroad, L), 0.0, 1.0),
-    clamp(dot(nFine, L), 0.0, 1.0),
-    0.68
-  );
-  shade = 0.35 + 0.65 * shade;
-  float elevationTint = smoothstep(120.0, 3400.0, max(centreElev, 0.0));
-  vec3 landBase = mix(u_terrain.rgb, u_ridgeHi.rgb, 0.12 + elevationTint * 0.5);
-  vec3 landCol = landBase * mix(0.78, 1.18, shade);
 
-  // Coastal shallow tint: blur the land mask a few texels to widen the band.
+  // Anti-aliased land/sea split. A bilinear binary mask stair-steps at the
+  // texel scale, so inside the one-texel coastal band (0 < mask < 1) the
+  // continuous elevation takes over the 0.5 crossing. Away from the band the
+  // mask alone decides, so below-sea-level land still reads as land.
+  // The baked mask already carries multi-texel stair steps, so a small tent
+  // blur (four diagonal bilinear taps) rounds them before the crossing.
+  float landSoft = 0.2 * land + 0.2 * (
+    texture(landTex, uv + texel * vec2( 0.9,  0.9)).r +
+    texture(landTex, uv + texel * vec2(-0.9,  0.9)).r +
+    texture(landTex, uv + texel * vec2( 0.9, -0.9)).r +
+    texture(landTex, uv + texel * vec2(-0.9, -0.9)).r);
+  float coastBand = 1.0 - abs(2.0 * landSoft - 1.0);
+  float landField = mix(landSoft, 0.5 + 0.5 * clamp(centreElev / 12.0, -1.0, 1.0), coastBand * 0.5);
+  float landAa = max(fwidth(landField), 1e-4);
+  float landW = smoothstep(0.5 - landAa, 0.5 + landAa, landField);
+  float coastPx = abs(landField - 0.5) / landAa;
+
+  // Cartographic relief: a north-west key light plus a softer overhead-north
+  // fill, normalised so flat ground shades to exactly 1. Sea-floor slopes are
+  // far gentler than mountain flanks, so bathymetry gets extra exaggeration to
+  // surface ridges and fracture zones that the depth tint alone flattens.
+  // The sea floor leans on the broad normal: fine bathymetric gradients carry
+  // survey-swath seams that a strong light would draw as straight scratches.
+  float reliefGain = mix(relief * 3.4, relief, landW);
+  vec3 nFine = normalize(vec3(-slopeFine * reliefGain, 1.0));
+  vec3 nBroad = normalize(vec3(-slopeBroad * reliefGain, 1.0));
+  vec3 n = normalize(mix(nBroad, nFine, mix(0.22, 0.62, landW)));
+  vec3 keyL = normalize(vec3(-0.62, 0.62, 0.48));
+  vec3 fillL = normalize(vec3(0.0, 0.45, 1.0));
+  float lit = 0.66 * max(dot(n, keyL), 0.0) + 0.34 * max(dot(n, fillL), 0.0);
+  float flatLit = 0.66 * keyL.z + 0.34 * fillL.z;
+  float shade = clamp(lit / flatLit, 0.18, 1.7);
+
+  // Broad curvature as cheap ambient occlusion: valleys (neighbours above the
+  // centre) sink, crests catch light. Scaled per km² so both grids agree.
+  float laplacian = (eE4 + eW4 + eN4 + eS4 - 4.0 * centreElev) /
+    max(1.0, 16.0 * cellKm.x * cellKm.y);
+  float occlusion = clamp(1.0 - laplacian * 0.010, 0.72, 1.18);
+
+  // Hypsometric land: dark sand lowland, weathered-rock highland, pale summits.
+  float elev = max(centreElev, 0.0);
+  vec3 landBase = mix(u_landLow.rgb, u_landHigh.rgb, smoothstep(40.0, 1400.0, elev));
+  landBase = mix(landBase, u_landPeak.rgb, smoothstep(1500.0, 3300.0, elev));
+  vec3 landCol = landBase * mix(0.30, 1.0, smoothstep(0.18, 1.0, shade)) *
+    mix(1.0, 1.32, smoothstep(1.0, 1.7, shade)) * occlusion;
+
+  // Ocean: luminous continental shelf, a blue continental slope, a near-black
+  // abyss. The coastal proximity term keeps the shelf readable where the
+  // simulation terrain carries less fine bathymetry.
   float prox = 0.25 * (
     texture(landTex, uv + vec2( texel.x * 3.0, 0.0)).r +
     texture(landTex, uv + vec2(-texel.x * 3.0, 0.0)).r +
     texture(landTex, uv + vec2(0.0,  texel.y * 3.0)).r +
     texture(landTex, uv + vec2(0.0, -texel.y * 3.0)).r);
-  float coastalShelf = smoothstep(0.05, 0.6, prox);
-
-  // The context sidecar contains real negative GMRT elevations. Let depth and
-  // its shaded gradient expose broad shelf/ridge structure instead of painting
-  // every offshore context pixel as an invented flat ocean.
-  float depth01 = clamp(max(-centreElev, 0.0) / 6000.0, 0.0, 1.0);
-  float shelfFromDepth = (1.0 - smoothstep(0.02, 0.82, depth01)) * showBathymetry;
-  float shallow = max(coastalShelf, shelfFromDepth * 0.58);
-  vec3 oceanCol = mix(u_oceanDeep.rgb, u_oceanShallow.rgb, shallow);
-  oceanCol *= mix(1.0, mix(0.78, 1.04, shade), showBathymetry);
-
-  // Subtle real-depth contours improve chart legibility without inventing a
-  // vector coastline or implying a nautical sounding product.
+  float coastalShelf = smoothstep(0.04, 0.7, prox);
   float depthM = max(-centreElev, 0.0);
+  float shelfFromDepth = (1.0 - smoothstep(60.0, 420.0, depthM)) * showBathymetry;
+  float slopeFromDepth = (1.0 - smoothstep(300.0, 4600.0, depthM)) * showBathymetry;
+  vec3 oceanCol = mix(u_abyss.rgb, u_basin.rgb, max(slopeFromDepth, coastalShelf * 0.6));
+  oceanCol = mix(oceanCol, u_shelf.rgb, max(coastalShelf * 0.55, shelfFromDepth * 0.8));
+  float seaShade = mix(1.0, clamp(shade, 0.4, 1.6), showBathymetry);
+  oceanCol *= mix(0.62, 1.0, smoothstep(0.4, 1.0, seaShade)) *
+    mix(1.0, 1.55, smoothstep(1.0, 1.6, seaShade));
+
+  // Real-depth contours every 500 m, plus a stronger shelf-break line at
+  // 200 m. Chart legibility only — never a nautical sounding product.
   float contourCoordinate = depthM / 500.0;
   float contourPhase = fract(contourCoordinate);
   float contourDistance = min(contourPhase, 1.0 - contourPhase);
@@ -128,11 +169,15 @@ vec3 surfaceColour(
     (1.0 - smoothstep(contourWidth, contourWidth * 2.2, contourDistance)) *
     smoothstep(80.0, 420.0, depthM) *
     showBathymetry;
-  oceanCol = mix(oceanCol, u_oceanShallow.rgb, depthContour * 0.075);
+  float breakDistance = abs(depthM - 200.0) / max(fwidth(depthM), 1.0);
+  float shelfBreak = (1.0 - smoothstep(0.6, 1.6, breakDistance)) * showBathymetry;
+  oceanCol = mix(oceanCol, u_shelf.rgb * 1.5, depthContour * 0.12 + shelfBreak * 0.16);
 
-  float coastline = 1.0 - smoothstep(0.025, 0.2, abs(land - 0.5));
-  vec3 surface = land > 0.5 ? landCol : oceanCol;
-  surface = mix(surface, u_ridgeHi.rgb, coastline * 0.24);
+  vec3 surface = mix(oceanCol, landCol, landW);
+  // A one-pixel luminous coastline with a soft seaward halo.
+  float coastLine = 1.0 - smoothstep(0.6, 1.5, coastPx);
+  float coastHalo = (1.0 - smoothstep(1.0, 6.0, coastPx)) * (1.0 - landW);
+  surface = mix(surface, u_coast.rgb, coastLine * 0.42 + coastHalo * 0.07);
 
   return surface;
 }
@@ -164,6 +209,10 @@ void main() {
       u_contextRelief,
       1.0
     );
+    // The context is presentation-only geography: keep it legible but
+    // recessed, so the lit simulation box reads as the stage.
+    float luma = dot(contextCol, vec3(0.299, 0.587, 0.114));
+    contextCol = mix(vec3(luma), contextCol, 0.55) * 0.68;
     contextCol = mix(u_oceanDeep.rgb, contextCol, u_contextFade);
   }
 
@@ -186,10 +235,23 @@ void main() {
   }
 
   float boundary = simulationBoundary(v_uv);
-  float boundaryStrength = 0.2 * max(u_detailFade, u_contextFade);
+  float boundaryStrength = 0.34 * max(u_detailFade, u_contextFade);
   col = mix(col, u_simBoundary.rgb, boundary * boundaryStrength);
   o = vec4(col, 1.0);
 }`;
+
+const COLOUR_UNIFORMS = {
+  oceanDeep: 'u_oceanDeep',
+  abyss: 'u_abyss',
+  basin: 'u_basin',
+  shelf: 'u_shelf',
+  landLow: 'u_landLow',
+  landHigh: 'u_landHigh',
+  landPeak: 'u_landPeak',
+  coast: 'u_coast',
+} as const satisfies Partial<Record<keyof typeof TOKENS, string>>;
+
+type ColourKey = keyof typeof COLOUR_UNIFORMS;
 
 interface Uniforms {
   view: WebGLUniformLocation | null;
@@ -208,10 +270,7 @@ interface Uniforms {
   contextFade: WebGLUniformLocation | null;
   hasDetail: WebGLUniformLocation | null;
   hasContext: WebGLUniformLocation | null;
-  oceanDeep: WebGLUniformLocation | null;
-  oceanShallow: WebGLUniformLocation | null;
-  terrain: WebGLUniformLocation | null;
-  ridgeHi: WebGLUniformLocation | null;
+  colours: Record<ColourKey, WebGLUniformLocation | null>;
   simBoundary: WebGLUniformLocation | null;
 }
 
@@ -219,13 +278,25 @@ export class TerrainLayer implements RenderModule {
   private gl!: WebGL2RenderingContext;
   private prog: WebGLProgram | null = null;
   private vao: WebGLVertexArrayObject | null = null;
+  private sampler: WebGLSampler | null = null;
   private u!: Uniforms;
 
   init(gl: WebGL2RenderingContext): void {
     this.gl = gl;
     this.prog = makeProgram(gl, VS, FS);
     this.vao = makeQuadVao(gl, this.prog);
+    this.sampler = gl.createSampler();
+    if (this.sampler) {
+      gl.samplerParameteri(this.sampler, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.samplerParameteri(this.sampler, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.samplerParameteri(this.sampler, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.samplerParameteri(this.sampler, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
     const u = (n: string) => gl.getUniformLocation(this.prog!, n);
+    const colours = {} as Record<ColourKey, WebGLUniformLocation | null>;
+    for (const key of Object.keys(COLOUR_UNIFORMS) as ColourKey[]) {
+      colours[key] = u(COLOUR_UNIFORMS[key]);
+    }
     this.u = {
       view: u('u_view'),
       elev: u('u_elev'),
@@ -243,10 +314,7 @@ export class TerrainLayer implements RenderModule {
       contextFade: u('u_contextFade'),
       hasDetail: u('u_hasDetail'),
       hasContext: u('u_hasContext'),
-      oceanDeep: u('u_oceanDeep'),
-      oceanShallow: u('u_oceanShallow'),
-      terrain: u('u_terrain'),
-      ridgeHi: u('u_ridgeHi'),
+      colours,
       simBoundary: u('u_simBoundary'),
     };
   }
@@ -289,6 +357,7 @@ export class TerrainLayer implements RenderModule {
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, contextLand);
     gl.uniform1i(this.u.contextLand, 3);
+    for (const unit of TERRAIN_UNITS) gl.bindSampler(unit, this.sampler);
 
     setViewUniform(gl, this.u.view, ctx.view);
     gl.uniform2f(this.u.detailTexel, 1 / detailGrid.nx, 1 / detailGrid.ny);
@@ -322,13 +391,13 @@ export class TerrainLayer implements RenderModule {
     gl.uniform1f(this.u.contextFade, contextFade);
     gl.uniform1f(this.u.hasDetail, hasDetail ? 1 : 0);
     gl.uniform1f(this.u.hasContext, hasContext ? 1 : 0);
-    gl.uniform4fv(this.u.oceanDeep, TOKENS.oceanDeep.rgba01);
-    gl.uniform4fv(this.u.oceanShallow, TOKENS.oceanShallow.rgba01);
-    gl.uniform4fv(this.u.terrain, TOKENS.terrain.rgba01);
-    gl.uniform4fv(this.u.ridgeHi, TOKENS.ridgeHi.rgba01);
+    for (const key of Object.keys(COLOUR_UNIFORMS) as ColourKey[]) {
+      gl.uniform4fv(this.u.colours[key], TOKENS[key].rgba01);
+    }
     gl.uniform4fv(this.u.simBoundary, TOKENS.textDim.rgba01);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    for (const unit of TERRAIN_UNITS) gl.bindSampler(unit, null);
     gl.bindVertexArray(null);
   }
 
@@ -336,7 +405,9 @@ export class TerrainLayer implements RenderModule {
     const gl = this.gl;
     if (this.prog) gl.deleteProgram(this.prog);
     if (this.vao) gl.deleteVertexArray(this.vao);
+    if (this.sampler) gl.deleteSampler(this.sampler);
     this.prog = null;
     this.vao = null;
+    this.sampler = null;
   }
 }

@@ -167,7 +167,7 @@ interface Program {
 
 export class PostFx {
   private gl!: WebGL2RenderingContext;
-  private caps: GlCaps = { colorBufferFloat: false, floatLinear: false };
+  private caps!: GlCaps;
   private bright: Program | null = null;
   private down: Program | null = null;
   private up: Program | null = null;

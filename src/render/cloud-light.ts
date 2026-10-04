@@ -132,7 +132,7 @@ const COLOURS = [
 
 export class CloudLightPass {
   private gl!: WebGL2RenderingContext;
-  private caps: GlCaps = { colorBufferFloat: false, floatLinear: false };
+  private caps!: GlCaps;
   private prog: WebGLProgram | null = null;
   private vao: WebGLVertexArrayObject | null = null;
   private target: RenderTarget | null = null;

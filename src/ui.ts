@@ -23,6 +23,7 @@ import type {
   SpawnParams,
   StormDeath,
   StormState,
+  StormStructure,
   UiState,
   ViewTransform,
 } from './types';
@@ -122,6 +123,9 @@ export const SLOWMO_HOURS_PER_SEC = 1;
 
 /** Land-click acknowledgement ripple lifetime, ms. */
 const RIPPLE_MS = 700;
+const KM_PER_LAT_DEGREE = 111.195;
+/** Ghost labels clear at least this far around the eye, even for weak storms. */
+const GHOST_CLEAR_MIN_KM = 140;
 /** How long a transient caption (e.g. land-click ack) shows before reverting, ms. */
 const ACK_MS = 1600;
 
@@ -1442,6 +1446,44 @@ export class UiController {
       if (!el) continue;
       el.style.left = `${this.pxX(a.lon, w)}px`;
       el.style.top = `${this.pxY(a.lat, h)}px`;
+    }
+  }
+
+  /**
+   * Fade historic-storm labels that sit on the live storm so its eye and core
+   * stay unobstructed: full strength beyond 1.4x the storm's 34-kt radius
+   * (floored at GHOST_CLEAR_MIN_KM), gone inside 0.6x. Presentation only — a
+   * CSS factor on the label's opacity; pass null to restore every label.
+   */
+  fadeGhostLabelsNear(
+    storm: { lat: number; lon: number; structure: Pick<StormStructure, 'r34Km'> } | null,
+  ): void {
+    if (this.ghostAnchors.length === 0) return;
+    const cv = this.host.overlayCanvas;
+    const w = cv.clientWidth;
+    const h = cv.clientHeight;
+    let eyeX = 0;
+    let eyeY = 0;
+    let radiusPx = 0;
+    if (storm && w > 0 && h > 0) {
+      eyeX = this.pxX(storm.lon, w);
+      eyeY = this.pxY(storm.lat, h);
+      const radiusKm = Math.max(GHOST_CLEAR_MIN_KM, maxWindRadiusKm(storm.structure.r34Km));
+      radiusPx = Math.abs(this.pxY(storm.lat + radiusKm / KM_PER_LAT_DEGREE, h) - eyeY);
+    }
+    for (const a of this.ghostAnchors) {
+      const el = this.ghostLabels.get(a.id);
+      if (!el) continue;
+      let near = 1;
+      if (radiusPx > 0) {
+        const d = Math.hypot(this.pxX(a.lon, w) - eyeX, this.pxY(a.lat, h) - eyeY);
+        const t = Math.min(1, Math.max(0, (d - 0.6 * radiusPx) / (0.8 * radiusPx)));
+        near = t * t * (3 - 2 * t);
+      }
+      const value = near.toFixed(2);
+      if (el.style.getPropertyValue('--ghost-near') !== value) {
+        el.style.setProperty('--ghost-near', value);
+      }
     }
   }
 

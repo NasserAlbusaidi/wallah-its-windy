@@ -3256,6 +3256,7 @@ function render(alpha: number, nowMs: number, hydroDeltaH: number): void {
         }
       : null,
   );
+  ui.fadeGhostLabelsNear(storm && (storm.alive || session.replayMode) ? storm : null);
   ui.updateFlightRecorder({
     storm,
     label: currentRunLabel,

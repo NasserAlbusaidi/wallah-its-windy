@@ -1921,7 +1921,8 @@ dd,
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--text, #7fd4e8);
-  opacity: 0.16;
+  /* --ghost-near (ui.ts fadeGhostLabelsNear) clears labels off the live storm. */
+  opacity: calc(0.16 * var(--ghost-near, 1));
   white-space: nowrap;
   pointer-events: none;
   /* sit just above-left of the anchor point so the line stays readable */
@@ -1929,7 +1930,7 @@ dd,
   transition: opacity 300ms ease;
 }
 .ghost-label.active {
-  opacity: 0.72;
+  opacity: calc(0.72 * var(--ghost-near, 1));
 }
 html[data-compact='true'] .ghost-label:not(.active) {
   display: none;
@@ -2026,6 +2027,19 @@ html[data-compact='true'] .ghost-label:not(.active) {
   border-radius: var(--radius-panel);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(10px);
+}
+
+/* Ghost labels are map typography, not panels: the glass recipe above would
+   give each a backdrop-blurred box that smears the storm beneath it. */
+#app .chrome.ghost-label {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  color: var(--text, #7fd4e8);
+  text-shadow:
+    0 1px 2px var(--ocean-deep, #02070d),
+    0 0 8px var(--ocean-deep, #02070d);
 }
 
 #layer-rail {
